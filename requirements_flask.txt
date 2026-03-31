@@ -1,0 +1,11 @@
+# Flask server requirements for Podcast-basiks
+# Install: pip install -r requirements_flask.txt
+#
+# Termux setup:
+#   pkg install python ffmpeg
+#   pip install -r requirements_flask.txt
+
+flask>=3.0.0
+flask-cors>=4.0.0
+yt-dlp>=2024.1.0
+youtube-transcript-api>=0.6.0
