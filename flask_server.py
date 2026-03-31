@@ -60,6 +60,30 @@ def cookies_path():
     return None
 
 
+def get_instagram_cookies():
+    """Extract all Instagram cookies from the saved Netscape cookies.txt file."""
+    ck = cookies_path()
+    if not ck:
+        return {}
+    cookies = {}
+    try:
+        with open(ck, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split('\t')
+                if len(parts) >= 7:
+                    domain = parts[0].lstrip('.')
+                    name = parts[5]
+                    value = parts[6]
+                    if 'instagram.com' in domain:
+                        cookies[name] = value
+    except Exception:
+        pass
+    return cookies
+
+
 def extract_video_id(url: str) -> str | None:
     """Extract YouTube video ID from URL."""
     import re
@@ -974,10 +998,21 @@ def instagram_download_status(job_id):
 
 @app.route('/api/instagram/comments', methods=['POST'])
 def instagram_comments():
-    """Scrape Instagram comments using instaloader."""
+    """
+    Scrape Instagram comments.
+    Strategy:
+      1. Try instaloader with session cookies from uploaded cookies.txt
+      2. If instaloader fails, try yt-dlp --write-comments as a fallback
+    max_comments: number or 'all' (0 internally = no limit)
+    """
     data = request.json or {}
     url = data.get('url', '').strip()
-    max_comments = int(data.get('max_comments', 100))
+    raw_max = data.get('max_comments', 100)
+    # 'all' or 0 means no limit
+    if str(raw_max).lower() == 'all' or raw_max == 0:
+        max_comments = 0
+    else:
+        max_comments = int(raw_max)
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400
@@ -986,24 +1021,36 @@ def instagram_comments():
     if not shortcode:
         return jsonify({'error': 'Invalid Instagram URL'}), 400
 
+    last_error = None
+    last_error_code = 'SCRAPE_ERROR'
+
+    # ── Attempt 1: instaloader with cookie injection ──────────────────────────
     try:
         import instaloader
-        L = instaloader.Instaloader()
-        ck = cookies_path()
-        if ck:
-            try:
-                import browser_cookie3
-            except ImportError:
-                pass
-            try:
-                L.load_session_from_file('', filename=ck)
-            except Exception:
-                pass
+
+        L = instaloader.Instaloader(
+            quiet=True,
+            download_pictures=False,
+            download_videos=False,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=True,
+            save_metadata=False,
+        )
+
+        # Inject Instagram cookies from the uploaded cookies.txt file
+        ig_cookies = get_instagram_cookies()
+        if ig_cookies:
+            for name, value in ig_cookies.items():
+                L.context._session.cookies.set(name, value, domain='.instagram.com', path='/')
+            # Suppress "not logged in" warnings — cookies handle auth
+            if 'sessionid' in ig_cookies:
+                L.context.username = ig_cookies.get('ds_user_id', 'user')
 
         post = instaloader.Post.from_shortcode(L.context, shortcode)
         comments = []
         for comment in post.get_comments():
-            if len(comments) >= max_comments:
+            if max_comments > 0 and len(comments) >= max_comments:
                 break
             text = comment.text.strip() if comment.text else ''
             if text:
@@ -1013,14 +1060,71 @@ def instagram_comments():
             'shortcode': shortcode,
             'count': len(comments),
             'comments': comments,
+            'source': 'instaloader',
         })
+
     except ImportError:
         return jsonify({'error': 'instaloader is not installed. Run: pip install instaloader', 'error_code': 'MISSING_DEPENDENCY'}), 500
     except Exception as e:
-        err = str(e)
-        if 'login' in err.lower() or 'private' in err.lower() or '401' in err or '403' in err:
-            return jsonify({'error': 'This post is private or requires Instagram login to access comments.', 'error_code': 'LOGIN_REQUIRED'}), 403
-        return jsonify({'error': err, 'error_code': 'SCRAPE_ERROR'}), 500
+        err_str = str(e)
+        if '401' in err_str or '403' in err_str or 'login' in err_str.lower() or 'Forbidden' in err_str:
+            last_error_code = 'LOGIN_REQUIRED'
+        last_error = err_str
+
+    # ── Attempt 2: yt-dlp --write-comments fallback ───────────────────────────
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            info_path = os.path.join(tmpdir, f'{shortcode}.info.json')
+            cmd = [
+                'yt-dlp',
+                '--write-info-json', '--write-comments',
+                '--skip-download', '--no-playlist',
+                *cookies_args(),
+                '-o', os.path.join(tmpdir, shortcode),
+                url,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+            if os.path.exists(info_path):
+                with open(info_path, 'r', encoding='utf-8') as f:
+                    info = json.load(f)
+
+                raw_comments = info.get('comments', [])
+                comments = []
+                for c in raw_comments:
+                    text = c.get('text', '').strip()
+                    if not text:
+                        continue
+                    parent = c.get('parent')
+                    if parent in (None, False, 'root', ''):
+                        comments.append(text)
+                        if max_comments > 0 and len(comments) >= max_comments:
+                            break
+
+                return jsonify({
+                    'shortcode': shortcode,
+                    'count': len(comments),
+                    'comments': comments,
+                    'source': 'yt-dlp',
+                })
+    except Exception as e2:
+        if not last_error:
+            last_error = str(e2)
+
+    # ── Both failed — return descriptive error ────────────────────────────────
+    if last_error_code == 'LOGIN_REQUIRED':
+        msg = (
+            'Instagram requires login to fetch comments. '
+            'Upload an Instagram cookies.txt file: '
+            '(1) Install "Get cookies.txt LOCALLY" browser extension, '
+            '(2) Log into instagram.com, '
+            '(3) Click the extension and export cookies, '
+            '(4) Upload the file using the "Upload cookies.txt" button above.'
+        )
+    else:
+        msg = last_error or 'Could not fetch comments. Try uploading Instagram cookies.'
+
+    return jsonify({'error': msg, 'error_code': last_error_code}), 403
 
 
 @app.route('/api/files', methods=['GET'])

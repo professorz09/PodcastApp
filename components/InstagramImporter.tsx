@@ -12,9 +12,12 @@ import {
   Copy,
   FileText,
   Upload,
+  Cookie,
+  ExternalLink,
 } from 'lucide-react';
 
 type Tab = 'info' | 'comments' | 'download';
+type MaxComments = 50 | 100 | 500 | 'all';
 
 const IG_STORAGE_KEY = 'ig_importer_v1';
 function readSaved<T>(key: string, fallback: T): T {
@@ -66,23 +69,44 @@ interface Props {
   onSkip: () => void;
 }
 
-const ErrBox = ({ msg, code }: { msg: string; code?: string }) => {
-  const tips: Record<string, string> = {
-    LOGIN_REQUIRED: 'Upload an Instagram cookies.txt file (exported from your browser) to access private or login-required content.',
-    MISSING_DEPENDENCY: 'On Flask server run: pip install instaloader',
-    SCRAPE_ERROR: 'Make sure the post is public and try again.',
-  };
-  const tip = code ? tips[code] : null;
-  return (
-    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mt-2 space-y-2">
+const CookieGuide = () => (
+  <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 space-y-2 mt-1">
+    <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
+      <Cookie size={13} />
+      Instagram Login Required — Upload Cookies
+    </div>
+    <ol className="text-[11px] text-gray-400 space-y-1 pl-4 list-decimal">
+      <li>Install <span className="text-white font-medium">"Get cookies.txt LOCALLY"</span> extension in Chrome/Firefox</li>
+      <li>Open <span className="text-white font-medium">instagram.com</span> and log in to your account</li>
+      <li>Click the extension icon → select <span className="text-white font-medium">"Export"</span> → save the file</li>
+      <li>Click <span className="text-white font-medium">"Upload cookies.txt"</span> button above and select the saved file</li>
+      <li>Try again — your session will now be used automatically</li>
+    </ol>
+    <a
+      href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+    >
+      <ExternalLink size={10} /> Get the extension
+    </a>
+  </div>
+);
+
+const ErrBox = ({ msg, code }: { msg: string; code?: string }) => (
+  <div className="space-y-2 mt-1">
+    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
       <div className="flex items-start gap-2 text-red-400 text-xs">
         <AlertCircle size={13} className="mt-0.5 shrink-0" />
         <span>{msg}</span>
       </div>
-      {tip && <div className="text-[11px] text-yellow-400/80 pl-5">💡 {tip}</div>}
     </div>
-  );
-};
+    {code === 'LOGIN_REQUIRED' && <CookieGuide />}
+    {code === 'MISSING_DEPENDENCY' && (
+      <div className="text-[11px] text-yellow-400/80 pl-1">💡 Run in Flask Server terminal: <code className="bg-white/10 px-1 rounded">pip install instaloader</code></div>
+    )}
+  </div>
+);
 
 const Section = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <div className={`bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 space-y-3 ${className}`}>
@@ -105,7 +129,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   const [comments, setComments] = useState<string[] | null>(() => readSaved('comments', null));
   const [commentsError, setCommentsError] = useState('');
   const [commentsErrorCode, setCommentsErrorCode] = useState('');
-  const [maxComments, setMaxComments] = useState<50 | 100 | 500>(() => readSaved<50 | 100 | 500>('maxComments', 100));
+  const [maxComments, setMaxComments] = useState<MaxComments>(() => readSaved<MaxComments>('maxComments', 100));
   const [showAllComments, setShowAllComments] = useState(false);
   const [attachedLabel, setAttachedLabel] = useState<string | null>(null);
 
@@ -113,6 +137,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [downloadedFilename, setDownloadedFilename] = useState(() => readSaved('downloadedFilename', ''));
   const [downloadError, setDownloadError] = useState('');
+  const [downloadErrorCode, setDownloadErrorCode] = useState('');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadSpeed, setDownloadSpeed] = useState('');
   const [downloadEta, setDownloadEta] = useState('');
@@ -137,9 +162,15 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   }, []);
 
   // Check cookies on mount
-  useEffect(() => {
-    fetch('/api/health').then(r => r.json()).then(d => setHasCookies(!!d.cookies)).catch(() => setHasCookies(false));
-  }, []);
+  const checkCookies = async () => {
+    try {
+      const r = await fetch('/api/health');
+      const d = await r.json();
+      setHasCookies(!!d.cookies);
+    } catch { setHasCookies(false); }
+  };
+
+  useEffect(() => { checkCookies(); }, []);
 
   const handleGetInfo = async () => {
     if (!url.trim()) return;
@@ -160,7 +191,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
       }
       setPostInfo(data);
     } catch (e: any) {
-      if (e.message?.includes('fetch') || e.message?.includes('connect')) {
+      if (e.message?.includes('fetch') || e.message?.includes('Failed to fetch')) {
         setInfoError('Could not connect to Flask server. Make sure the "Flask Server" workflow is running.');
       } else {
         setInfoError(e.message || 'Something went wrong');
@@ -189,7 +220,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
       }
       setComments(data.comments);
     } catch (e: any) {
-      if (e.message?.includes('fetch') || e.message?.includes('connect')) {
+      if (e.message?.includes('Failed to fetch') || e.message?.includes('connect')) {
         setCommentsError('Could not connect to Flask server. Make sure the "Flask Server" workflow is running.');
         setCommentsErrorCode('CONNECTION_ERROR');
       } else {
@@ -218,7 +249,11 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
         } else if (data.status === 'error') {
           clearInterval(pollRef.current!);
           setDownloadLoading(false);
-          setDownloadError(data.error || 'Download failed');
+          const errMsg = data.error || 'Download failed';
+          setDownloadError(errMsg);
+          if (errMsg.toLowerCase().includes('login') || errMsg.toLowerCase().includes('private') || errMsg.toLowerCase().includes('cookie')) {
+            setDownloadErrorCode('LOGIN_REQUIRED');
+          }
         }
       } catch { }
     }, 1500);
@@ -228,6 +263,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
     if (!url.trim()) return;
     setDownloadLoading(true);
     setDownloadError('');
+    setDownloadErrorCode('');
     setDownloadedFilename('');
     setDownloadProgress(0);
     setDownloadSpeed('');
@@ -239,7 +275,10 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
         body: JSON.stringify({ url }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || 'Download start failed');
+      if (!res.ok) {
+        setDownloadErrorCode(data.error_code || '');
+        throw new Error(data.error || 'Download start failed');
+      }
       if (data.status === 'done') {
         setDownloadLoading(false);
         setDownloadedFilename(data.filename);
@@ -264,10 +303,15 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
       const d = await safeJson(r);
       if (!r.ok) throw new Error(d.error || 'Upload failed');
       setHasCookies(true);
+      // Clear errors so user retries
+      setCommentsError('');
+      setDownloadError('');
+      setInfoError('');
     } catch (e: any) {
       alert('Failed to upload cookies: ' + (e.message || 'Unknown error'));
     } finally {
       setCookiesUploading(false);
+      if (cookiesInputRef.current) cookiesInputRef.current.value = '';
     }
   };
 
@@ -326,7 +370,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
         </button>
       </div>
 
-      {/* URL Input */}
+      {/* URL + Cookies */}
       <Section>
         <label className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Instagram URL</label>
         <div className="flex gap-2">
@@ -347,19 +391,20 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
         </div>
         {url && !isValidUrl && (
           <p className="text-[11px] text-yellow-500/80">
-            Supported URLs: instagram.com/p/..., /reel/..., /reels/..., /tv/...
+            Supported: instagram.com/p/... · /reel/... · /reels/... · /tv/...
           </p>
         )}
 
-        {/* Cookies badge */}
-        <div className="flex items-center justify-between">
+        {/* Cookies row */}
+        <div className="flex items-center justify-between pt-0.5">
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase tracking-wider ${hasCookies ? 'text-green-400 border-green-500/30 bg-green-500/10' : 'text-gray-600 border-white/10'}`}>
-              {hasCookies ? '🍪 Cookies loaded' : 'No cookies (public only)'}
+            <div className={`w-2 h-2 rounded-full ${hasCookies ? 'bg-green-400' : 'bg-gray-700'}`} />
+            <span className={`text-[11px] font-medium ${hasCookies ? 'text-green-400' : 'text-gray-600'}`}>
+              {hasCookies ? 'Instagram cookies loaded' : 'No cookies — public posts only'}
             </span>
           </div>
-          <label className="cursor-pointer flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 transition-colors">
-            <Upload size={11} />
+          <label className="cursor-pointer flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-200 border border-white/10 hover:border-white/20 px-3 py-1.5 rounded-lg transition-all">
+            {cookiesUploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
             {cookiesUploading ? 'Uploading…' : 'Upload cookies.txt'}
             <input
               ref={cookiesInputRef}
@@ -370,6 +415,18 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
             />
           </label>
         </div>
+
+        {/* Cookie guide — only shown when no cookies */}
+        {!hasCookies && (
+          <details className="group">
+            <summary className="text-[11px] text-gray-600 hover:text-gray-400 cursor-pointer select-none list-none flex items-center gap-1">
+              <span className="group-open:hidden">▶</span>
+              <span className="hidden group-open:inline">▼</span>
+              How to get cookies.txt from Instagram
+            </summary>
+            <CookieGuide />
+          </details>
+        )}
       </Section>
 
       {/* Tabs */}
@@ -386,7 +443,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
         ))}
       </div>
 
-      {/* Tab: Post Info */}
+      {/* ── Tab: Post Info ── */}
       {activeTab === 'info' && (
         <Section>
           <div className="flex items-center justify-between">
@@ -432,7 +489,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
                     <span className="text-xs text-gray-400">{postInfo.duration}s</span>
                   </div>
                 )}
-                {(postInfo.like_count && postInfo.like_count !== 'NA') && (
+                {postInfo.like_count && postInfo.like_count !== 'NA' && (
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-gray-600 uppercase tracking-widest w-20 shrink-0">Likes</span>
                     <span className="text-xs text-gray-400">{Number(postInfo.like_count).toLocaleString()}</span>
@@ -460,20 +517,24 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
         </Section>
       )}
 
-      {/* Tab: Comments */}
+      {/* ── Tab: Comments ── */}
       {activeTab === 'comments' && (
         <Section>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-gray-400">Scrape comments</span>
               <select
-                value={maxComments}
-                onChange={e => setMaxComments(Number(e.target.value) as 50 | 100 | 500)}
+                value={String(maxComments)}
+                onChange={e => {
+                  const v = e.target.value;
+                  setMaxComments(v === 'all' ? 'all' : Number(v) as MaxComments);
+                }}
                 className="bg-[#1a1a1a] border border-white/10 text-gray-400 text-[11px] rounded-lg px-2 py-1 focus:outline-none"
               >
-                <option value={50}>Top 50</option>
-                <option value={100}>Top 100</option>
-                <option value={500}>Top 500</option>
+                <option value="50">Top 50</option>
+                <option value="100">Top 100</option>
+                <option value="500">Top 500</option>
+                <option value="all">All comments</option>
               </select>
             </div>
             <button
@@ -485,7 +546,10 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
               {commentsLoading ? 'Scraping…' : 'Get Comments'}
             </button>
           </div>
-          <p className="text-[11px] text-gray-600">Works on public posts. Private posts require a cookies.txt login file.</p>
+
+          <p className="text-[11px] text-gray-600">
+            Requires Instagram login cookies for most posts. Upload cookies.txt above first.
+          </p>
 
           {commentsError && <ErrBox msg={commentsError} code={commentsErrorCode} />}
 
@@ -528,14 +592,14 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
                 className="w-full flex items-center justify-center gap-2 border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-xs font-medium px-4 py-2.5 rounded-xl transition-all"
               >
                 {attachedLabel?.includes('Comment') ? <CheckCircle size={13} /> : <Copy size={13} />}
-                {attachedLabel?.includes('Comment') ? 'Comments Attached!' : '→ Send Comments to Script Context'}
+                {attachedLabel?.includes('Comment') ? 'Comments Attached to Context!' : '→ Send Comments to Script Context'}
               </button>
             </div>
           )}
         </Section>
       )}
 
-      {/* Tab: Download */}
+      {/* ── Tab: Download ── */}
       {activeTab === 'download' && (
         <Section>
           <div className="flex items-center justify-between">
@@ -549,7 +613,9 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
               {downloadLoading ? 'Downloading…' : 'Download'}
             </button>
           </div>
-          <p className="text-[11px] text-gray-600">Downloads best available quality. Private posts require cookies.txt.</p>
+          <p className="text-[11px] text-gray-600">
+            Downloads best available quality. Most posts require Instagram cookies to download.
+          </p>
 
           {downloadLoading && (
             <div className="space-y-2">
@@ -566,7 +632,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
             </div>
           )}
 
-          {downloadError && <ErrBox msg={downloadError} />}
+          {downloadError && <ErrBox msg={downloadError} code={downloadErrorCode} />}
 
           {downloadedFilename && !downloadLoading && (
             <div className="space-y-2">
