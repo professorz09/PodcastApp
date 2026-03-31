@@ -20,9 +20,11 @@ export interface VideoScene {
 }
 
 export enum AppState {
-  YOUTUBE_IMPORT = 'YOUTUBE_IMPORT',   // Step 0  - Import YouTube video (skippable)
-  INSTAGRAM_IMPORT = 'INSTAGRAM_IMPORT', // Step 0b - Import Instagram video/comments (skippable)
-  REDDIT_IMPORT = 'REDDIT_IMPORT',     // Step 0c - Import Reddit post + comments (skippable)
+  IMPORT = 'IMPORT',                   // Step 0  - Unified importer (YT / IG / Reddit, skippable)
+  // Legacy states kept for backward-compat with persisted storage
+  YOUTUBE_IMPORT = 'YOUTUBE_IMPORT',
+  INSTAGRAM_IMPORT = 'INSTAGRAM_IMPORT',
+  REDDIT_IMPORT = 'REDDIT_IMPORT',
   INPUT = 'INPUT',
   SCRIPT = 'SCRIPT',
   AUDIO = 'AUDIO',

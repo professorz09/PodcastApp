@@ -8,10 +8,8 @@ import {
   X,
   Sparkles,
   Image,
-  Youtube,
-  Instagram,
+  FolderDown,
   RotateCcw,
-  MessageCircle,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -26,9 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const steps = [
-    { id: AppState.YOUTUBE_IMPORT, label: 'YT Import', icon: Youtube, optional: true },
-    { id: AppState.INSTAGRAM_IMPORT, label: 'IG Import', icon: Instagram, optional: true },
-    { id: AppState.REDDIT_IMPORT, label: 'Reddit', icon: MessageCircle, optional: true },
+    { id: AppState.IMPORT, label: 'Import', icon: FolderDown, optional: true },
     { id: AppState.INPUT, label: 'Generate', icon: Mic2 },
     { id: AppState.SCRIPT, label: 'Script', icon: FileText },
     { id: AppState.THUMBNAIL, label: 'Thumb', icon: Image },
@@ -99,9 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
               >
                 <step.icon size={18} className={isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-400'} />
                 <span className={`font-medium text-sm ${isActive ? 'tracking-wide' : ''}`}>
-                  {step.id === AppState.YOUTUBE_IMPORT ? 'YT Import' :
-                   step.id === AppState.INSTAGRAM_IMPORT ? 'IG Import' :
-                   step.id === AppState.REDDIT_IMPORT ? 'Reddit' :
+                  {step.id === AppState.IMPORT ? 'Import Content' :
                    step.id === AppState.INPUT ? 'Generate' :
                    step.id === AppState.SCRIPT ? 'Script Editor' :
                    step.id === AppState.THUMBNAIL ? 'Thumbnail' :

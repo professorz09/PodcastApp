@@ -5,9 +5,7 @@ import ScriptEditor from './components/ScriptEditor';
 import AudioGenerator from './components/AudioGenerator';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import DebateVisualizer from './components/DebateVisualizer';
-import YoutubeImporter from './components/YoutubeImporter';
-import InstagramImporter from './components/InstagramImporter';
-import RedditImporter from './components/RedditImporter';
+import ContentImporter from './components/ContentImporter';
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
@@ -23,7 +21,7 @@ declare global {
 }
 
 const App: React.FC = () => {
-  const [appState, setAppState] = useState<AppState>(AppState.YOUTUBE_IMPORT);
+  const [appState, setAppState] = useState<AppState>(AppState.IMPORT);
   const [youtubeData, setYoutubeData] = useState<YoutubeImportData | null>(null);
   const [script, setScript] = useState<DebateSegment[]>([]);
   const [thumbnailState, setThumbnailState] = useState<ThumbnailState>({
@@ -87,11 +85,13 @@ const App: React.FC = () => {
           setYoutubeData(stored.youtubeData);
         }
 
+        const isImportState = (s: AppState) =>
+          s === AppState.IMPORT || s === AppState.YOUTUBE_IMPORT ||
+          s === AppState.INSTAGRAM_IMPORT || s === AppState.REDDIT_IMPORT;
+
         if (stored.script.length > 0) {
-          // Don't restore to import screens if user had a project in progress
-          const restoredState = (stored.appState === AppState.YOUTUBE_IMPORT || stored.appState === AppState.INSTAGRAM_IMPORT)
-            ? AppState.INPUT
-            : stored.appState;
+          // Don't restore to import screen if user had a project in progress
+          const restoredState = isImportState(stored.appState) ? AppState.INPUT : stored.appState;
           setAppState(restoredState);
           setScript(stored.script);
           if (stored.thumbnailState) {
@@ -104,9 +104,7 @@ const App: React.FC = () => {
           }
         } else if (stored.youtubeData) {
           // Had transcript but no script — go to INPUT step
-          const restoredState = (stored.appState === AppState.YOUTUBE_IMPORT || stored.appState === AppState.INSTAGRAM_IMPORT)
-            ? AppState.INPUT
-            : stored.appState;
+          const restoredState = isImportState(stored.appState) ? AppState.INPUT : stored.appState;
           setAppState(restoredState);
         }
       }
@@ -204,7 +202,8 @@ const App: React.FC = () => {
     try { sessionStorage.removeItem('yt_importer_v1'); } catch {}
     try { sessionStorage.removeItem('ig_importer_v1'); } catch {}
     try { sessionStorage.removeItem('reddit_importer_v1'); } catch {}
-    setAppState(AppState.YOUTUBE_IMPORT);
+    try { sessionStorage.removeItem('content_importer_platform'); } catch {}
+    setAppState(AppState.IMPORT);
   };
 
   if (!hasApiKey) {
@@ -317,8 +316,8 @@ const App: React.FC = () => {
     )}
 
     <Layout activeStep={appState} onStepChange={setAppState} onNewProject={handleNewProject}>
-      {appState === AppState.YOUTUBE_IMPORT && (
-        <YoutubeImporter
+      {appState === AppState.IMPORT && (
+        <ContentImporter
           onImportDone={(data) => {
             setYoutubeData(data);
             setAppState(AppState.INPUT);
@@ -339,32 +338,6 @@ const App: React.FC = () => {
                 ? { commentsFileContent: content, commentsFileName: fileName }
                 : { contextFileContent: content, contextFileName: fileName }
               ),
-            }));
-          }}
-          onSkip={() => setAppState(AppState.INPUT)}
-        />
-      )}
-
-      {appState === AppState.INSTAGRAM_IMPORT && (
-        <InstagramImporter
-          onAttachContext={(content, fileName) => {
-            setYoutubeData(prev => ({
-              ...(prev ?? { url: '', videoId: '', transcript: [], fullText: '' }),
-              commentsFileContent: content,
-              commentsFileName: fileName,
-            }));
-          }}
-          onSkip={() => setAppState(AppState.INPUT)}
-        />
-      )}
-
-      {appState === AppState.REDDIT_IMPORT && (
-        <RedditImporter
-          onAttachContext={(content, fileName) => {
-            setYoutubeData(prev => ({
-              ...(prev ?? { url: '', videoId: '', transcript: [], fullText: '' }),
-              commentsFileContent: content,
-              commentsFileName: fileName,
             }));
           }}
           onAttachPost={(content, fileName) => {
