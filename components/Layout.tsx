@@ -11,6 +11,7 @@ import {
   Youtube,
   Instagram,
   RotateCcw,
+  MessageCircle,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -27,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
   const steps = [
     { id: AppState.YOUTUBE_IMPORT, label: 'YT Import', icon: Youtube, optional: true },
     { id: AppState.INSTAGRAM_IMPORT, label: 'IG Import', icon: Instagram, optional: true },
+    { id: AppState.REDDIT_IMPORT, label: 'Reddit', icon: MessageCircle, optional: true },
     { id: AppState.INPUT, label: 'Generate', icon: Mic2 },
     { id: AppState.SCRIPT, label: 'Script', icon: FileText },
     { id: AppState.THUMBNAIL, label: 'Thumb', icon: Image },
@@ -99,6 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
                 <span className={`font-medium text-sm ${isActive ? 'tracking-wide' : ''}`}>
                   {step.id === AppState.YOUTUBE_IMPORT ? 'YT Import' :
                    step.id === AppState.INSTAGRAM_IMPORT ? 'IG Import' :
+                   step.id === AppState.REDDIT_IMPORT ? 'Reddit' :
                    step.id === AppState.INPUT ? 'Generate' :
                    step.id === AppState.SCRIPT ? 'Script Editor' :
                    step.id === AppState.THUMBNAIL ? 'Thumbnail' :

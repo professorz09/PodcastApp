@@ -871,6 +871,25 @@ def extract_instagram_shortcode(url: str):
     return None
 
 
+def shortcode_to_mediaid(shortcode: str) -> str:
+    """Convert Instagram shortcode to numeric media ID (base64 with IG alphabet)."""
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    n = 0
+    for char in shortcode:
+        n = n * 64 + alphabet.index(char)
+    return str(n)
+
+
+def extract_reddit_post_id(url: str):
+    """Extract Reddit post ID from URL."""
+    import re
+    m = re.search(r'/comments/([a-zA-Z0-9]+)', url)
+    if m:
+        return m.group(1)
+    m = re.search(r'redd\.it/([a-zA-Z0-9]+)', url)
+    return m.group(1) if m else None
+
+
 @app.route('/api/instagram/info', methods=['POST'])
 def instagram_info():
     """Get Instagram post info using yt-dlp."""
@@ -1026,6 +1045,76 @@ def instagram_comments():
 
     last_error = None
     last_error_code = 'SCRAPE_ERROR'
+
+    # ── Attempt 0: Mobile-app API simulation (instagrapi-style headers) ────────
+    # Uses real Instagram Android app headers + shortcode→mediaid conversion
+    # Different app_id (567067343352427) and user-agent than instaloader
+    try:
+        import requests as req_lib
+        import uuid
+        import time as time_mod
+
+        ig_cookies = get_instagram_cookies()
+        if not ig_cookies or 'sessionid' not in ig_cookies:
+            raise Exception("No session cookies — skipping mobile-app attempt")
+
+        media_id = shortcode_to_mediaid(shortcode)
+        sess = req_lib.Session()
+        for name, val in ig_cookies.items():
+            sess.cookies.set(name, val, domain='.instagram.com')
+
+        mob_headers = {
+            'User-Agent': 'Instagram 295.0.0.32.119 Android (30/11; 420dpi; 1080x2400; Google; Pixel 6; oriole; qcom; en_US; 490770583)',
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Language': 'en-US',
+            'X-IG-App-ID': '567067343352427',
+            'X-IG-Android-ID': f'android-{uuid.uuid4().hex[:16]}',
+            'X-IG-Capabilities': '3brTvw8=',
+            'X-IG-Connection-Type': 'WIFI',
+            'X-Pigeon-Session-Id': str(uuid.uuid4()),
+            'X-Pigeon-Rawclienttime': str(round(time_mod.time(), 3)),
+            'Connection': 'keep-alive',
+        }
+
+        comments = []
+        min_id = None
+        for _ in range(20):  # max 20 pages
+            params = {'can_support_threading': 'true', 'permalink_enabled': 'false'}
+            if min_id:
+                params['min_id'] = min_id
+            r = sess.get(
+                f'https://i.instagram.com/api/v1/media/{media_id}/comments/',
+                params=params, headers=mob_headers, timeout=20,
+            )
+            if r.status_code != 200:
+                raise Exception(f"HTTP {r.status_code} from mobile API")
+            d = r.json()
+            if d.get('status') != 'ok':
+                raise Exception(f"mobile API fail: {d.get('message', d.get('status'))}")
+            for c in d.get('comments', []):
+                text = (c.get('text') or '').strip()
+                if text:
+                    comments.append(text)
+                    if max_comments > 0 and len(comments) >= max_comments:
+                        break
+            if max_comments > 0 and len(comments) >= max_comments:
+                break
+            next_min = d.get('next_min_id')
+            if not next_min:
+                break
+            min_id = next_min
+
+        if comments:
+            return jsonify({'shortcode': shortcode, 'count': len(comments), 'comments': comments, 'source': 'mobile-api'})
+        else:
+            last_error = 'Mobile API returned 0 comments (IP may be blocked)'
+
+    except Exception as e0:
+        err0 = str(e0)
+        if any(k in err0.lower() for k in ['fail', '401', '403', 'login', 'forbidden']):
+            last_error_code = 'LOGIN_REQUIRED'
+        last_error = err0
 
     # ── Attempt 1: instaloader with cookie injection ──────────────────────────
     try:
@@ -1183,6 +1272,136 @@ def instagram_comments():
         msg = last_error or 'Could not fetch comments. Instagram may be rate-limiting this server IP. Try again in a few minutes.'
 
     return jsonify({'error': msg, 'error_code': last_error_code}), 403
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reddit API — uses Reddit's public JSON API (no auth required for public posts)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+REDDIT_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 DebateForge/1.0 (comment scraper; contact@debateforge.app)',
+    'Accept': 'application/json',
+}
+
+
+def _reddit_get(path: str, params: dict = None):
+    """GET from Reddit JSON API with retries."""
+    import requests as req_lib
+    url = f'https://www.reddit.com{path}'
+    r = req_lib.get(url, headers=REDDIT_HEADERS, params=params, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def _flatten_comments(listing: dict, include_replies: bool, max_depth: int, depth: int = 0) -> list:
+    """Recursively extract comment text from Reddit comment listing."""
+    results = []
+    for child in (listing.get('data') or {}).get('children', []):
+        kind = child.get('kind')
+        if kind != 't1':
+            continue
+        data = child['data']
+        body = (data.get('body') or '').strip()
+        if body and body not in ('[deleted]', '[removed]'):
+            results.append(body)
+        if include_replies and depth < max_depth:
+            replies = data.get('replies')
+            if isinstance(replies, dict):
+                results.extend(_flatten_comments(replies, include_replies, max_depth, depth + 1))
+    return results
+
+
+@app.route('/api/reddit/info', methods=['POST'])
+def reddit_info():
+    """Get Reddit post metadata."""
+    data = request.json or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    post_id = extract_reddit_post_id(url)
+    if not post_id:
+        return jsonify({'error': 'Invalid Reddit URL. Supported: reddit.com/r/.../comments/{id}/... or redd.it/{id}', 'error_code': 'INVALID_URL'}), 400
+
+    try:
+        res = _reddit_get(f'/comments/{post_id}.json', {'limit': 1, 'depth': 0})
+        post = res[0]['data']['children'][0]['data']
+        return jsonify({
+            'post_id': post_id,
+            'title': post.get('title', ''),
+            'author': post.get('author', ''),
+            'subreddit': post.get('subreddit', ''),
+            'subreddit_prefixed': post.get('subreddit_name_prefixed', f"r/{post.get('subreddit','')}"),
+            'score': post.get('score', 0),
+            'upvote_ratio': post.get('upvote_ratio', 0),
+            'num_comments': post.get('num_comments', 0),
+            'selftext': post.get('selftext', ''),
+            'url': post.get('url', ''),
+            'permalink': f"https://www.reddit.com{post.get('permalink', '')}",
+            'thumbnail': post.get('thumbnail', ''),
+            'is_self': post.get('is_self', True),
+            'flair': post.get('link_flair_text', ''),
+        })
+    except Exception as e:
+        err = str(e)
+        if '403' in err or '401' in err:
+            return jsonify({'error': 'Reddit blocked the request. Post may be private or NSFW.', 'error_code': 'REDDIT_BLOCKED'}), 403
+        if '404' in err:
+            return jsonify({'error': 'Post not found. Check the URL.', 'error_code': 'NOT_FOUND'}), 404
+        return jsonify({'error': f'Failed to fetch post info: {err}', 'error_code': 'SCRAPE_ERROR'}), 500
+
+
+@app.route('/api/reddit/comments', methods=['POST'])
+def reddit_comments():
+    """
+    Scrape Reddit post comments using the public JSON API.
+    No authentication required for public posts.
+    """
+    data = request.json or {}
+    url = data.get('url', '').strip()
+    raw_max = data.get('max_comments', 100)
+    include_replies = bool(data.get('include_replies', False))
+    sort = data.get('sort', 'top')  # top, best, new, controversial, old
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    max_comments = 0 if str(raw_max).lower() == 'all' else int(raw_max)
+
+    post_id = extract_reddit_post_id(url)
+    if not post_id:
+        return jsonify({'error': 'Invalid Reddit URL', 'error_code': 'INVALID_URL'}), 400
+
+    try:
+        limit = min(max_comments * 3, 500) if max_comments > 0 else 500
+        res = _reddit_get(
+            f'/comments/{post_id}.json',
+            {'limit': limit, 'depth': 6 if include_replies else 1, 'sort': sort},
+        )
+
+        post = res[0]['data']['children'][0]['data']
+        all_comments = _flatten_comments(res[1], include_replies, max_depth=5)
+
+        if max_comments > 0:
+            all_comments = all_comments[:max_comments]
+
+        return jsonify({
+            'post_id': post_id,
+            'title': post.get('title', ''),
+            'author': post.get('author', ''),
+            'subreddit': post.get('subreddit_name_prefixed', ''),
+            'count': len(all_comments),
+            'comments': all_comments,
+            'source': 'reddit-json-api',
+        })
+
+    except Exception as e:
+        err = str(e)
+        if '403' in err or 'blocked' in err.lower():
+            return jsonify({'error': 'Reddit blocked the request. Post may be private, NSFW-gated, or quarantined.', 'error_code': 'REDDIT_BLOCKED'}), 403
+        if '404' in err:
+            return jsonify({'error': 'Post not found.', 'error_code': 'NOT_FOUND'}), 404
+        return jsonify({'error': f'Failed to fetch comments: {err}', 'error_code': 'SCRAPE_ERROR'}), 500
 
 
 @app.route('/api/files', methods=['GET'])

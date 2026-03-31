@@ -7,6 +7,7 @@ import ThumbnailGenerator from './components/ThumbnailGenerator';
 import DebateVisualizer from './components/DebateVisualizer';
 import YoutubeImporter from './components/YoutubeImporter';
 import InstagramImporter from './components/InstagramImporter';
+import RedditImporter from './components/RedditImporter';
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
@@ -202,6 +203,7 @@ const App: React.FC = () => {
     // Clear importer sessionStorage so it starts fresh
     try { sessionStorage.removeItem('yt_importer_v1'); } catch {}
     try { sessionStorage.removeItem('ig_importer_v1'); } catch {}
+    try { sessionStorage.removeItem('reddit_importer_v1'); } catch {}
     setAppState(AppState.YOUTUBE_IMPORT);
   };
 
@@ -350,6 +352,26 @@ const App: React.FC = () => {
               ...(prev ?? { url: '', videoId: '', transcript: [], fullText: '' }),
               commentsFileContent: content,
               commentsFileName: fileName,
+            }));
+          }}
+          onSkip={() => setAppState(AppState.INPUT)}
+        />
+      )}
+
+      {appState === AppState.REDDIT_IMPORT && (
+        <RedditImporter
+          onAttachContext={(content, fileName) => {
+            setYoutubeData(prev => ({
+              ...(prev ?? { url: '', videoId: '', transcript: [], fullText: '' }),
+              commentsFileContent: content,
+              commentsFileName: fileName,
+            }));
+          }}
+          onAttachPost={(content, fileName) => {
+            setYoutubeData(prev => ({
+              ...(prev ?? { url: '', videoId: '', transcript: [], fullText: '' }),
+              contextFileContent: content,
+              contextFileName: fileName,
             }));
           }}
           onSkip={() => setAppState(AppState.INPUT)}
