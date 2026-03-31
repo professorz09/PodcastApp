@@ -46,7 +46,7 @@ interface Props {
 
 const DEFAULT_FLASK_URL = '';
 const DEFAULT_SEG_ZOOM = { zoom: 1.0, panX: 0, panY: 0 };
-type Tab = 'transcript' | 'comments' | 'video' | 'stt' | 'editor';
+type Tab = 'transcript' | 'comments' | 'video' | 'stt';
 type BlackBars = 'none' | 'top_bottom' | 'sides' | 'both';
 
 // ── Helper: trigger browser download of text ──────────────────────────────────
@@ -775,11 +775,6 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
       label: 'STT',
       icon: <Mic size={16} />,
     },
-    {
-      id: 'editor',
-      label: 'Editor',
-      icon: <Edit3 size={16} />,
-    },
   ];
 
   return (
@@ -794,7 +789,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
             </div>
             <div>
               <h1 className="text-base font-bold leading-tight">YouTube Import</h1>
-              <p className="text-[10px] text-gray-600 leading-tight">Transcript · Comments · Video · STT · Editor</p>
+              <p className="text-[10px] text-gray-600 leading-tight">Transcript · Comments · Video · STT</p>
             </div>
           </div>
           <button
@@ -1326,13 +1321,6 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                     <Download size={13} />
                     Phone par Download
                   </a>
-                  <button
-                    onClick={() => setActiveTab('editor')}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-yellow-600/20 active:bg-yellow-600/30 border border-yellow-500/30 text-yellow-300 rounded-xl text-xs font-semibold"
-                  >
-                    <Edit3 size={13} />
-                    Open in Editor
-                  </button>
                 </div>
               </Section>
             )}
@@ -1575,22 +1563,11 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
           </>
         )}
 
-        {/* ── EDITOR TAB ─────────────────────────────────────────────────────── */}
-        {activeTab === 'editor' && (
+        {/* editor tab removed — kept state vars for session persistence only */}
+        {false && (
           <>
             {!downloadedFilename ? (
-              <Section>
-                <div className="text-center py-6 space-y-3">
-                  <Video size={32} className="mx-auto text-gray-700" />
-                  <p className="text-sm text-gray-500">Pehle Video tab mein video download karo</p>
-                  <button
-                    onClick={() => setActiveTab('video')}
-                    className="mx-auto flex items-center gap-1.5 px-4 py-2.5 bg-green-600/20 border border-green-500/30 text-green-300 rounded-xl text-sm font-semibold"
-                  >
-                    <Download size={14} /> Video Tab
-                  </button>
-                </div>
-              </Section>
+              <Section><div /></Section>
             ) : (
               <>
                 {/* ── LIVE VIDEO PREVIEW ── */}
@@ -2033,11 +2010,6 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
           {downloadedFilename && (
             <span className="text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
               ✓ Video
-            </span>
-          )}
-          {editedFilename && (
-            <span className="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full">
-              ✓ Edited
             </span>
           )}
         </div>
