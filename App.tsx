@@ -6,6 +6,7 @@ import AudioGenerator from './components/AudioGenerator';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import DebateVisualizer from './components/DebateVisualizer';
 import YoutubeImporter from './components/YoutubeImporter';
+import InstagramImporter from './components/InstagramImporter';
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
@@ -86,8 +87,8 @@ const App: React.FC = () => {
         }
 
         if (stored.script.length > 0) {
-          // Don't restore to YOUTUBE_IMPORT if user had a project in progress
-          const restoredState = stored.appState === AppState.YOUTUBE_IMPORT
+          // Don't restore to import screens if user had a project in progress
+          const restoredState = (stored.appState === AppState.YOUTUBE_IMPORT || stored.appState === AppState.INSTAGRAM_IMPORT)
             ? AppState.INPUT
             : stored.appState;
           setAppState(restoredState);
@@ -102,7 +103,7 @@ const App: React.FC = () => {
           }
         } else if (stored.youtubeData) {
           // Had transcript but no script — go to INPUT step
-          const restoredState = stored.appState === AppState.YOUTUBE_IMPORT
+          const restoredState = (stored.appState === AppState.YOUTUBE_IMPORT || stored.appState === AppState.INSTAGRAM_IMPORT)
             ? AppState.INPUT
             : stored.appState;
           setAppState(restoredState);
@@ -198,8 +199,9 @@ const App: React.FC = () => {
       referenceImage: null,
       extraInstructions: '',
     });
-    // Clear YoutubeImporter's sessionStorage so it starts fresh
+    // Clear importer sessionStorage so it starts fresh
     try { sessionStorage.removeItem('yt_importer_v1'); } catch {}
+    try { sessionStorage.removeItem('ig_importer_v1'); } catch {}
     setAppState(AppState.YOUTUBE_IMPORT);
   };
 
@@ -335,6 +337,19 @@ const App: React.FC = () => {
                 ? { commentsFileContent: content, commentsFileName: fileName }
                 : { contextFileContent: content, contextFileName: fileName }
               ),
+            }));
+          }}
+          onSkip={() => setAppState(AppState.INPUT)}
+        />
+      )}
+
+      {appState === AppState.INSTAGRAM_IMPORT && (
+        <InstagramImporter
+          onAttachContext={(content, fileName) => {
+            setYoutubeData(prev => ({
+              ...(prev ?? { url: '', videoId: '', transcript: [], fullText: '' }),
+              commentsFileContent: content,
+              commentsFileName: fileName,
             }));
           }}
           onSkip={() => setAppState(AppState.INPUT)}

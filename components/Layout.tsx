@@ -9,6 +9,7 @@ import {
   Sparkles,
   Image,
   Youtube,
+  Instagram,
   RotateCcw,
 } from 'lucide-react';
 import { AppState } from '../types';
@@ -24,7 +25,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const steps = [
-    { id: AppState.YOUTUBE_IMPORT, label: 'Import', icon: Youtube, optional: true },
+    { id: AppState.YOUTUBE_IMPORT, label: 'YT Import', icon: Youtube, optional: true },
+    { id: AppState.INSTAGRAM_IMPORT, label: 'IG Import', icon: Instagram, optional: true },
     { id: AppState.INPUT, label: 'Generate', icon: Mic2 },
     { id: AppState.SCRIPT, label: 'Script', icon: FileText },
     { id: AppState.THUMBNAIL, label: 'Thumb', icon: Image },
@@ -96,6 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
                 <step.icon size={18} className={isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-400'} />
                 <span className={`font-medium text-sm ${isActive ? 'tracking-wide' : ''}`}>
                   {step.id === AppState.YOUTUBE_IMPORT ? 'YT Import' :
+                   step.id === AppState.INSTAGRAM_IMPORT ? 'IG Import' :
                    step.id === AppState.INPUT ? 'Generate' :
                    step.id === AppState.SCRIPT ? 'Script Editor' :
                    step.id === AppState.THUMBNAIL ? 'Thumbnail' :
@@ -148,7 +151,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
               <button
                 key={step.id}
                 onClick={() => onStepChange(step.id)}
-                className={`flex flex-col items-center justify-center gap-1 py-2.5 px-3 min-w-[68px] flex-1 transition-all active:scale-95 ${
+                className={`flex flex-col items-center justify-center gap-1 py-2.5 px-3 min-w-[60px] flex-1 transition-all active:scale-95 ${
                   isActive
                     ? 'text-white'
                     : 'text-gray-600 hover:text-gray-400'

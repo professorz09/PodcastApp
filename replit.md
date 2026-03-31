@@ -16,8 +16,17 @@ A React + Express web application that generates debate-style video content usin
 - `services/` — Client-side services (geminiService, elevenLabsService, googleCloudService, storageService, audioUtils, canvasRenderer, videoRenderer)
 - `types.ts` — Shared TypeScript types
 
+## Instagram Import (Python, port 8000)
+- `/api/instagram/info` — Get post metadata (title, uploader, thumbnail, description) via yt-dlp
+- `/api/instagram/download` — Download Instagram video/reel (background job with progress polling)
+- `/api/instagram/download/status/<job_id>` — Poll download progress
+- `/api/instagram/comments` — Scrape comments using instaloader (public posts only; private needs cookies)
+- Cookies: same `yt_cookies.txt` file used for both YouTube and Instagram auth
+- Frontend: `components/InstagramImporter.tsx`
+
 ## App Flow
 1. YouTube Import (optional) — import transcript from a YouTube video
+1b. Instagram Import (optional) — download video/reel, scrape comments, attach to script context
 2. Input — configure debate topic, speakers, style, duration
 3. Script — review and edit the generated script
 4. Thumbnail — generate a thumbnail image
@@ -30,8 +39,8 @@ A React + Express web application that generates debate-style video content usin
 - `GOOGLE_CLOUD_API_KEY` — Google Cloud API key (for speech-to-text transcription)
 
 ## Flask Server (Python, port 8000)
-- `flask_server.py` — YouTube transcript/comments (youtube-transcript-api), video download (yt-dlp + ffmpeg), video edit (ffmpeg)
-- Express proxies `/api/youtube`, `/api/video`, `/api/files`, `/api/health` → Flask
+- `flask_server.py` — YouTube transcript/comments (youtube-transcript-api), video download (yt-dlp + ffmpeg), video edit (ffmpeg), Instagram video download + comment scraping (yt-dlp + instaloader)
+- Express proxies `/api/youtube`, `/api/video`, `/api/files`, `/api/health`, `/api/instagram` → Flask
 - Download progress tracked in real-time via `subprocess.Popen` + yt-dlp `--newline` flag
 - Workflow: "Flask Server" → `python flask_server.py` → port 8000 (internal)
 - `/api/video/edit` supports per-segment zoom/pan (each cut `{start,end,zoom?,pan_x?,pan_y?}`)

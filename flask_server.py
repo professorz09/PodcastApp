@@ -823,6 +823,206 @@ def merge_videos():
                 pass
 
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Instagram Routes
+# ──────────────────────────────────────────────────────────────────────────────
+
+def extract_instagram_shortcode(url: str):
+    """Extract Instagram post shortcode from URL."""
+    import re
+    patterns = [
+        r'instagram\.com/p/([A-Za-z0-9_-]+)',
+        r'instagram\.com/reel/([A-Za-z0-9_-]+)',
+        r'instagram\.com/reels/([A-Za-z0-9_-]+)',
+        r'instagram\.com/tv/([A-Za-z0-9_-]+)',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+
+@app.route('/api/instagram/info', methods=['POST'])
+def instagram_info():
+    """Get Instagram post info using yt-dlp."""
+    data = request.json or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    shortcode = extract_instagram_shortcode(url)
+    if not shortcode:
+        return jsonify({'error': 'Invalid Instagram URL. Supported: /p/, /reel/, /reels/, /tv/'}), 400
+
+    try:
+        cmd = [
+            'yt-dlp',
+            '--skip-download',
+            '--no-playlist',
+            '--print', '%(title)s\n%(uploader)s\n%(thumbnail)s\n%(duration)s\n%(like_count)s\n%(view_count)s\n%(description)s',
+            *cookies_args(),
+            url
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
+        if result.returncode != 0:
+            err = result.stderr
+            if 'login' in err.lower() or 'log in' in err.lower():
+                return jsonify({'error': 'This post requires Instagram login. Upload a cookies file to proceed.', 'error_code': 'LOGIN_REQUIRED'}), 403
+            return jsonify({'error': 'Could not fetch post info: ' + err[-400:]}), 500
+
+        lines = result.stdout.strip().split('\n')
+        return jsonify({
+            'shortcode': shortcode,
+            'title': lines[0] if len(lines) > 0 else '',
+            'uploader': lines[1] if len(lines) > 1 else '',
+            'thumbnail': lines[2] if len(lines) > 2 else '',
+            'duration': lines[3] if len(lines) > 3 else '',
+            'like_count': lines[4] if len(lines) > 4 else '',
+            'view_count': lines[5] if len(lines) > 5 else '',
+            'description': '\n'.join(lines[6:]) if len(lines) > 6 else '',
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Request timed out'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/instagram/download', methods=['POST'])
+def instagram_download():
+    """Download Instagram video/reel using yt-dlp (background job)."""
+    data = request.json or {}
+    url = data.get('url', '').strip()
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    shortcode = extract_instagram_shortcode(url)
+    if not shortcode:
+        return jsonify({'error': 'Invalid Instagram URL'}), 400
+
+    job_id = f'ig_{shortcode}'
+    output_path = os.path.join(DOWNLOAD_DIR, f'ig_{shortcode}.mp4')
+
+    if os.path.exists(output_path):
+        return jsonify({
+            'job_id': job_id,
+            'status': 'done',
+            'progress': 100,
+            'filename': os.path.basename(output_path),
+            'download_url': f'/api/files/{os.path.basename(output_path)}'
+        })
+
+    if job_id in active_jobs and active_jobs[job_id]['status'] == 'downloading':
+        return jsonify(active_jobs[job_id])
+
+    def do_download():
+        import re as _re
+        active_jobs[job_id] = {'job_id': job_id, 'status': 'downloading', 'progress': 0, 'speed': '', 'eta': ''}
+        try:
+            cmd = [
+                'yt-dlp',
+                '-f', 'best[ext=mp4]/best',
+                '--merge-output-format', 'mp4',
+                '--newline',
+                '--no-playlist',
+                *cookies_args(),
+                '-o', output_path,
+                url
+            ]
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in proc.stdout:
+                line = line.strip()
+                if '[download]' in line and '%' in line:
+                    m = _re.search(r'(\d+\.?\d*)%', line)
+                    speed_m = _re.search(r'at\s+([\d.]+\s*\w+/s)', line)
+                    eta_m = _re.search(r'ETA\s+([\d:]+)', line)
+                    if m:
+                        active_jobs[job_id]['progress'] = round(float(m.group(1)), 1)
+                    if speed_m:
+                        active_jobs[job_id]['speed'] = speed_m.group(1)
+                    if eta_m:
+                        active_jobs[job_id]['eta'] = eta_m.group(1)
+            proc.wait(timeout=300)
+            if proc.returncode == 0 and os.path.exists(output_path):
+                active_jobs[job_id] = {
+                    'job_id': job_id, 'status': 'done', 'progress': 100,
+                    'filename': os.path.basename(output_path),
+                    'download_url': f'/api/files/{os.path.basename(output_path)}'
+                }
+            else:
+                active_jobs[job_id] = {'job_id': job_id, 'status': 'error', 'error': 'yt-dlp download failed. The post may be private or require login.'}
+        except subprocess.TimeoutExpired:
+            active_jobs[job_id] = {'job_id': job_id, 'status': 'error', 'error': 'Download timed out'}
+        except Exception as e:
+            active_jobs[job_id] = {'job_id': job_id, 'status': 'error', 'error': str(e)}
+
+    thread = threading.Thread(target=do_download, daemon=True)
+    thread.start()
+
+    return jsonify({'job_id': job_id, 'status': 'downloading', 'progress': 0})
+
+
+@app.route('/api/instagram/download/status/<job_id>', methods=['GET'])
+def instagram_download_status(job_id):
+    """Check Instagram download status."""
+    if job_id not in active_jobs:
+        return jsonify({'status': 'not_found'}), 404
+    return jsonify(active_jobs[job_id])
+
+
+@app.route('/api/instagram/comments', methods=['POST'])
+def instagram_comments():
+    """Scrape Instagram comments using instaloader."""
+    data = request.json or {}
+    url = data.get('url', '').strip()
+    max_comments = int(data.get('max_comments', 100))
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    shortcode = extract_instagram_shortcode(url)
+    if not shortcode:
+        return jsonify({'error': 'Invalid Instagram URL'}), 400
+
+    try:
+        import instaloader
+        L = instaloader.Instaloader()
+        ck = cookies_path()
+        if ck:
+            try:
+                import browser_cookie3
+            except ImportError:
+                pass
+            try:
+                L.load_session_from_file('', filename=ck)
+            except Exception:
+                pass
+
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+        comments = []
+        for comment in post.get_comments():
+            if len(comments) >= max_comments:
+                break
+            text = comment.text.strip() if comment.text else ''
+            if text:
+                comments.append(text)
+
+        return jsonify({
+            'shortcode': shortcode,
+            'count': len(comments),
+            'comments': comments,
+        })
+    except ImportError:
+        return jsonify({'error': 'instaloader is not installed. Run: pip install instaloader', 'error_code': 'MISSING_DEPENDENCY'}), 500
+    except Exception as e:
+        err = str(e)
+        if 'login' in err.lower() or 'private' in err.lower() or '401' in err or '403' in err:
+            return jsonify({'error': 'This post is private or requires Instagram login to access comments.', 'error_code': 'LOGIN_REQUIRED'}), 403
+        return jsonify({'error': err, 'error_code': 'SCRAPE_ERROR'}), 500
+
+
 @app.route('/api/files', methods=['GET'])
 def list_files():
     """List all downloaded/edited files."""

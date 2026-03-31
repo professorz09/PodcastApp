@@ -20,7 +20,8 @@ export interface VideoScene {
 }
 
 export enum AppState {
-  YOUTUBE_IMPORT = 'YOUTUBE_IMPORT', // NEW: Step 0 - Import YouTube video (skippable)
+  YOUTUBE_IMPORT = 'YOUTUBE_IMPORT', // Step 0 - Import YouTube video (skippable)
+  INSTAGRAM_IMPORT = 'INSTAGRAM_IMPORT', // Step 0b - Import Instagram video/comments (skippable)
   INPUT = 'INPUT',
   SCRIPT = 'SCRIPT',
   AUDIO = 'AUDIO',
