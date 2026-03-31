@@ -1039,6 +1039,7 @@ def instagram_comments():
             download_geotags=False,
             download_comments=True,
             save_metadata=False,
+            max_connection_attempts=1,  # don't retry — fail fast
         )
 
         ig_cookies = get_instagram_cookies()

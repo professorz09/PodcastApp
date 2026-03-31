@@ -132,6 +132,8 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   const [maxComments, setMaxComments] = useState<MaxComments>(() => readSaved<MaxComments>('maxComments', 100));
   const [showAllComments, setShowAllComments] = useState(false);
   const [attachedLabel, setAttachedLabel] = useState<string | null>(null);
+  const [pasteText, setPasteText] = useState('');
+  const [showPasteBox, setShowPasteBox] = useState(false);
 
   // Download
   const [downloadLoading, setDownloadLoading] = useState(false);
@@ -551,7 +553,51 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
             Requires Instagram login cookies for most posts. Upload cookies.txt above first.
           </p>
 
-          {commentsError && <ErrBox msg={commentsError} code={commentsErrorCode} />}
+          {commentsError && (
+            <>
+              <ErrBox msg={commentsError} code={commentsErrorCode} />
+              <div className="bg-white/3 border border-white/8 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-400 font-medium">Can't scrape? Paste comments manually</span>
+                  <button
+                    onClick={() => setShowPasteBox(p => !p)}
+                    className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    {showPasteBox ? 'Hide' : 'Open paste box'}
+                  </button>
+                </div>
+                {showPasteBox && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-gray-600">
+                      Open the reel on Instagram, copy comments one-by-one or use a browser extension, then paste below — one comment per line.
+                    </p>
+                    <textarea
+                      value={pasteText}
+                      onChange={e => setPasteText(e.target.value)}
+                      placeholder={"Comment 1\nComment 2\nComment 3…"}
+                      rows={6}
+                      className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-300 placeholder-gray-700 focus:outline-none focus:border-purple-500/40 resize-none"
+                    />
+                    <button
+                      onClick={() => {
+                        const lines = pasteText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                        if (lines.length > 0) {
+                          setComments(lines);
+                          setCommentsError('');
+                          setShowPasteBox(false);
+                          setPasteText('');
+                        }
+                      }}
+                      disabled={!pasteText.trim()}
+                      className="w-full flex items-center justify-center gap-2 bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium px-4 py-2 rounded-xl transition-all"
+                    >
+                      <CheckCircle size={13} /> Use these comments ({pasteText.split('\n').filter(l => l.trim()).length})
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {comments && comments.length === 0 && (
             <div className="text-center py-6 text-gray-600 text-sm">No comments found on this post.</div>
