@@ -1041,12 +1041,10 @@ def instagram_comments():
             save_metadata=False,
         )
 
-        # Inject Instagram cookies from the uploaded cookies.txt file
         ig_cookies = get_instagram_cookies()
         if ig_cookies:
             for name, value in ig_cookies.items():
                 L.context._session.cookies.set(name, value, domain='.instagram.com', path='/')
-            # Suppress "not logged in" warnings — cookies handle auth
             if 'sessionid' in ig_cookies:
                 L.context.username = ig_cookies.get('ds_user_id', 'user')
 
@@ -1059,12 +1057,16 @@ def instagram_comments():
             if text:
                 comments.append(text)
 
-        return jsonify({
-            'shortcode': shortcode,
-            'count': len(comments),
-            'comments': comments,
-            'source': 'instaloader',
-        })
+        # Only return success if we actually got comments — otherwise fall through
+        if comments:
+            return jsonify({
+                'shortcode': shortcode,
+                'count': len(comments),
+                'comments': comments,
+                'source': 'instaloader',
+            })
+        else:
+            last_error = 'instaloader returned 0 comments (Instagram API blocked from server IP)'
 
     except ImportError:
         return jsonify({'error': 'instaloader is not installed. Run: pip install instaloader', 'error_code': 'MISSING_DEPENDENCY'}), 500
@@ -1074,19 +1076,76 @@ def instagram_comments():
             last_error_code = 'LOGIN_REQUIRED'
         last_error = err_str
 
-    # ── Attempt 2: yt-dlp --write-comments fallback ───────────────────────────
+    # ── Attempt 2: yt-dlp Python API (more reliable than subprocess) ──────────
+    try:
+        import yt_dlp
+
+        ck = cookies_path()
+        ytdl_opts = {
+            'getcomments': True,
+            'skip_download': True,
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+        }
+        if ck:
+            ytdl_opts['cookiefile'] = ck
+
+        with yt_dlp.YoutubeDL(ytdl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        raw_comments = (info or {}).get('comments', [])
+        comments = []
+        for c in raw_comments:
+            text = (c.get('text') or '').strip()
+            if not text:
+                continue
+            parent = c.get('parent')
+            if parent in (None, False, 'root', ''):
+                comments.append(text)
+                if max_comments > 0 and len(comments) >= max_comments:
+                    break
+
+        if comments:
+            return jsonify({
+                'shortcode': shortcode,
+                'count': len(comments),
+                'comments': comments,
+                'source': 'yt-dlp',
+            })
+        else:
+            if not last_error:
+                last_error = 'yt-dlp returned 0 comments'
+
+    except Exception as e2:
+        err_str2 = str(e2)
+        if '401' in err_str2 or '403' in err_str2 or 'login' in err_str2.lower():
+            last_error_code = 'LOGIN_REQUIRED'
+        if not last_error:
+            last_error = err_str2
+
+    # ── Attempt 3: yt-dlp subprocess (last resort, different code path) ───────
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            info_path = os.path.join(tmpdir, f'{shortcode}.info.json')
+            out_template = os.path.join(tmpdir, shortcode)
             cmd = [
                 'yt-dlp',
                 '--write-info-json', '--write-comments',
                 '--skip-download', '--no-playlist',
+                '--no-warnings',
                 *cookies_args(),
-                '-o', os.path.join(tmpdir, shortcode),
+                '-o', out_template,
                 url,
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+
+            # yt-dlp writes <template>.info.json
+            info_path = out_template + '.info.json'
+            if not os.path.exists(info_path):
+                # sometimes it adds a suffix
+                candidates = [f for f in os.listdir(tmpdir) if f.endswith('.info.json')]
+                if candidates:
+                    info_path = os.path.join(tmpdir, candidates[0])
 
             if os.path.exists(info_path):
                 with open(info_path, 'r', encoding='utf-8') as f:
@@ -1095,7 +1154,7 @@ def instagram_comments():
                 raw_comments = info.get('comments', [])
                 comments = []
                 for c in raw_comments:
-                    text = c.get('text', '').strip()
+                    text = (c.get('text') or '').strip()
                     if not text:
                         continue
                     parent = c.get('parent')
@@ -1104,28 +1163,23 @@ def instagram_comments():
                         if max_comments > 0 and len(comments) >= max_comments:
                             break
 
-                return jsonify({
-                    'shortcode': shortcode,
-                    'count': len(comments),
-                    'comments': comments,
-                    'source': 'yt-dlp',
-                })
-    except Exception as e2:
-        if not last_error:
-            last_error = str(e2)
+                if comments:
+                    return jsonify({
+                        'shortcode': shortcode,
+                        'count': len(comments),
+                        'comments': comments,
+                        'source': 'yt-dlp-subprocess',
+                    })
 
-    # ── Both failed — return descriptive error ────────────────────────────────
+    except Exception as e3:
+        if not last_error:
+            last_error = str(e3)
+
+    # ── All methods failed — return descriptive error ─────────────────────────
     if last_error_code == 'LOGIN_REQUIRED':
-        msg = (
-            'Instagram requires login to fetch comments. '
-            'Upload an Instagram cookies.txt file: '
-            '(1) Install "Get cookies.txt LOCALLY" browser extension, '
-            '(2) Log into instagram.com, '
-            '(3) Click the extension and export cookies, '
-            '(4) Upload the file using the "Upload cookies.txt" button above.'
-        )
+        msg = 'Instagram blocked the comment request (login required). Make sure you have uploaded a fresh cookies.txt file from an active Instagram session.'
     else:
-        msg = last_error or 'Could not fetch comments. Try uploading Instagram cookies.'
+        msg = last_error or 'Could not fetch comments. Instagram may be rate-limiting this server IP. Try again in a few minutes.'
 
     return jsonify({'error': msg, 'error_code': last_error_code}), 403
 
