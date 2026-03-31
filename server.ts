@@ -239,7 +239,7 @@ async function startServer() {
 
   // Flask proxy routes — forward YouTube/video/files API calls to Flask on port 8000
   const FLASK_URL = 'http://localhost:8000';
-  const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/health', '/api/instagram'];
+  const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/health', '/api/instagram', '/api/cookies'];
 
   app.use(flaskRoutes, async (req: any, res: any) => {
     const controller = new AbortController();

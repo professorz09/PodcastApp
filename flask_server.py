@@ -61,7 +61,9 @@ def cookies_path():
 
 
 def get_instagram_cookies():
-    """Extract all Instagram cookies from the saved Netscape cookies.txt file."""
+    """Extract all Instagram cookies from the saved Netscape cookies.txt file.
+    URL-decodes values so requests/instaloader gets the raw cookie values."""
+    from urllib.parse import unquote
     ck = cookies_path()
     if not ck:
         return {}
@@ -76,9 +78,10 @@ def get_instagram_cookies():
                 if len(parts) >= 7:
                     domain = parts[0].lstrip('.')
                     name = parts[5]
-                    value = parts[6]
+                    value = parts[6].strip('"')  # strip surrounding quotes
                     if 'instagram.com' in domain:
-                        cookies[name] = value
+                        # URL-decode values — some exports encode colons as %3A etc.
+                        cookies[name] = unquote(value)
     except Exception:
         pass
     return cookies
