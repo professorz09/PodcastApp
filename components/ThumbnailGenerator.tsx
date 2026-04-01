@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebateSegment, ThumbnailState, YoutubeImportData } from '../types';
-import { generateThumbnail, generateTitles, generateThumbnailText } from '../services/geminiService';
+import { generateThumbnail, generateTitles, generateThumbnailText, ThumbnailVideoStyle } from '../services/geminiService';
 import {
   Image, Loader2, RefreshCw, Download, ChevronLeft, X, ArrowRight,
   Upload, FileText, AlignLeft, Zap, Copy, Check, Wand2, Info,
@@ -45,7 +45,14 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
+  const [videoStyle, setVideoStyle] = useState<ThumbnailVideoStyle>('situational');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const styleOptions: { value: ThumbnailVideoStyle; label: string; desc: string; color: string }[] = [
+    { value: 'situational', label: 'Situational', desc: 'Emotional & personal story', color: 'rose' },
+    { value: 'debate', label: 'Debate', desc: 'Confrontational & bold', color: 'amber' },
+    { value: 'podcast', label: 'Podcast', desc: 'Shocking clickbait', color: 'purple' },
+  ];
 
   const hasScript = script.length > 0;
   const hasTranscript = !!(youtubeData?.fullText && youtubeData.fullText.trim().length > 0);
@@ -96,7 +103,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     setGenerateError(null);
     try {
       const text = getSourceText(titleSource);
-      const generatedTitles = await generateTitles(text);
+      const generatedTitles = await generateTitles(text, videoStyle);
       onUpdateThumbnailState({
         ...thumbnailState,
         titles: generatedTitles,
@@ -115,7 +122,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     setGenerateError(null);
     try {
       const text = getSourceText(titleSource);
-      const generatedTexts = await generateThumbnailText(text);
+      const generatedTexts = await generateThumbnailText(text, videoStyle);
       onUpdateThumbnailState({
         ...thumbnailState,
         thumbnailTexts: generatedTexts,
@@ -231,6 +238,34 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
             {/* ── LEFT: Controls ── */}
             <div className="space-y-4">
+
+              {/* ── Content Style Selector ── */}
+              <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
+                <div>
+                  <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Content Style</p>
+                  <p className="text-xs text-gray-600 mt-0.5">Title aur thumbnail text ka tone is pe depend karta hai</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {styleOptions.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setVideoStyle(opt.value)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
+                        videoStyle === opt.value
+                          ? opt.color === 'rose'
+                            ? 'bg-rose-600/20 border-rose-500/60 text-white'
+                            : opt.color === 'amber'
+                            ? 'bg-amber-600/20 border-amber-500/60 text-white'
+                            : 'bg-purple-600/20 border-purple-500/60 text-white'
+                          : 'bg-white/3 border-white/8 text-gray-400 hover:bg-white/6 hover:border-white/15'
+                      }`}
+                    >
+                      <span className="text-sm font-bold">{opt.label}</span>
+                      <span className="text-[10px] leading-tight opacity-70">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Source toggle */}
               {hasScript && hasTranscript && (

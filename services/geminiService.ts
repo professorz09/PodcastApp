@@ -24,22 +24,59 @@ const getApiKey = () => {
   return apiKey;
 };
 
-export const generateTitles = async (scriptText: string): Promise<string[]> => {
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast';
+
+const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
+  if (style === 'situational') {
+    return `
+    You are a YouTube copywriter specializing in personal story and emotional content.
+    Read the script and generate 4 highly clickable YouTube titles that feel deeply personal, relatable, and emotionally resonant.
+
+    Requirements:
+    1. First-person or story-driven: "I Lost Everything...", "Nobody Warned Me About This", "My Life Changed After..."
+    2. Make the viewer feel "this is literally my situation" or "I need to watch this"
+    3. Emotional words: "Broke Me", "Changed Everything", "Nobody Told Me", "I Finally Understood", "Worst Mistake"
+    4. Under 65 characters. No generic clickbait — must feel like a real person's real story.
+    5. Match the language/tone of the script (Hindi topics → Hinglish titles okay)
+    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
+    `;
+  }
+  if (style === 'debate') {
+    return `
+    You are a YouTube copywriter specializing in debate, opinion, and controversy content.
+    Read the script and generate 4 highly clickable YouTube titles that feel confrontational, opinionated, and debate-worthy.
+
+    Requirements:
+    1. Two-sides framing: "X vs Y: Who's Actually Right?", "Why Everyone Is WRONG About X", "The REAL Truth About X"
+    2. Challenge conventional wisdom: "Stop Believing This About X", "X Is A Lie — Here's Proof"
+    3. Strong opinion words: "EXPOSED", "DEBUNKED", "The REAL Truth", "WRONG", "FIGHT BACK", "Unpopular Opinion"
+    4. Under 65 characters. Must feel like a hot debate, not a tutorial.
+    5. Match the language/tone of the script (Hindi topics → Hinglish titles okay)
+    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
+    `;
+  }
+  // podcast / default
+  return `
+    You are an expert YouTube strategist and copywriter.
+    Read the ENTIRE script to deeply understand the core topic, context, and main conflict or value proposition.
+    Generate 4 highly clickable, catchy, viral-style YouTube video titles.
+
+    Requirements:
+    1. Topic MUST be immediately clear.
+    2. Hook/Curiosity: intense FOMO or curiosity bait.
+    3. Strong words: "Exposed", "The Truth", "Why You're Wrong", "Secret", "Nobody Talks About This"
+    4. Under 60 characters so they don't get cut off on mobile.
+    5. Match the language/tone of the script (Hindi topics → Hinglish titles okay)
+    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
+  `;
+};
+
+export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `
-    You are an expert YouTube strategist and copywriter. 
-    Read the ENTIRE script provided below to deeply understand the core topic, context, and the main conflict or value proposition.
-    
-    Based on the script, generate 4 highly clickable, catchy, and viral-style YouTube video titles.
-    
-    Requirements for the titles:
-    1. **Topic Clarity**: The main topic MUST be immediately clear to the viewer.
-    2. **Hook/Curiosity**: Structure the title like a hook to generate intense curiosity or FOMO (Fear Of Missing Out).
-    3. **Clickable**: Use strong, emotional, or action-oriented words (e.g., "Exposed", "The Truth", "Why You're Wrong", "Secret").
-    4. **Length**: Keep them concise (under 60 characters if possible) so they don't get cut off on mobile screens.
-    5. **Format**: Return ONLY a valid JSON array containing exactly 4 strings. Do not include markdown formatting like \`\`\`json.
+    ${getTitleStylePrompt(videoStyle)}
     
     Script:
     ${scriptText}
@@ -71,24 +108,67 @@ export const generateTitles = async (scriptText: string): Promise<string[]> => {
   }
 };
 
-export const generateThumbnailText = async (scriptText: string): Promise<string[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+const getThumbnailTextStylePrompt = (style: ThumbnailVideoStyle): string => {
+  if (style === 'situational') {
+    return `
+    You are a YouTube thumbnail copywriter specializing in personal story and emotional content.
+    Generate 5 SHORT thumbnail text lines (max 5 words each) that feel raw, personal, and emotionally heavy.
+    These appear as BIG BOLD TEXT on a thumbnail — NOT full titles.
 
-  const prompt = `
+    Style: emotional gut-punch, relatable pain, raw honesty.
+    Examples: "It Broke Me", "I Gave Up Everything", "No One Warned Me", "My Biggest Regret", "I Was Shattered", "Couldn't Tell Anyone", "Sabse Bada Ghalti", "Toot Gaya Main"
+    
+    Rules:
+    1. Max 5 words — short and emotionally heavy
+    2. First-person, raw, honest — NOT shocking clickbait
+    3. Can use "..." for trailing emotion, light caps for 1 word
+    4. NO dramatic punctuation like ?! or ALL CAPS screaming
+    5. Match content language (Hindi content → Hinglish/Hindi thumbnail text okay)
+    6. Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+    `;
+  }
+  if (style === 'debate') {
+    return `
+    You are a YouTube thumbnail copywriter specializing in debate and controversy content.
+    Generate 5 SHORT thumbnail text lines (max 5 words each) that feel confrontational, bold, and debate-worthy.
+    These appear as BIG BOLD TEXT on a thumbnail — NOT full titles.
+
+    Style: bold confrontation, challenging, two-sides battle.
+    Examples: "WHO'S RIGHT?", "BOTH WRONG?", "EXPOSED!", "The REAL Truth", "FIGHT BACK", "They LIED", "Yeh Galat Hai!", "Sach Suno", "DEBUNKED", "Stop Believing This"
+    
+    Rules:
+    1. Max 5 words — short and confrontational
+    2. Challenge, expose, or take a strong side
+    3. ALL CAPS for key words, dramatic punctuation (!?) welcome
+    4. Can use ellipsis (...) or censored style (SU*CIDE style) if topic warrants
+    5. Match content language (Hindi content → Hinglish/Hindi thumbnail text okay)
+    6. Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+    `;
+  }
+  // podcast / default
+  return `
     You are an expert YouTube thumbnail copywriter.
-    Read the content below to understand the core topic, main conflict, or shocking moment.
+    Generate 5 SHORT, PUNCHY, CLICKBAIT thumbnail text lines — these appear as BIG BOLD TEXT on a YouTube thumbnail (NOT full titles).
 
-    Generate 5 SHORT, PUNCHY, CLICKBAIT thumbnail text lines — these will appear as BIG BOLD TEXT overlaid on a YouTube thumbnail image (NOT full video titles).
+    Style: dramatic, shocking, curiosity-evoking — Joe Rogan / podcast style.
+    Examples: "I Quit...", "He EXPOSED Everything", "The Truth REVEALED", "They LIED To Us", "It's OVER...", "He Said WHAT?!", "Gone FOREVER", "Nobody Talks About This"
 
     Rules:
     1. Maximum 4-6 words only — short and explosive
     2. Dramatic, shocking, emotional, or intensely curiosity-evoking
-    3. Style examples: "I Quit...", "He EXPOSED Everything", "The Truth REVEALED", "They LIED To Us", "It's OVER...", "He Said WHAT?!", "Gone FOREVER", "Nobody Talks About This"
-    4. Can use ellipsis (...), ALL CAPS for 1-2 words, dramatic punctuation (!?), or censored words (SU*CIDE style)
-    5. NO full sentences — just the explosive hook phrase
-    6. Match the language/tone of the content (Hindi topics → Hindi or Hinglish lines okay)
-    7. Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+    3. Can use ellipsis (...), ALL CAPS for 1-2 words, dramatic punctuation (!?), or censored words (SU*CIDE style)
+    4. NO full sentences — just the explosive hook phrase
+    5. Match content language (Hindi content → Hinglish/Hindi thumbnail text okay)
+    6. Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+  `;
+};
+
+export const generateThumbnailText = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `
+    ${getThumbnailTextStylePrompt(videoStyle)}
 
     Content:
     ${scriptText}
