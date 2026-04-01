@@ -45,6 +45,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
   const [pairs, setPairs] = useState<{ title: string; thumbnailText: string }[]>([]);
   const [isGeneratingPair, setIsGeneratingPair] = useState(false);
+  const [pairError, setPairError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
@@ -202,11 +203,16 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     const sourceText = getSourceText(titleSource);
     if (!sourceText) return;
     setIsGeneratingPair(true);
+    setPairError(null);
     try {
       const result = await generateTitleTextPair(sourceText, videoStyle);
-      setPairs(result);
+      if (result.length === 0) {
+        setPairError('Koi pair nahi aaya — dobara try karo.');
+      } else {
+        setPairs(result);
+      }
     } catch (err: any) {
-      console.error('Pair generation error', err);
+      setPairError(err?.message || 'Generation fail hui. Dobara try karo.');
     } finally {
       setIsGeneratingPair(false);
     }
@@ -398,6 +404,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                       );
                     })}
                   </div>
+                ) : pairError ? (
+                  <p className="text-xs text-red-400 py-1">{pairError}</p>
                 ) : (
                   <p className="text-xs text-gray-600 py-1">"Generate Both" dabao → 3 matched pairs milenge. Ek click mein dono set ho jaayenge.</p>
                 )}

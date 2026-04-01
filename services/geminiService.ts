@@ -271,10 +271,14 @@ ${scriptText.slice(0, 3000)}`;
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { responseMimeType: 'application/json' },
     });
-    let jsonText = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(jsonText);
-    return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
+    const raw = response.text?.trim() || '[]';
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('Expected array from AI');
+    return parsed.slice(0, 3).filter(
+      (p: any) => p && typeof p.title === 'string' && typeof p.thumbnailText === 'string'
+    );
   } catch (error: any) {
     if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
       throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
