@@ -46,7 +46,6 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
   const [videoStyle, setVideoStyle] = useState<ThumbnailVideoStyle>('situational');
-  const [isDefaultStyle, setIsDefaultStyle] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const styleOptions: { value: ThumbnailVideoStyle; label: string; desc: string; color: string }[] = [
@@ -59,34 +58,6 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const hasTranscript = !!(youtubeData?.fullText && youtubeData.fullText.trim().length > 0);
   const hasEitherSource = hasScript || hasTranscript;
   const isStyleCopyMode = !!referenceImage;
-
-  const defaultStyleImageMap: Record<ThumbnailVideoStyle, string> = {
-    situational: '/default-style-situational.jpg',
-    debate: '/default-style-debate.jpg',
-    podcast: '/default-thumbnail-style.jpg',
-  };
-
-  const loadDefaultImage = (style: ThumbnailVideoStyle, extraUpdates: Partial<ThumbnailState> = {}) => {
-    fetch(defaultStyleImageMap[style])
-      .then(r => r.blob())
-      .then(blob => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const result = ev.target?.result as string;
-          const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-          if (match) {
-            setIsDefaultStyle(true);
-            onUpdateThumbnailState({
-              ...thumbnailState,
-              ...extraUpdates,
-              referenceImage: { mimeType: match[1], data: match[2], url: result },
-            });
-          }
-        };
-        reader.readAsDataURL(blob);
-      })
-      .catch(() => {});
-  };
 
   // Only initialize speaker names on mount — NO auto-generate
   useEffect(() => {
@@ -101,18 +72,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     const effectiveSource: TitleSource = hasScript ? 'script' : 'transcript';
     setTitleSource(effectiveSource);
 
-    if (!referenceImage) {
-      loadDefaultImage(videoStyle, changed ? updates : {});
-      return;
-    }
-
     if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates });
   }, []);
-
-  // Swap default image when style changes (only if current image is a default)
-  useEffect(() => {
-    if (isDefaultStyle) loadDefaultImage(videoStyle);
-  }, [videoStyle]);
 
   const getSourceText = (source: TitleSource): string => {
     if (source === 'transcript' && hasTranscript) return youtubeData!.fullText;
@@ -183,18 +144,12 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
   const handleRemoveImage = () => {
     onUpdateThumbnailState({ ...thumbnailState, referenceImage: null, extraInstructions: '' });
-    setIsDefaultStyle(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleImageUploadWithFlag = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIsDefaultStyle(false);
-    handleImageUpload(e);
   };
 
   const handleGenerateThumbnail = async () => {
     const textForThumbnail = selectedThumbnailText || selectedTitle;
-    if (!textForThumbnail || !guestName) return;
+    if (!textForThumbnail) return;
     setIsLoading(true);
     setLoadingStep(referenceImage ? 'inspecting' : 'generating');
     try {
@@ -463,43 +418,46 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 )}
               </div>
 
-              {/* ── STEP 3: Speakers ── */}
-              <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
-                <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 3 — Speakers</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-gray-500 font-medium">Host (right side)</label>
-                    <input
-                      type="text"
-                      value={hostName}
-                      onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
-                      placeholder="Joe Rogan"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
-                    />
+              {/* ── STEP 3: Speakers (Podcast only) ── */}
+              {videoStyle === 'podcast' && (
+                <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 3 — Speakers</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Podcast style mein naam zaroori hai</p>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-gray-500 font-medium">Guest (left side) *</label>
-                    <input
-                      type="text"
-                      value={guestName}
-                      onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
-                      placeholder="Guest ka naam..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Host (right side)</label>
+                      <input
+                        type="text"
+                        value={hostName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
+                        placeholder="Joe Rogan"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Guest (left side)</label>
+                      <input
+                        type="text"
+                        value={guestName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
+                        placeholder="Guest ka naam..."
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* ── STEP 4: Style ── */}
               <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
                 <div>
                   <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 4 — Style</p>
                   <p className="text-xs text-gray-600 mt-0.5">
-                    {isDefaultStyle
-                      ? 'Default style loaded — isko replace kar sakte ho apni image se'
-                      : isStyleCopyMode
+                    {isStyleCopyMode
                       ? 'Style Copy Mode — reference image ki style copy hogi, topic nayi hogi'
-                      : 'Apni thumbnail ki reference image upload karo'}
+                      : 'Apni thumbnail ki reference image upload karo (optional)'}
                   </p>
                 </div>
 
@@ -520,8 +478,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                     {/* Preview */}
                     <div className="relative w-full h-28 rounded-xl overflow-hidden border border-orange-500/30 group">
                       <img src={referenceImage.url} alt="Reference" className="w-full h-full object-cover" />
-                      <div className={`absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${isDefaultStyle ? 'bg-blue-600' : 'bg-orange-500'}`}>
-                        {isDefaultStyle ? '⭐ Default Style' : <><Copy size={9} /> Style Copy Mode</>}
+                      <div className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Copy size={9} /> Style Copy Mode
                       </div>
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button
@@ -560,7 +518,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 <input
                   type="file"
                   ref={fileInputRef}
-                  onChange={handleImageUploadWithFlag}
+                  onChange={handleImageUpload}
                   accept="image/jpeg,image/png,image/webp"
                   className="hidden"
                 />
