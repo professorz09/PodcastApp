@@ -2061,11 +2061,7 @@ The first chunk's start_seconds must be 0. The last chunk's end_seconds must be 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const STYLE_PROMPTS: Record<string, string> = {
-  funny: 'Funny meme rap song — internet humor, absurdist punchlines, relatable observations, unexpected wordplay. Think viral Twitter/Reddit humor turned into bars. Make people laugh out loud.',
-  sarcastic: 'Sarcastic roast song — dripping with sarcasm, dark wit, shade, and savage observations. Deadpan delivery. Every line should feel like a mic drop moment or a cutting remark.',
-  hiphop: 'Hip-hop street banger — hard-hitting bars, confident swagger, vivid storytelling, internal rhyme schemes. Real talk, no fluff. Think modern US hip-hop energy with cultural references.',
-  hollywood: 'Classic cinematic Hollywood song — dramatic, orchestral feel in the lyrics. Grand metaphors, emotional depth, sweeping imagery. Like a movie trailer anthem or a Disney villain song.',
-  viral: 'Viral pop bop — super catchy, radio-friendly, TikTok-worthy hook. Short punchy lines, repetitive chorus that sticks in your head, upbeat energy. Written to go viral on social media.',
+  auto: 'AUTO',
 };
 
 export const generateLyrics = async (params: {
@@ -2079,36 +2075,34 @@ export const generateLyrics = async (params: {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  const styleDesc = STYLE_PROMPTS[params.style] || params.style;
-
   const lang = params.language || 'Hindi';
 
   const topicLine = params.context
     ? `TOPIC (write ONLY about this): ${params.context}`
     : params.comments
-      ? `TOPIC: Derive the topic from the comments below — stay 100% true to what the comments are about.`
-      : `TOPIC: Write a general fun/relatable song in the given style.`;
+      ? `TOPIC: Derive the topic entirely from the comments below — stay 100% true to what the comments are about.`
+      : `TOPIC: Write a fun and creative song.`;
 
-  const prompt = `You are a creative lyricist. Write song lyrics STRICTLY about the topic given below. Do NOT add unrelated themes, do NOT default to politics unless the topic itself is political.
+  const prompt = `You are a creative lyricist. Your job is to write the BEST possible song for the given topic.
 
-STYLE: ${styleDesc}
-LANGUAGE: ${lang}
+LANGUAGE: ${lang} — natural, colloquial speech. Slang is welcome.
 ${topicLine}
-${params.comments ? `\nCOMMENTS (use the humor, emotions, and reactions from these — the song must reflect what these comments are about):\n${params.comments.slice(0, 3000)}` : ''}
-${params.directLyrics ? `\nUSER DRAFT (refine and expand this, keep the same topic):\n${params.directLyrics}` : ''}
+${params.comments ? `\nCOMMENTS FROM AUDIENCE (extract the topic, emotion, and humor from these — let them inspire every line):\n${params.comments.slice(0, 3000)}` : ''}
+${params.directLyrics ? `\nUSER'S DRAFT (refine and polish this, keep the same topic):\n${params.directLyrics}` : ''}
+
+STYLE INSTRUCTION: Choose the most fitting style yourself based on the topic and comments. If the topic is funny/meme-worthy → funny rap or sarcastic roast. If it's emotional → melodic/ballad. If it's hype/news → hip-hop bars. If it's dramatic/big → cinematic. If it's light/trendy → pop/viral. You decide — pick whatever makes the song hit hardest.
 
 Write complete song lyrics with:
-- [Mukhda] — hook/chorus capturing the core emotion or punchline of the topic (6–10 lines)
-- [Antara 1] — first verse with specific details about the topic (6–10 lines)
+- [Mukhda] — hook/chorus: the core punchline or emotion (6–10 lines)
+- [Antara 1] — first verse: specific details about the topic (6–10 lines)
 - [Mukhda] — repeat
-- [Antara 2] — second verse, different angle on the same topic (6–10 lines)
+- [Antara 2] — second verse: different angle or deeper take (6–10 lines)
 - [Mukhda] — repeat
 - [Bridge] — twist, punchline, or emotional peak (4–6 lines)
 
 STRICT RULES:
-• Stay 100% on the given topic. Never drift to unrelated subjects.
-• Language: ${lang} — natural, conversational, NOT formal. Slang welcome.
-• Match the style: ${styleDesc}
+• Write ONLY about the given topic. Never drift.
+• Do NOT add politics unless the topic itself is political.
 • Output ONLY the lyrics with section labels. No explanations, no commentary.`;
 
   try {
@@ -2144,14 +2138,7 @@ export const generateSongAudio = async (
     .trim();
 
   // Build a Lyria-optimized music generation prompt
-  const styleMap: Record<string, string> = {
-    funny:     'Comedic rap beat with bouncy bass, playful synths, and upbeat humorous energy',
-    sarcastic: 'Dark satirical rap with minor key piano, punchy 808s, and dry deadpan delivery',
-    hiphop:    'Modern US hip-hop banger with heavy 808 bass, trap hi-hats, and confident rap vocals',
-    hollywood: 'Epic cinematic orchestral piece with sweeping strings, brass fanfare, and dramatic choir',
-    viral:     'Upbeat viral pop song with catchy synth hook, claps, and energetic modern production',
-  };
-  const musicDesc = styleMap[style] || `${style} style Indian music`;
+  const musicDesc = 'A modern song with vocals — let the lyrics determine the mood, genre, and instrumentation';
 
   const musicPrompt = `${musicDesc}. Include vocals singing these lyrics:\n\n${cleanLyrics.slice(0, 800)}`;
 

@@ -9,16 +9,8 @@ import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
 import LyricsCanvas from './LyricsCanvas';
 
 type Phase = 'write' | 'song' | 'canvas';
-type Style = 'funny' | 'sarcastic' | 'hiphop' | 'hollywood' | 'viral';
+type Style = 'auto';
 type LangKey = 'Hindi' | 'English';
-
-const STYLES: { id: Style; label: string; emoji: string; desc: string }[] = [
-  { id: 'funny',     label: 'Funny Meme Rap',   emoji: '🤣', desc: 'Internet humor, punchlines, meme energy' },
-  { id: 'sarcastic', label: 'Sarcastic Roast',  emoji: '😏', desc: 'Dark wit, shade, savage burns' },
-  { id: 'hiphop',    label: 'Hip-Hop / Street', emoji: '🎤', desc: 'Hard bars, swagger, storytelling' },
-  { id: 'hollywood', label: 'Classic Hollywood',emoji: '🎬', desc: 'Cinematic, dramatic, orchestral feel' },
-  { id: 'viral',     label: 'Pop / Viral',      emoji: '🌟', desc: 'TikTok-ready, catchy, radio-friendly' },
-];
 
 const LYRIA_MODELS = [
   { id: 'lyria-3-clip-preview', label: 'Lyria 3 Clip', desc: '~30 sec · Fast', badge: '⚡' },
@@ -57,7 +49,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const [contextText, setContextText] = useState('');
   const [directMode, setDirectMode] = useState(false);
   const [directLyrics, setDirectLyrics] = useState('');
-  const [style, setStyle] = useState<Style>('funny');
+  const [style] = useState<Style>('auto');
   const [language, setLanguage] = useState<LangKey>('Hindi');
   const [model, setModel] = useState('gemini-3-flash-preview');
 
@@ -245,26 +237,6 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                 className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 focus:outline-none focus:border-purple-500/40 resize-none font-mono"
               />
             )}
-          </Section>
-
-          {/* Style picker */}
-          <Section>
-            <Label>Song Style</Label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {STYLES.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => setStyle(s.id)}
-                  className={`flex items-start gap-2 p-3 rounded-xl border text-left transition-all active:scale-95 ${style === s.id ? 'border-purple-500/50 bg-purple-500/10 text-white' : 'border-white/8 text-gray-500 hover:border-white/15 hover:text-gray-300'}`}
-                >
-                  <span className="text-base leading-none">{s.emoji}</span>
-                  <div>
-                    <div className="text-xs font-semibold">{s.label}</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">{s.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
           </Section>
 
           {/* Language + Model */}
