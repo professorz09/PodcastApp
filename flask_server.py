@@ -1047,15 +1047,15 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
             'error': msg, 'error_code': code,
         }
 
-    # ── Attempt 0: instagrapi — Private API (most reliable with cookies) ──────
-    update('Trying instagrapi Private API…')
+    # ── instagrapi — Private API with chunked pagination ──────────────────────
+    update('Connecting to Instagram…')
     try:
-        import concurrent.futures as _cf
+        import time as _time
         from instagrapi import Client as IGClient
 
         ig_cookies = get_instagram_cookies()
         if not ig_cookies or 'sessionid' not in ig_cookies:
-            raise Exception("No session cookies — skipping instagrapi")
+            raise Exception("No session cookies — upload cookies.txt first")
 
         cl = IGClient()
         cl.set_settings({'authorization_data': {'sessionid': ig_cookies.get('sessionid', '')}})
@@ -1065,309 +1065,56 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
             'User-Agent': 'Instagram 295.0.0.32.119 Android (30/11; 420dpi; 1080x2400; Google; Pixel 6; oriole; qcom; en_US; 490770583)',
         })
 
-        def _run_instagrapi():
-            mpk = cl.media_pk_from_url(url)
-            return list(cl.media_comments(mpk, amount=max_comments if max_comments > 0 else 0))
+        update('Fetching post ID…')
+        mpk = cl.media_pk_from_url(url)
 
-        with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
-            _fut = _ex.submit(_run_instagrapi)
+        # ── Chunked pagination: keeps fetching until max_comments reached ──────
+        collected = []
+        min_id = None
+        page = 0
+        while True:
             try:
-                raw = _fut.result(timeout=45)   # hard 45-second cap
-            except _cf.TimeoutError:
-                raise Exception("instagrapi timed out after 45s — no response from Instagram")
+                chunk, min_id = cl.media_comments_chunk(mpk, min_id=min_id)
+            except AttributeError:
+                # Older instagrapi without media_comments_chunk — fallback
+                chunk = cl.media_comments(mpk, amount=max_comments if max_comments > 0 else 0)
+                min_id = None
 
-        comments = []
-        for c in raw:
-            text = (c.text or '').strip()
-            if text:
-                comments.append(text)
-                if max_comments > 0 and len(comments) >= max_comments:
+            for c in chunk:
+                text = (c.text or '').strip()
+                if text:
+                    collected.append(text)
+                if max_comments > 0 and len(collected) >= max_comments:
                     break
-            if len(comments) % 50 == 0 and comments:
-                update(f'instagrapi: {len(comments)} comments…')
+
+            page += 1
+            update(f'Fetching comments… {len(collected)} so far (page {page})')
+
+            if not min_id:
+                break
+            if max_comments > 0 and len(collected) >= max_comments:
+                break
+            _time.sleep(0.4)   # small delay to avoid rate-limiting
+
+        comments = collected[:max_comments] if max_comments > 0 else collected
 
         if comments:
             return finish_ok(comments, 'instagrapi')
-        last_error = 'instagrapi returned 0 comments'
+        last_error = 'instagrapi: post has 0 comments'
 
     except ImportError:
         last_error = 'instagrapi not installed'
     except Exception as e0:
         err0 = str(e0)
-        if any(k in err0.lower() for k in ['401', '403', 'login', 'forbidden', 'challenge', 'unauthorized']):
+        if any(k in err0.lower() for k in ['401', '403', 'login', 'forbidden', 'challenge', 'unauthorized', 'cookie']):
             last_error_code = 'LOGIN_REQUIRED'
         last_error = f'instagrapi: {err0}'
 
-    # ── Attempt 1: curl_cffi — Chrome TLS fingerprint (best for public posts) ─
-    update('Trying curl_cffi (Chrome TLS)…')
-    try:
-        from curl_cffi import requests as cffi_req
-        import json as _json
-        import time as _time
-
-        ig_cookies = get_instagram_cookies()
-        cffi_headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'X-IG-App-ID': '936619743392459',
-            'Referer': f'https://www.instagram.com/p/{shortcode}/',
-            'Origin': 'https://www.instagram.com',
-        }
-
-        sess_cffi = cffi_req.Session(impersonate='chrome124')
-        if ig_cookies:
-            for name, val in ig_cookies.items():
-                sess_cffi.cookies.set(name, val, domain='.instagram.com')
-
-        media_id = shortcode_to_mediaid(shortcode)
-        comments = []
-        min_id = None
-        for _page in range(50):   # up to 50 pages (≈1000 comments per page)
-            params = {'can_support_threading': 'true', 'permalink_enabled': 'false'}
-            if min_id:
-                params['min_id'] = min_id
-            r = sess_cffi.get(
-                f'https://i.instagram.com/api/v1/media/{media_id}/comments/',
-                params=params, headers=cffi_headers, timeout=20,
-            )
-            if r.status_code == 401:
-                raise Exception('401 Unauthorized (need cookies)')
-            if r.status_code != 200:
-                raise Exception(f'HTTP {r.status_code}')
-
-            d = r.json()
-            for c in d.get('comments', []):
-                text = (c.get('text') or '').strip()
-                if text:
-                    comments.append(text)
-                    if max_comments > 0 and len(comments) >= max_comments:
-                        break
-            if len(comments) % 100 == 0 and comments:
-                update(f'curl_cffi: {len(comments)} comments…')
-            if max_comments > 0 and len(comments) >= max_comments:
-                break
-            next_min = d.get('next_min_id')
-            if not next_min or not d.get('has_more_comments'):
-                break
-            min_id = next_min
-            _time.sleep(0.5)
-
-        # GraphQL fallback (public posts, no cookies needed)
-        if not comments:
-            update('Trying GraphQL fallback…')
-            gql_params = {
-                'doc_id': '9310670392322965',
-                'variables': _json.dumps({'shortcode': shortcode, 'first': 50}),
-            }
-            gr = sess_cffi.get('https://www.instagram.com/graphql/query/', params=gql_params, headers=cffi_headers, timeout=20)
-            if gr.status_code == 200:
-                try:
-                    edges = (gr.json().get('data', {}).get('xdt_shortcode_media', {})
-                             .get('edge_media_to_parent_comment', {}).get('edges', []))
-                    for edge in edges:
-                        text = (edge.get('node', {}).get('text') or '').strip()
-                        if text:
-                            comments.append(text)
-                            if max_comments > 0 and len(comments) >= max_comments:
-                                break
-                except Exception:
-                    pass
-
-        if comments:
-            return finish_ok(comments, 'curl_cffi')
-        if not last_error:
-            last_error = 'curl_cffi: 0 comments returned'
-
-    except ImportError:
-        if not last_error:
-            last_error = 'curl_cffi not installed'
-    except Exception as e1:
-        err1 = str(e1)
-        if any(k in err1.lower() for k in ['401', '403', 'login', 'forbidden', 'unauthorized']):
-            last_error_code = 'LOGIN_REQUIRED'
-        if not last_error:
-            last_error = f'curl_cffi: {err1}'
-
-    # ── Attempt 2: requests Mobile-app API simulation ─────────────────────────
-    update('Trying mobile API…')
-    try:
-        import requests as req_lib
-        import uuid
-        import time as time_mod
-
-        ig_cookies = get_instagram_cookies()
-        if not ig_cookies or 'sessionid' not in ig_cookies:
-            raise Exception("No session cookies")
-
-        media_id = shortcode_to_mediaid(shortcode)
-        sess = req_lib.Session()
-        for name, val in ig_cookies.items():
-            sess.cookies.set(name, val, domain='.instagram.com')
-
-        mob_headers = {
-            'User-Agent': 'Instagram 295.0.0.32.119 Android (30/11; 420dpi; 1080x2400; Google; Pixel 6; oriole; qcom; en_US; 490770583)',
-            'Accept': '*/*', 'Accept-Encoding': 'gzip, deflate', 'Accept-Language': 'en-US',
-            'X-IG-App-ID': '567067343352427',
-            'X-IG-Android-ID': f'android-{uuid.uuid4().hex[:16]}',
-            'X-IG-Capabilities': '3brTvw8=', 'X-IG-Connection-Type': 'WIFI',
-            'X-Pigeon-Session-Id': str(uuid.uuid4()),
-            'X-Pigeon-Rawclienttime': str(round(time_mod.time(), 3)),
-        }
-
-        comments = []
-        min_id = None
-        for _ in range(50):
-            params = {'can_support_threading': 'true', 'permalink_enabled': 'false'}
-            if min_id:
-                params['min_id'] = min_id
-            r = sess.get(f'https://i.instagram.com/api/v1/media/{media_id}/comments/',
-                         params=params, headers=mob_headers, timeout=15)
-            if r.status_code != 200:
-                raise Exception(f'HTTP {r.status_code}')
-            d = r.json()
-            if d.get('status') != 'ok':
-                raise Exception(f"API error: {d.get('message', d.get('status'))}")
-            for c in d.get('comments', []):
-                text = (c.get('text') or '').strip()
-                if text:
-                    comments.append(text)
-                    if max_comments > 0 and len(comments) >= max_comments:
-                        break
-            if max_comments > 0 and len(comments) >= max_comments:
-                break
-            next_min = d.get('next_min_id')
-            if not next_min:
-                break
-            min_id = next_min
-
-        if comments:
-            return finish_ok(comments, 'mobile-api')
-        if not last_error:
-            last_error = 'Mobile API: 0 comments'
-
-    except Exception as e2:
-        err2 = str(e2)
-        if any(k in err2.lower() for k in ['401', '403', 'login', 'forbidden']):
-            last_error_code = 'LOGIN_REQUIRED'
-        if not last_error:
-            last_error = f'mobile-api: {err2}'
-
-    # ── Attempt 3: instaloader ────────────────────────────────────────────────
-    update('Trying instaloader…')
-    try:
-        import instaloader
-        L = instaloader.Instaloader(quiet=True, download_pictures=False,
-            download_videos=False, download_video_thumbnails=False,
-            download_geotags=False, download_comments=True,
-            save_metadata=False, max_connection_attempts=1)
-
-        ig_cookies = get_instagram_cookies()
-        if ig_cookies:
-            for name, value in ig_cookies.items():
-                L.context._session.cookies.set(name, value, domain='.instagram.com', path='/')
-            if 'sessionid' in ig_cookies:
-                L.context.username = ig_cookies.get('ds_user_id', 'user')
-
-        post = instaloader.Post.from_shortcode(L.context, shortcode)
-        comments = []
-        for comment in post.get_comments():
-            if max_comments > 0 and len(comments) >= max_comments:
-                break
-            text = comment.text.strip() if comment.text else ''
-            if text:
-                comments.append(text)
-
-        if comments:
-            return finish_ok(comments, 'instaloader')
-        if not last_error:
-            last_error = 'instaloader: 0 comments'
-
-    except ImportError:
-        if not last_error:
-            last_error = 'instaloader not installed'
-    except Exception as e3:
-        err3 = str(e3)
-        if '401' in err3 or '403' in err3 or 'login' in err3.lower() or 'Forbidden' in err3:
-            last_error_code = 'LOGIN_REQUIRED'
-        if not last_error:
-            last_error = f'instaloader: {err3}'
-
-    # ── Attempt 4: yt-dlp Python API ─────────────────────────────────────────
-    update('Trying yt-dlp…')
-    try:
-        import yt_dlp
-        ck = cookies_path()
-        ytdl_opts = {'getcomments': True, 'skip_download': True,
-                     'quiet': True, 'no_warnings': True, 'extract_flat': False}
-        if ck:
-            ytdl_opts['cookiefile'] = ck
-
-        with yt_dlp.YoutubeDL(ytdl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-
-        comments = []
-        for c in (info or {}).get('comments', []):
-            text = (c.get('text') or '').strip()
-            if not text:
-                continue
-            if c.get('parent') in (None, False, 'root', ''):
-                comments.append(text)
-                if max_comments > 0 and len(comments) >= max_comments:
-                    break
-
-        if comments:
-            return finish_ok(comments, 'yt-dlp')
-        if not last_error:
-            last_error = 'yt-dlp: 0 comments'
-
-    except Exception as e4:
-        err4 = str(e4)
-        if '401' in err4 or '403' in err4 or 'login' in err4.lower():
-            last_error_code = 'LOGIN_REQUIRED'
-        if not last_error:
-            last_error = f'yt-dlp: {err4}'
-
-    # ── Attempt 5: yt-dlp subprocess (last resort) ────────────────────────────
-    update('Trying yt-dlp subprocess…')
-    try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_template = os.path.join(tmpdir, shortcode)
-            cmd = ['yt-dlp', '--write-info-json', '--write-comments',
-                   '--skip-download', '--no-playlist', '--no-warnings',
-                   *cookies_args(), '-o', out_template, url]
-            subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-
-            info_path = out_template + '.info.json'
-            if not os.path.exists(info_path):
-                candidates = [f for f in os.listdir(tmpdir) if f.endswith('.info.json')]
-                if candidates:
-                    info_path = os.path.join(tmpdir, candidates[0])
-
-            if os.path.exists(info_path):
-                with open(info_path, 'r', encoding='utf-8') as f:
-                    info = json.load(f)
-                comments = []
-                for c in info.get('comments', []):
-                    text = (c.get('text') or '').strip()
-                    if not text:
-                        continue
-                    if c.get('parent') in (None, False, 'root', ''):
-                        comments.append(text)
-                        if max_comments > 0 and len(comments) >= max_comments:
-                            break
-                if comments:
-                    return finish_ok(comments, 'yt-dlp-subprocess')
-
-    except Exception as e5:
-        if not last_error:
-            last_error = str(e5)
-
-    # ── All methods failed ─────────────────────────────────────────────────────
+    # ── Failed ────────────────────────────────────────────────────────────────
     if last_error_code == 'LOGIN_REQUIRED':
         msg = 'Instagram blocked the request (login required). Upload a fresh cookies.txt from an active Instagram session.'
     else:
-        msg = last_error or 'Could not fetch comments. Instagram may be rate-limiting this IP. Try again in a few minutes.'
+        msg = last_error or 'Could not fetch comments. Try uploading fresh cookies.txt.'
     finish_err(msg, last_error_code)
 
 
