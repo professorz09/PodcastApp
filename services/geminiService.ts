@@ -441,15 +441,51 @@ export const generateDebateScript = async (
               }
 
               ══════════════════════════════════════════
-              【 SPEAKER 1 — STORY TELLER (situation में फंसा इंसान) 】
+              【 SPEAKER 1 — THE HOOK + STORY (situation में फंसा इंसान) 】
               ══════════════════════════════════════════
-              ★ यह इंसान एक STORY सुनाता है — dry facts नहीं।
-              ★ SPECIFIC details दो: exact amount ($23,000 credit card debt), specific date ("March में जब layoff हुई"), real emotion ("रात को 2 बजे wife रो रही थी")
-              ★ CINEMATIC opening: सीधे moment से शुरू करो — "तीन हफ्ते पहले मुझे एक email आई जिसने सब कुछ बदल दिया..."
-              ★ कहानी में arc होनी चाहिए: पहले सब ठीक था → फिर क्या हुआ → अभी कहाँ हूँ → क्या confusion है
-              ★ Middle-class USA context: rent, credit score, 401k, H1B, student loan, car payment, medical bill — जो भी relevant हो
-              ★ अपनी गलती भी honestly बताओ — audience को relate होगा
-              ★ एक specific सवाल पूछो जो उसे सबसे ज़्यादा परेशान कर रहा है
+
+              ⚡ RULE #0 — HOOK: पहली LINE ही audience को रोक दे।
+              Generic openings BANNED हैं: "Hi, मैं आज एक situation share करना चाहता हूँ..." — यह मत लिखो।
+              पहली line में IMMEDIATELY punch होनी चाहिए। नीचे से कोई एक pattern choose करो:
+
+              ┌─────────────────────────────────────────────────────┐
+              │ HOOK PATTERN 1 — REVERSE REVEAL (सबसे powerful)     │
+              │ Result पहले बताओ, फिर story उलटी चलाओ              │
+              │ "तीन महीने पहले मेरे account में $178,000 थे।       │
+              │  आज मेरे पास $47 हैं। और यह कोई जुआ नहीं था।"      │
+              ├─────────────────────────────────────────────────────┤
+              │ HOOK PATTERN 2 — MID-SCENE DROP                     │
+              │ सबसे worst moment के बीच से शुरू करो               │
+              │ "मैं office parking lot में अपनी car में बैठा था,   │
+              │  lunch कर रहा था। Phone vibrate किया।               │
+              │  Screen पर था — IRS Notice: $67,000 due."           │
+              ├─────────────────────────────────────────────────────┤
+              │ HOOK PATTERN 3 — IMPOSSIBLE CONTRADICTION           │
+              │ जो impossible लगे वो सच हो                         │
+              │ "मैं एक software engineer हूँ। $130k salary है।     │
+              │  और मैं financially इतना broke हूँ कि rent नहीं    │
+              │  दे पा रहा। हाँ, यह possible है।"                  │
+              ├─────────────────────────────────────────────────────┤
+              │ HOOK PATTERN 4 — TICKING CLOCK                      │
+              │ Immediate urgency — deadline दिखाओ                  │
+              │ "मेरे पास 14 दिन हैं। उसके बाद या तो मैं decide   │
+              │  करता हूँ, या decision मेरे लिए हो जाएगा।"         │
+              └─────────────────────────────────────────────────────┘
+
+              Hook के बाद STORY आती है — यह arc follow करो:
+              → Scene: कहाँ थे, क्या सोच रहे थे, life normal थी
+              → Turning Point: वो exact moment जब सब बदला — date, amount, जगह, feeling
+              → Spiral: चीज़ें कैसे worse होती गईं — एक-एक कदम
+              → Now: आज कहाँ हो — emotionally और practically
+              → The ONE question: वो एक सवाल जो रात को सोने नहीं देता
+
+              ★ SPECIFIC details mandatory: "$23,400 credit card debt" नहीं "बहुत debt है"
+              ★ Sensory emotion: "बच्चा पूछता है papa new shoes कब मिलेंगे — मैं कुछ नहीं बोल सका"
+              ★ USA middle-class reality में रखो: credit score, H1B, 401k, car loan, medical bill
+              ★ अपनी गलती openly बताओ — audience को तभी ACTUALLY connect होगा
+              ★ अंत में ONE burning question — vague नहीं, specific: "क्या मुझे अभी bankruptcy file करनी चाहिए या पहले negotiate करना चाहिए?"
+              ★ BANNED openings: "Hi, mera naam...", "Aaj main share karna chahta hoon...", "Toh basically..."
+              ★ LENGTH: Hook छोटी हो — 1-2 sentences। फिर story naturally build हो।
 
               ══════════════════════════════════════════
               【 SPEAKER 2 — EXPERT 1 (पहला angle) 】
@@ -985,15 +1021,52 @@ export const generateDebateScript = async (
             }
 
             ══════════════════════════════════════════
-            【 SPEAKER 1 — STORYTELLER (the person in the situation) 】
+            【 SPEAKER 1 — THE HOOK + STORY (the person in the situation) 】
             ══════════════════════════════════════════
-            ★ Tell a STORY — not a list of facts. Make it cinematic.
-            ★ Open with a specific moment: "Three weeks ago I got an email that changed everything..."
-            ★ Use SPECIFIC details: exact dollar amounts ($23,000 credit card debt), real dates ("when I got laid off in March"), sensory emotion ("my wife was crying at 2am and I didn't know what to say")
-            ★ Story arc: life was fine → then THIS happened → now I'm here → here's what I can't figure out
-            ★ USA middle-class context: credit score drops, rent hikes, car payments, medical surprise bills, H1B timelines, student loans — whatever fits
-            ★ Be honest about your own mistakes — audiences respect vulnerability
-            ★ End with ONE specific burning question — the thing that's keeping you up at night
+
+            ⚡ RULE #0 — THE HOOK: The very first line must STOP the audience cold.
+            BANNED openers: "Hi, so today I want to share something...", "Okay so basically...", "Let me tell you my story..." — NEVER write these.
+            The first line must create INSTANT curiosity. Choose one of these proven hook patterns:
+
+            ┌──────────────────────────────────────────────────────────┐
+            │ HOOK PATTERN 1 — REVERSE REVEAL (most powerful)          │
+            │ State the shocking outcome first, then unravel the story  │
+            │ "Three months ago I had $178,000 in my savings account.  │
+            │  Today I have $47. And it wasn't gambling."              │
+            ├──────────────────────────────────────────────────────────┤
+            │ HOOK PATTERN 2 — MID-SCENE DROP                          │
+            │ Drop into the exact worst moment — already in progress   │
+            │ "I was eating lunch in my car in the office parking lot. │
+            │  My phone buzzed. IRS Notice: $67,000 due. I just sat    │
+            │  there. Couldn't move."                                  │
+            ├──────────────────────────────────────────────────────────┤
+            │ HOOK PATTERN 3 — IMPOSSIBLE CONTRADICTION                │
+            │ Something that sounds impossible — but is true           │
+            │ "I'm a software engineer making $130k a year in          │
+            │  California. And I can't pay my rent this month.         │
+            │  Yeah. That's possible."                                 │
+            ├──────────────────────────────────────────────────────────┤
+            │ HOOK PATTERN 4 — TICKING CLOCK                           │
+            │ Immediate hard deadline creates urgency                  │
+            │ "I have 14 days to make a decision. After that, the      │
+            │  decision gets made for me. And I still don't know       │
+            │  what to do."                                            │
+            └──────────────────────────────────────────────────────────┘
+
+            After the hook, the STORY unfolds — follow this arc:
+            → Scene: where you were, what life looked like before
+            → Turning Point: the exact moment everything changed — specific date, amount, place, feeling
+            → Spiral: how things got progressively worse — each step, not a summary
+            → Now: where you stand today — emotionally and practically
+            → The ONE question: the thing you cannot figure out, keeping you up at night
+
+            ★ SPECIFIC details non-negotiable: "$23,400 credit card debt" not "a lot of debt"
+            ★ Sensory emotion: "My kid asked me when we could get new shoes. I couldn't answer."
+            ★ USA middle-class reality: credit score numbers, H1B status, 401k penalties, car loan, surprise medical bills
+            ★ Own your mistakes openly — that's what makes audiences actually connect
+            ★ End with ONE burning specific question — not vague: "Should I file Chapter 7 now or try to negotiate with creditors first?"
+            ★ BANNED openers: "Hi, my name is...", "Today I want to share...", "So basically what happened was..."
+            ★ Hook = 1–2 sentences MAX. Then the story builds naturally from there.
 
             ══════════════════════════════════════════
             【 SPEAKER 2 — EXPERT 1 (first angle) 】
