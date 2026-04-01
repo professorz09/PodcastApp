@@ -2110,6 +2110,9 @@ Rules:
     const response = await ai.models.generateContent({
       model: params.model || 'gemini-3-flash-preview',
       contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
     });
     if (!response.text) throw new Error('Gemini returned empty lyrics');
     return response.text.trim();
@@ -2124,37 +2127,44 @@ Rules:
 export const generateSongAudio = async (
   lyrics: string,
   style: string,
-  voiceName: string = 'Aoede',
+  lyriaModel: string = 'lyria-3-clip-preview',
 ): Promise<Blob> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  // Strip section labels for clean TTS reading
+  // Strip section labels for clean music prompt
   const cleanLyrics = lyrics
     .replace(/\[(Mukhda|Antara \d+|Bridge|Sanchari|Chorus|Verse \d+)\]/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  const instruction = `Recite these ${style} song lyrics with rhythm, emotion, and musical cadence — as if performing them live:\n\n${cleanLyrics}`;
+  // Build a Lyria-optimized music generation prompt
+  const styleMap: Record<string, string> = {
+    bollywood: 'Bollywood film song with orchestral strings, tabla, and soulful vocals',
+    rap: 'Desi hip-hop rap beat with heavy bass, 808 drums, and expressive rap vocals',
+    pop: 'Upbeat pop song with catchy chorus, acoustic guitar, and clear modern vocals',
+    ghazal: 'Classical ghazal with harmonium, tabla, and melodic Urdu-Hindi vocals',
+    folk: 'Indian folk/lok geet with dhol, flute, and warm acoustic instruments',
+  };
+  const musicDesc = styleMap[style] || `${style} style Indian music`;
+
+  const musicPrompt = `${musicDesc}. Include vocals singing these lyrics:\n\n${cleanLyrics.slice(0, 800)}`;
 
   const response = await (ai.models as any).generateContent({
-    model: 'gemini-2.5-flash-preview-tts',
-    contents: [{ parts: [{ text: instruction }] }],
+    model: lyriaModel,
+    contents: musicPrompt,
     config: {
       responseModalities: ['AUDIO'],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName },
-        },
-      },
     },
   });
 
-  const part = response?.candidates?.[0]?.content?.parts?.[0];
-  if (!part?.inlineData?.data) throw new Error('Gemini TTS returned no audio data');
+  // Lyria returns parts array — iterate to find audio
+  const parts = response?.candidates?.[0]?.content?.parts || [];
+  const audioPart = parts.find((p: any) => p?.inlineData?.data);
+  if (!audioPart?.inlineData?.data) throw new Error('Lyria returned no audio data. Try again.');
 
-  const raw = atob(part.inlineData.data);
+  const raw = atob(audioPart.inlineData.data);
   const buf = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
-  return new Blob([buf], { type: part.inlineData.mimeType || 'audio/wav' });
+  return new Blob([buf], { type: audioPart.inlineData.mimeType || 'audio/wav' });
 };

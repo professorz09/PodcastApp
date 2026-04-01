@@ -20,12 +20,9 @@ const STYLES: { id: Style; label: string; emoji: string; desc: string }[] = [
   { id: 'folk',      label: 'Folk / Lok Geet', emoji: '🪘', desc: 'Traditional baithak vibe' },
 ];
 
-const VOICES = [
-  { id: 'Aoede', label: 'Aoede (Female)' },
-  { id: 'Charon', label: 'Charon (Male)' },
-  { id: 'Fenrir', label: 'Fenrir (Male, deep)' },
-  { id: 'Kore', label: 'Kore (Female, soft)' },
-  { id: 'Puck', label: 'Puck (Male, expressive)' },
+const LYRIA_MODELS = [
+  { id: 'lyria-3-clip-preview', label: 'Lyria 3 Clip', desc: '~30 sec · Fast', badge: '⚡' },
+  { id: 'lyria-3-pro-preview',  label: 'Lyria 3 Pro',  desc: '~3 min · Studio quality', badge: '🎵' },
 ];
 
 const LANGS: LangKey[] = ['Hindi', 'English'];
@@ -70,7 +67,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const [lyricsError, setLyricsError] = useState('');
 
   // ── Song audio ───────────────────────────────────────────────
-  const [voice, setVoice] = useState('Aoede');
+  const [lyriaModel, setLyriaModel] = useState('lyria-3-clip-preview');
   const [isMakingSong, setIsMakingSong] = useState(false);
   const [songBlob, setSongBlob] = useState<Blob | null>(null);
   const [songUrl, setSongUrl] = useState('');
@@ -112,7 +109,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
     if (songUrl) URL.revokeObjectURL(songUrl);
     setSongUrl('');
     try {
-      const blob = await generateSongAudio(lyrics, style, voice);
+      const blob = await generateSongAudio(lyrics, style, lyriaModel);
       setSongBlob(blob);
       const url = URL.createObjectURL(blob);
       setSongUrl(url);
@@ -121,7 +118,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
     } finally {
       setIsMakingSong(false);
     }
-  }, [lyrics, style, voice, songUrl]);
+  }, [lyrics, style, lyriaModel, songUrl]);
 
   const handleTranscribe = useCallback(async () => {
     if (!songBlob) return;
@@ -348,17 +345,18 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
             />
           </Section>
 
-          {/* Voice + Generate Song */}
+          {/* Lyria Model + Generate Song */}
           <Section>
-            <Label>Song Voice (Gemini TTS)</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {VOICES.map(v => (
+            <Label>Music Model (Google Lyria 3)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {LYRIA_MODELS.map(m => (
                 <button
-                  key={v.id}
-                  onClick={() => setVoice(v.id)}
-                  className={`text-[11px] px-2.5 py-1.5 rounded-lg border transition-all ${voice === v.id ? 'border-pink-500/50 bg-pink-500/10 text-pink-300' : 'border-white/8 text-gray-600 hover:text-gray-400'}`}
+                  key={m.id}
+                  onClick={() => setLyriaModel(m.id)}
+                  className={`flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border transition-all text-left ${lyriaModel === m.id ? 'border-pink-500/50 bg-pink-500/10 text-white' : 'border-white/8 text-gray-600 hover:text-gray-400 hover:border-white/15'}`}
                 >
-                  {v.label}
+                  <span className="text-sm">{m.badge} <span className="text-xs font-semibold">{m.label}</span></span>
+                  <span className="text-[10px] opacity-60">{m.desc}</span>
                 </button>
               ))}
             </div>
@@ -369,7 +367,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
               className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-all active:scale-[0.98]"
             >
               {isMakingSong ? <Loader2 size={15} className="animate-spin" /> : <Music2 size={15} />}
-              {isMakingSong ? 'Song ban raha hai…' : 'Song Banao (Gemini TTS)'}
+              {isMakingSong ? 'Song ban raha hai…' : 'Song Banao (Lyria 3)'}
             </button>
 
             {songError && <ErrBox msg={songError} />}
@@ -392,7 +390,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                   </button>
                   <div className="flex-1">
                     <div className="text-xs text-white font-medium">Song Audio Ready</div>
-                    <div className="text-[11px] text-gray-500">Style: {style} · Voice: {voice}</div>
+                    <div className="text-[11px] text-gray-500">Style: {style} · {LYRIA_MODELS.find(m => m.id === lyriaModel)?.label || 'Lyria 3'}</div>
                   </div>
                   <button onClick={downloadSong} className="text-gray-600 hover:text-gray-400 p-2">
                     <Download size={15} />

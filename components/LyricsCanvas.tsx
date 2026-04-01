@@ -304,46 +304,49 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
   return (
     <div className="min-h-screen bg-[#050505] flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border-b border-white/5">
-        <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors">
-          <ArrowLeft size={16} /> Back to Studio
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 bg-[#0a0a0a] border-b border-white/5 gap-2">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs sm:text-sm transition-colors shrink-0">
+          <ArrowLeft size={15} /> <span className="hidden sm:inline">Back to Studio</span><span className="sm:hidden">Back</span>
         </button>
-        <span className="text-xs text-gray-600 font-semibold uppercase tracking-widest">Lyrics Canvas</span>
-        <div className="flex items-center gap-2">
+        <span className="text-[10px] text-gray-600 font-semibold uppercase tracking-widest hidden md:block">Lyrics Canvas</span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setShowStylePanel(p => !p)}
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all ${showStylePanel ? 'border-purple-500/40 text-purple-400 bg-purple-500/10' : 'border-white/10 text-gray-500'}`}
+            className={`flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all ${showStylePanel ? 'border-purple-500/40 text-purple-400 bg-purple-500/10' : 'border-white/10 text-gray-500'}`}
           >
-            <Palette size={13} /> Styles
+            <Palette size={12} /> <span className="hidden xs:inline">Styles</span>
           </button>
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="flex items-center gap-1.5 text-xs bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-xl transition-all"
+            className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-40 text-white px-2.5 sm:px-3 py-1.5 rounded-xl transition-all"
           >
             {isExporting ? <Loader2 size={12} className="animate-spin" /> : exportDone ? <CheckCircle size={12} /> : <Download size={12} />}
-            {isExporting ? 'Exporting…' : exportDone ? 'Saved!' : 'Export Video'}
+            <span className="hidden sm:inline">{isExporting ? 'Exporting…' : exportDone ? 'Saved!' : 'Export Video'}</span>
+            <span className="sm:hidden">{isExporting ? '…' : exportDone ? '✓' : 'Export'}</span>
           </button>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
         {/* ── Style Panel ── */}
         {showStylePanel && (
-          <aside className="w-64 bg-[#0a0a0a] border-r border-white/5 overflow-y-auto p-4 space-y-5 shrink-0">
+          <aside className="w-full lg:w-64 bg-[#0a0a0a] border-b lg:border-b-0 lg:border-r border-white/5 overflow-y-auto p-4 space-y-5 shrink-0 max-h-[40vh] lg:max-h-none">
             {/* Canvas Style */}
             <div className="space-y-2">
               <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Style</div>
-              {CANVAS_STYLES.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => setStyleDef(s)}
-                  className={`w-full flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${styleDef.id === s.id ? 'border-purple-500/50 bg-purple-500/10 text-white' : 'border-white/5 text-gray-500 hover:text-gray-300 hover:border-white/10'}`}
-                >
-                  <span className="text-base">{s.emoji}</span>
-                  <span className="text-xs font-medium">{s.label}</span>
-                </button>
-              ))}
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-1.5">
+                {CANVAS_STYLES.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => setStyleDef(s)}
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${styleDef.id === s.id ? 'border-purple-500/50 bg-purple-500/10 text-white' : 'border-white/5 text-gray-500 hover:text-gray-300 hover:border-white/10'}`}
+                  >
+                    <span className="text-base">{s.emoji}</span>
+                    <span className="text-xs font-medium">{s.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Background */}
