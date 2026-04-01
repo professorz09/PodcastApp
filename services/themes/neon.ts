@@ -174,7 +174,7 @@ export const neonTheme: Theme = {
         drawNeonText(label, pos.x * canvasWidth, color, isSpeaking);
 
         if (showSpeakers) {
-            drawSpeaker(pos.x, pos.y, isSpeaking, color, config.showSpeakerImages ? assets.speakerImages[index] : null, label);
+            drawSpeaker(pos.x, pos.y, isSpeaking, color, config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null, label);
         }
     });
 

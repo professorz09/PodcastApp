@@ -13,7 +13,7 @@ export interface VisualConfig {
   showVuMeter: boolean;
   vuMeterStyle: 'ring' | 'bar' | 'glow' | 'wave' | 'dots';
   showSpeakers: boolean;
-  showSpeakerImages: boolean;
+  showSpeakerImages: boolean[];
   showScores: boolean;
   backgroundDim: number;
   speakerPositions: { x: number; y: number }[];

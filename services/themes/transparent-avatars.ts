@@ -312,7 +312,7 @@ export const transparentAvatarsTheme: Theme = {
                 pos.y, 
                 isSpeaking, 
                 color, 
-                config.showSpeakerImages ? assets.speakerImages[index] : null
+                config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null
             );
         });
     }

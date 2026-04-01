@@ -139,7 +139,7 @@ export const modernAltTheme: Theme = {
             const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
             const color = colors[index % colors.length];
             
-            drawSpeaker(label, pos.x, pos.y, isSpeaking, color, config.showSpeakerImages ? assets.speakerImages[index] : null);
+            drawSpeaker(label, pos.x, pos.y, isSpeaking, color, config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null);
         });
     }
 

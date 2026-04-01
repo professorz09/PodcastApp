@@ -89,7 +89,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   const [showVuMeter, setShowVuMeter] = useState(true);
   const [vuMeterStyle, setVuMeterStyle] = useState<'ring' | 'bar' | 'glow' | 'wave' | 'dots'>('ring');
-  const [showSpeakerImages, setShowSpeakerImages] = useState(true);
+  const [showSpeakerImages, setShowSpeakerImages] = useState<boolean[]>([]);
   const [showSpeakers, setShowSpeakers] = useState(true);
   const [showNameLabels, setShowNameLabels] = useState(true);
   const [showTimer, setShowTimer] = useState(true);
@@ -2860,10 +2860,18 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                               </label>
                             )}
                             <button
-                              onClick={() => setShowSpeakerImages(v => !v)}
+                              onClick={() => setShowSpeakerImages(prev => {
+                                const next = [...prev];
+                                next[idx] = next[idx] === false ? true : false;
+                                return next;
+                              })}
+                              title={showSpeakerImages[idx] === false ? 'Show image' : 'Hide image'}
                               className="absolute top-2 left-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"
                             >
-                              {showSpeakerImages ? <Eye size={12} className="text-white" /> : <EyeOff size={12} className="text-gray-400" />}
+                              {showSpeakerImages[idx] === false
+                                ? <EyeOff size={12} className="text-gray-400" />
+                                : <Eye size={12} className="text-white" />
+                              }
                             </button>
                           </div>
 
