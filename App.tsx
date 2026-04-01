@@ -142,7 +142,7 @@ const App: React.FC = () => {
           ),
           generateContextBridgeConclusion(
             config.topic, config.language, speakerName,
-            contextContent, 'gemini-3-flash-preview'
+            contextContent, config.model
           ),
         ]);
 
@@ -151,6 +151,10 @@ const App: React.FC = () => {
           ...seg,
           id: `conclusion-${mainSegments.length + i}`,
         }));
+
+        if (reindexed.length === 0) {
+          toast.info('Script generated — conclusion segment could not be added.');
+        }
 
         setScript([...mainSegments, ...reindexed]);
       } else {

@@ -63,6 +63,16 @@ const DebateInput: React.FC<DebateInputProps> = ({
     let finalContext = contextFileContent;
     let finalTopic = topic || (contextFileContent ? "the provided document" : "");
 
+    if (mode === 'topic' && !finalTopic.trim()) {
+      toast.warning('Please enter a topic to generate a script');
+      return;
+    }
+
+    if (mode === 'script' && !customScript.trim()) {
+      toast.warning('Please paste your script before generating');
+      return;
+    }
+
     if (mode === 'youtube') {
       if (!youtubeUrl) {
         toast.warning('Please enter a YouTube URL');
@@ -405,7 +415,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as any;
+                      const newStyle = e.target.value as 'debate' | 'explained' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }

@@ -3,9 +3,13 @@ import { AppState, DebateSegment, ThumbnailState, YoutubeImportData } from '../t
 
 const STORE_KEY = 'autovid_state';
 
+interface StoredSegment extends DebateSegment {
+  audioBlob?: Blob | null;
+}
+
 interface StoredState {
   appState: AppState;
-  script: DebateSegment[];
+  script: StoredSegment[];
   thumbnailState?: ThumbnailState;
   youtubeData?: YoutubeImportData | null;
 }
