@@ -161,7 +161,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
                   <step.icon size={19} className={isActive ? 'text-purple-400' : ''} />
                 </div>
                 <span className={`text-[10px] font-semibold leading-none ${isActive ? 'text-white' : 'text-gray-600'}`}>
-                  {step.label}
+                  {step.id === AppState.LYRICS ? 'Song' : step.label}
                 </span>
               </button>
             );

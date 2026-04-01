@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { toast } from './Toast';
 import {
   Instagram,
   Download,
@@ -358,7 +359,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
       setDownloadError('');
       setInfoError('');
     } catch (e: any) {
-      alert('Failed to upload cookies: ' + (e.message || 'Unknown error'));
+      toast.error('Failed to upload cookies: ' + (e.message || 'Unknown error'));
     } finally {
       setCookiesUploading(false);
       if (cookiesInputRef.current) cookiesInputRef.current.value = '';

@@ -11,6 +11,7 @@ import { generateDebateScript, generateContextBridgeConclusion } from './service
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
 import { Key, ExternalLink, RotateCcw, AlertTriangle, X } from 'lucide-react';
+import { ToastContainer, toast } from './components/Toast';
 
 declare global {
   interface Window {
@@ -166,12 +167,11 @@ const App: React.FC = () => {
       setScriptStyle(config.style);
       setAppState(AppState.SCRIPT);
     } catch (error: any) {
-      console.error(error);
       const errorMessage = error.message || "Failed to generate script.";
       if (errorMessage.includes("API Key is missing")) {
         setHasApiKey(false);
       } else {
-        alert(errorMessage + " Please try again.");
+        toast.error(errorMessage);
       }
     } finally {
       setIsLoading(false);
@@ -246,11 +246,24 @@ const App: React.FC = () => {
   }
 
   if (!isInitialized) {
-    return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-white text-black flex items-center justify-center shadow-lg shadow-purple-900/20">
+          <Key size={22} />
+        </div>
+        <div className="flex items-center gap-2.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+        <p className="text-gray-600 text-sm font-medium">Restoring your project…</p>
+      </div>
+    );
   }
 
   return (
     <>
+    <ToastContainer />
     {/* ── Custom Reset Confirmation Modal ───────────────────────────────── */}
     {showResetModal && (
       <div

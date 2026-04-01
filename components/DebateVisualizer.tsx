@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
+import { toast } from './Toast';
 import { ChevronLeft, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
@@ -458,7 +459,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         setBackgroundVideo(null);
       };
     } catch (e: any) {
-      alert(e.message || 'Background generation failed. Please try again.');
+      toast.error(e.message || 'Background generation failed. Please try again.');
     } finally {
       setIsGeneratingBg(false);
     }
@@ -519,12 +520,12 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         clearLoading();
       };
       img.onerror = () => {
-        alert(`Speaker image could not be loaded.`);
+        toast.error('Speaker image could not be loaded.');
         clearLoading();
       };
       img.src = dataUrl;
     } catch (e: any) {
-      alert(`Image generation failed: ${e.message}`);
+      toast.error(`Image generation failed: ${e.message}`);
       clearLoading();
     }
   };
@@ -2320,27 +2321,24 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   // Export Logic
   const handleExport = async () => {
-      console.log("Export initiated");
       setStatusMessage("Initializing...");
       
       try {
         if (!mergedAudioUrl) {
-            console.warn("Export aborted: Audio not ready");
             setStatusMessage("Error: Audio not ready");
-            alert("Audio is still processing. Please wait for the audio to finish generating.");
+            toast.warning("Audio is still processing. Please wait for the audio to finish generating.");
             return;
         }
 
         if (!('VideoEncoder' in window)) {
             setStatusMessage("Error: Browser not supported");
-            alert("High-quality video export is not supported in this browser. Please use Chrome, Edge, or Safari 16+.");
+            toast.error("High-quality video export is not supported in this browser. Please use Chrome, Edge, or Safari 16+.");
             return;
         }
 
         // Check for long video risk
         let duration = audioRef.current?.duration || 0;
         if (!isFinite(duration)) {
-            console.warn("Duration is infinite, estimating from script...");
             // Estimate from last segment end
             if (segmentOffsets.length > 0 && script.length > 0) {
                 const lastOffset = segmentOffsets[segmentOffsets.length - 1];
@@ -2351,7 +2349,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             }
         }
         
-        console.log("Video duration:", duration);
         
         /* 
         // Removed warning to unblock user
@@ -2369,7 +2366,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         }
         */
 
-        console.log("Starting export process...");
         setIsExporting(true);
         setExportProgress(0);
         setShowExportSettings(false);
@@ -2380,7 +2376,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
         // --- HIGH QUALITY OFFLINE RENDER ---
         // 1. Load all assets
-        console.log("Loading assets...");
         setStatusMessage("Loading assets...");
         const assets: RenderAssets = {
             background,
@@ -2411,7 +2406,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         await Promise.all(bgPromises);
 
         // 2. Get Audio Blob and Decode
-        console.log("Decoding audio...");
         setStatusMessage("Decoding audio...");
         const audioRes = await fetch(mergedAudioUrl);
         const audioBlob = await audioRes.blob();
@@ -2435,7 +2429,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         }
 
         // 3. Render Video
-        console.log("Rendering video...");
         setStatusMessage("Rendering video...");
         const canvas = canvasRef.current;
         if (!canvas) throw new Error("No canvas");
@@ -2541,7 +2534,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
         // 4. Download + keep blob for merge
         if (videoBlob) {
-            console.log("Triggering download...");
             setStatusMessage("Download ready! (Merge available in Settings)");
             setRenderedBlob(videoBlob as Blob);
             const url = URL.createObjectURL(videoBlob as Blob);
@@ -2557,12 +2549,11 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             setTimeout(() => setStatusMessage(""), 6000);
         }
         
-        console.log("Export complete");
 
       } catch (err: any) {
           console.error("Export error:", err);
           setStatusMessage(`Error: ${err.message}`);
-          alert(`Export failed: ${err.message}`);
+          toast.error(`Export failed: ${err.message}`);
       } finally {
           setIsExporting(false);
       }
@@ -2570,12 +2561,12 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   const handleMergeVideos = async () => {
       if (!renderedBlob) {
-          alert('Please export the video first before merging.');
+          toast.warning('Please export the video first before merging.');
           return;
       }
       const introFilename = youtubeData?.editedFilename || youtubeData?.downloadedFilename;
       if (!introFilename) {
-          alert('YouTube video filename not found. Please download the video in the YouTube Import step.');
+          toast.error('YouTube video filename not found. Please download the video in the YouTube Import step.');
           return;
       }
       setIsMergingVideos(true);

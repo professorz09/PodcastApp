@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { toast } from './Toast';
 import IntroVideoMaker from './IntroVideoMaker';
 
 // ── Session persistence ───────────────────────────────────────────────────────
@@ -327,9 +328,9 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
       const d = await safeJson(r);
       if (!r.ok) throw new Error(d.error || 'Upload failed');
       setHasCookies(true);
-      alert(`✅ Cookies saved! (${Math.round(d.size / 1024)}KB)\nAll future requests will use these cookies.`);
+      toast.success(`Cookies saved! ${Math.round(d.size / 1024)}KB — All future requests will use these cookies.`);
     } catch (e: any) {
-      alert('❌ ' + (e.message || 'Upload failed'));
+      toast.error(e.message || 'Upload failed');
     } finally {
       setCookiesUploading(false);
     }
@@ -340,7 +341,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
     try {
       await fetch(`${flaskUrl}/api/cookies/delete`, { method: 'POST' });
       setHasCookies(false);
-    } catch { alert('Failed to delete cookies'); }
+    } catch { toast.error('Failed to delete cookies'); }
   };
 
   // ── Comments ─────────────────────────────────────────────────────────────────
@@ -839,11 +840,9 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                   const r = await fetch(`${flaskUrl}/api/health`);
                   const d = await safeJson(r);
                   setHasCookies(!!d.cookies);
-                  alert(
-                    `✅ Connected!\nTranscript API: ${d.transcript_api ? 'Ready' : '❌ pip install youtube-transcript-api'}\nCookies: ${d.cookies ? `✅ Active (${Math.round(d.cookies_size/1024)}KB)` : '❌ Not set'}`
-                  );
+                  toast.success(`Connected! Transcript API: ${d.transcript_api ? 'Ready' : 'Not installed'} | Cookies: ${d.cookies ? `Active (${Math.round(d.cookies_size/1024)}KB)` : 'Not set'}`);
                 } catch {
-                  alert('❌ Could not connect to server.\nIs Flask Server workflow running?');
+                  toast.error('Could not connect to server. Is the Flask Server running?');
                 }
               }}
               className="shrink-0 px-3 py-2 bg-purple-600/20 active:bg-purple-600/30 border border-purple-500/30 text-purple-300 rounded-xl text-xs"

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { toast } from './Toast';
 import {
   ArrowLeft, Play, Pause, Download, RotateCcw, ChevronLeft, ChevronRight,
   Loader2, CheckCircle, ImagePlus, X, Settings, Palette, ThumbsUp,
@@ -486,7 +487,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
       URL.revokeObjectURL(url);
       setExportDone(true);
     } catch (err: any) {
-      alert('Export failed: ' + err.message);
+      toast.error('Export failed: ' + err.message);
     } finally {
       setIsExporting(false);
     }

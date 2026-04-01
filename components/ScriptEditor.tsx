@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
+import { toast } from './Toast';
 import { ChevronLeft, ArrowRight, Edit2, Sparkles, Loader2, Save, RefreshCw, Trash2, User, AlignLeft, Clock, Languages, Quote, Copy, Check, RotateCcw, X, Scissors, Play, Download, BookOpen, MapPin } from 'lucide-react';
 import { rewriteScriptSegment, translateScriptToHindi, generateTopicQuote, analyzeTimelineCuts, analyzeContextBridgeTimeline, TimelineCut } from '../services/geminiService';
 
@@ -123,7 +124,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       setActiveRewriteId(null);
     } catch (e: any) {
       console.error(e);
-      alert(e.message || "Failed to rewrite segment. Please try again.");
+      toast.error(e.message || "Failed to rewrite segment. Please try again.");
     } finally {
       setIsRewriting(false);
     }
@@ -142,7 +143,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       setTranslateView(true);
     } catch (e: any) {
       console.error(e);
-      alert(e.message || "Translation failed. Please try again.");
+      toast.error(e.message || "Translation failed. Please try again.");
     } finally {
       setIsTranslating(false);
     }
@@ -156,7 +157,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       const result = await generateTopicQuote(fullText);
       setQuoteData(result);
     } catch (e: any) {
-      alert(e.message || 'Quote generation failed. Please try again.');
+      toast.error(e.message || 'Quote generation failed. Please try again.');
     } finally {
       setIsGeneratingQuote(false);
     }
@@ -202,7 +203,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     try {
       const transcript = getTimedTranscript();
       if (transcript.length === 0) {
-        alert('Please fetch the transcript in the YouTube Import section first — the timestamped transcript will be used.');
+        toast.warning('Please fetch the transcript in the YouTube Import section first — the timestamped transcript will be used.');
         return;
       }
       // Group segments into points: each point starts at a Narrator segment
@@ -232,13 +233,13 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       }));
 
       if (finalPoints.length === 0) {
-        alert('No segments found in the script.');
+        toast.warning('No segments found in the script.');
         return;
       }
       const cuts = await analyzeTimelineCuts(finalPoints, transcript);
       setTimelineCuts(cuts);
     } catch (e: any) {
-      alert(e.message || 'Timeline analysis failed. Please try again.');
+      toast.error(e.message || 'Timeline analysis failed. Please try again.');
     } finally {
       setIsAnalyzingTimeline(false);
     }

@@ -5,7 +5,7 @@ const STORE_KEY = 'autovid_state';
 
 interface StoredState {
   appState: AppState;
-  script: any[];
+  script: DebateSegment[];
   thumbnailState?: ThumbnailState;
   youtubeData?: YoutubeImportData | null;
 }

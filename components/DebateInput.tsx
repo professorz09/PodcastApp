@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { toast } from './Toast';
 import { DebateConfig } from '../types';
 import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Zap, Brain, Activity, Video, BookOpen } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -76,7 +77,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
     if (mode === 'youtube') {
       if (!youtubeUrl) {
-        alert('Please enter a YouTube URL');
+        toast.warning('Please enter a YouTube URL');
         return;
       }
       finalTopic = "YouTube Podcast Review";
@@ -133,7 +134,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       }
     } catch (error) {
       console.error('Error reading file:', error);
-      alert('Failed to read file. Please try a different format.');
+      toast.error('Failed to read file. Please try a different format.');
       setFileName(undefined);
       setContextFileContent(undefined);
     } finally {

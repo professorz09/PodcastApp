@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebateSegment, TranscriptSegment } from '../types';
+import { toast } from './Toast';
 import { generateSpeech, transcribeAudioBlob, generateClipIntro } from '../services/geminiService';
 import { getElevenLabsVoices, generateElevenLabsSpeech, ElevenLabsVoice } from '../services/elevenLabsService';
 import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
@@ -119,7 +120,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const intro = await generateClipIntro(transcriptText, nonNarrators);
       setClipIntro(intro);
     } catch (e: any) {
-      alert(e.message || 'Intro generation failed. Please try again.');
+      toast.error(e.message || 'Intro generation failed. Please try again.');
     } finally {
       setIsGeneratingIntro(false);
     }
@@ -138,7 +139,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const { audioUrl } = await generateSpeech(clipIntro, voice);
       setIntroAudioUrlSafe(audioUrl);
     } catch (e: any) {
-      alert(e.message || 'Intro audio generation failed. Please try again.');
+      toast.error(e.message || 'Intro audio generation failed. Please try again.');
     } finally {
       setIsGeneratingIntroAudio(false);
     }
@@ -490,7 +491,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       });
     } catch (error) {
       console.error('Failed to sync transcript', error);
-      alert('Failed to sync transcript: ' + (error as Error).message);
+      toast.error('Failed to sync transcript: ' + (error as Error).message);
     } finally {
       setSyncingSegments(prev => ({ ...prev, [seg.id]: false }));
     }
@@ -562,7 +563,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       console.error('Failed to merge audio', error);
-      alert('Failed to merge audio files.');
+      toast.error('Failed to merge audio files.');
     } finally {
       setIsMerging(false);
     }

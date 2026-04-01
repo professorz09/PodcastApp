@@ -1,7 +1,13 @@
-# AutoVid AI - Audio to Video Sync
+# DebateForge — AI Video Generator
 
 ## Project Overview
-A React + Express web application that generates debate-style video content using AI. It uses Gemini for script generation, ElevenLabs for text-to-speech, and Google Cloud Speech-to-Text for transcription.
+An AI-powered platform (branded **DebateForge**) for generating debate/conversational-style videos from YouTube, Instagram, Reddit, or custom scripts. Supports multiple video styles (Debate, Explained, Situational, Podcast Panel, Context Analyst), a Song/Lyrics Studio, and 16:9 YouTube-style video export. Uses Gemini for script/image generation, ElevenLabs for TTS, and Google Cloud STT for transcription.
+
+## Toast Notification System
+- All `alert()` calls have been replaced with `toast.*` notifications (see `components/Toast.tsx`)
+- `toast.error()`, `toast.success()`, `toast.warning()`, `toast.info()` — auto-dismiss after 4.5s
+- `<ToastContainer />` is mounted at root in `App.tsx`
+- Import via: `import { toast } from './Toast';` (within components/) or `../components/Toast` (from services/)
 
 ## Architecture
 - **Frontend**: React 19 + TypeScript + Vite, styled with Tailwind CSS
