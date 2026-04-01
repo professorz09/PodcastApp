@@ -431,89 +431,74 @@ export const generateDebateScript = async (
               विषय: "${topic}" पर एक "Situational" style की video script बनाओ।
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
               ${durLineHi}
-              भाषा: हिंदी + Hinglish (जैसे real लोग America में बात करते हैं)।
-              Target Audience: USA में रहने वाला desi middle-class — $60k-$100k income, rent/mortgage, credit card debt, H1B visa tension, kids की tuition, medical bills — इन्हीं की ज़िंदगी है।
+              भाषा: हिंदी + Hinglish (जैसे real लोग बात करते हैं — natural, simple, human)।
+              Target Audience: USA में रहने वाले desi लोग — इनकी ज़िंदगी के issues इस topic से जुड़ते हैं।
 
               पात्र — ठीक 3 वक्ता (fixed):
               ${speakers.length >= 3
                 ? `इन नामों का उपयोग करें: ${speakers[0]} (situation में फंसा इंसान), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
-                : `Topic के हिसाब से नाम चुनो — Speaker 1 वो इंसान जो situation में फंसा है, Speaker 2 और 3 दो अलग-अलग domain experts (जैसे financial advisor + immigration attorney, therapist + career coach, CPA + life coach — topic के अनुसार)।`
+                : `Topic के हिसाब से नाम और experts चुनो — Speaker 1 वो इंसान जो situation में फंसा है, Speaker 2 और 3 उस topic के दो अलग-अलग domain experts (topic देखकर decide करो कि कौन से experts सबसे relevant हैं)।`
               }
 
               ══════════════════════════════════════════
-              【 SPEAKER 1 — THE HOOK + STORY (situation में फंसा इंसान) 】
+              【 SPEAKER 1 — HOOK + STORY (situation में फंसा इंसान) 】
               ══════════════════════════════════════════
 
-              ⚡ RULE #0 — HOOK: पहली LINE ही audience को रोक दे।
+              पहली LINE ही audience को रोक दे — एक ऐसी line जो दिमाग में सवाल पैदा करे:
+              "यह कैसे हुआ?", "आगे क्या होगा?", "यह तो मेरी ही situation है!"
+              कोई formula नहीं — इस specific topic के हिसाब से जो सबसे ज़्यादा punch करे, वो लिखो।
+              Hook: 1-2 lines। फिर story naturally build हो।
+
               BANNED openings: "Hi, मैं आज share करना चाहता हूँ...", "Toh basically...", "Mera naam X hai..."
-              पहली line audience के दिमाग में एक सवाल पैदा करे — "यह कैसे हुआ?", "आगे क्या होगा?", "यह तो मेरी ही situation है!"
-              कोई fixed formula नहीं — situation के हिसाब से जो सबसे ज़्यादा punch करे, वो लिखो।
-              Examples for inspiration only (इन्हें copy मत करो, इनसे सीखो):
-                → "तीन महीने पहले मेरे account में $178,000 थे। आज $47 हैं।" (outcome पहले)
-                → "मैं office parking lot में था। Phone आया — IRS: $67,000 due।" (moment में drop)
-                → "$130k salary है। Rent नहीं दे पा रहा। हाँ, यह possible है।" (contradiction)
-                → "मेरे पास 14 दिन हैं decide करने के लिए। अभी तक नहीं पता क्या करूँ।" (urgency)
-              Hook 1-2 lines — बाकी story naturally build हो।
 
-              Hook के बाद STORY आती है — यह arc follow करो:
-              → Scene: कहाँ थे, क्या सोच रहे थे, life normal थी
-              → Turning Point: वो exact moment जब सब बदला — date, amount, जगह, feeling
-              → Spiral: चीज़ें कैसे worse होती गईं — एक-एक कदम
-              → Now: आज कहाँ हो — emotionally और practically
-              → The ONE question: वो एक सवाल जो रात को सोने नहीं देता
+              Hook के बाद STORY arc:
+              → पहले सब ठीक था — वो normal life
+              → वो exact moment जब सब बदला — specific detail के साथ
+              → चीज़ें कैसे complicated होती गईं — एक-एक कदम
+              → आज कहाँ हूँ — emotionally और practically
+              → वो ONE burning question जो सोने नहीं देता — specific, topic-relevant
 
-              ★ SPECIFIC details mandatory: "$23,400 credit card debt" नहीं "बहुत debt है"
-              ★ Sensory emotion: "बच्चा पूछता है papa new shoes कब मिलेंगे — मैं कुछ नहीं बोल सका"
-              ★ USA middle-class reality में रखो: credit score, H1B, 401k, car loan, medical bill
-              ★ अपनी गलती openly बताओ — audience को तभी ACTUALLY connect होगा
-              ★ अंत में ONE burning question — vague नहीं, specific: "क्या मुझे अभी bankruptcy file करनी चाहिए या पहले negotiate करना चाहिए?"
-              ★ BANNED openings: "Hi, mera naam...", "Aaj main share karna chahta hoon...", "Toh basically..."
-              ★ LENGTH: Hook छोटी हो — 1-2 sentences। फिर story naturally build हो।
+              ★ Specific details दो — vague नहीं ("बहुत परेशान था" नहीं, "उस रात नींद नहीं आई, बार-बार वही moment replay हो रहा था")
+              ★ Sensory emotion — audience को feel हो, सिर्फ बताओ नहीं
+              ★ अपनी गलती openly बताओ — real connection यहीं से बनता है
+              ★ अंत में ONE specific question — वही जो इस topic में सबसे confusing है
 
               ══════════════════════════════════════════
               【 SPEAKER 2 — EXPERT 1 (पहला angle) 】
               ══════════════════════════════════════════
-              ★ पहले situation को FEEL करो — "यार, यह सुनकर सच में दिल भारी हो गया" — फिर शुरू करो
-              ★ हर point 3 levels deep जाओ:
-                  Level 1: क्या है problem
-                  Level 2: क्यों होता है यह (real mechanism)
-                  Level 3: तुम specifically क्या करो — step by step
-              ★ कोई भी JARGON use करो तो IMMEDIATELY उसी वाक्य में simple language में explain करो।
-                  WRONG: "You should file for Chapter 7 bankruptcy."
-                  RIGHT: "Chapter 7 bankruptcy — matlab ek legal process जिसमें court तुम्हारे कुछ debts को completely wipe कर देती है, जैसे उन्होंने कभी exist ही नहीं किया — but इसका credit score पर 7-10 साल असर रहता है।"
-              ★ हर advice के साथ एक REAL example: "मेरे एक client थे, Rajesh, Fremont में रहते थे, $45k का medical debt था..."
-              ★ Pros AND cons दोनों बताओ — false hope मत दो
-              ★ USA specific: credit score impact, IRS rules, state laws, H1B implications जो relevant हों
+              ★ पहले story को genuinely feel करो — "यार, यह सुनकर समझ आता है कितना tough होगा" — फिर शुरू करो
+              ★ हर point simple और clear रखो — जैसे किसी दोस्त को समझा रहे हो, lecture नहीं
+              ★ कोई भी term जो आम आदमी न जाने — उसी line में simple भाषा में explain करो
+              ★ हर advice के साथ एक real example — कोई नाम, situation, result — abstract नहीं
+              ★ Pros और cons दोनों बताओ — false hope मत दो, real picture दो
 
               ══════════════════════════════════════════
               【 SPEAKER 3 — EXPERT 2 (दूसरा angle) 】
               ══════════════════════════════════════════
-              ★ Speaker 2 की बात repeat नहीं करना — नया angle लाओ
-              ★ Speaker 2 से politely disagree या उनकी बात को further challenge करो जहाँ ज़रूरी हो
-              ★ वो angle दो जो लोग usually miss करते हैं — emotional cost, hidden fees, long-term consequences
-              ★ एक specific analogy दो जो USA middle class को instantly समझ आए:
-                  जैसे: "यह situation उस moment जैसी है जब तुम्हारी car का check engine light आता है — ignore करोगे तो $300 का repair $3000 का हो जाएगा"
-              ★ कोई भी technical term IMMEDIATELY explain करो — कभी bare term मत छोड़ो
+              ★ Speaker 2 की बात repeat मत करो — बिल्कुल नया angle लाओ
+              ★ वो चीज़ बताओ जो लोग usually miss करते हैं — hidden costs, emotional toll, long-term consequences
+              ★ एक ऐसी analogy दो जो instantly समझ आए — रोज़ की ज़िंदगी से
+              ★ कोई भी term — immediately explain करो, bare term कभी मत छोड़ो
+              ★ Politely disagree करो जहाँ ज़रूरी हो — real conversation होनी चाहिए
 
               ══════════════════════════════════════════
-              FLOW — यह arc follow करो:
+              FLOW:
               ══════════════════════════════════════════
-              ACT 1 — Setup (Speaker 1 की story): Cinematic opening → situation की पूरी journey → specific confusion/question
-              ACT 2 — Discovery (Experts react): First, genuinely react to the story → clarify → फिर तुरंत action में आओ
-              ACT 3 — Deep Dive (back-and-forth): Experts आपस में भी बात करें, एक-दूसरे को challenge करें, Speaker 1 बीच में questions पूछे
-              ACT 4 — Resolution: दोनों experts मिलकर 3-4 SPECIFIC, numbered, actionable steps दें — vague नहीं
-              CLOSING: Speaker 1 का एक honest reaction — hope है या doubt — real ending, not a bow
+              ACT 1 — Speaker 1 की story: Hook → journey → ONE burning question
+              ACT 2 — Experts react genuinely → clarify → advice शुरू करें
+              ACT 3 — Back-and-forth: Experts एक-दूसरे को challenge करें, Speaker 1 बीच में सवाल पूछे
+              ACT 4 — 3-4 specific, numbered, actionable steps — vague नहीं, actual instructions
+              CLOSE — Speaker 1 का honest reaction: hope है, doubt है, या दोनों — real ending
 
               ══════════════════════════════════════════
-              HARD RULES — इन्हें तोड़ा तो script fail:
+              HARD RULES:
               ══════════════════════════════════════════
-              ✗ कोई भी jargon बिना explanation के — NEVER
-              ✗ "consult a professional" — यह coward advice है, यहाँ professional पहले से बैठे हैं, actual advice दो
-              ✗ "यह ध्यान देने योग्य है", "निष्कर्ष में", "यह सुनिश्चित करें" — banned
-              ✗ Surface level: "budget बनाओ", "savings करो" — yeh sab already pata hai, deeper जाओ
-              ✗ Lecture mode — conversation होनी चाहिए, TED talk नहीं
-              ✓ हर major point के साथ एक real, named, specific example
-              ✓ USA middle-class reality: dollars में amounts, credit score numbers, actual US laws/processes
+              ✗ Jargon बिना explanation — NEVER
+              ✗ "consult a professional" — professionals पहले से बैठे हैं, actual advice दो
+              ✗ "ध्यान देने योग्य है", "निष्कर्ष में", "सुनिश्चित करें" — banned
+              ✗ Surface-level generic advice — deeper जाओ
+              ✗ Lecture mode — conversation होनी चाहिए
+              ✓ हर major point = एक real, named example
               ✓ Emotional truth — audience को लगे "यार यह तो मेरी ही story है"
               ══════════════════════════════════════════
               ${durFillHi}
@@ -995,89 +980,72 @@ export const generateDebateScript = async (
             ${specificDetails ? `Situation details: ${specificDetails}` : ''}
             ${durLineEn}
             Language: ${language}.
-            Target Audience: USA desi middle-class — $60k–$100k household income, dealing with rent/mortgage, credit card debt, H1B visa stress, kids' tuition, medical bills, 401k anxiety. Every example MUST feel like their real life.
+            Target Audience: USA desi audience — people dealing with real-life issues related to this topic.
 
             Characters — exactly 3 speakers (fixed):
             ${speakers.length >= 3
               ? `Use these names: ${speakers[0]} (the person in the situation), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
-              : `Pick names appropriate for the topic — Speaker 1 is the person stuck in the situation, Speakers 2 & 3 are two different domain experts (e.g. financial advisor + immigration attorney, therapist + career coach, CPA + life coach — pick based on topic).`
+              : `Choose names and experts appropriate for THIS topic — Speaker 1 is the person stuck in the situation, Speakers 2 & 3 are two different domain experts relevant to the topic (decide which type of experts make the most sense based on what the topic is about).`
             }
 
             ══════════════════════════════════════════
-            【 SPEAKER 1 — THE HOOK + STORY (the person in the situation) 】
+            【 SPEAKER 1 — HOOK + STORY (the person in the situation) 】
             ══════════════════════════════════════════
 
-            ⚡ RULE #0 — THE HOOK: The very first line must stop the audience cold.
-            BANNED openers: "Hi, so today I want to share...", "Okay so basically...", "Let me tell you my story..." — never write these.
-            The first line should plant a question in the listener's head: "How did that happen?", "What comes next?", "Wait — that's me."
-            No fixed formula — write whatever hits hardest for THIS specific situation.
-            Examples for inspiration only (don't copy, learn the principle):
-              → "Three months ago I had $178,000 in savings. Today I have $47." (outcome first)
-              → "I was eating lunch in my car. Phone buzzed — IRS: $67,000 due." (drop mid-scene)
-              → "I make $130k a year in California. I can't pay rent this month." (contradiction)
-              → "I have 14 days to decide. I still have no idea what to do." (urgency)
-            Hook = 1–2 lines max. The story builds naturally from there.
+            The very first line must stop the audience cold — plant a question in their head:
+            "How did that happen?", "What comes next?", "Wait — that's literally me."
+            No fixed formula — write whatever hits hardest for THIS specific topic and situation.
+            Hook = 1–2 lines max. BANNED openers: "Hi, today I want to share...", "So basically...", "Let me tell you my story..."
 
-            After the hook, the STORY unfolds — follow this arc:
-            → Scene: where you were, what life looked like before
-            → Turning Point: the exact moment everything changed — specific date, amount, place, feeling
-            → Spiral: how things got progressively worse — each step, not a summary
-            → Now: where you stand today — emotionally and practically
-            → The ONE question: the thing you cannot figure out, keeping you up at night
+            After the hook, the STORY unfolds:
+            → Life before — what normal looked like
+            → The exact moment everything changed — specific detail, place, feeling
+            → How things got complicated — step by step, not a summary
+            → Where you are now — emotionally and practically
+            → The ONE burning question this person can't figure out — specific to this topic
 
-            ★ SPECIFIC details non-negotiable: "$23,400 credit card debt" not "a lot of debt"
-            ★ Sensory emotion: "My kid asked me when we could get new shoes. I couldn't answer."
-            ★ USA middle-class reality: credit score numbers, H1B status, 401k penalties, car loan, surprise medical bills
-            ★ Own your mistakes openly — that's what makes audiences actually connect
-            ★ End with ONE burning specific question — not vague: "Should I file Chapter 7 now or try to negotiate with creditors first?"
-            ★ BANNED openers: "Hi, my name is...", "Today I want to share...", "So basically what happened was..."
-            ★ Hook = 1–2 sentences MAX. Then the story builds naturally from there.
+            ★ Specific details — not vague ("I was devastated" → "I just sat there staring at the message for twenty minutes, didn't even realize the coffee had gone cold")
+            ★ Sensory emotion — make the audience feel it, not just hear it
+            ★ Own your mistakes openly — that's what creates real connection
+            ★ End with ONE specific question that is genuinely hard to answer about this topic
 
             ══════════════════════════════════════════
             【 SPEAKER 2 — EXPERT 1 (first angle) 】
             ══════════════════════════════════════════
-            ★ First, FEEL the story before analyzing it — "Man, hearing that… that's a lot to carry. Okay, let's actually dig into this."
-            ★ Go 3 levels deep on every point:
-                Level 1 — What is the actual problem
-                Level 2 — Why it happens (the real mechanism most people don't know)
-                Level 3 — Specifically what THIS person should do — step by step
-            ★ EVERY technical term must be explained IMMEDIATELY in plain language with an analogy:
-                WRONG: "You should look into Chapter 7 bankruptcy."
-                RIGHT: "Chapter 7 bankruptcy — think of it like hitting a financial reset button. The court legally erases certain debts as if they never existed. But here's the catch: it stays on your credit report for 10 years, which can affect everything from getting an apartment to refinancing your home."
-            ★ Every piece of advice needs a REAL named example: "I had a client — Priya, from Fremont — she was $38k in credit card debt and thought her only option was..."
-            ★ Spell out both the upside AND the downside — no false hope
-            ★ USA-specific details where relevant: credit score numbers, IRS timelines, state-specific laws, H1B implications
+            ★ First, genuinely feel the story — "Man, hearing that… I can understand how overwhelming that must feel." Then dig in.
+            ★ Explain everything in simple, plain language — like talking to a smart friend, not a client
+            ★ Any term the average person might not know — explain it immediately in the same sentence
+            ★ Every piece of advice needs a real example — give it a name, a situation, a result — not abstract
+            ★ Give both the upside AND the downside — no false hope, real picture
 
             ══════════════════════════════════════════
             【 SPEAKER 3 — EXPERT 2 (second angle) 】
             ══════════════════════════════════════════
-            ★ Bring a completely different angle — do NOT echo Expert 1
-            ★ Respectfully push back or add nuance where Expert 1 might have oversimplified
-            ★ Surface the angle people always miss — emotional tax, hidden costs, downstream consequences
-            ★ Use one powerful analogy that USA middle class instantly gets:
-                e.g. "This is like ignoring your check engine light — what's a $300 fix today becomes a $3,000 engine replacement in 6 months"
-            ★ Any technical term you use — explain it immediately, same sentence or the next one. No bare jargon ever.
+            ★ Bring a completely different angle — do NOT repeat what Expert 1 said
+            ★ Surface what people usually miss — hidden costs, emotional toll, long-term consequences
+            ★ Use one analogy from everyday life that instantly clicks
+            ★ Any term you use — explain it immediately. No bare jargon ever.
+            ★ Respectfully push back on Expert 1 where needed — real conversation, not a tag team
 
             ══════════════════════════════════════════
-            STORY ARC — follow this structure:
+            STORY ARC:
             ══════════════════════════════════════════
-            ACT 1 — Setup: Speaker 1's cinematic story, specific details, emotional honesty, the one burning question
-            ACT 2 — First Reaction: Experts genuinely react to the story (not just pivot to advice) → clarify a few things → then start going deep
-            ACT 3 — Deep Dive: Real back-and-forth between experts, challenge each other, Speaker 1 asks follow-up questions in the middle
-            ACT 4 — Action Plan: Both experts together give 3–5 SPECIFIC numbered steps — not vague ("consult someone") but actual instructions ("First, pull your free credit report from annualcreditreport.com — you get one per bureau per year...")
-            CLOSE: Speaker 1 gives an honest reaction — are they hopeful? still scared? both? Real ending, not a bow.
+            ACT 1 — Speaker 1's story: Hook → full journey → ONE burning question
+            ACT 2 — Experts genuinely react → clarify → start going deep
+            ACT 3 — Real back-and-forth: experts challenge each other, Speaker 1 asks follow-up questions
+            ACT 4 — 3–5 specific, numbered, actionable steps — actual instructions, not vague suggestions
+            CLOSE — Speaker 1's honest reaction: hopeful? still scared? both? Real ending, not a bow.
 
             ══════════════════════════════════════════
             NON-NEGOTIABLE RULES:
             ══════════════════════════════════════════
-            ✗ NEVER use any jargon without immediately explaining it — this is the #1 rule
+            ✗ NEVER use any term without immediately explaining it
             ✗ NEVER say "consult a professional" — you ARE the professionals, give actual advice
-            ✗ NEVER give surface-level advice like "make a budget" or "save more" — go deeper
-            ✗ NO lecture mode — this is a conversation, not a TED talk
-            ✗ Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "It's worth mentioning", "I want to emphasize"
-            ✓ Every major point = one real named example with specific numbers
-            ✓ USA middle-class dollars, credit scores, real US processes and laws
-            ✓ Audience should think: "Wait — this is literally my life they're talking about"
+            ✗ NO surface-level generic advice — go deeper than what anyone already knows
+            ✗ NO lecture mode — this is a real conversation
+            ✗ Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "I want to emphasize"
+            ✓ Every major point = one real example with specific detail
+            ✓ Audience should think: "Wait — this is literally my situation"
             ══════════════════════════════════════════
             ${durFillEn}
           `;
