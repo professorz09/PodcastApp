@@ -269,7 +269,7 @@ ${scriptText.slice(0, 3000)}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-04-17',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { responseMimeType: 'application/json' },
     });
@@ -311,7 +311,7 @@ Write in plain English. No bullet points. No JSON. Just a short, crisp art direc
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash-preview-04-17',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
     return response.text?.trim() || '';
