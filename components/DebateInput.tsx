@@ -246,8 +246,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
           </div>
         </div>
 
-        {/* Configuration Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Configuration Grid — hidden when pasting a script directly */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${mode === 'script' ? 'hidden' : ''}`}>
           
           {/* Left Column (Speakers & Context) */}
           <div className="space-y-4">
@@ -589,7 +589,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
             </>
           ) : (
             <>
-              <span>Generate Video</span>
+              <span>{mode === 'script' ? 'Process Script' : 'Generate Video'}</span>
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </>
           )}

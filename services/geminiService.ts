@@ -321,22 +321,26 @@ export const generateDebateScript = async (
   if (isHindi) {
       if (customScript) {
         prompt = `
-          निम्नलिखित स्क्रिप्ट का विश्लेषण करें और इसे ${style} प्रारूप में व्यवस्थित करें।
-          स्क्रिप्ट: "${customScript}"
-          
-          नियम:
-          1. इसे 'नैरेटर' (यदि लागू हो) और ${speakerCount} वक्ताओं (${speakerListStr}) के लिए खंडों में विभाजित करें।
-          2. यदि स्क्रिप्ट में स्पष्ट नहीं है कि कौन बोल रहा है, तो ${style} प्रवाह बनाने के लिए इसे तार्किक रूप से असाइन करें।
-          3. ${includeNarrator ? `सुनिश्चित करें कि नैरेटर एक परिचय प्रदान करता है जो संदर्भ/दुविधा को सीधे समझाता है और केंद्रीय प्रश्न के साथ समाप्त होता है। "AI मॉडल" का उल्लेख न करें। अंत में बहुत संक्षिप्त सारांश (1-2 वाक्य) दें।` : "नैरेटर का उपयोग न करें।"}
-          4. सुनिश्चित करें कि आउटपुट हिंदी (Hindi) में है।
-          ${durTotalHi}
-          6. ${includeNarrator ? "महत्वपूर्ण: नैरेटर के खंड छोटे और संक्षिप्त रखें। ध्यान वक्ताओं पर होना चाहिए।" : ""}
-          ${style === 'explained' ? '7. महत्वपूर्ण: सुनिश्चित करें कि स्क्रिप्ट "इस वीडियो में..." से शुरू होती है और एक स्पष्ट, संरचित शैक्षिक प्रारूप का पालन करती है।' : ''}
-          
-          स्वर और भाषा (Tone & Language):
-          - भाषा बहुत ही स्वाभाविक, संवादात्मक (conversational) और इंसानों जैसी (human-like) होनी चाहिए।
-          - रोबोटिक, किताबी या अत्यधिक औपचारिक शब्दों का प्रयोग न करें। आम बोलचाल की भाषा (Colloquial Hindi/Hinglish) का उपयोग करें।
-          - AI वाले घिसे-पिटे वाक्यों से बचें। ऐसा लगना चाहिए जैसे असली इंसान स्वाभाविक रूप से बात कर रहे हैं।
+          नीचे दी गई script को बिना कोई बदलाव किए, बिना कुछ जोड़े या हटाए, सिर्फ speaker के हिसाब से अलग-अलग segments में बाँटो।
+
+          Script:
+          """
+          ${customScript}
+          """
+
+          RULES:
+          1. Script में जो speakers हैं, उन्हें exactly वैसे ही detect करो जैसे script में लिखे हैं। कोई नया नाम मत दो।
+          2. हर speaker का text उसी के segment में डालो — text में एक भी word मत बदलो।
+          3. Narration या description (जो किसी speaker का नहीं है) को "Narrator" speaker के under रखो।
+          4. अगर script में speaker clearly marked नहीं है (कोई tag नहीं है), तो context देखकर logically assign करो — लेकिन text मत बदलो।
+          5. Output ONLY valid JSON array of segments। कोई extra text, explanation, या markdown नहीं।
+
+          Output format:
+          [
+            {"speaker": "Speaker Name", "text": "Exact text from script"},
+            {"speaker": "Speaker Name", "text": "Next segment text"},
+            ...
+          ]
         `;
       } else {
         if (style === 'explained') {
@@ -756,23 +760,26 @@ export const generateDebateScript = async (
       // English Logic
       if (customScript) {
         prompt = `
-          Analyze the following script and structure it into a ${style} format.
-          Script: "${customScript}"
-          
-          Rules:
-          1. Break it down into segments for 'Narrator' (if applicable) and the ${speakerCount} speakers (${speakerListStr}).
-          2. If the script doesn't explicitly say who speaks, assign it logically to create a ${style} flow.
-          3. ${includeNarrator ? `Ensure the Narrator provides an introduction that explains the context/dilemma directly and ends with the central question. Do NOT mention "AI models". Ends with a VERY BRIEF summary (1-2 sentences).` : "Do NOT use a Narrator."}
-          4. Ensure the output is in ${language}.
-          ${durTotalEn}
-          6. ${includeNarrator ? "CRITICAL: Keep Narrator segments SHORT and CONCISE. The focus should be on the speakers." : ""}
-          ${style === 'explained' ? '7. CRITICAL: Ensure the script starts with "In this video..." and follows a clear, structured educational format.' : ''}
-          
-          Tone & Language:
-          - Use highly natural, conversational, and human-like language.
-          - Avoid robotic, overly formal, or cliché AI phrases (like "In conclusion", "It's important to note", "Let's delve into").
-          - Use contractions, natural pauses, colloquialisms, and conversational filler where appropriate to make it sound like real people talking.
-          - Show emotion, personality, and natural reactions.
+          Split the script below into speaker segments. Do NOT change, add, or remove any text — only identify who is speaking each part.
+
+          Script:
+          """
+          ${customScript}
+          """
+
+          RULES:
+          1. Detect speakers exactly as they appear in the script. Do NOT invent or rename speakers.
+          2. Keep every word of each speaker's text exactly as written — no edits, no paraphrasing.
+          3. Any narration or unattributed text that is not a speaker goes under "Narrator".
+          4. If the script has no explicit speaker labels, assign segments logically based on context — but do not change the words.
+          5. Output ONLY a valid JSON array of segments. No extra text, explanations, or markdown.
+
+          Output format:
+          [
+            {"speaker": "Speaker Name", "text": "Exact text from script"},
+            {"speaker": "Speaker Name", "text": "Next segment text"},
+            ...
+          ]
         `;
       } else {
         // General Prompt Construction
