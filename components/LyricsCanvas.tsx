@@ -1,26 +1,50 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, Play, Pause, Download, RotateCcw, ChevronLeft, ChevronRight,
-  Loader2, CheckCircle, ImagePlus, X, Settings, Palette,
+  Loader2, CheckCircle, ImagePlus, X, Settings, Palette, ThumbsUp,
 } from 'lucide-react';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
 
 const BG_PRESETS = [
-  { id: 'black',   label: 'Black',   value: '#000000' },
-  { id: 'dark',    label: 'Dark',    value: '#0a0a0a' },
-  { id: 'navy',    label: 'Night',   value: 'linear-gradient(135deg,#060d1a,#0a1628,#0d1f3c)' },
-  { id: 'purple',  label: 'Violet',  value: 'linear-gradient(135deg,#1a0030,#3d0060,#0a0020)' },
-  { id: 'sunset',  label: 'Sunset',  value: 'linear-gradient(135deg,#1a0038,#5c0030,#c0392b)' },
-  { id: 'cosmic',  label: 'Cosmic',  value: 'linear-gradient(135deg,#0a0028,#200060,#4a0080)' },
-  { id: 'forest',  label: 'Forest',  value: 'linear-gradient(135deg,#001a0a,#003010,#00501a)' },
-  { id: 'ocean',   label: 'Ocean',   value: 'linear-gradient(135deg,#001a2c,#003b6e,#005f8a)' },
+  { id: 'black',  label: 'Black',  value: '#000000' },
+  { id: 'dark',   label: 'Dark',   value: '#0a0a0a' },
+  { id: 'navy',   label: 'Night',  value: 'linear-gradient(135deg,#060d1a,#0a1628,#0d1f3c)' },
+  { id: 'purple', label: 'Violet', value: 'linear-gradient(135deg,#1a0030,#3d0060,#0a0020)' },
+  { id: 'sunset', label: 'Sunset', value: 'linear-gradient(135deg,#1a0038,#5c0030,#c0392b)' },
+  { id: 'cosmic', label: 'Cosmic', value: 'linear-gradient(135deg,#0a0028,#200060,#4a0080)' },
+  { id: 'forest', label: 'Forest', value: 'linear-gradient(135deg,#001a0a,#003010,#00501a)' },
+  { id: 'ocean',  label: 'Ocean',  value: 'linear-gradient(135deg,#001a2c,#003b6e,#005f8a)' },
 ];
 
-// Word reveal interval in ms
-const WORD_MS = 280;
+const AVATAR_COLORS = [
+  '#8B5CF6','#EC4899','#F97316','#14B8A6','#3B82F6',
+  '#EF4444','#10B981','#F59E0B','#6366F1','#D946EF',
+];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const USERNAMES = [
+  'v3lvetring_','tyler_gies_','doubledavid69','leafybean','not_a_bot_42',
+  'memequeen99','RealOne_7','AnonymousJi','LyricsLover','MusicManiac',
+  'sarcasm_king','funny_or_die','DesiVibes','UrbanPoet','NightOwl_SK',
+  'BombayBoy99','Sharma__ji','desi_roaster','PunchlinesOnly','viral.raj',
+];
+
+const TIME_LABELS = [
+  '2w','4w','1 month','3 months','6 months','22w','34w','1 year','21w','8w',
+  '2 months','11w','5w','18w','7 months',
+];
+
+const LIKES = [
+  12,47,103,8,251,36,1200,88,5,322,74,17,540,9,2100,
+];
+
+// Animation modes cycle
+type AnimMode = 'partial' | 'all' | 'wbw';
+const ANIM_MODES: AnimMode[] = ['wbw', 'all', 'partial'];
+
+const WORD_MS = 280;  // ms per word in wbw mode
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parseLyrics(text: string) {
   return text.split('\n')
@@ -28,6 +52,108 @@ function parseLyrics(text: string) {
     .filter(l => l.length > 0)
     .map((l, i) => ({ isSection: l.startsWith('['), text: l, lineIdx: i }));
 }
+
+function seededPick<T>(arr: T[], seed: number): T {
+  return arr[Math.abs(seed * 2654435761) % arr.length];
+}
+
+// ── YouTube Comment Card ──────────────────────────────────────────────────────
+
+interface CommentCardProps {
+  text: string;           // currently visible text
+  lineIdx: number;        // used to seed username/avatar
+  animMode: AnimMode;
+  phase: 'partial' | 'full'; // for partial mode
+}
+
+const CommentCard: React.FC<CommentCardProps> = ({ text, lineIdx, animMode, phase }) => {
+  const username  = seededPick(USERNAMES,    lineIdx);
+  const avatarBg  = seededPick(AVATAR_COLORS, lineIdx);
+  const timeAgo   = seededPick(TIME_LABELS,   lineIdx + 5);
+  const likes     = seededPick(LIKES,         lineIdx + 3);
+  const initial   = username.charAt(0).toUpperCase();
+
+  return (
+    <div
+      style={{
+        background: '#ffffff',
+        borderRadius: 12,
+        padding: '10px 14px 8px 14px',
+        display: 'flex',
+        gap: 10,
+        alignItems: 'flex-start',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.28)',
+        maxWidth: '92%',
+        minWidth: 220,
+        position: 'relative',
+      }}
+    >
+      {/* Avatar */}
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          background: avatarBg,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          fontWeight: 700,
+          fontSize: 16,
+          flexShrink: 0,
+          marginTop: 2,
+        }}
+      >
+        {initial}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Username + time */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 3 }}>
+          <span style={{ fontWeight: 600, fontSize: 13, color: '#0f0f0f', fontFamily: 'sans-serif' }}>
+            {username}
+          </span>
+          <span style={{ fontSize: 11, color: '#909090', fontFamily: 'sans-serif' }}>
+            {timeAgo}
+          </span>
+        </div>
+
+        {/* Comment text */}
+        <p
+          key={text + phase}
+          style={{
+            margin: 0,
+            fontSize: 14,
+            lineHeight: 1.45,
+            color: '#0f0f0f',
+            fontFamily: 'sans-serif',
+            fontWeight: 400,
+            wordBreak: 'break-word',
+            animation: 'commentFadeIn 0.18s ease',
+            minHeight: 20,
+          }}
+        >
+          {text}
+          {/* blinking cursor during animation */}
+          {animMode === 'wbw' && (
+            <span style={{ display: 'inline-block', width: 2, height: 14, background: '#555', marginLeft: 2, verticalAlign: 'middle', animation: 'blink 0.7s step-end infinite' }} />
+          )}
+        </p>
+
+        {/* Reply + likes */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#606060' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 10v12"/><path d="M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+            <span style={{ fontSize: 11, fontFamily: 'sans-serif' }}>{likes.toLocaleString()}</span>
+          </div>
+          <span style={{ fontSize: 11, color: '#606060', fontFamily: 'sans-serif', cursor: 'pointer' }}>Reply</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
@@ -39,78 +165,104 @@ interface Props {
 }
 
 const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = '', onBack }) => {
-  const lines = parseLyrics(lyricsText);
+  const lines       = parseLyrics(lyricsText);
   const lyricsLines = lines.filter(l => !l.isSection);
 
-  // UI state
+  // ── UI state ──
   const [bgImage, setBgImage]         = useState('');
   const [bgPreset, setBgPreset]       = useState(BG_PRESETS[0]);
   const [customColor, setCustomColor] = useState('');
-  const [stripBg, setStripBg]         = useState<'white' | 'black' | 'blur'>('white');
   const [showPanel, setShowPanel]     = useState(false);
 
-  // Playback state
+  // ── Playback ──
   const [currentIdx, setCurrentIdx]   = useState(0);
-  const [wordIdx, setWordIdx]         = useState(0);   // words revealed so far
+  const [wordIdx, setWordIdx]         = useState(0);
+  const [animPhase, setAnimPhase]     = useState<'partial' | 'full'>('partial');
   const [isPlaying, setIsPlaying]     = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportDone, setExportDone]   = useState(false);
 
   const audioRef     = useRef<HTMLAudioElement>(null);
-  const lineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveBg = bgImage ? undefined : (customColor || bgPreset.value);
 
-  // Current line words
+  // Current line
   const currentLine  = lyricsLines[currentIdx];
   const currentWords = currentLine ? currentLine.text.split(' ') : [];
   const totalWords   = currentWords.length;
+  const animMode     = ANIM_MODES[currentIdx % ANIM_MODES.length];
 
-  // Displayed text: words built up so far
-  const displayedText = currentWords.slice(0, Math.max(1, wordIdx)).join(' ');
+  // ── Compute displayed text based on animMode + phase/wordIdx ──
+  let displayedText = '';
+  if (animMode === 'wbw') {
+    displayedText = currentWords.slice(0, Math.max(1, wordIdx)).join(' ');
+  } else if (animMode === 'all') {
+    displayedText = currentLine?.text || '';
+  } else if (animMode === 'partial') {
+    const half = Math.max(1, Math.ceil(totalWords / 2));
+    displayedText = animPhase === 'partial'
+      ? currentWords.slice(0, half).join(' ')
+      : currentLine?.text || '';
+  }
 
-  // Reset word idx when line changes
+  // ── Reset animation state on line change ──
   useEffect(() => {
     setWordIdx(0);
+    setAnimPhase('partial');
   }, [currentIdx]);
 
-  // Word-by-word reveal animation when playing
+  // ── Animation engine ──
   useEffect(() => {
     if (wordTimerRef.current) clearInterval(wordTimerRef.current);
     if (lineTimerRef.current) clearTimeout(lineTimerRef.current);
+    if (!isPlaying || !currentLine) return;
 
-    if (!isPlaying) return;
-
-    // Start building words
-    wordTimerRef.current = setInterval(() => {
-      setWordIdx(prev => {
-        const next = prev + 1;
-        if (next >= totalWords) {
-          // All words shown — wait then advance line
-          clearInterval(wordTimerRef.current!);
-          lineTimerRef.current = setTimeout(() => {
-            setCurrentIdx(ci => {
-              if (ci >= lyricsLines.length - 1) {
-                setIsPlaying(false);
-                audioRef.current?.pause();
-                return ci;
-              }
-              return ci + 1;
-            });
-          }, 900); // brief pause after full line
-          return next;
+    const advanceLine = () => {
+      setCurrentIdx(ci => {
+        if (ci >= lyricsLines.length - 1) {
+          setIsPlaying(false);
+          audioRef.current?.pause();
+          return ci;
         }
-        return next;
+        return ci + 1;
       });
-    }, WORD_MS);
+    };
+
+    if (animMode === 'wbw') {
+      // Word by word, then pause, then next line
+      wordTimerRef.current = setInterval(() => {
+        setWordIdx(prev => {
+          const next = prev + 1;
+          if (next >= totalWords) {
+            clearInterval(wordTimerRef.current!);
+            lineTimerRef.current = setTimeout(advanceLine, 900);
+          }
+          return next;
+        });
+      }, WORD_MS);
+
+    } else if (animMode === 'all') {
+      // Show all at once, pause, then next line
+      setWordIdx(totalWords);
+      lineTimerRef.current = setTimeout(advanceLine, totalWords * 120 + 700);
+
+    } else if (animMode === 'partial') {
+      const half = Math.max(1, Math.ceil(totalWords / 2));
+      // Show first half, pause, show full, pause, next line
+      lineTimerRef.current = setTimeout(() => {
+        setAnimPhase('full');
+        lineTimerRef.current = setTimeout(advanceLine, 900);
+      }, half * WORD_MS + 400);
+    }
 
     return () => {
       if (wordTimerRef.current) clearInterval(wordTimerRef.current);
       if (lineTimerRef.current) clearTimeout(lineTimerRef.current);
     };
-  }, [isPlaying, currentIdx, totalWords, lyricsLines.length]);
+  }, [isPlaying, currentIdx, animMode, totalWords, lyricsLines.length]);
 
   const togglePlay = () => {
     if (!isPlaying && audioUrl && audioRef.current) {
@@ -124,14 +276,14 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
 
   const reset = () => {
     setIsPlaying(false);
-    setCurrentIdx(0);
-    setWordIdx(0);
+    setCurrentIdx(0); setWordIdx(0); setAnimPhase('partial');
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
   };
 
   const goTo = (idx: number) => {
     setCurrentIdx(idx);
     setWordIdx(0);
+    setAnimPhase('partial');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,14 +294,8 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     reader.readAsDataURL(file);
   };
 
-  // Strip style variants
-  const stripStyles: Record<string, React.CSSProperties> = {
-    white: { background: '#ffffff', color: '#111827' },
-    black: { background: 'rgba(0,0,0,0.82)', color: '#ffffff', backdropFilter: 'blur(4px)' },
-    blur:  { background: 'rgba(255,255,255,0.15)', color: '#ffffff', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.2)' },
-  };
+  // ── Export ─────────────────────────────────────────────────────────────────
 
-  // ── 16:9 Video Export ────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
     setIsExporting(true); setExportDone(false);
     try {
@@ -158,7 +304,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
       canvas.width = W; canvas.height = H;
       const ctx = canvas.getContext('2d')!;
 
-      const stream = canvas.captureStream(30);
+      const stream   = canvas.captureStream(30);
       const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
       const chunks: Blob[] = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -172,74 +318,127 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
         await new Promise(r => { bgImg!.onload = r; bgImg!.onerror = r; });
       }
 
-      const stripH = 130;
+      const cardH   = 180;
+      const cardPad = 40;
+      const cardY   = H - cardH - cardPad;
+
+      const drawBg = () => {
+        if (bgImg) {
+          ctx.drawImage(bgImg, 0, 0, W, H);
+          ctx.fillStyle = 'rgba(0,0,0,0.18)';
+          ctx.fillRect(0, 0, W, H);
+        } else {
+          const grd = ctx.createLinearGradient(0, 0, W, H);
+          grd.addColorStop(0, '#0a0028'); grd.addColorStop(1, '#1a0040');
+          ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+        }
+      };
+
+      const drawCard = (text: string, lineI: number) => {
+        const avatarColor = AVATAR_COLORS[Math.abs(lineI * 2654435761) % AVATAR_COLORS.length];
+        const username    = USERNAMES[Math.abs(lineI * 2654435761) % USERNAMES.length];
+        const timeAgo     = TIME_LABELS[(lineI + 5) % TIME_LABELS.length];
+        const likes       = LIKES[(lineI + 3) % LIKES.length];
+
+        // Card background
+        const cX = cardPad, cW = W - cardPad * 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.roundRect(cX + 4, cardY + 4, cW, cardH, 16);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(cX, cardY, cW, cardH, 16);
+        ctx.fill();
+
+        // Avatar
+        const avX = cX + 30, avY = cardY + 30, avR = 28;
+        ctx.beginPath();
+        ctx.arc(avX, avY + avR, avR, 0, Math.PI * 2);
+        ctx.fillStyle = avatarColor;
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 26px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(username.charAt(0).toUpperCase(), avX, avY + avR + 9);
+
+        // Username + time
+        const textX = avX + avR + 16;
+        ctx.fillStyle = '#0f0f0f';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(username, textX, cardY + 44);
+        ctx.fillStyle = '#909090';
+        ctx.font = '18px sans-serif';
+        ctx.fillText(timeAgo, textX + ctx.measureText(username).width + 12, cardY + 44);
+
+        // Comment text
+        ctx.fillStyle = '#0f0f0f';
+        ctx.font = '24px sans-serif';
+        ctx.fillText(text.slice(0, 100), textX, cardY + 82);
+
+        // Reply
+        ctx.fillStyle = '#606060';
+        ctx.font = '18px sans-serif';
+        ctx.fillText(`👍 ${likes}   Reply`, textX, cardY + 120);
+      };
 
       for (let i = 0; i < lyricsLines.length; i++) {
-        const words = lyricsLines[i].text.split(' ');
-        // Animate word by word
-        for (let w = 1; w <= words.length; w++) {
-          // Draw background
-          if (bgImg) {
-            ctx.drawImage(bgImg, 0, 0, W, H);
-            ctx.fillStyle = 'rgba(0,0,0,0.18)';
-            ctx.fillRect(0, 0, W, H);
-          } else {
-            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-            const grd = ctx.createLinearGradient(0, 0, W, H);
-            grd.addColorStop(0, '#0a0028'); grd.addColorStop(1, '#1a0040');
-            ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+        const words  = lyricsLines[i].text.split(' ');
+        const mode   = ANIM_MODES[i % ANIM_MODES.length];
+        const half   = Math.max(1, Math.ceil(words.length / 2));
+
+        if (mode === 'wbw') {
+          for (let w = 1; w <= words.length; w++) {
+            drawBg();
+            drawCard(words.slice(0, w).join(' '), i);
+            await new Promise(r => setTimeout(r, WORD_MS));
           }
-
-          // White strip at bottom
-          if (stripBg === 'white') {
-            ctx.fillStyle = '#ffffff';
-          } else {
-            ctx.fillStyle = 'rgba(0,0,0,0.82)';
-          }
-          ctx.fillRect(0, H - stripH, W, stripH);
-
-          // Text
-          const textColor = stripBg === 'white' ? '#111827' : '#ffffff';
-          ctx.fillStyle = textColor;
-          ctx.font = 'bold 52px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const partial = words.slice(0, w).join(' ');
-          ctx.fillText(partial, W / 2, H - stripH / 2);
-
-          await new Promise(r => setTimeout(r, WORD_MS));
+        } else if (mode === 'all') {
+          drawBg();
+          drawCard(lyricsLines[i].text, i);
+          await new Promise(r => setTimeout(r, words.length * 120 + 700));
+        } else {
+          // partial → full
+          drawBg();
+          drawCard(words.slice(0, half).join(' '), i);
+          await new Promise(r => setTimeout(r, half * WORD_MS + 400));
+          drawBg();
+          drawCard(lyricsLines[i].text, i);
+          await new Promise(r => setTimeout(r, 900));
         }
-        // Pause after full line
         await new Promise(r => setTimeout(r, 800));
       }
 
       recorder.stop();
       await new Promise(r => { recorder.onstop = r; });
       const blob = new Blob(chunks, { type: 'video/webm' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
       a.href = url; a.download = `lyrics_${Date.now()}.webm`; a.click();
       URL.revokeObjectURL(url);
       setExportDone(true);
     } catch (err: any) {
       alert('Export failed: ' + err.message);
-    } finally { setIsExporting(false); }
-  }, [lyricsLines, bgImage, stripBg]);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [lyricsLines, bgImage]);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-col overflow-hidden">
 
-      {/* ── Fixed top bar ─────────────────────────────────────────── */}
+      {/* Top bar */}
       <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-3 sm:px-4 h-14 bg-[#050505]/95 backdrop-blur-xl border-b border-white/5">
         <button onClick={onBack} className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors active:scale-95">
           <ArrowLeft size={18} />
           <span className="hidden sm:inline">Back</span>
         </button>
-
-        <span className="text-[11px] text-gray-600 uppercase tracking-widest font-semibold hidden md:block">
-          {songStyle || 'Lyrics'} Canvas · 16:9
+        <span className="text-[10px] text-gray-700 uppercase tracking-widest font-semibold hidden md:block">
+          Lyrics Canvas · 16:9
         </span>
-
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowPanel(p => !p)}
@@ -259,10 +458,9 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
         </div>
       </div>
 
-      {/* ── Layout ────────────────────────────────────────────────── */}
       <div className="flex flex-1 pt-14 overflow-hidden">
 
-        {/* ── Canvas area ─────────────────────────────────────────── */}
+        {/* ── Canvas area ── */}
         <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-5 overflow-y-auto gap-4 min-w-0">
 
           {/* 16:9 Frame */}
@@ -276,39 +474,35 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 24px 64px rgba(0,0,0,0.7)',
               }}
             >
-              {/* Dark overlay when image is set */}
-              {bgImage && (
-                <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.18)' }} />
-              )}
+              {bgImage && <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.18)' }} />}
 
-              {/* ── White/dark bottom strip ── */}
+              {/* ── Comment card overlay ── */}
               <div
-                className="absolute left-0 right-0 bottom-0 flex items-center justify-center"
-                style={{
-                  minHeight: '18%',
-                  padding: '12px 24px',
-                  ...stripStyles[stripBg],
-                }}
+                className="absolute left-0 right-0 bottom-0 flex justify-start items-end pb-[3%] px-[3%]"
+                style={{ zIndex: 10 }}
               >
-                <p
-                  key={displayedText}
-                  style={{
-                    fontSize: 'clamp(13px, 2.8vw, 28px)',
-                    fontWeight: 700,
-                    textAlign: 'center',
-                    lineHeight: 1.35,
-                    margin: 0,
-                    letterSpacing: '0.01em',
-                    animation: 'wordPop 0.18s ease',
-                    color: stripStyles[stripBg].color,
-                  }}
+                <div
+                  key={`${currentIdx}-${animPhase}-${wordIdx > 0 ? 'typing' : 'start'}`}
+                  style={{ animation: 'cardSlideUp 0.22s cubic-bezier(0.22,1,0.36,1)' }}
                 >
-                  {displayedText}
-                </p>
+                  <CommentCard
+                    text={displayedText}
+                    lineIdx={currentIdx}
+                    animMode={animMode}
+                    phase={animPhase}
+                  />
+                </div>
               </div>
 
-              {/* Progress bar at very bottom edge */}
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20">
+              {/* Anim mode badge */}
+              <div className="absolute top-[3%] right-[3%] z-20">
+                <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-black/40 text-white/50 backdrop-blur-sm">
+                  {animMode === 'wbw' ? '⌨ Word' : animMode === 'all' ? '⚡ Flash' : '◑ Build'}
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20 z-20">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
                   style={{ width: `${((currentIdx + 1) / lyricsLines.length) * 100}%` }}
@@ -316,7 +510,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
               </div>
             </div>
 
-            {/* ── Playback controls ── */}
+            {/* Playback controls */}
             <div className="flex items-center justify-center gap-3 mt-4">
               <button
                 onClick={() => goTo(Math.max(0, currentIdx - 1))}
@@ -324,10 +518,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
               >
                 <ChevronLeft size={18} />
               </button>
-              <button
-                onClick={reset}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-white/10 text-gray-400 hover:text-white hover:border-white/25 flex items-center justify-center transition-all active:scale-95"
-              >
+              <button onClick={reset} className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-white/10 text-gray-400 hover:text-white hover:border-white/25 flex items-center justify-center transition-all active:scale-95">
                 <RotateCcw size={15} />
               </button>
               <button
@@ -346,51 +537,40 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 {currentIdx + 1} / {lyricsLines.length}
               </span>
             </div>
-
-            {/* Word progress dots */}
-            <div className="flex items-center justify-center gap-1 mt-2">
-              {currentWords.map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-full transition-all duration-150"
-                  style={{
-                    width: i < wordIdx ? 6 : 4,
-                    height: i < wordIdx ? 6 : 4,
-                    background: i < wordIdx ? '#a855f7' : 'rgba(255,255,255,0.12)',
-                  }}
-                />
-              ))}
-            </div>
           </div>
 
-          {/* ── All lyrics list ── */}
+          {/* All lyrics list */}
           <div className="w-full space-y-1" style={{ maxWidth: 900 }}>
             <div className="text-[10px] text-gray-700 uppercase tracking-widest font-semibold mb-2">All Lines</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-              {lyricsLines.map((line, i) => (
-                <button
-                  key={i}
-                  onClick={() => goTo(i)}
-                  className={`text-left text-xs px-3 py-2 rounded-lg transition-all ${i === currentIdx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-600 hover:text-gray-300 hover:bg-white/4 border border-transparent'}`}
-                >
-                  <span className="text-gray-700 mr-1.5">{i + 1}.</span>{line.text}
-                </button>
-              ))}
+              {lyricsLines.map((line, i) => {
+                const mode = ANIM_MODES[i % ANIM_MODES.length];
+                return (
+                  <button
+                    key={i}
+                    onClick={() => goTo(i)}
+                    className={`text-left text-xs px-3 py-2 rounded-lg transition-all flex items-center gap-2 ${i === currentIdx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-600 hover:text-gray-300 hover:bg-white/4 border border-transparent'}`}
+                  >
+                    <span className="text-[9px] text-gray-700 w-10 shrink-0">
+                      {mode === 'wbw' ? '⌨' : mode === 'all' ? '⚡' : '◑'}
+                    </span>
+                    <span className="truncate">{line.text}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </main>
 
-        {/* ── Customize Panel ──────────────────────────────────────── */}
+        {/* ── Customize Panel ── */}
         <>
           {showPanel && (
             <div className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={() => setShowPanel(false)} />
           )}
           <aside className={`
             fixed lg:static inset-y-0 right-0 z-50 w-72 sm:w-80 bg-[#0a0a0a] border-l border-white/5
-            flex flex-col overflow-y-auto
-            transition-transform duration-300 ease-in-out
-            ${showPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0 lg:hidden'}
-            pt-14 lg:pt-0
+            flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out
+            ${showPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0 lg:hidden'} pt-14 lg:pt-0
           `}>
             <div className="p-4 space-y-5">
               <div className="flex items-center justify-between">
@@ -428,7 +608,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 )}
               </div>
 
-              {/* BG Color Presets */}
+              {/* BG Presets */}
               <div className="space-y-2">
                 <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Background Color</div>
                 <div className="grid grid-cols-4 gap-1.5">
@@ -452,38 +632,44 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 />
               </div>
 
-              {/* Strip Style */}
+              {/* Animation modes legend */}
               <div className="space-y-2">
-                <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Text Strip Style</div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {([
-                    { id: 'white', label: 'White', preview: '#fff' },
-                    { id: 'black', label: 'Black', preview: '#000' },
-                    { id: 'blur',  label: 'Glass', preview: 'rgba(255,255,255,0.15)' },
-                  ] as const).map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => setStripBg(s.id)}
-                      style={{ background: s.preview, border: stripBg === s.id ? '2px solid #a855f7' : '2px solid rgba(255,255,255,0.08)' }}
-                      className="h-10 rounded-xl text-[10px] font-semibold transition-all"
-                    >
-                      <span style={{ color: s.id === 'white' ? '#111' : '#fff', textShadow: s.id === 'white' ? 'none' : '0 1px 3px rgba(0,0,0,0.5)' }}>
-                        {s.label}
-                      </span>
-                    </button>
+                <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Animation Styles</div>
+                <div className="space-y-1.5">
+                  {[
+                    { icon: '⌨', label: 'Word by Word', desc: 'Ek word at a time type hota hai' },
+                    { icon: '⚡', label: 'Flash', desc: 'Pura phrase ek saath flash karta hai' },
+                    { icon: '◑', label: 'Build', desc: 'Aadha phrase pehle, phir pura' },
+                  ].map(s => (
+                    <div key={s.icon} className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/4 border border-white/5">
+                      <span className="text-base leading-none mt-0.5">{s.icon}</span>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-300">{s.label}</div>
+                        <div className="text-[10px] text-gray-600 mt-0.5">{s.desc}</div>
+                      </div>
+                    </div>
                   ))}
                 </div>
+                <p className="text-[10px] text-gray-700 pl-1">Styles automatically cycle across lines</p>
               </div>
             </div>
           </aside>
         </>
       </div>
 
-      {/* CSS animation */}
+      {/* CSS */}
       <style>{`
-        @keyframes wordPop {
-          from { opacity: 0.3; transform: scale(0.92); }
-          to   { opacity: 1;   transform: scale(1); }
+        @keyframes commentFadeIn {
+          from { opacity: 0.2; transform: translateY(4px); }
+          to   { opacity: 1;   transform: translateY(0); }
+        }
+        @keyframes cardSlideUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink {
+          0%,100% { opacity: 1; }
+          50%      { opacity: 0; }
         }
       `}</style>
 
