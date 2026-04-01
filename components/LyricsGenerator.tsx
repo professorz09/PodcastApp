@@ -1,12 +1,16 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Music2, FileText, Video, ChevronRight, Loader2, AlertCircle, CheckCircle,
   Play, Pause, Download, Mic2, RefreshCw, Sparkles, Copy, MessageSquare,
   ToggleLeft, ToggleRight, Volume2, Wand2,
 } from 'lucide-react';
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { generateLyrics, generateSongAudio } from '../services/geminiService';
 import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
 import LyricsCanvas from './LyricsCanvas';
+
+const LS_KEY  = 'lyrics_studio_v1';
+const IDB_KEY = 'lyrics_studio_audio_v1';
 
 type Phase = 'write' | 'song' | 'canvas';
 type Style = 'auto';
@@ -74,6 +78,52 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
 
   // ── Canvas ───────────────────────────────────────────────────
   const [showCanvas, setShowCanvas] = useState(false);
+
+  // ── Persistence: load on mount ────────────────────────────────
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.lyrics)       { setLyrics(d.lyrics); setPhase('song'); }
+        if (d.commentsText) setCommentsText(d.commentsText);
+        if (d.contextText)  setContextText(d.contextText);
+        if (d.language)     setLanguage(d.language);
+        if (d.model)        setModel(d.model);
+        if (d.lyriaModel)   setLyriaModel(d.lyriaModel);
+        if (d.directMode !== undefined) setDirectMode(d.directMode);
+        if (d.directLyrics) setDirectLyrics(d.directLyrics);
+      }
+    } catch {}
+
+    // Restore audio blob from IndexedDB
+    idbGet(IDB_KEY).then((blob: Blob | undefined) => {
+      if (blob && blob.size > 0) {
+        setSongBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setSongUrl(url);
+      }
+    }).catch(() => {});
+  }, []);
+
+  // ── Persistence: save lyrics + form data ─────────────────────
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        lyrics, commentsText, contextText, language, model,
+        lyriaModel, directMode, directLyrics,
+      }));
+    } catch {}
+  }, [lyrics, commentsText, contextText, language, model, lyriaModel, directMode, directLyrics]);
+
+  // ── Persistence: save audio blob ─────────────────────────────
+  useEffect(() => {
+    if (songBlob) {
+      idbSet(IDB_KEY, songBlob).catch(() => {});
+    } else {
+      idbDel(IDB_KEY).catch(() => {});
+    }
+  }, [songBlob]);
 
   const handleGenerateLyrics = useCallback(async () => {
     setIsGenerating(true); setLyricsError(''); setLyrics('');
