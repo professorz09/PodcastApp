@@ -2082,29 +2082,34 @@ export const generateLyrics = async (params: {
   const styleDesc = STYLE_PROMPTS[params.style] || params.style;
 
   const lang = params.language || 'Hindi';
-  const prompt = `You are a viral content lyricist who writes songs about current events, politics, news, and trending social topics — content that makes people laugh, think, or react strongly. You write for a desi social media audience (YouTube Shorts, Instagram Reels).
+
+  const topicLine = params.context
+    ? `TOPIC (write ONLY about this): ${params.context}`
+    : params.comments
+      ? `TOPIC: Derive the topic from the comments below — stay 100% true to what the comments are about.`
+      : `TOPIC: Write a general fun/relatable song in the given style.`;
+
+  const prompt = `You are a creative lyricist. Write song lyrics STRICTLY about the topic given below. Do NOT add unrelated themes, do NOT default to politics unless the topic itself is political.
 
 STYLE: ${styleDesc}
 LANGUAGE: ${lang}
-TARGET AUDIENCE: Desi social media viewers — people who follow daily news, viral videos, political drama, and funny current events. The song should feel like a roast, a satire, or an emotional reaction to what's happening around them.
-${params.context ? `TOPIC / EVENT: ${params.context}` : ''}
-${params.comments ? `\nAUDIENCE COMMENTS & REACTIONS (use the energy, opinions, and humor from these):\n${params.comments.slice(0, 3000)}` : ''}
-${params.directLyrics ? `\nUSER-PROVIDED DRAFT (refine and polish):\n${params.directLyrics}` : ''}
+${topicLine}
+${params.comments ? `\nCOMMENTS (use the humor, emotions, and reactions from these — the song must reflect what these comments are about):\n${params.comments.slice(0, 3000)}` : ''}
+${params.directLyrics ? `\nUSER DRAFT (refine and expand this, keep the same topic):\n${params.directLyrics}` : ''}
 
-Write complete song lyrics with these sections:
-- [Mukhda] — punchy hook/chorus that captures the main reaction or opinion (6–10 lines)
-- [Antara 1] — first verse with specific details, facts, or funny observations (6–10 lines)
+Write complete song lyrics with:
+- [Mukhda] — hook/chorus capturing the core emotion or punchline of the topic (6–10 lines)
+- [Antara 1] — first verse with specific details about the topic (6–10 lines)
 - [Mukhda] — repeat
-- [Antara 2] — second verse going deeper or from another angle (6–10 lines)
+- [Antara 2] — second verse, different angle on the same topic (6–10 lines)
 - [Mukhda] — repeat
-- [Bridge] — optional twist, punchline, or call to action (4–6 lines)
+- [Bridge] — twist, punchline, or emotional peak (4–6 lines)
 
-Rules:
-• Language: ${lang} — use natural colloquial speech, not formal. Desi slang is welcome.
-• Make it punchy, relatable, and shareable — the kind of song people screenshot or send to friends
-• If the topic is political or news-based: use wit, sarcasm, satire — don't be boring
-• If comments are funny: amplify that humor into the lyrics
-• Output ONLY the lyrics with section labels. Nothing else.`;
+STRICT RULES:
+• Stay 100% on the given topic. Never drift to unrelated subjects.
+• Language: ${lang} — natural, conversational, NOT formal. Slang welcome.
+• Match the style: ${styleDesc}
+• Output ONLY the lyrics with section labels. No explanations, no commentary.`;
 
   try {
     const response = await ai.models.generateContent({
