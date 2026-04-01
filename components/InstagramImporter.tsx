@@ -368,7 +368,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   const attachComments = () => {
     if (!comments || comments.length === 0) return;
     const content = comments.map(c => `• ${c}`).join('\n\n');
-    const label = `Instagram Comments (${postInfo?.uploader || 'post'})`;
+    const label = `comments_ig_${postInfo?.uploader || postInfo?.shortcode || 'post'}`;
     onAttachContext?.(content, label);
     setAttachedLabel(label);
   };
@@ -672,7 +672,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
                   <button onClick={downloadComments} className="hover:text-gray-300 transition-colors">Download .txt</button>
                   <span>·</span>
                   <button onClick={attachComments} className="hover:text-gray-300 transition-colors">
-                    {attachedLabel?.includes('Comment') ? '✓ Attached' : 'Attach to Context'}
+                    {attachedLabel?.startsWith('comments_ig') ? '✓ Attached' : 'Attach to Context'}
                   </button>
                 </div>
               </div>
@@ -698,8 +698,8 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
                 onClick={attachComments}
                 className="w-full flex items-center justify-center gap-2 border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-xs font-medium px-4 py-2.5 rounded-xl transition-all"
               >
-                {attachedLabel?.includes('Comment') ? <CheckCircle size={13} /> : <Copy size={13} />}
-                {attachedLabel?.includes('Comment') ? 'Comments Attached to Context!' : '→ Send Comments to Script Context'}
+                {attachedLabel?.startsWith('comments_ig') ? <CheckCircle size={13} /> : <Copy size={13} />}
+                {attachedLabel?.startsWith('comments_ig') ? 'Comments Attached!' : '→ Send Comments to Lyrics & Script'}
               </button>
             </div>
           )}

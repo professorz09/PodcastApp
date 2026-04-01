@@ -171,7 +171,7 @@ const RedditImporter: React.FC<Props> = ({ onAttachContext, onAttachPost, onSkip
   const attachComments = () => {
     if (!comments || comments.length === 0) return;
     const content = comments.map((c, i) => `${i + 1}. ${c}`).join('\n\n');
-    const label = `Reddit Comments — ${postInfo?.title?.slice(0, 40) || 'post'}`;
+    const label = `comments_reddit_${postInfo?.post_id || postInfo?.title?.slice(0, 30).replace(/\s+/g, '_') || 'post'}`;
     onAttachContext?.(content, label);
     setCommentsAttached(true);
   };
@@ -414,7 +414,7 @@ const RedditImporter: React.FC<Props> = ({ onAttachContext, onAttachPost, onSkip
                 className="w-full flex items-center justify-center gap-2 border border-orange-500/30 text-orange-400 hover:bg-orange-500/10 text-xs font-medium px-4 py-2.5 rounded-xl transition-all"
               >
                 {commentsAttached ? <CheckCircle size={13} /> : <Copy size={13} />}
-                {commentsAttached ? 'Comments Attached to Context!' : '→ Send Comments to Script Context'}
+                {commentsAttached ? 'Comments Attached!' : '→ Send Comments to Lyrics & Script'}
               </button>
             </div>
           )}

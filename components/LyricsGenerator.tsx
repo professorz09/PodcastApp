@@ -80,9 +80,18 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   // ── Canvas ───────────────────────────────────────────────────
   const [showCanvas, setShowCanvas] = useState(false);
 
-  // ── Persistence: load on mount ────────────────────────────────
-  const isInitialized = React.useRef(false);
+  // ── Sync initialComments prop → commentsText whenever it changes ─────────
+  // This ensures freshly-scraped/attached comments always appear in the textarea,
+  // even if LyricsGenerator was already mounted before the user attached them.
+  const prevInitialComments = React.useRef(initialComments);
+  useEffect(() => {
+    if (initialComments && initialComments !== prevInitialComments.current) {
+      setCommentsText(initialComments);
+      prevInitialComments.current = initialComments;
+    }
+  }, [initialComments]);
 
+  // ── Persistence: load on mount ────────────────────────────────
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY);
