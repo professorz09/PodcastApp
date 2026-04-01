@@ -55,7 +55,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         if (!newVoices[speaker]) {
           if (isNarrator(speaker)) newVoices[speaker] = 'Sulafat';
           else {
-            const defaults = ['Zubenelgenubi', 'Gacrux', 'Zephyr', 'Charon', 'Leda'];
+            const defaults = ['Puck', 'Zephyr', 'Charon', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
             const speakerIndex = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(speaker);
             newVoices[speaker] = defaults[speakerIndex % defaults.length];
           }
@@ -228,36 +228,36 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
   }
 
   const googleVoices = [
-    { id: 'Zephyr', label: 'Zephyr', desc: 'Bright', gender: 'Neutral' },
-    { id: 'Puck', label: 'Puck', desc: 'Upbeat', gender: 'Neutral' },
-    { id: 'Charon', label: 'Charon', desc: 'Informative', gender: 'Neutral' },
-    { id: 'Kore', label: 'Kore', desc: 'Firm', gender: 'Neutral' },
-    { id: 'Fenrir', label: 'Fenrir', desc: 'Excitable', gender: 'Neutral' },
-    { id: 'Leda', label: 'Leda', desc: 'Youthful', gender: 'Neutral' },
-    { id: 'Orus', label: 'Orus', desc: 'Firm', gender: 'Neutral' },
-    { id: 'Aoede', label: 'Aoede', desc: 'Breezy', gender: 'Neutral' },
-    { id: 'Callirrhoe', label: 'Callirrhoe', desc: 'Easy-going', gender: 'Neutral' },
-    { id: 'Autonoe', label: 'Autonoe', desc: 'Bright', gender: 'Neutral' },
-    { id: 'Enceladus', label: 'Enceladus', desc: 'Breathy', gender: 'Neutral' },
-    { id: 'Iapetus', label: 'Iapetus', desc: 'Clear', gender: 'Neutral' },
-    { id: 'Umbriel', label: 'Umbriel', desc: 'Easy-going', gender: 'Neutral' },
-    { id: 'Algieba', label: 'Algieba', desc: 'Smooth', gender: 'Neutral' },
-    { id: 'Despina', label: 'Despina', desc: 'Smooth', gender: 'Neutral' },
-    { id: 'Erinome', label: 'Erinome', desc: 'Clear', gender: 'Neutral' },
-    { id: 'Algenib', label: 'Algenib', desc: 'Gravelly', gender: 'Neutral' },
-    { id: 'Rasalgethi', label: 'Rasalgethi', desc: 'Informative', gender: 'Neutral' },
-    { id: 'Laomedeia', label: 'Laomedeia', desc: 'Upbeat', gender: 'Neutral' },
-    { id: 'Achernar', label: 'Achernar', desc: 'Soft', gender: 'Neutral' },
-    { id: 'Alnilam', label: 'Alnilam', desc: 'Firm', gender: 'Neutral' },
-    { id: 'Schedar', label: 'Schedar', desc: 'Even', gender: 'Neutral' },
-    { id: 'Gacrux', label: 'Gacrux', desc: 'Mature', gender: 'Neutral' },
-    { id: 'Pulcherrima', label: 'Pulcherrima', desc: 'Forward', gender: 'Neutral' },
-    { id: 'Achird', label: 'Achird', desc: 'Friendly', gender: 'Neutral' },
-    { id: 'Zubenelgenubi', label: 'Zubenelgenubi', desc: 'Casual', gender: 'Neutral' },
-    { id: 'Vindemiatrix', label: 'Vindemiatrix', desc: 'Gentle', gender: 'Neutral' },
-    { id: 'Sadachbia', label: 'Sadachbia', desc: 'Lively', gender: 'Neutral' },
-    { id: 'Sadaltager', label: 'Sadaltager', desc: 'Knowledgeable', gender: 'Neutral' },
-    { id: 'Sulafat', label: 'Sulafat', desc: 'Warm', gender: 'Neutral' },
+    { id: 'Zephyr',        label: 'Zephyr',        desc: 'Bright',        gender: 'Female' },
+    { id: 'Kore',          label: 'Kore',          desc: 'Firm',          gender: 'Female' },
+    { id: 'Leda',          label: 'Leda',          desc: 'Youthful',      gender: 'Female' },
+    { id: 'Aoede',         label: 'Aoede',         desc: 'Breezy',        gender: 'Female' },
+    { id: 'Callirrhoe',    label: 'Callirrhoe',    desc: 'Easy-going',    gender: 'Female' },
+    { id: 'Autonoe',       label: 'Autonoe',       desc: 'Bright',        gender: 'Female' },
+    { id: 'Despina',       label: 'Despina',       desc: 'Smooth',        gender: 'Female' },
+    { id: 'Erinome',       label: 'Erinome',       desc: 'Clear',         gender: 'Female' },
+    { id: 'Gacrux',        label: 'Gacrux',        desc: 'Mature',        gender: 'Female' },
+    { id: 'Laomedeia',     label: 'Laomedeia',     desc: 'Upbeat',        gender: 'Female' },
+    { id: 'Achernar',      label: 'Achernar',      desc: 'Soft',          gender: 'Female' },
+    { id: 'Pulcherrima',   label: 'Pulcherrima',   desc: 'Forward',       gender: 'Female' },
+    { id: 'Vindemiatrix',  label: 'Vindemiatrix',  desc: 'Gentle',        gender: 'Female' },
+    { id: 'Sulafat',       label: 'Sulafat',       desc: 'Warm',          gender: 'Female' },
+    { id: 'Puck',          label: 'Puck',          desc: 'Upbeat',        gender: 'Male'   },
+    { id: 'Charon',        label: 'Charon',        desc: 'Informative',   gender: 'Male'   },
+    { id: 'Fenrir',        label: 'Fenrir',        desc: 'Excitable',     gender: 'Male'   },
+    { id: 'Orus',          label: 'Orus',          desc: 'Firm',          gender: 'Male'   },
+    { id: 'Enceladus',     label: 'Enceladus',     desc: 'Breathy',       gender: 'Male'   },
+    { id: 'Iapetus',       label: 'Iapetus',       desc: 'Clear',         gender: 'Male'   },
+    { id: 'Umbriel',       label: 'Umbriel',       desc: 'Easy-going',    gender: 'Male'   },
+    { id: 'Algieba',       label: 'Algieba',       desc: 'Smooth',        gender: 'Male'   },
+    { id: 'Algenib',       label: 'Algenib',       desc: 'Gravelly',      gender: 'Male'   },
+    { id: 'Rasalgethi',    label: 'Rasalgethi',    desc: 'Informative',   gender: 'Male'   },
+    { id: 'Alnilam',       label: 'Alnilam',       desc: 'Firm',          gender: 'Male'   },
+    { id: 'Schedar',       label: 'Schedar',       desc: 'Even',          gender: 'Male'   },
+    { id: 'Achird',        label: 'Achird',        desc: 'Friendly',      gender: 'Male'   },
+    { id: 'Zubenelgenubi', label: 'Zubenelgenubi', desc: 'Casual',        gender: 'Male'   },
+    { id: 'Sadachbia',     label: 'Sadachbia',     desc: 'Lively',        gender: 'Male'   },
+    { id: 'Sadaltager',    label: 'Sadaltager',    desc: 'Knowledgeable', gender: 'Male'   },
   ];
 
   const generateSingleSegment = async (index: number) => {
@@ -806,7 +806,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
               const speakerReady = speakerSegs.filter(s => s.audioUrl).length;
               const voiceLabel = ttsProvider === 'google'
                 ? googleVoices.find(v => v.id === voices[role])
-                  ? `${voices[role]} · ${googleVoices.find(v => v.id === voices[role])!.desc}`
+                  ? `${voices[role]} · ${googleVoices.find(v => v.id === voices[role])!.gender}, ${googleVoices.find(v => v.id === voices[role])!.desc}`
                   : voices[role]
                 : elevenLabsVoices.find(v => v.voice_id === voices[role])?.name || voices[role];
 
@@ -834,8 +834,12 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                       disabled={loadingVoices}
                     >
                       {ttsProvider === 'google'
-                        ? googleVoices.map(v => (
-                            <option key={v.id} value={v.id}>{v.label} · {v.gender}, {v.desc}</option>
+                        ? (['Female', 'Male'] as const).map(g => (
+                            <optgroup key={g} label={g === 'Female' ? '♀ Female' : '♂ Male'}>
+                              {googleVoices.filter(v => v.gender === g).map(v => (
+                                <option key={v.id} value={v.id}>{v.label} · {v.desc}</option>
+                              ))}
+                            </optgroup>
                           ))
                         : elevenLabsVoices.length > 0
                           ? elevenLabsVoices.map(v => (
