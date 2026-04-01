@@ -117,6 +117,7 @@ export interface ThumbnailState {
   guestName: string;
   thumbnailUrl: string | null;
   referenceImage: { data: string, mimeType: string, url: string } | null;
+  videoStyle?: 'situational' | 'debate' | 'podcast';
 }
 
 export interface DebateConfig {

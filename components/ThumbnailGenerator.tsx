@@ -43,13 +43,14 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
   const [isGeneratingThumbnailText, setIsGeneratingThumbnailText] = useState(false);
   const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
+  const [inspirationError, setInspirationError] = useState<string | null>(null);
   const [pairs, setPairs] = useState<{ title: string; thumbnailText: string }[]>([]);
   const [isGeneratingPair, setIsGeneratingPair] = useState(false);
   const [pairError, setPairError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
-  const [videoStyle, setVideoStyle] = useState<ThumbnailVideoStyle>('situational');
+  const videoStyle: ThumbnailVideoStyle = thumbnailState.videoStyle || 'situational';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const styleOptions: { value: ThumbnailVideoStyle; label: string; desc: string; color: string }[] = [
@@ -101,6 +102,28 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
     if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates });
   }, []);
+
+  // Auto-load Situational style image whenever videoStyle becomes 'situational' and no image set
+  useEffect(() => {
+    if (videoStyle !== 'situational' || referenceImage) return;
+    fetch('/default-style-situational.jpg')
+      .then(r => r.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const result = ev.target?.result as string;
+          const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+          if (match) {
+            onUpdateThumbnailState({
+              ...thumbnailState,
+              referenceImage: { mimeType: match[1], data: match[2], url: result },
+            });
+          }
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {});
+  }, [videoStyle]);
 
   const getSourceText = (source: TitleSource): string => {
     if (source === 'transcript' && hasTranscript) return youtubeData!.fullText;
@@ -230,11 +253,12 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     const sourceText = getSourceText(titleSource);
     if (!sourceText) return;
     setIsGeneratingInspiration(true);
+    setInspirationError(null);
     try {
       const inspiration = await generateThumbnailInspiration(sourceText, videoStyle);
       onUpdateThumbnailState({ ...thumbnailState, extraInstructions: inspiration });
     } catch (err: any) {
-      console.error('Inspiration error', err);
+      setInspirationError(err?.message || 'Inspiration generate nahi hui. Dobara try karo.');
     } finally {
       setIsGeneratingInspiration(false);
     }
@@ -310,7 +334,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   {styleOptions.map(opt => (
                     <button
                       key={opt.value}
-                      onClick={() => setVideoStyle(opt.value)}
+                      onClick={() => onUpdateThumbnailState({ ...thumbnailState, videoStyle: opt.value, referenceImage: null })}
                       className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
                         videoStyle === opt.value
                           ? opt.color === 'rose'
@@ -656,6 +680,9 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                         rows={3}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500 transition-colors placeholder-gray-600 resize-none"
                       />
+                      {inspirationError && (
+                        <p className="text-xs text-red-400 mt-1">{inspirationError}</p>
+                      )}
                     </div>
                   </div>
                 )}

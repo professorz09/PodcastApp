@@ -36,6 +36,7 @@ const App: React.FC = () => {
     thumbnailUrl: null,
     referenceImage: null,
     extraInstructions: '',
+    videoStyle: 'situational',
   });
   const [audioVoices, setAudioVoices] = useState<Record<string, string>>({});
   const [scriptStyle, setScriptStyle] = useState<string>('debate');
@@ -202,6 +203,7 @@ const App: React.FC = () => {
       thumbnailUrl: null,
       referenceImage: null,
       extraInstructions: '',
+      videoStyle: 'situational',
     });
     // Clear importer sessionStorage so it starts fresh
     try { sessionStorage.removeItem('yt_importer_v1'); } catch {}
