@@ -17,18 +17,8 @@ const BG_PRESETS = [
   { id: 'ocean',   label: 'Ocean',   value: 'linear-gradient(135deg,#001a2c,#003b6e,#005f8a)' },
 ];
 
-const AVATAR_COLORS = [
-  '#8B5CF6','#EC4899','#F97316','#14B8A6','#3B82F6','#EF4444','#10B981','#F59E0B',
-  '#6366F1','#D946EF','#0EA5E9','#22C55E',
-];
-
-const USERNAMES = [
-  'v3lvetring_','tyler_gies_','doubledadid69','leafybean','not_a_bot_42','memequeen99',
-  'RealOne_7','AnonymousJi','LyricsLover','MusicManiac','SoundSeeker','DarkHumor101',
-  'sarcasm_king','funny_or_die','DesiVibes','UrbanPoet','NightOwl_SK','BombayBoy99',
-];
-
-const TIME_LABELS = ['2w','4w','1 month','3 months','6 months','22w','34w','1 year','21w','8w'];
+// Word reveal interval in ms
+const WORD_MS = 280;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,68 +28,6 @@ function parseLyrics(text: string) {
     .filter(l => l.length > 0)
     .map((l, i) => ({ isSection: l.startsWith('['), text: l, lineIdx: i }));
 }
-
-function avatarColor(username: string): string {
-  let n = 0;
-  for (const c of username) n += c.charCodeAt(0);
-  return AVATAR_COLORS[n % AVATAR_COLORS.length];
-}
-
-function getInitial(u: string) { return u.charAt(0).toUpperCase(); }
-
-// ── YouTube Comment Overlay Card ───────────────────────────────────────────────
-
-interface CommentProps {
-  line: string;
-  username: string;
-  timeAgo: string;
-  likes: number;
-  isNext?: boolean;
-}
-
-const CommentOverlay: React.FC<CommentProps> = ({ line, username, timeAgo, likes, isNext }) => {
-  const col = avatarColor(username);
-  return (
-    <div
-      style={{
-        background: '#ffffff',
-        borderRadius: 12,
-        padding: '10px 14px',
-        transition: 'all 0.4s cubic-bezier(.4,0,.2,1)',
-        opacity: isNext ? 0.28 : 1,
-        transform: isNext ? 'translateY(6px) scale(0.97)' : 'translateY(0) scale(1)',
-        boxShadow: isNext ? 'none' : '0 4px 24px rgba(0,0,0,0.5)',
-        pointerEvents: 'none',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        {/* Avatar */}
-        <div style={{
-          width: 36, height: 36, minWidth: 36, borderRadius: '50%',
-          background: col, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 14, fontWeight: 700, flexShrink: 0,
-        }}>
-          {getInitial(username)}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Username + time */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>@{username}</span>
-            <span style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo}</span>
-          </div>
-          {/* Lyric as comment */}
-          <p style={{ fontSize: 14, color: '#1f2937', lineHeight: 1.45, margin: 0, fontWeight: 400 }}>{line}</p>
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 12, color: '#6b7280' }}>
-            <span>👍 {likes}</span>
-            <span>👎</span>
-            <span style={{ fontWeight: 500 }}>Reply</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
@@ -114,44 +42,75 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
   const lines = parseLyrics(lyricsText);
   const lyricsLines = lines.filter(l => !l.isSection);
 
-  // Stable derived data
-  const [usernames] = useState(() => lyricsLines.map((_, i) => USERNAMES[i % USERNAMES.length]));
-  const [timings]   = useState(() => lyricsLines.map((_, i) => TIME_LABELS[i % TIME_LABELS.length]));
-  const [likes]     = useState(() => lyricsLines.map(() => Math.floor(Math.random() * 8900 + 100)));
-
-  // State
+  // UI state
   const [bgImage, setBgImage]         = useState('');
   const [bgPreset, setBgPreset]       = useState(BG_PRESETS[0]);
   const [customColor, setCustomColor] = useState('');
-  const [overlayText, setOverlayText] = useState('CHAT MUSIC');
-  const [commentPos, setCommentPos]   = useState<'bottom-left' | 'bottom-right' | 'bottom-center'>('bottom-left');
+  const [stripBg, setStripBg]         = useState<'white' | 'black' | 'blur'>('white');
   const [showPanel, setShowPanel]     = useState(false);
+
+  // Playback state
   const [currentIdx, setCurrentIdx]   = useState(0);
+  const [wordIdx, setWordIdx]         = useState(0);   // words revealed so far
   const [isPlaying, setIsPlaying]     = useState(false);
-  const [speed, setSpeed]             = useState(2500);
   const [isExporting, setIsExporting] = useState(false);
   const [exportDone, setExportDone]   = useState(false);
 
-  const audioRef    = useRef<HTMLAudioElement>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioRef     = useRef<HTMLAudioElement>(null);
+  const lineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveBg = bgImage ? undefined : (customColor || bgPreset.value);
 
-  // Auto-advance
+  // Current line words
+  const currentLine  = lyricsLines[currentIdx];
+  const currentWords = currentLine ? currentLine.text.split(' ') : [];
+  const totalWords   = currentWords.length;
+
+  // Displayed text: words built up so far
+  const displayedText = currentWords.slice(0, Math.max(1, wordIdx)).join(' ');
+
+  // Reset word idx when line changes
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setCurrentIdx(prev => {
-          if (prev >= lyricsLines.length - 1) { setIsPlaying(false); audioRef.current?.pause(); return prev; }
-          return prev + 1;
-        });
-      }, speed);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isPlaying, speed, lyricsLines.length]);
+    setWordIdx(0);
+  }, [currentIdx]);
+
+  // Word-by-word reveal animation when playing
+  useEffect(() => {
+    if (wordTimerRef.current) clearInterval(wordTimerRef.current);
+    if (lineTimerRef.current) clearTimeout(lineTimerRef.current);
+
+    if (!isPlaying) return;
+
+    // Start building words
+    wordTimerRef.current = setInterval(() => {
+      setWordIdx(prev => {
+        const next = prev + 1;
+        if (next >= totalWords) {
+          // All words shown — wait then advance line
+          clearInterval(wordTimerRef.current!);
+          lineTimerRef.current = setTimeout(() => {
+            setCurrentIdx(ci => {
+              if (ci >= lyricsLines.length - 1) {
+                setIsPlaying(false);
+                audioRef.current?.pause();
+                return ci;
+              }
+              return ci + 1;
+            });
+          }, 900); // brief pause after full line
+          return next;
+        }
+        return next;
+      });
+    }, WORD_MS);
+
+    return () => {
+      if (wordTimerRef.current) clearInterval(wordTimerRef.current);
+      if (lineTimerRef.current) clearTimeout(lineTimerRef.current);
+    };
+  }, [isPlaying, currentIdx, totalWords, lyricsLines.length]);
 
   const togglePlay = () => {
     if (!isPlaying && audioUrl && audioRef.current) {
@@ -166,7 +125,13 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
   const reset = () => {
     setIsPlaying(false);
     setCurrentIdx(0);
+    setWordIdx(0);
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+  };
+
+  const goTo = (idx: number) => {
+    setCurrentIdx(idx);
+    setWordIdx(0);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,7 +142,14 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     reader.readAsDataURL(file);
   };
 
-  // 16:9 video export (1920×1080)
+  // Strip style variants
+  const stripStyles: Record<string, React.CSSProperties> = {
+    white: { background: '#ffffff', color: '#111827' },
+    black: { background: 'rgba(0,0,0,0.82)', color: '#ffffff', backdropFilter: 'blur(4px)' },
+    blur:  { background: 'rgba(255,255,255,0.15)', color: '#ffffff', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.2)' },
+  };
+
+  // ── 16:9 Video Export ────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
     setIsExporting(true); setExportDone(false);
     try {
@@ -200,65 +172,45 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
         await new Promise(r => { bgImg!.onload = r; bgImg!.onerror = r; });
       }
 
+      const stripH = 130;
+
       for (let i = 0; i < lyricsLines.length; i++) {
-        // Background
-        if (bgImg) {
-          ctx.drawImage(bgImg, 0, 0, W, H);
-          ctx.fillStyle = 'rgba(0,0,0,0.25)';
-          ctx.fillRect(0, 0, W, H);
-        } else {
-          ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-          const grd = ctx.createLinearGradient(0, 0, W, H);
-          grd.addColorStop(0, '#1a0030'); grd.addColorStop(1, '#0a0020');
-          ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
-        }
-
-        // Overlay label
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.beginPath(); ctx.roundRect(40, 40, 340, 70, 12); ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 36px Arial';
-        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-        ctx.fillText(overlayText, 60, 75);
-
-        // Comment card (bottom-left)
-        const cardX = 40, cardW = Math.min(700, W - 80), cardH = 180;
-        const cardY = H - cardH - 60;
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 16); ctx.fill();
-
-        // Avatar
-        ctx.fillStyle = avatarColor(usernames[i]);
-        ctx.beginPath(); ctx.arc(cardX + 50, cardY + 50, 26, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 22px Arial';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(getInitial(usernames[i]), cardX + 50, cardY + 50);
-
-        // Username + time
-        ctx.fillStyle = '#111827'; ctx.font = 'bold 22px Arial';
-        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-        ctx.fillText('@' + usernames[i], cardX + 88, cardY + 42);
-        ctx.fillStyle = '#9ca3af'; ctx.font = '18px Arial';
-        ctx.fillText(timings[i], cardX + 88, cardY + 68);
-
-        // Lyric text
-        ctx.fillStyle = '#1f2937'; ctx.font = '24px Arial';
-        const maxW = cardW - 110;
         const words = lyricsLines[i].text.split(' ');
-        let ln = '', lineY = cardY + 100;
-        for (const word of words) {
-          const test = ln ? ln + ' ' + word : word;
-          if (ctx.measureText(test).width > maxW && ln) {
-            ctx.fillText(ln, cardX + 88, lineY); ln = word; lineY += 32;
-          } else { ln = test; }
+        // Animate word by word
+        for (let w = 1; w <= words.length; w++) {
+          // Draw background
+          if (bgImg) {
+            ctx.drawImage(bgImg, 0, 0, W, H);
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            ctx.fillRect(0, 0, W, H);
+          } else {
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+            const grd = ctx.createLinearGradient(0, 0, W, H);
+            grd.addColorStop(0, '#0a0028'); grd.addColorStop(1, '#1a0040');
+            ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+          }
+
+          // White strip at bottom
+          if (stripBg === 'white') {
+            ctx.fillStyle = '#ffffff';
+          } else {
+            ctx.fillStyle = 'rgba(0,0,0,0.82)';
+          }
+          ctx.fillRect(0, H - stripH, W, stripH);
+
+          // Text
+          const textColor = stripBg === 'white' ? '#111827' : '#ffffff';
+          ctx.fillStyle = textColor;
+          ctx.font = 'bold 52px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const partial = words.slice(0, w).join(' ');
+          ctx.fillText(partial, W / 2, H - stripH / 2);
+
+          await new Promise(r => setTimeout(r, WORD_MS));
         }
-        if (ln) ctx.fillText(ln, cardX + 88, lineY);
-
-        // Footer
-        ctx.fillStyle = '#6b7280'; ctx.font = '18px Arial';
-        ctx.fillText(`👍 ${likes[i]}    👎    Reply`, cardX + 88, cardY + 160);
-
-        await new Promise(r => setTimeout(r, speed));
+        // Pause after full line
+        await new Promise(r => setTimeout(r, 800));
       }
 
       recorder.stop();
@@ -272,36 +224,23 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     } catch (err: any) {
       alert('Export failed: ' + err.message);
     } finally { setIsExporting(false); }
-  }, [lyricsLines, usernames, timings, likes, bgImage, overlayText, speed]);
-
-  const cur  = lyricsLines[currentIdx];
-  const next = lyricsLines[currentIdx + 1];
-
-  const commentAlign = commentPos === 'bottom-right' ? { right: 16 }
-    : commentPos === 'bottom-center' ? { left: '50%', transform: 'translateX(-50%)' }
-    : { left: 16 };
+  }, [lyricsLines, bgImage, stripBg]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-gray-100 flex flex-col overflow-hidden">
 
-      {/* ── Mobile top bar ─────────────────────────────────────── */}
+      {/* ── Fixed top bar ─────────────────────────────────────────── */}
       <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-3 sm:px-4 h-14 bg-[#050505]/95 backdrop-blur-xl border-b border-white/5">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors active:scale-95"
-        >
+        <button onClick={onBack} className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors active:scale-95">
           <ArrowLeft size={18} />
-          <span className="hidden sm:inline text-sm">Back</span>
+          <span className="hidden sm:inline">Back</span>
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-gray-600 uppercase tracking-widest font-semibold hidden md:block">
-            {songStyle || 'Lyrics'} Canvas · 16:9
-          </span>
-        </div>
+        <span className="text-[11px] text-gray-600 uppercase tracking-widest font-semibold hidden md:block">
+          {songStyle || 'Lyrics'} Canvas · 16:9
+        </span>
 
         <div className="flex items-center gap-2">
-          {/* Settings toggle */}
           <button
             onClick={() => setShowPanel(p => !p)}
             className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border transition-all active:scale-95 ${showPanel ? 'border-purple-500/50 text-purple-400 bg-purple-500/10' : 'border-white/10 text-gray-500 hover:text-gray-300'}`}
@@ -309,8 +248,6 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
             <Settings size={14} />
             <span className="hidden sm:inline">Customize</span>
           </button>
-
-          {/* Export */}
           <button
             onClick={handleExport}
             disabled={isExporting}
@@ -322,10 +259,10 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
         </div>
       </div>
 
-      {/* ── Main layout (below fixed top bar) ─────────────────── */}
+      {/* ── Layout ────────────────────────────────────────────────── */}
       <div className="flex flex-1 pt-14 overflow-hidden">
 
-        {/* ── Canvas area ───────────────────────────────────────── */}
+        {/* ── Canvas area ─────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-5 overflow-y-auto gap-4 min-w-0">
 
           {/* 16:9 Frame */}
@@ -339,73 +276,39 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 24px 64px rgba(0,0,0,0.7)',
               }}
             >
-              {/* Slight dark overlay when image is set */}
+              {/* Dark overlay when image is set */}
               {bgImage && (
-                <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.22)' }} />
+                <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.18)' }} />
               )}
 
-              {/* ── "CHAT MUSIC" overlay label (top-left) ── */}
-              {overlayText && (
-                <div
-                  className="absolute top-3 sm:top-4 left-3 sm:left-4 select-none"
-                  style={{
-                    background: 'rgba(0,0,0,0.60)',
-                    borderRadius: 8,
-                    padding: '4px 12px',
-                    backdropFilter: 'blur(6px)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: '"Arial Black", Impact, sans-serif',
-                      fontWeight: 900,
-                      fontSize: 'clamp(10px, 2.2vw, 22px)',
-                      color: '#ffffff',
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-                    }}
-                  >
-                    {overlayText}
-                  </span>
-                </div>
-              )}
-
-              {/* ── YouTube comment overlay (bottom) ── */}
+              {/* ── White/dark bottom strip ── */}
               <div
-                className="absolute"
+                className="absolute left-0 right-0 bottom-0 flex items-center justify-center"
                 style={{
-                  bottom: 12,
-                  width: 'clamp(260px, 55%, 480px)',
-                  ...commentAlign,
+                  minHeight: '18%',
+                  padding: '12px 24px',
+                  ...stripStyles[stripBg],
                 }}
               >
-                <div className="space-y-2">
-                  {/* Next comment (faded, behind) */}
-                  {next && (
-                    <CommentOverlay
-                      line={next.text}
-                      username={usernames[currentIdx + 1] || ''}
-                      timeAgo={timings[currentIdx + 1] || ''}
-                      likes={likes[currentIdx + 1] || 50}
-                      isNext
-                    />
-                  )}
-                  {/* Active comment */}
-                  {cur && (
-                    <CommentOverlay
-                      line={cur.text}
-                      username={usernames[currentIdx] || ''}
-                      timeAgo={timings[currentIdx] || ''}
-                      likes={likes[currentIdx] || 100}
-                    />
-                  )}
-                </div>
+                <p
+                  key={displayedText}
+                  style={{
+                    fontSize: 'clamp(13px, 2.8vw, 28px)',
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    lineHeight: 1.35,
+                    margin: 0,
+                    letterSpacing: '0.01em',
+                    animation: 'wordPop 0.18s ease',
+                    color: stripStyles[stripBg].color,
+                  }}
+                >
+                  {displayedText}
+                </p>
               </div>
 
-              {/* Progress bar inside frame (bottom edge) */}
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10">
+              {/* Progress bar at very bottom edge */}
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
                   style={{ width: `${((currentIdx + 1) / lyricsLines.length) * 100}%` }}
@@ -413,10 +316,10 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
               </div>
             </div>
 
-            {/* ── Playback controls (below frame) ── */}
+            {/* ── Playback controls ── */}
             <div className="flex items-center justify-center gap-3 mt-4">
               <button
-                onClick={() => setCurrentIdx(p => Math.max(0, p - 1))}
+                onClick={() => goTo(Math.max(0, currentIdx - 1))}
                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-white/10 text-gray-400 hover:text-white hover:border-white/25 flex items-center justify-center transition-all active:scale-95"
               >
                 <ChevronLeft size={18} />
@@ -434,7 +337,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-0.5" />}
               </button>
               <button
-                onClick={() => setCurrentIdx(p => Math.min(lyricsLines.length - 1, p + 1))}
+                onClick={() => goTo(Math.min(lyricsLines.length - 1, currentIdx + 1))}
                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-white/10 text-gray-400 hover:text-white hover:border-white/25 flex items-center justify-center transition-all active:scale-95"
               >
                 <ChevronRight size={18} />
@@ -442,6 +345,21 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
               <span className="text-xs text-gray-600 ml-1 tabular-nums">
                 {currentIdx + 1} / {lyricsLines.length}
               </span>
+            </div>
+
+            {/* Word progress dots */}
+            <div className="flex items-center justify-center gap-1 mt-2">
+              {currentWords.map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-full transition-all duration-150"
+                  style={{
+                    width: i < wordIdx ? 6 : 4,
+                    height: i < wordIdx ? 6 : 4,
+                    background: i < wordIdx ? '#a855f7' : 'rgba(255,255,255,0.12)',
+                  }}
+                />
+              ))}
             </div>
           </div>
 
@@ -452,7 +370,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
               {lyricsLines.map((line, i) => (
                 <button
                   key={i}
-                  onClick={() => setCurrentIdx(i)}
+                  onClick={() => goTo(i)}
                   className={`text-left text-xs px-3 py-2 rounded-lg transition-all ${i === currentIdx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-600 hover:text-gray-300 hover:bg-white/4 border border-transparent'}`}
                 >
                   <span className="text-gray-700 mr-1.5">{i + 1}.</span>{line.text}
@@ -462,17 +380,11 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
           </div>
         </main>
 
-        {/* ── Customize Panel (right on desktop, overlay on mobile) ─ */}
+        {/* ── Customize Panel ──────────────────────────────────────── */}
         <>
-          {/* Mobile backdrop */}
           {showPanel && (
-            <div
-              className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-              onClick={() => setShowPanel(false)}
-            />
+            <div className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={() => setShowPanel(false)} />
           )}
-
-          {/* Panel */}
           <aside className={`
             fixed lg:static inset-y-0 right-0 z-50 w-72 sm:w-80 bg-[#0a0a0a] border-l border-white/5
             flex flex-col overflow-y-auto
@@ -504,7 +416,6 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                     >
                       <X size={13} />
                     </button>
-                    <div className="absolute bottom-2 left-2 text-[10px] text-white/60 bg-black/60 rounded px-1.5 py-0.5">Image loaded ✓</div>
                   </div>
                 ) : (
                   <button
@@ -533,63 +444,49 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                     </button>
                   ))}
                 </div>
-                <div>
-                  <div className="text-[10px] text-gray-700 mb-1">Custom color</div>
-                  <input
-                    type="color"
-                    value={customColor || '#000000'}
-                    onChange={e => { setCustomColor(e.target.value); setBgImage(''); }}
-                    className="w-full h-9 rounded-lg cursor-pointer border border-white/10 bg-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Overlay Title */}
-              <div className="space-y-2">
-                <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Title Overlay</div>
                 <input
-                  value={overlayText}
-                  onChange={e => setOverlayText(e.target.value)}
-                  placeholder="CHAT MUSIC"
-                  className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2.5 text-xs text-gray-200 focus:outline-none focus:border-purple-500/40"
+                  type="color"
+                  value={customColor || '#000000'}
+                  onChange={e => { setCustomColor(e.target.value); setBgImage(''); }}
+                  className="w-full h-9 rounded-lg cursor-pointer border border-white/10 bg-transparent"
                 />
               </div>
 
-              {/* Comment Position */}
+              {/* Strip Style */}
               <div className="space-y-2">
-                <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Comment Position</div>
+                <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Text Strip Style</div>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {(['bottom-left','bottom-center','bottom-right'] as const).map(pos => (
+                  {([
+                    { id: 'white', label: 'White', preview: '#fff' },
+                    { id: 'black', label: 'Black', preview: '#000' },
+                    { id: 'blur',  label: 'Glass', preview: 'rgba(255,255,255,0.15)' },
+                  ] as const).map(s => (
                     <button
-                      key={pos}
-                      onClick={() => setCommentPos(pos)}
-                      className={`text-[10px] py-2 rounded-lg border transition-all ${commentPos === pos ? 'border-purple-500/50 bg-purple-500/10 text-purple-300' : 'border-white/8 text-gray-600 hover:text-gray-400'}`}
+                      key={s.id}
+                      onClick={() => setStripBg(s.id)}
+                      style={{ background: s.preview, border: stripBg === s.id ? '2px solid #a855f7' : '2px solid rgba(255,255,255,0.08)' }}
+                      className="h-10 rounded-xl text-[10px] font-semibold transition-all"
                     >
-                      {pos === 'bottom-left' ? '← Left' : pos === 'bottom-center' ? '— Center' : 'Right →'}
+                      <span style={{ color: s.id === 'white' ? '#111' : '#fff', textShadow: s.id === 'white' ? 'none' : '0 1px 3px rgba(0,0,0,0.5)' }}>
+                        {s.label}
+                      </span>
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Speed */}
-              <div className="space-y-2">
-                <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Line Speed</div>
-                {[{ label: 'Slow — 4s', ms: 4000 }, { label: 'Normal — 2.5s', ms: 2500 }, { label: 'Fast — 1.5s', ms: 1500 }].map(sp => (
-                  <button
-                    key={sp.ms}
-                    onClick={() => setSpeed(sp.ms)}
-                    className={`w-full text-xs py-2 rounded-xl border transition-all ${speed === sp.ms ? 'border-purple-500/50 bg-purple-500/10 text-purple-300' : 'border-white/8 text-gray-600 hover:text-gray-400'}`}
-                  >
-                    {sp.label}
-                  </button>
-                ))}
               </div>
             </div>
           </aside>
         </>
       </div>
 
-      {/* Audio element */}
+      {/* CSS animation */}
+      <style>{`
+        @keyframes wordPop {
+          from { opacity: 0.3; transform: scale(0.92); }
+          to   { opacity: 1;   transform: scale(1); }
+        }
+      `}</style>
+
       {audioUrl && <audio ref={audioRef} src={audioUrl} onEnded={() => setIsPlaying(false)} />}
     </div>
   );
