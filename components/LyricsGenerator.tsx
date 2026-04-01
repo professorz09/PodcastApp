@@ -72,9 +72,10 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // ── STT transcript ───────────────────────────────────────────
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [isTranscribing, setIsTranscribing]   = useState(false);
+  const [transcript, setTranscript]           = useState('');
   const [transcriptError, setTranscriptError] = useState('');
+  const [wordTimings, setWordTimings]         = useState<{ word: string; start: number; end: number }[]>([]);
 
   // ── Canvas ───────────────────────────────────────────────────
   const [showCanvas, setShowCanvas] = useState(false);
@@ -93,6 +94,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
         if (d.lyriaModel)   setLyriaModel(d.lyriaModel);
         if (d.directMode !== undefined) setDirectMode(d.directMode);
         if (d.directLyrics) setDirectLyrics(d.directLyrics);
+        if (d.wordTimings?.length)  { setWordTimings(d.wordTimings); setTranscript(d.wordTimings.map((t: any) => t.word).join(' ')); }
       }
     } catch {}
 
@@ -111,10 +113,10 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({
         lyrics, commentsText, contextText, language, model,
-        lyriaModel, directMode, directLyrics,
+        lyriaModel, directMode, directLyrics, wordTimings,
       }));
     } catch {}
-  }, [lyrics, commentsText, contextText, language, model, lyriaModel, directMode, directLyrics]);
+  }, [lyrics, commentsText, contextText, language, model, lyriaModel, directMode, directLyrics, wordTimings]);
 
   // ── Persistence: save audio blob ─────────────────────────────
   useEffect(() => {
@@ -164,9 +166,10 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
 
   const handleTranscribe = useCallback(async () => {
     if (!songBlob) return;
-    setIsTranscribing(true); setTranscriptError(''); setTranscript('');
+    setIsTranscribing(true); setTranscriptError(''); setTranscript(''); setWordTimings([]);
     try {
       const timings = await transcribeAudioGoogleCloud(songBlob, language === 'English' ? 'en-US' : 'hi-IN');
+      setWordTimings(timings);
       setTranscript(timings.map(t => t.word).join(' '));
     } catch (e: any) {
       setTranscriptError(e.message || 'Transcription failed');
@@ -203,6 +206,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
         lyricsText={lyrics}
         audioUrl={songUrl}
         songStyle={style}
+        wordTimings={wordTimings}
         onBack={() => setShowCanvas(false)}
       />
     );

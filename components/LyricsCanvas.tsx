@@ -157,16 +157,31 @@ const CommentCard: React.FC<CommentCardProps> = ({ text, lineIdx, animMode, phas
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
+type TimedWord = { word: string; start: number; end: number };
+
 interface Props {
   lyricsText: string;
   audioUrl?: string;
   songStyle?: string;
+  wordTimings?: TimedWord[];
   onBack: () => void;
 }
 
-const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = '', onBack }) => {
+const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = '', wordTimings = [], onBack }) => {
   const lines       = parseLyrics(lyricsText);
   const lyricsLines = lines.filter(l => !l.isSection);
+
+  // ── Build STT line mapping (which STT word index starts each lyric line) ──
+  const lineStartWordIdx = React.useMemo<number[]>(() => {
+    if (!wordTimings.length) return [];
+    const result: number[] = [];
+    let cum = 0;
+    for (const line of lyricsLines) {
+      result.push(cum);
+      cum += line.text.split(' ').length;
+    }
+    return result;
+  }, [wordTimings.length, lyricsLines.length]);
 
   // ── UI state ──
   const [bgImage, setBgImage]         = useState('');
@@ -185,6 +200,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
   const audioRef     = useRef<HTMLAudioElement>(null);
   const wordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef       = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveBg = bgImage ? undefined : (customColor || bgPreset.value);
@@ -214,11 +230,45 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     setAnimPhase('partial');
   }, [currentIdx]);
 
-  // ── Animation engine ──
+  // ── STT-synced rAF loop (when wordTimings are present) ──
+  useEffect(() => {
+    cancelAnimationFrame(rafRef.current);
+    if (!isPlaying || !wordTimings.length || !lineStartWordIdx.length) return;
+
+    const tick = () => {
+      const t = audioRef.current?.currentTime ?? 0;
+
+      // Find last STT word whose start <= t
+      let wi = -1;
+      for (let i = 0; i < wordTimings.length; i++) {
+        if (wordTimings[i].start <= t) wi = i;
+        else break;
+      }
+      if (wi < 0) { rafRef.current = requestAnimationFrame(tick); return; }
+
+      // Which lyric line does this word belong to?
+      let li = 0;
+      for (let i = 0; i < lineStartWordIdx.length - 1; i++) {
+        if (wi >= lineStartWordIdx[i + 1]) li = i + 1;
+        else break;
+      }
+
+      const wordsInLine = wi - lineStartWordIdx[li] + 1;
+      setCurrentIdx(li);
+      setWordIdx(wordsInLine);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [isPlaying, wordTimings, lineStartWordIdx]);
+
+  // ── Timer animation engine (fallback when no STT timings) ──
   useEffect(() => {
     if (wordTimerRef.current) clearInterval(wordTimerRef.current);
     if (lineTimerRef.current) clearTimeout(lineTimerRef.current);
-    if (!isPlaying || !currentLine) return;
+    // Skip if STT mode is active
+    if (!isPlaying || !currentLine || wordTimings.length > 0) return;
 
     const advanceLine = () => {
       setCurrentIdx(ci => {
@@ -494,12 +544,13 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 </div>
               </div>
 
-              {/* Anim mode badge */}
-              <div className="absolute top-[3%] right-[3%] z-20">
-                <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-black/40 text-white/50 backdrop-blur-sm">
-                  {animMode === 'wbw' ? '⌨ Word' : animMode === 'all' ? '⚡ Flash' : '◑ Build'}
-                </span>
-              </div>
+              {/* STT sync indicator — small dot only when live-synced */}
+              {wordTimings.length > 0 && isPlaying && (
+                <div className="absolute top-[3%] right-[3%] z-20 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-[9px] text-white/40 font-semibold">LIVE SYNC</span>
+                </div>
+              )}
 
               {/* Progress bar */}
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20 z-20">
@@ -543,21 +594,16 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
           <div className="w-full space-y-1" style={{ maxWidth: 900 }}>
             <div className="text-[10px] text-gray-700 uppercase tracking-widest font-semibold mb-2">All Lines</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-              {lyricsLines.map((line, i) => {
-                const mode = ANIM_MODES[i % ANIM_MODES.length];
-                return (
-                  <button
-                    key={i}
-                    onClick={() => goTo(i)}
-                    className={`text-left text-xs px-3 py-2 rounded-lg transition-all flex items-center gap-2 ${i === currentIdx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-600 hover:text-gray-300 hover:bg-white/4 border border-transparent'}`}
-                  >
-                    <span className="text-[9px] text-gray-700 w-10 shrink-0">
-                      {mode === 'wbw' ? '⌨' : mode === 'all' ? '⚡' : '◑'}
-                    </span>
-                    <span className="truncate">{line.text}</span>
-                  </button>
-                );
-              })}
+              {lyricsLines.map((line, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  className={`text-left text-xs px-3 py-2 rounded-lg transition-all flex items-center gap-2 ${i === currentIdx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-600 hover:text-gray-300 hover:bg-white/4 border border-transparent'}`}
+                >
+                  <span className="text-gray-700 shrink-0">{i + 1}.</span>
+                  <span className="truncate">{line.text}</span>
+                </button>
+              ))}
             </div>
           </div>
         </main>
@@ -632,26 +678,16 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 />
               </div>
 
-              {/* Animation modes legend */}
-              <div className="space-y-2">
-                <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Animation Styles</div>
-                <div className="space-y-1.5">
-                  {[
-                    { icon: '⌨', label: 'Word by Word', desc: 'Ek word at a time type hota hai' },
-                    { icon: '⚡', label: 'Flash', desc: 'Pura phrase ek saath flash karta hai' },
-                    { icon: '◑', label: 'Build', desc: 'Aadha phrase pehle, phir pura' },
-                  ].map(s => (
-                    <div key={s.icon} className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/4 border border-white/5">
-                      <span className="text-base leading-none mt-0.5">{s.icon}</span>
-                      <div>
-                        <div className="text-xs font-semibold text-gray-300">{s.label}</div>
-                        <div className="text-[10px] text-gray-600 mt-0.5">{s.desc}</div>
-                      </div>
-                    </div>
-                  ))}
+              {/* STT sync status */}
+              {wordTimings.length > 0 && (
+                <div className="flex items-start gap-2 px-3 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <span className="w-2 h-2 rounded-full bg-green-400 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="text-xs font-semibold text-green-400">Live Sync Active</div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">{wordTimings.length} words synced — text audio ke saath bilkul match karega</div>
+                  </div>
                 </div>
-                <p className="text-[10px] text-gray-700 pl-1">Styles automatically cycle across lines</p>
-              </div>
+              )}
             </div>
           </aside>
         </>
