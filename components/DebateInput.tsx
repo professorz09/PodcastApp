@@ -36,10 +36,10 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
   const [style, setStyle] = useState<'debate' | 'explained' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational'>(
-    initialContextContent ? 'podcast_panel' : 'debate'
+    initialContextContent ? 'podcast_panel' : 'situational'
   );
   // Auto speaker count + duration for Joe Rogan Style
-  const [speakerCount, setSpeakerCount] = useState<number>(initialContextContent ? 3 : 2);
+  const [speakerCount, setSpeakerCount] = useState<number>(initialContextContent ? 3 : 3);
   const [duration, setDuration] = useState<number>(8);
   const [contextFileContent, setContextFileContent] = useState<string | undefined>(initialContextContent);
   const [fileName, setFileName] = useState<string | undefined>(initialFileName);
