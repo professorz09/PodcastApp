@@ -451,17 +451,8 @@ export const generateDebateScript = async (
 
               BANNED openings: "Hi, मैं आज share करना चाहता हूँ...", "Toh basically...", "Mera naam X hai..."
 
-              Hook के बाद STORY arc:
-              → पहले सब ठीक था — वो normal life
-              → वो exact moment जब सब बदला — specific detail के साथ
-              → चीज़ें कैसे complicated होती गईं — एक-एक कदम
-              → आज कहाँ हूँ — emotionally और practically
-              → वो ONE burning question जो सोने नहीं देता — specific, topic-relevant
-
-              ★ Specific details दो — vague नहीं ("बहुत परेशान था" नहीं, "उस रात नींद नहीं आई, बार-बार वही moment replay हो रहा था")
-              ★ Sensory emotion — audience को feel हो, सिर्फ बताओ नहीं
-              ★ अपनी गलती openly बताओ — real connection यहीं से बनता है
-              ★ अंत में ONE specific question — वही जो इस topic में सबसे confusing है
+              Hook के बाद story खुद naturally बनाओ — structure AI decide करे, कोई fixed arc नहीं।
+              बस एक rule: story के अंत में ONE specific burning question हो — वही जो इस topic में सबसे confusing है और जो audience को भी सोने न दे।
 
               ══════════════════════════════════════════
               【 SPEAKER 2 — EXPERT 1 (पहला angle) 】
@@ -997,17 +988,8 @@ export const generateDebateScript = async (
             No fixed formula — write whatever hits hardest for THIS specific topic and situation.
             Hook = 1–2 lines max. BANNED openers: "Hi, today I want to share...", "So basically...", "Let me tell you my story..."
 
-            After the hook, the STORY unfolds:
-            → Life before — what normal looked like
-            → The exact moment everything changed — specific detail, place, feeling
-            → How things got complicated — step by step, not a summary
-            → Where you are now — emotionally and practically
-            → The ONE burning question this person can't figure out — specific to this topic
-
-            ★ Specific details — not vague ("I was devastated" → "I just sat there staring at the message for twenty minutes, didn't even realize the coffee had gone cold")
-            ★ Sensory emotion — make the audience feel it, not just hear it
-            ★ Own your mistakes openly — that's what creates real connection
-            ★ End with ONE specific question that is genuinely hard to answer about this topic
+            After the hook, let the story build naturally — no fixed structure, AI decides how it flows.
+            One rule only: end the story with ONE specific burning question — the hardest, most confusing thing about this topic that the audience is also wrestling with.
 
             ══════════════════════════════════════════
             【 SPEAKER 2 — EXPERT 1 (first angle) 】
