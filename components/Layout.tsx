@@ -26,12 +26,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
 
   const steps = [
     { id: AppState.IMPORT, label: 'Import', icon: FolderDown, optional: true },
-    { id: AppState.LYRICS, label: 'Lyrics', icon: Music2, optional: true },
     { id: AppState.INPUT, label: 'Generate', icon: Mic2 },
     { id: AppState.SCRIPT, label: 'Script', icon: FileText },
     { id: AppState.THUMBNAIL, label: 'Thumb', icon: Image },
     { id: AppState.AUDIO, label: 'Voice', icon: Wand2 },
     { id: AppState.VISUALIZER, label: 'Video', icon: Video },
+    { id: AppState.LYRICS, label: 'Lyrics', icon: Music2, optional: true },
   ];
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
