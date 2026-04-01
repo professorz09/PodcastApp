@@ -165,17 +165,60 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
   const lines       = parseLyrics(lyricsText);
   const lyricsLines = lines.filter(l => !l.isSection);
 
-  // ── Build STT line mapping (which STT word index starts each lyric line) ──
+  // ── Build STT line mapping — content-based (handles word-count drift) ──
   const lineStartWordIdx = React.useMemo<number[]>(() => {
-    if (!wordTimings.length) return [];
+    if (!wordTimings.length || !lyricsLines.length) return [];
+
+    // Normalize word for comparison: lowercase, remove all non-alphanumeric
+    // (works for Latin, Devanagari, Arabic scripts)
+    const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+    const sttNorm = wordTimings.map(wt => norm(wt.word));
+
     const result: number[] = [];
-    let cum = 0;
-    for (const line of lyricsLines) {
-      result.push(cum);
-      cum += line.text.split(' ').length;
+    let searchFrom = 0;   // STT index to start next search from
+
+    for (let li = 0; li < lyricsLines.length; li++) {
+      const lineWords = lyricsLines[li].text.split(/\s+/).filter(Boolean);
+
+      if (!lineWords.length) {
+        result.push(searchFrom);
+        continue;
+      }
+
+      // Expected position based on naive word count (fallback)
+      const expectedPos = searchFrom;
+
+      // Look for the first 1-2 lyric words in a window of ±12 STT words
+      const firstNorm  = norm(lineWords[0]);
+      const secondNorm = lineWords[1] ? norm(lineWords[1]) : '';
+      const windowStart = Math.max(0, expectedPos - 4);
+      const windowEnd   = Math.min(sttNorm.length - 1, expectedPos + 14);
+
+      let matchIdx = -1;
+      let singleMatchIdx = -1;
+
+      for (let si = windowStart; si <= windowEnd; si++) {
+        if (sttNorm[si] === firstNorm) {
+          if (!secondNorm || sttNorm[si + 1] === secondNorm) {
+            matchIdx = si;   // strong 2-word match → take it immediately
+            break;
+          }
+          if (singleMatchIdx < 0) singleMatchIdx = si;  // weak 1-word match
+        }
+      }
+
+      const best = matchIdx >= 0 ? matchIdx
+                 : singleMatchIdx >= 0 ? singleMatchIdx
+                 : searchFrom;  // no match → keep sequential estimate
+
+      result.push(best);
+      // Advance searchFrom by average of lyric word count (keeps next window reasonable)
+      searchFrom = best + Math.max(1, lineWords.length);
     }
+
     return result;
-  }, [wordTimings.length, lyricsLines.length]);
+  }, [wordTimings, lyricsLines]);
 
   // ── UI state ──
   const [bgImage, setBgImage]         = useState('');

@@ -1021,16 +1021,18 @@ def instagram_download_status(job_id):
 @app.route('/api/instagram/comments', methods=['POST'])
 def instagram_comments():
     """
-    Scrape Instagram comments.
-    Strategy:
-      1. Try instaloader with session cookies from uploaded cookies.txt
-      2. If instaloader fails, try yt-dlp --write-comments as a fallback
-    max_comments: number or 'all' (0 internally = no limit)
+    Scrape Instagram comments — 5-strategy fallback chain:
+      0. instagrapi Private API (best with session cookies)
+      1. curl_cffi + GraphQL (Chrome TLS fingerprint — best without login)
+      2. Mobile-app API simulation with requests (needs cookies)
+      3. instaloader with cookie injection
+      4. yt-dlp Python API
+      5. yt-dlp subprocess
+    max_comments: number or 'all' (0 = no limit)
     """
     data = request.json or {}
     url = data.get('url', '').strip()
     raw_max = data.get('max_comments', 100)
-    # 'all' or 0 means no limit
     if str(raw_max).lower() == 'all' or raw_max == 0:
         max_comments = 0
     else:
@@ -1046,9 +1048,146 @@ def instagram_comments():
     last_error = None
     last_error_code = 'SCRAPE_ERROR'
 
-    # ── Attempt 0: Mobile-app API simulation (instagrapi-style headers) ────────
-    # Uses real Instagram Android app headers + shortcode→mediaid conversion
-    # Different app_id (567067343352427) and user-agent than instaloader
+    # ── Attempt 0: instagrapi — Private API (most reliable with cookies) ──────
+    # Uses Chrome TLS fingerprint via curl_cffi under the hood
+    try:
+        from instagrapi import Client as IGClient
+
+        ig_cookies = get_instagram_cookies()
+        if not ig_cookies or 'sessionid' not in ig_cookies:
+            raise Exception("No session cookies — skipping instagrapi")
+
+        cl = IGClient()
+        # Inject session directly from cookies.txt — no username/password needed
+        cl.set_settings({
+            'authorization_data': {'sessionid': ig_cookies.get('sessionid', '')},
+        })
+        # Set individual cookies into the session
+        for name, val in ig_cookies.items():
+            cl.private.cookies.set(name, val, domain='.instagram.com', path='/')
+        cl.private.headers.update({
+            'User-Agent': 'Instagram 295.0.0.32.119 Android (30/11; 420dpi; 1080x2400; Google; Pixel 6; oriole; qcom; en_US; 490770583)',
+        })
+
+        media_pk = cl.media_pk_from_url(url)
+        raw = cl.media_comments(media_pk, amount=max_comments if max_comments > 0 else 0)
+        comments = []
+        for c in raw:
+            text = (c.text or '').strip()
+            if text:
+                comments.append(text)
+                if max_comments > 0 and len(comments) >= max_comments:
+                    break
+
+        if comments:
+            return jsonify({'shortcode': shortcode, 'count': len(comments), 'comments': comments, 'source': 'instagrapi'})
+        else:
+            last_error = 'instagrapi returned 0 comments'
+
+    except ImportError:
+        last_error = 'instagrapi not installed'
+    except Exception as e0:
+        err0 = str(e0)
+        if any(k in err0.lower() for k in ['401', '403', 'login', 'forbidden', 'challenge', 'unauthorized']):
+            last_error_code = 'LOGIN_REQUIRED'
+        last_error = f'instagrapi: {err0}'
+
+    # ── Attempt 1: curl_cffi — Chrome TLS fingerprint (best for public posts) ─
+    # Python requests is TLS-fingerprinted by Instagram; curl_cffi impersonates Chrome
+    try:
+        from curl_cffi import requests as cffi_req
+        import json as _json
+        import time as _time
+
+        ig_cookies = get_instagram_cookies()
+
+        cffi_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'X-IG-App-ID': '936619743392459',
+            'Referer': f'https://www.instagram.com/p/{shortcode}/',
+            'Origin': 'https://www.instagram.com',
+        }
+
+        sess_cffi = cffi_req.Session(impersonate='chrome124')
+        if ig_cookies:
+            for name, val in ig_cookies.items():
+                sess_cffi.cookies.set(name, val, domain='.instagram.com')
+
+        # Step 1 — resolve media_id
+        media_id = shortcode_to_mediaid(shortcode)
+
+        # Step 2 — fetch comments via Private API (same endpoint, but Chrome TLS)
+        comments = []
+        min_id = None
+        for _page in range(20):
+            params = {'can_support_threading': 'true', 'permalink_enabled': 'false'}
+            if min_id:
+                params['min_id'] = min_id
+            r = sess_cffi.get(
+                f'https://i.instagram.com/api/v1/media/{media_id}/comments/',
+                params=params, headers=cffi_headers, timeout=25,
+            )
+            if r.status_code == 401:
+                raise Exception(f'curl_cffi: 401 Unauthorized (need cookies)')
+            if r.status_code != 200:
+                raise Exception(f'curl_cffi: HTTP {r.status_code}')
+
+            d = r.json()
+            for c in d.get('comments', []):
+                text = (c.get('text') or '').strip()
+                if text:
+                    comments.append(text)
+                    if max_comments > 0 and len(comments) >= max_comments:
+                        break
+            if max_comments > 0 and len(comments) >= max_comments:
+                break
+            next_min = d.get('next_min_id')
+            if not next_min or not d.get('has_more_comments'):
+                break
+            min_id = next_min
+            _time.sleep(0.8)
+
+        # Fallback inside curl_cffi: try GraphQL endpoint (works for public posts)
+        if not comments:
+            gql_url = 'https://www.instagram.com/graphql/query/'
+            # doc_id for fetching post comments (may rotate — checked April 2025)
+            gql_params = {
+                'doc_id': '9310670392322965',
+                'variables': _json.dumps({'shortcode': shortcode, 'first': 50}),
+            }
+            gr = sess_cffi.get(gql_url, params=gql_params, headers=cffi_headers, timeout=25)
+            if gr.status_code == 200:
+                gd = gr.json()
+                try:
+                    edges = (gd.get('data', {}).get('xdt_shortcode_media', {})
+                             .get('edge_media_to_parent_comment', {}).get('edges', []))
+                    for edge in edges:
+                        text = (edge.get('node', {}).get('text') or '').strip()
+                        if text:
+                            comments.append(text)
+                            if max_comments > 0 and len(comments) >= max_comments:
+                                break
+                except Exception:
+                    pass
+
+        if comments:
+            return jsonify({'shortcode': shortcode, 'count': len(comments), 'comments': comments, 'source': 'curl_cffi'})
+        else:
+            if not last_error:
+                last_error = 'curl_cffi: 0 comments (post may be private or IP blocked)'
+
+    except ImportError:
+        last_error = 'curl_cffi not installed'
+    except Exception as e1:
+        err1 = str(e1)
+        if any(k in err1.lower() for k in ['401', '403', 'login', 'forbidden', 'unauthorized']):
+            last_error_code = 'LOGIN_REQUIRED'
+        if not last_error:
+            last_error = f'curl_cffi: {err1}'
+
+    # ── Attempt 2: requests Mobile-app API simulation (needs cookies) ─────────
     try:
         import requests as req_lib
         import uuid
@@ -1079,7 +1218,7 @@ def instagram_comments():
 
         comments = []
         min_id = None
-        for _ in range(20):  # max 20 pages
+        for _ in range(20):
             params = {'can_support_threading': 'true', 'permalink_enabled': 'false'}
             if min_id:
                 params['min_id'] = min_id
@@ -1108,15 +1247,17 @@ def instagram_comments():
         if comments:
             return jsonify({'shortcode': shortcode, 'count': len(comments), 'comments': comments, 'source': 'mobile-api'})
         else:
-            last_error = 'Mobile API returned 0 comments (IP may be blocked)'
+            if not last_error:
+                last_error = 'Mobile API returned 0 comments'
 
-    except Exception as e0:
-        err0 = str(e0)
-        if any(k in err0.lower() for k in ['fail', '401', '403', 'login', 'forbidden']):
+    except Exception as e2:
+        err2 = str(e2)
+        if any(k in err2.lower() for k in ['401', '403', 'login', 'forbidden']):
             last_error_code = 'LOGIN_REQUIRED'
-        last_error = err0
+        if not last_error:
+            last_error = f'mobile-api: {err2}'
 
-    # ── Attempt 1: instaloader with cookie injection ──────────────────────────
+    # ── Attempt 3: instaloader with cookie injection ──────────────────────────
     try:
         import instaloader
 
@@ -1128,7 +1269,7 @@ def instagram_comments():
             download_geotags=False,
             download_comments=True,
             save_metadata=False,
-            max_connection_attempts=1,  # don't retry — fail fast
+            max_connection_attempts=1,
         )
 
         ig_cookies = get_instagram_cookies()
@@ -1147,26 +1288,23 @@ def instagram_comments():
             if text:
                 comments.append(text)
 
-        # Only return success if we actually got comments — otherwise fall through
         if comments:
-            return jsonify({
-                'shortcode': shortcode,
-                'count': len(comments),
-                'comments': comments,
-                'source': 'instaloader',
-            })
+            return jsonify({'shortcode': shortcode, 'count': len(comments), 'comments': comments, 'source': 'instaloader'})
         else:
-            last_error = 'instaloader returned 0 comments (Instagram API blocked from server IP)'
+            if not last_error:
+                last_error = 'instaloader returned 0 comments'
 
     except ImportError:
-        return jsonify({'error': 'instaloader is not installed. Run: pip install instaloader', 'error_code': 'MISSING_DEPENDENCY'}), 500
-    except Exception as e:
-        err_str = str(e)
-        if '401' in err_str or '403' in err_str or 'login' in err_str.lower() or 'Forbidden' in err_str:
+        if not last_error:
+            last_error = 'instaloader not installed'
+    except Exception as e3:
+        err3 = str(e3)
+        if '401' in err3 or '403' in err3 or 'login' in err3.lower() or 'Forbidden' in err3:
             last_error_code = 'LOGIN_REQUIRED'
-        last_error = err_str
+        if not last_error:
+            last_error = f'instaloader: {err3}'
 
-    # ── Attempt 2: yt-dlp Python API (more reliable than subprocess) ──────────
+    # ── Attempt 4: yt-dlp Python API ─────────────────────────────────────────
     try:
         import yt_dlp
 
@@ -1197,24 +1335,19 @@ def instagram_comments():
                     break
 
         if comments:
-            return jsonify({
-                'shortcode': shortcode,
-                'count': len(comments),
-                'comments': comments,
-                'source': 'yt-dlp',
-            })
+            return jsonify({'shortcode': shortcode, 'count': len(comments), 'comments': comments, 'source': 'yt-dlp'})
         else:
             if not last_error:
                 last_error = 'yt-dlp returned 0 comments'
 
-    except Exception as e2:
-        err_str2 = str(e2)
-        if '401' in err_str2 or '403' in err_str2 or 'login' in err_str2.lower():
+    except Exception as e4:
+        err4 = str(e4)
+        if '401' in err4 or '403' in err4 or 'login' in err4.lower():
             last_error_code = 'LOGIN_REQUIRED'
         if not last_error:
-            last_error = err_str2
+            last_error = f'yt-dlp: {err4}'
 
-    # ── Attempt 3: yt-dlp subprocess (last resort, different code path) ───────
+    # ── Attempt 5: yt-dlp subprocess (last resort) ────────────────────────────
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             out_template = os.path.join(tmpdir, shortcode)
@@ -1229,10 +1362,8 @@ def instagram_comments():
             ]
             subprocess.run(cmd, capture_output=True, text=True, timeout=90)
 
-            # yt-dlp writes <template>.info.json
             info_path = out_template + '.info.json'
             if not os.path.exists(info_path):
-                # sometimes it adds a suffix
                 candidates = [f for f in os.listdir(tmpdir) if f.endswith('.info.json')]
                 if candidates:
                     info_path = os.path.join(tmpdir, candidates[0])
@@ -1254,16 +1385,11 @@ def instagram_comments():
                             break
 
                 if comments:
-                    return jsonify({
-                        'shortcode': shortcode,
-                        'count': len(comments),
-                        'comments': comments,
-                        'source': 'yt-dlp-subprocess',
-                    })
+                    return jsonify({'shortcode': shortcode, 'count': len(comments), 'comments': comments, 'source': 'yt-dlp-subprocess'})
 
-    except Exception as e3:
+    except Exception as e5:
         if not last_error:
-            last_error = str(e3)
+            last_error = str(e5)
 
     # ── All methods failed — return descriptive error ─────────────────────────
     if last_error_code == 'LOGIN_REQUIRED':

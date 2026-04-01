@@ -81,6 +81,8 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const [showCanvas, setShowCanvas] = useState(false);
 
   // ── Persistence: load on mount ────────────────────────────────
+  const isInitialized = React.useRef(false);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY);
@@ -106,10 +108,16 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
         setSongUrl(url);
       }
     }).catch(() => {});
+
+    // Mark load complete — save effect must not run before this
+    isInitialized.current = true;
   }, []);
 
   // ── Persistence: save lyrics + form data ─────────────────────
+  // Guard: only save AFTER initial load is done (prevents race condition
+  // where mount-time save with empty state overwrites restored data)
   useEffect(() => {
+    if (!isInitialized.current) return;
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({
         lyrics, commentsText, contextText, language, model,
