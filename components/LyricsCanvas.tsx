@@ -165,60 +165,34 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
   const lines       = parseLyrics(lyricsText);
   const lyricsLines = lines.filter(l => !l.isSection);
 
-  // ── Build STT line mapping — content-based (handles word-count drift) ──
-  const lineStartWordIdx = React.useMemo<number[]>(() => {
-    if (!wordTimings.length || !lyricsLines.length) return [];
+  // ── STT-based lines: group wordTimings into ~6-word chunks ────────────────
+  // When STT data is available these become the authoritative source of lines
+  // with exact start/end times. Lyrics text is the fallback (no STT).
+  const STT_WORDS_PER_LINE = 6;
 
-    // Normalize word for comparison: lowercase, remove all non-alphanumeric
-    // (works for Latin, Devanagari, Arabic scripts)
-    const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-
-    const sttNorm = wordTimings.map(wt => norm(wt.word));
-
-    const result: number[] = [];
-    let searchFrom = 0;   // STT index to start next search from
-
-    for (let li = 0; li < lyricsLines.length; li++) {
-      const lineWords = lyricsLines[li].text.split(/\s+/).filter(Boolean);
-
-      if (!lineWords.length) {
-        result.push(searchFrom);
-        continue;
-      }
-
-      // Expected position based on naive word count (fallback)
-      const expectedPos = searchFrom;
-
-      // Look for the first 1-2 lyric words in a window of ±12 STT words
-      const firstNorm  = norm(lineWords[0]);
-      const secondNorm = lineWords[1] ? norm(lineWords[1]) : '';
-      const windowStart = Math.max(0, expectedPos - 4);
-      const windowEnd   = Math.min(sttNorm.length - 1, expectedPos + 14);
-
-      let matchIdx = -1;
-      let singleMatchIdx = -1;
-
-      for (let si = windowStart; si <= windowEnd; si++) {
-        if (sttNorm[si] === firstNorm) {
-          if (!secondNorm || sttNorm[si + 1] === secondNorm) {
-            matchIdx = si;   // strong 2-word match → take it immediately
-            break;
-          }
-          if (singleMatchIdx < 0) singleMatchIdx = si;  // weak 1-word match
-        }
-      }
-
-      const best = matchIdx >= 0 ? matchIdx
-                 : singleMatchIdx >= 0 ? singleMatchIdx
-                 : searchFrom;  // no match → keep sequential estimate
-
-      result.push(best);
-      // Advance searchFrom by average of lyric word count (keeps next window reasonable)
-      searchFrom = best + Math.max(1, lineWords.length);
+  const sttLines = React.useMemo(() => {
+    if (!wordTimings.length) return null;
+    const result: { text: string; startTime: number; endTime: number; wordStart: number; wordEnd: number }[] = [];
+    for (let i = 0; i < wordTimings.length; i += STT_WORDS_PER_LINE) {
+      const chunk = wordTimings.slice(i, i + STT_WORDS_PER_LINE);
+      result.push({
+        text:      chunk.map(w => w.word).join(' '),
+        startTime: chunk[0].start,
+        endTime:   chunk[chunk.length - 1].end,
+        wordStart: i,
+        wordEnd:   i + chunk.length - 1,
+      });
     }
-
     return result;
-  }, [wordTimings, lyricsLines]);
+  }, [wordTimings]);
+
+  // Active lines: STT lines when available, else AI lyrics lines
+  const activeLines = sttLines
+    ? sttLines.map((l, i) => ({ text: l.text, lineIdx: i }))
+    : lyricsLines;
+
+  // Helper: seconds → mm:ss
+  const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
   // ── UI state ──
   const [bgImage, setBgImage]         = useState('');
@@ -242,8 +216,8 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
 
   const effectiveBg = bgImage ? undefined : (customColor || bgPreset.value);
 
-  // Current line
-  const currentLine  = lyricsLines[currentIdx];
+  // Current line (from active source: STT or lyrics)
+  const currentLine  = activeLines[currentIdx];
   const currentWords = currentLine ? currentLine.text.split(' ') : [];
   const totalWords   = currentWords.length;
   const animMode     = ANIM_MODES[currentIdx % ANIM_MODES.length];
@@ -267,49 +241,48 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     setAnimPhase('partial');
   }, [currentIdx]);
 
-  // ── STT-synced rAF loop (when wordTimings are present) ──
+  // ── STT-synced rAF loop ───────────────────────────────────────────────────
   useEffect(() => {
     cancelAnimationFrame(rafRef.current);
-    if (!isPlaying || !wordTimings.length || !lineStartWordIdx.length) return;
+    if (!isPlaying) return;
 
-    const tick = () => {
-      const t = audioRef.current?.currentTime ?? 0;
-
-      // Find last STT word whose start <= t
-      let wi = -1;
-      for (let i = 0; i < wordTimings.length; i++) {
-        if (wordTimings[i].start <= t) wi = i;
-        else break;
-      }
-      if (wi < 0) { rafRef.current = requestAnimationFrame(tick); return; }
-
-      // Which lyric line does this word belong to?
-      let li = 0;
-      for (let i = 0; i < lineStartWordIdx.length - 1; i++) {
-        if (wi >= lineStartWordIdx[i + 1]) li = i + 1;
-        else break;
-      }
-
-      const wordsInLine = wi - lineStartWordIdx[li] + 1;
-      setCurrentIdx(li);
-      setWordIdx(wordsInLine);
+    if (sttLines && sttLines.length) {
+      // STT mode: drive entirely by sttLines startTime vs audio.currentTime
+      const tick = () => {
+        const t = audioRef.current?.currentTime ?? 0;
+        // Find the last sttLine whose startTime <= t
+        let li = 0;
+        for (let i = 0; i < sttLines.length; i++) {
+          if (sttLines[i].startTime <= t) li = i;
+          else break;
+        }
+        // Words spoken within this line so far
+        const lineWordStart = sttLines[li].wordStart;
+        let wi = lineWordStart;
+        for (let i = lineWordStart; i <= sttLines[li].wordEnd; i++) {
+          if (wordTimings[i]?.start <= t) wi = i;
+          else break;
+        }
+        const wordsInLine = wi - lineWordStart + 1;
+        setCurrentIdx(li);
+        setWordIdx(wordsInLine);
+        rafRef.current = requestAnimationFrame(tick);
+      };
       rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [isPlaying, wordTimings, lineStartWordIdx]);
+      return () => cancelAnimationFrame(rafRef.current);
+    }
+  }, [isPlaying, sttLines, wordTimings]);
 
   // ── Timer animation engine (fallback when no STT timings) ──
   useEffect(() => {
     if (wordTimerRef.current) clearInterval(wordTimerRef.current);
     if (lineTimerRef.current) clearTimeout(lineTimerRef.current);
-    // Skip if STT mode is active
-    if (!isPlaying || !currentLine || wordTimings.length > 0) return;
+    // Skip if STT mode is active (sttLines present)
+    if (!isPlaying || !currentLine || sttLines) return;
 
     const advanceLine = () => {
       setCurrentIdx(ci => {
-        if (ci >= lyricsLines.length - 1) {
+        if (ci >= activeLines.length - 1) {
           setIsPlaying(false);
           audioRef.current?.pause();
           return ci;
@@ -349,11 +322,11 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
       if (wordTimerRef.current) clearInterval(wordTimerRef.current);
       if (lineTimerRef.current) clearTimeout(lineTimerRef.current);
     };
-  }, [isPlaying, currentIdx, animMode, totalWords, lyricsLines.length]);
+  }, [isPlaying, currentIdx, animMode, totalWords, activeLines.length, sttLines]);
 
   const togglePlay = () => {
     if (!isPlaying && audioUrl && audioRef.current) {
-      audioRef.current.currentTime = 0;
+      // Don't reset to 0 — resume from current position
       audioRef.current.play().catch(() => {});
     } else if (isPlaying) {
       audioRef.current?.pause();
@@ -367,10 +340,17 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
   };
 
+  // goTo: change line + seek audio to that line's STT start time
   const goTo = (idx: number) => {
-    setCurrentIdx(idx);
+    const clampedIdx = Math.max(0, Math.min(idx, activeLines.length - 1));
+    setCurrentIdx(clampedIdx);
     setWordIdx(0);
     setAnimPhase('partial');
+    // Seek audio to the STT start time of this line
+    if (sttLines && audioRef.current) {
+      const t = sttLines[clampedIdx]?.startTime ?? 0;
+      audioRef.current.currentTime = t;
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -588,7 +568,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/20 z-20">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
-                  style={{ width: `${((currentIdx + 1) / lyricsLines.length) * 100}%` }}
+                  style={{ width: `${((currentIdx + 1) / activeLines.length) * 100}%` }}
                 />
               </div>
             </div>
@@ -611,28 +591,43 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-0.5" />}
               </button>
               <button
-                onClick={() => goTo(Math.min(lyricsLines.length - 1, currentIdx + 1))}
+                onClick={() => goTo(Math.min(activeLines.length - 1, currentIdx + 1))}
                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-white/10 text-gray-400 hover:text-white hover:border-white/25 flex items-center justify-center transition-all active:scale-95"
               >
                 <ChevronRight size={18} />
               </button>
               <span className="text-xs text-gray-600 ml-1 tabular-nums">
-                {currentIdx + 1} / {lyricsLines.length}
+                {currentIdx + 1} / {activeLines.length}
               </span>
             </div>
           </div>
 
-          {/* All lyrics list */}
+          {/* All lyrics / STT lines list */}
           <div className="w-full space-y-1" style={{ maxWidth: 900 }}>
-            <div className="text-[10px] text-gray-700 uppercase tracking-widest font-semibold mb-2">All Lines</div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] text-gray-700 uppercase tracking-widest font-semibold">
+                {sttLines ? 'All Lines (STT)' : 'All Lines'}
+              </span>
+              {sttLines && (
+                <span className="text-[9px] bg-green-500/15 text-green-400 border border-green-500/20 rounded-full px-2 py-0.5 font-medium">
+                  Click any line to jump
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-              {lyricsLines.map((line, i) => (
+              {activeLines.map((line, i) => (
                 <button
                   key={i}
                   onClick={() => goTo(i)}
                   className={`text-left text-xs px-3 py-2 rounded-lg transition-all flex items-center gap-2 ${i === currentIdx ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-600 hover:text-gray-300 hover:bg-white/4 border border-transparent'}`}
                 >
-                  <span className="text-gray-700 shrink-0">{i + 1}.</span>
+                  {sttLines ? (
+                    <span className="text-[10px] text-purple-500/70 shrink-0 tabular-nums font-mono">
+                      {fmtTime(sttLines[i].startTime)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-700 shrink-0">{i + 1}.</span>
+                  )}
                   <span className="truncate">{line.text}</span>
                 </button>
               ))}
@@ -711,12 +706,14 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
               </div>
 
               {/* STT sync status */}
-              {wordTimings.length > 0 && (
+              {wordTimings.length > 0 && sttLines && (
                 <div className="flex items-start gap-2 px-3 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
                   <span className="w-2 h-2 rounded-full bg-green-400 mt-0.5 shrink-0" />
                   <div>
-                    <div className="text-xs font-semibold text-green-400">Live Sync Active</div>
-                    <div className="text-[10px] text-gray-500 mt-0.5">{wordTimings.length} words synced — text audio ke saath bilkul match karega</div>
+                    <div className="text-xs font-semibold text-green-400">STT Live Sync Active</div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">
+                      {wordTimings.length} STT words → {sttLines.length} lines — click any line to jump
+                    </div>
                   </div>
                 </div>
               )}

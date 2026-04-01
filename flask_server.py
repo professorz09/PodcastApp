@@ -1072,13 +1072,21 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
         collected = []
         min_id = None
         page = 0
+        # Batch size per request: 20 is Instagram's typical page size
+        BATCH = 20
         while True:
             try:
-                chunk, min_id = cl.media_comments_chunk(mpk, min_id=min_id)
-            except AttributeError:
-                # Older instagrapi without media_comments_chunk — fallback
-                chunk = cl.media_comments(mpk, amount=max_comments if max_comments > 0 else 0)
+                # media_comments_chunk(media_pk, max_amount, min_id=None)
+                chunk, min_id = cl.media_comments_chunk(mpk, BATCH, min_id=min_id)
+            except (AttributeError, TypeError):
+                # Older instagrapi / different signature — fallback to media_comments
+                raw_all = cl.media_comments(mpk, amount=max_comments if max_comments > 0 else 0)
+                for c in raw_all:
+                    text = (c.text or '').strip()
+                    if text:
+                        collected.append(text)
                 min_id = None
+                break
 
             for c in chunk:
                 text = (c.text or '').strip()
