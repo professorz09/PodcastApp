@@ -432,7 +432,7 @@ export const generateDebateScript = async (
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
               ${durLineHi}
               भाषा: हिंदी + Hinglish (जैसे real लोग बात करते हैं — natural, simple, human)।
-              Target Audience: USA में रहने वाले desi लोग — इनकी ज़िंदगी के issues इस topic से जुड़ते हैं।
+              Target Audience: USA में रहने वाले mature adults — इनकी ज़िंदगी के issues इस topic से जुड़ते हैं।
 
               पात्र — ठीक 3 वक्ता (fixed):
               ${speakers.length >= 3
@@ -980,7 +980,7 @@ export const generateDebateScript = async (
             ${specificDetails ? `Situation details: ${specificDetails}` : ''}
             ${durLineEn}
             Language: ${language}.
-            Target Audience: USA desi audience — people dealing with real-life issues related to this topic.
+            Target Audience: USA mature audience — people dealing with real-life issues related to this topic.
 
             Characters — exactly 3 speakers (fixed):
             ${speakers.length >= 3
