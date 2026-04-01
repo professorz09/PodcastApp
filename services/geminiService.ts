@@ -249,7 +249,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' = 'debate',
+  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -340,29 +340,142 @@ export const generateDebateScript = async (
         `;
       } else {
         if (style === 'explained') {
+            if (includeNarrator) {
+              prompt = `
+                विषय: "${topic}" पर एक गहरी "Explained" शैली की वीडियो स्क्रिप्ट तैयार करें।
+                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                ${durLineHi}
+                भाषा: हिंदी (Hinglish ठीक है)।
+
+                पात्र:
+                - Narrator: एक (हमेशा "Narrator" नाम से)
+                - ${speakerCount} वक्ता: ${speakers.length > 0 ? speakers.join(", ") : `विषय के अनुरूप उचित नाम ऑटो-डिटेक्ट करें`}
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                संरचना (Narrator ON मोड):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                【 शुरुआत — Narrator का परिचय 】
+                - एक strong hook से शुरू करें (चौंकाने वाला fact, सवाल, या real situation)
+                - यह topic क्या है — सीधे और interesting तरीके से
+                - क्यों जानना ज़रूरी है, इस video में क्या-क्या समझेंगे (clear roadmap)
+                - Audience को engage करें, boring intro नहीं
+
+                【 मुख्य चर्चा — दोनों वक्ता (topic की depth में) 】
+                - दोनों speakers मिलकर step-by-step topic explain करें
+                - हर concept: पहले simple भाषा में, फिर real-life example (middle class Indian context से)
+                - एक speaker explain करे, दूसरा question पूछे, add करे, या counter-example दे
+                - बीच में Narrator 1-2 बार short transitions दे सकता है ("अब देखते हैं...", "यहाँ एक interesting twist है...")
+                - Deep जाएं — surface level नहीं, असली insight दें
+                - Avoid: "इसलिए यह महत्वपूर्ण है", "आइए विचार करें" जैसे robotic phrases
+
+                【 अंत — Narrator का निष्कर्ष 】
+                - Key takeaways summarize करें (3-4 sharp points)
+                - एक actionable insight या thought-provoking question दें
+                - Memorable ending line — audience के दिमाग में रह जाए
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                स्वर और भाषा:
+                - बिल्कुल natural, दो पढ़े-लिखे दोस्तों की conversation जैसी
+                - Colloquial Hindi/Hinglish — robotic या किताबी भाषा नहीं
+                - AI phrases ban: "इस प्रकार", "निष्कर्ष के रूप में", "यह ध्यान देने योग्य है"
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ${durFillHi}
+              `;
+            } else {
+              prompt = `
+                विषय: "${topic}" पर एक गहरी "Explained" शैली की वीडियो स्क्रिप्ट तैयार करें।
+                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                ${durLineHi}
+                भाषा: हिंदी (Hinglish ठीक है)।
+
+                पात्र — ठीक ${speakerCount} वक्ता (कोई Narrator नहीं):
+                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `विषय के अनुरूप उचित नाम ऑटो-डिटेक्ट करें।`}
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                संरचना (Narrator OFF — सिर्फ दो दोस्त explain कर रहे हैं):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                【 शुरुआत 】
+                - एक speaker सीधे topic introduce करता है — interesting hook (चौंकाने वाला fact या सवाल)
+                - दूसरा speaker react करता है, curiosity दिखाता है
+
+                【 पूरी चर्चा — दोनों मिलकर deep explain करते हैं 】
+                - जैसे दो पढ़े-लिखे दोस्त बैठकर किसी topic को जड़ से explain कर रहे हों
+                - हर concept: पहले simple भाषा में explain, फिर real-life example (middle class Indian situations से)
+                - दोनों naturally आगे-पीछे बात करें — एक explain करे, दूसरा question पूछे, add करे
+                - Avoid: Narrator, "अब हम देखेंगे" जैसे transition announcements
+                - Examples: जो middle class Indian audience को directly relatable हों
+                - Deep जाएं — surface level नहीं, असली insight दें
+                - हर बड़े point के बाद कोई relatable analogy या case study ज़रूर दें
+
+                【 अंत 】
+                - दोनों मिलकर naturally conversation में key points conclude करें
+                - एक memorable line या thought से end करें — artificial नहीं
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                स्वर और भाषा:
+                - बिल्कुल natural, conversational Hinglish
+                - Robotic या किताबी phrases बिल्कुल नहीं
+                - AI clichés ban: "इस प्रकार", "निष्कर्ष के रूप में", "यह ध्यान देने योग्य है"
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ${durFillHi}
+              `;
+            }
+        } else if (style === 'situational') {
             prompt = `
-              विषय: "${topic}" पर एक शैक्षिक और संरचित "Explained" शैली की वीडियो स्क्रिप्ट तैयार करें।
-              ${specificDetails ? `विशिष्ट विवरण/संदर्भ: ${specificDetails}` : ''}
+              विषय: "${topic}" पर एक "Situational" शैली की वीडियो स्क्रिप्ट तैयार करें।
+              ${specificDetails ? `विशिष्ट परिस्थिति/विवरण: ${specificDetails}` : ''}
               ${durLineHi}
-              भाषा: हिंदी (Hindi)।
-              
-              पात्र:
-              ${speakerCount} अलग-अलग वक्ता बनाएं।
-              ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `विषय के लिए उपयुक्त नाम/व्यक्तित्व ऑटो-डिटेक्ट करें।`}
-              
-              संरचना और प्रवाह:
-              1. **महत्वपूर्ण शुरुआत**: स्क्रिप्ट की शुरुआत "इस वीडियो में..." वाक्यांश से होनी चाहिए। यह पहले वक्ता या नैरेटर द्वारा बोला जाना चाहिए।
-              2. एक स्पष्ट, संरचित प्रारूप का पालन करें (जैसे, परिचय -> मुख्य अवधारणा 1 -> मुख्य अवधारणा 2 -> वास्तविक दुनिया के उदाहरण -> निष्कर्ष)।
-              3. टोन जानकारीपूर्ण, आकर्षक और स्पष्ट होनी चाहिए (जैसे Vox या Kurzgesagt वीडियो)।
-              4. जटिल विचारों को सरल, सुपाच्य भागों में तोड़ें।
-              5. सभी ${speakerCount} वक्ताओं की समान भागीदारी सुनिश्चित करें, शायद एक "समझाने वाले" के रूप में कार्य कर रहा है और अन्य प्रश्न पूछ रहे हैं या उदाहरण दे रहे हैं।
-              6. पूरी स्क्रिप्ट हिंदी में होनी चाहिए।
-              
-              स्वर और भाषा (Tone & Language):
-              - भाषा बहुत ही स्वाभाविक, संवादात्मक (conversational) और इंसानों जैसी (human-like) होनी चाहिए।
-              - रोबोटिक, किताबी या अत्यधिक औपचारिक शब्दों का प्रयोग न करें। आम बोलचाल की भाषा (Colloquial Hindi/Hinglish) का उपयोग करें।
-              - AI वाले घिसे-पिटे वाक्यों से बचें। ऐसा लगना चाहिए जैसे असली इंसान स्वाभाविक रूप से बात कर रहे हैं।
-              
+              भाषा: हिंदी (Hinglish ठीक है)।
+
+              पात्र — ठीक 3 वक्ता (fixed, no changes):
+              ${speakers.length >= 3
+                ? `इन नामों का उपयोग करें: ${speakers[0]} (परिस्थिति में फंसा व्यक्ति), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
+                : `विषय के अनुरूप नाम ऑटो-डिटेक्ट करें — Speaker 1 वह व्यक्ति जो situation में फंसा है, Speaker 2 और 3 दो अलग-अलग expert advisors (जैसे financial advisor + psychologist, lawyer + life coach, doctor + counselor — topic के अनुसार चुनें)।`
+              }
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              भूमिकाएं:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              【 Speaker 1 — परिस्थिति में फंसा व्यक्ति 】
+              - अपनी पूरी situation detail में बताएगा — कैसे फंसा, क्या हुआ, अभी कैसा feel हो रहा है
+              - Situation किसी भी तरह की हो सकती है: debt trap, financial crisis, moral dilemma, relationship problem, family pressure, job loss, legal problem, emotional pain, religious conflict, life-changing decision, etc.
+              - Language: Real, raw, emotional — जैसे कोई सच में बात कर रहा हो
+              - Judgmental नहीं, genuinely confused और stressed
+
+              【 Speaker 2 — पहला Expert 】
+              - पहले situation को पूरी तरह समझता है, ज़रूरत हो तो clarifying questions पूछता है
+              - एक angle से deep practical advice देता है
+              - Middle class Indian audience को relatable examples use करता है (real case studies, changed names)
+              - Emotional support भी देता है — judgmental नहीं
+              - दोनों sides देखता है — pros और cons
+
+              【 Speaker 3 — दूसरा Expert 】
+              - दूसरे angle से situation को देखता है (Speaker 2 की बातें repeat नहीं करता)
+              - नई insights, practical steps, या important considerations add करता है
+              - Real examples, analogies, या case studies (middle class Indian context) use करता है
+              - दोनों मिलकर full picture बनाते हैं
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              प्रवाह (Flow):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              1. Speaker 1 अपनी पूरी situation detail में बताता है (emotional, real, raw — 3-4 exchanges)
+              2. Experts पहले situation और clearly समझते हैं (2-3 clarifying exchanges)
+              3. दोनों experts मिलकर deep advice देते हैं — practical, emotional, legal/moral जो भी relevant हो
+              4. हर बड़े point के साथ real-life example (middle class Indian context)
+              5. Natural back-and-forth — Experts आपस में भी बात करें, agree/disagree करें
+              6. अंत में: दोनों experts Speaker 1 को clear, actionable steps दें
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              CRITICAL RULES:
+              - कोई judgment नहीं, कोई lecture नहीं
+              - Natural conversation — जैसे असली लोग बात करते हैं
+              - Deep और relatable — surface level नहीं
+              - Middle class Indian experience से examples
+              - AI clichés ban: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में", "आइए विचार करें"
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillHi}
             `;
         } else if (style === 'podcast_panel') {
@@ -664,31 +777,142 @@ export const generateDebateScript = async (
       } else {
         // General Prompt Construction
         if (style === 'explained') {
+          if (includeNarrator) {
+            prompt = `
+              Generate a deep "Explained" style video script on the topic: "${topic}".
+              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              ${durLineEn}
+              Language: ${language}.
+
+              Characters:
+              - Narrator: one (always named "Narrator")
+              - ${speakerCount} speakers: ${speakers.length > 0 ? speakers.join(", ") : `Auto-detect names appropriate for the topic`}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Structure (Narrator ON mode):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              【 Opening — Narrator's Introduction 】
+              - Start with a strong hook (shocking fact, question, or real situation that grabs attention)
+              - What this topic is — explained simply and interestingly
+              - Why it matters and a clear roadmap of what will be covered
+              - Make the audience want to keep watching — no boring intros
+
+              【 Main Discussion — Both Speakers (deep into the topic) 】
+              - Both speakers explain the topic step-by-step together
+              - Each concept: first in simple language, then with a real-life relatable example (middle-class / everyday context)
+              - One speaker explains, the other asks, adds, or gives a counter-example
+              - Narrator may give 1-2 short transitions in the middle ("Now let's look at...", "Here's where it gets interesting...")
+              - Go deep — no surface-level takes, give real insight
+              - Banned phrases: "It's important to note", "Let's delve into", "In conclusion", "This is significant"
+
+              【 Closing — Narrator's Conclusion 】
+              - Summarize 3-4 sharp key takeaways
+              - Give one actionable insight or thought-provoking question
+              - End with a memorable line the audience will remember
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Tone & Language:
+              - Highly natural — like two knowledgeable friends talking
+              - Conversational, use contractions, natural pauses, personality
+              - No robotic or formal AI phrases
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ${durFillEn}
+            `;
+          } else {
+            prompt = `
+              Generate a deep "Explained" style video script on the topic: "${topic}".
+              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              ${durLineEn}
+              Language: ${language}.
+
+              Characters — exactly ${speakerCount} speakers (no Narrator):
+              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Auto-detect names appropriate for the topic.`}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Structure (Narrator OFF — just two friends explaining):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              【 Opening 】
+              - One speaker introduces the topic with a strong hook (shocking fact or question)
+              - The other speaker reacts, shows curiosity, pulls the conversation forward
+
+              【 Full Discussion — Both Explain Together (deep) 】
+              - Like two well-read friends sitting down to explain a topic from the ground up
+              - Every concept: explain simply first, then give a real-life relatable example (everyday / middle-class context)
+              - Natural back-and-forth — one explains, the other asks, adds, or challenges
+              - Avoid: Narrator role, announcement transitions ("Now we will look at...")
+              - Examples must feel directly relatable to a general everyday audience
+              - Go deep — real insight, not surface-level takes
+              - After every major point, give a relatable analogy or mini case study
+
+              【 Closing 】
+              - Both naturally conclude in conversation — no forced summary
+              - End with a memorable line or thought — not artificial
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Tone & Language:
+              - Highly natural, conversational — like real knowledgeable people talking
+              - No robotic or formal AI phrases
+              - Banned: "It's important to note", "Let's delve into", "In conclusion", "This is significant"
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ${durFillEn}
+            `;
+          }
+        } else if (style === 'situational') {
           prompt = `
-            Generate an educational and structured "Explained" style video script on the topic: "${topic}".
+            Generate a "Situational" style video script on the topic: "${topic}".
+            ${specificDetails ? `Specific situation/details: ${specificDetails}` : ''}
             ${durLineEn}
             Language: ${language}.
-            
-            CRITICAL: You MUST base the explanation heavily on the provided context material if available. Accurately reflect the specific facts, data, and arguments from the "batchit" (conversation) or document.
-            
-            Characters:
-            Create or use ${speakerCount} distinct speakers.
-            ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Auto-detect appropriate names/personas for the topic.`}
-            
-            Structure & Flow:
-            1. **CRITICAL START**: The script MUST start with the exact phrase: "In this video...". This should be spoken by the first speaker or Narrator.
-            2. Follow a clear, structured format (e.g., Introduction -> Key Concept 1 -> Key Concept 2 -> Real-world Examples -> Conclusion).
-            3. The tone should be informative, engaging, and clear (like a Vox or Kurzgesagt video).
-            4. Break down complex ideas into simple, digestible parts.
-            5. Ensure equal participation from all ${speakerCount} speakers, perhaps with one acting as the "Explainer" and others asking questions or providing examples.
-            6. The entire script MUST be in ${language}.
-            
-            Tone & Language:
-            - Use highly natural, conversational, and human-like language.
-            - Avoid robotic, overly formal, or cliché AI phrases (like "In conclusion", "It's important to note", "Let's delve into").
-            - Use contractions, natural pauses, colloquialisms, and conversational filler where appropriate to make it sound like real people talking.
-            - Show emotion, personality, and natural reactions.
-            
+
+            Characters — exactly 3 speakers (fixed):
+            ${speakers.length >= 3
+              ? `Use these names: ${speakers[0]} (the person with the situation), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
+              : `Auto-detect names for the topic — Speaker 1 is the person stuck in the situation, Speakers 2 and 3 are two different expert advisors (e.g. financial advisor + psychologist, lawyer + life coach, doctor + counselor — choose based on the topic).`
+            }
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Roles:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 Speaker 1 — The Person in the Situation 】
+            - Shares their full situation in detail — how they got stuck, what happened, how they feel right now
+            - The situation can be anything: debt trap, financial crisis, moral dilemma, relationship problem, family pressure, job loss, legal trouble, emotional pain, religious conflict, major life decision, etc.
+            - Language: real, raw, emotional — like someone genuinely speaking
+            - Not self-righteous — genuinely confused, stressed, or at a crossroads
+
+            【 Speaker 2 — First Expert 】
+            - First fully understands the situation, asks clarifying questions if needed
+            - Then gives deep practical advice from one angle
+            - Uses relatable everyday examples (middle-class / general audience context — changed names, real case studies)
+            - Provides emotional support too — non-judgmental
+            - Sees both sides — pros and cons
+
+            【 Speaker 3 — Second Expert 】
+            - Views the situation from a different angle (does NOT repeat Speaker 2)
+            - Adds new insights, practical steps, or important considerations
+            - Uses real examples, analogies, or case studies (everyday context)
+            - Together, both experts build the complete picture
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Flow:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            1. Speaker 1 shares full situation in detail (emotional, real, raw — 3-4 exchanges)
+            2. Experts first understand the situation better (2-3 clarifying exchanges)
+            3. Both experts give deep advice — practical, emotional, legal/moral as relevant
+            4. Every major point backed by a real-life relatable example (everyday context)
+            5. Natural back-and-forth — experts also talk to each other, agree or respectfully differ
+            6. Closing: both experts give Speaker 1 clear, actionable steps they can take
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            CRITICAL RULES:
+            - No judgment, no lecturing
+            - Natural conversation — the way real people actually talk
+            - Go deep and be relatable — no surface-level advice
+            - Use everyday audience context for examples
+            - Banned AI phrases: "It's important to note", "Let's delve into", "In conclusion", "It is worth mentioning"
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ${durFillEn}
           `;
         } else if (style === 'podcast_panel') {
