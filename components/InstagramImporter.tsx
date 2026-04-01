@@ -130,6 +130,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   const [comments, setComments] = useState<string[] | null>(() => readSaved('comments', null));
   const [commentsError, setCommentsError] = useState('');
   const [commentsErrorCode, setCommentsErrorCode] = useState('');
+  const [commentsSource, setCommentsSource] = useState<string>('');
   const [maxComments, setMaxComments] = useState<MaxComments>(() => readSaved<MaxComments>('maxComments', 100));
   const [showAllComments, setShowAllComments] = useState(false);
   const [attachedLabel, setAttachedLabel] = useState<string | null>(null);
@@ -234,6 +235,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
       // If the cached result came back immediately (already done)
       if (data.status === 'done') {
         setComments(data.comments);
+        setCommentsSource(data.source || '');
         setCommentsStatus('');
         setCommentsLoading(false);
         return;
@@ -252,6 +254,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
           } else if (sd.status === 'done') {
             clearInterval(commentsPollRef.current!);
             setComments(sd.comments);
+            setCommentsSource(sd.source || '');
             setCommentsStatus('');
             setCommentsLoading(false);
           } else if (sd.status === 'error' || sd.status === 'not_found') {
@@ -657,7 +660,14 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
           {comments && comments.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-[11px] text-gray-500">
-                <span>{comments.length} comments scraped</span>
+                <span className="flex items-center gap-2">
+                  {comments.length} comments scraped
+                  {commentsSource && (
+                    <span className="bg-green-500/15 text-green-400 border border-green-500/25 rounded-full px-2 py-0.5 text-[10px] font-medium">
+                      via {commentsSource}
+                    </span>
+                  )}
+                </span>
                 <div className="flex items-center gap-2">
                   <button onClick={downloadComments} className="hover:text-gray-300 transition-colors">Download .txt</button>
                   <span>·</span>

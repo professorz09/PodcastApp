@@ -1033,6 +1033,7 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
     last_error_code = 'SCRAPE_ERROR'
 
     def finish_ok(comments, source):
+        print(f'[IG Comments] ✓ SUCCESS via [{source}] — {len(comments)} comments  (shortcode={shortcode})')
         active_jobs[job_id] = {
             'status': 'done', 'job_id': job_id,
             'shortcode': shortcode, 'count': len(comments),
@@ -1040,6 +1041,7 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
         }
 
     def finish_err(msg, code='SCRAPE_ERROR'):
+        print(f'[IG Comments] ✗ ALL STRATEGIES FAILED (shortcode={shortcode}): {msg}')
         active_jobs[job_id] = {
             'status': 'error', 'job_id': job_id,
             'error': msg, 'error_code': code,
