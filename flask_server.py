@@ -1048,6 +1048,7 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
     # ── Attempt 0: instagrapi — Private API (most reliable with cookies) ──────
     update('Trying instagrapi Private API…')
     try:
+        import concurrent.futures as _cf
         from instagrapi import Client as IGClient
 
         ig_cookies = get_instagram_cookies()
@@ -1062,8 +1063,17 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
             'User-Agent': 'Instagram 295.0.0.32.119 Android (30/11; 420dpi; 1080x2400; Google; Pixel 6; oriole; qcom; en_US; 490770583)',
         })
 
-        media_pk = cl.media_pk_from_url(url)
-        raw = cl.media_comments(media_pk, amount=max_comments if max_comments > 0 else 0)
+        def _run_instagrapi():
+            mpk = cl.media_pk_from_url(url)
+            return list(cl.media_comments(mpk, amount=max_comments if max_comments > 0 else 0))
+
+        with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+            _fut = _ex.submit(_run_instagrapi)
+            try:
+                raw = _fut.result(timeout=45)   # hard 45-second cap
+            except _cf.TimeoutError:
+                raise Exception("instagrapi timed out after 45s — no response from Instagram")
+
         comments = []
         for c in raw:
             text = (c.text or '').strip()
