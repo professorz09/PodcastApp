@@ -111,55 +111,89 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
 const getThumbnailTextStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'situational') {
     return `
-    You are a YouTube thumbnail copywriter specializing in personal story and emotional content.
-    Generate 5 SHORT thumbnail text lines (max 5 words each) that feel raw, personal, and emotionally heavy.
-    These appear as BIG BOLD TEXT on a thumbnail — NOT full titles.
+You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT that appears on a thumbnail image.
 
-    Style: emotional gut-punch, relatable pain, raw honesty.
-    Examples: "It Broke Me", "I Gave Up Everything", "No One Warned Me", "My Biggest Regret", "I Was Shattered", "Couldn't Tell Anyone", "Sabse Bada Ghalti", "Toot Gaya Main"
-    
-    Rules:
-    1. Max 5 words — short and emotionally heavy
-    2. First-person, raw, honest — NOT shocking clickbait
-    3. Can use "..." for trailing emotion, light caps for 1 word
-    4. NO dramatic punctuation like ?! or ALL CAPS screaming
-    5. Match content language (Hindi content → Hinglish/Hindi thumbnail text okay)
-    6. Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+STYLE: Emotional personal story — raw, real, relatable. NOT generic clickbait.
+
+CRITICAL RULE — TOPIC SPECIFICITY:
+Every option MUST hint at the actual topic from the script. Generic phrases like "It Broke Me" or "My Biggest Regret" that could apply to ANY video are FORBIDDEN unless combined with a topic hint.
+BAD: "It Broke Me" (could be anything)
+GOOD: "My Job Broke Me..." (topic: job loss)
+BAD: "Toot Gaya Main"
+GOOD: "Rishta Toot Gaya..." (topic: relationship)
+
+Generate exactly 5 options with VARIETY — not all the same tone:
+- Option 1: Pure emotional first-person with topic hint (e.g. "Lost Everything at 40...")
+- Option 2: The unspoken truth about this topic (e.g. "Nobody Warns You About This")
+- Option 3: Hindi/Hinglish emotional (e.g. "Galti Ho Gayi Mujhse...")
+- Option 4: The question this person is living (e.g. "Can I Still Fix This?")
+- Option 5: The hardest moment, specific (e.g. "That One Phone Call...")
+
+RULES:
+- Max 5 words each — short and heavy
+- Trailing "..." welcome for emotion
+- One word can be light caps (CAPS for 1 word max)
+- NO generic topic-free phrases
+- Match script language (Hindi script → mix Hindi + English options)
+- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
   if (style === 'debate') {
     return `
-    You are a YouTube thumbnail copywriter specializing in debate and controversy content.
-    Generate 5 SHORT thumbnail text lines (max 5 words each) that feel confrontational, bold, and debate-worthy.
-    These appear as BIG BOLD TEXT on a thumbnail — NOT full titles.
+You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT that appears on a debate thumbnail.
 
-    Style: bold confrontation, challenging, two-sides battle.
-    Examples: "WHO'S RIGHT?", "BOTH WRONG?", "EXPOSED!", "The REAL Truth", "FIGHT BACK", "They LIED", "Yeh Galat Hai!", "Sach Suno", "DEBUNKED", "Stop Believing This"
-    
-    Rules:
-    1. Max 5 words — short and confrontational
-    2. Challenge, expose, or take a strong side
-    3. ALL CAPS for key words, dramatic punctuation (!?) welcome
-    4. Can use ellipsis (...) or censored style (SU*CIDE style) if topic warrants
-    5. Match content language (Hindi content → Hinglish/Hindi thumbnail text okay)
-    6. Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+STYLE: Bold, confrontational, two-sides battle — makes you pick a side immediately.
+
+CRITICAL RULE — TOPIC SPECIFICITY:
+The thumbnail text MUST reference the actual debate topic from the script. Generic "WHO'S RIGHT?" or "EXPOSED!" with no topic context are weak.
+BAD: "WHO'S RIGHT?" (could be anything)
+GOOD: "Is MARRIAGE Over?" (topic: marriage debate)
+BAD: "BOTH WRONG?"
+GOOD: "BOTH Sides LYING?" (keeps confrontation + hints)
+
+Generate exactly 5 options with VARIETY:
+- Option 1: Direct yes/no question about THIS topic (e.g. "Is Hustle Culture DEAD?")
+- Option 2: Explosive claim about THIS topic (e.g. "MARRIAGE Is A TRAP")  
+- Option 3: Challenge conventional wisdom (e.g. "Stop Believing This LIE")
+- Option 4: Hindi/Hinglish confrontational (e.g. "Sachchi Baat Karo!")
+- Option 5: Censored-style if controversial (e.g. "It's All BULL**IT") — use * for letters
+
+RULES:
+- Max 5 words each
+- ALL CAPS for 1-2 key power words
+- ! or ? welcome
+- Censored style (F**K, BULL**IT) only if topic is genuinely controversial
+- Match script language (Hindi script → mix Hindi + English options)
+- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
   // podcast / default
   return `
-    You are an expert YouTube thumbnail copywriter.
-    Generate 5 SHORT, PUNCHY, CLICKBAIT thumbnail text lines — these appear as BIG BOLD TEXT on a YouTube thumbnail (NOT full titles).
+You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT for a podcast-style thumbnail.
 
-    Style: dramatic, shocking, curiosity-evoking — Joe Rogan / podcast style.
-    Examples: "I Quit...", "He EXPOSED Everything", "The Truth REVEALED", "They LIED To Us", "It's OVER...", "He Said WHAT?!", "Gone FOREVER", "Nobody Talks About This"
+STYLE: Shocking, curiosity-driven, high-energy — Joe Rogan / MrBeast energy. Makes you stop scrolling.
 
-    Rules:
-    1. Maximum 4-6 words only — short and explosive
-    2. Dramatic, shocking, emotional, or intensely curiosity-evoking
-    3. Can use ellipsis (...), ALL CAPS for 1-2 words, dramatic punctuation (!?), or censored words (SU*CIDE style)
-    4. NO full sentences — just the explosive hook phrase
-    5. Match content language (Hindi content → Hinglish/Hindi thumbnail text okay)
-    6. Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+CRITICAL RULE — TOPIC SPECIFICITY:
+The text must hint at the actual topic/person/revelation from the script. Pure generic shock with no content hook is weak.
+BAD: "Gone FOREVER" (could be anything)
+GOOD: "He LEFT It All..." (topic: someone who quit everything)
+BAD: "The Truth REVEALED"
+GOOD: "The REAL Story Finally" (still vague but slightly better — prefer specific)
+
+Generate exactly 5 options with VARIETY:
+- Option 1: Shocking revelation about THIS topic (e.g. "He Knew All Along...")
+- Option 2: Explosive question (e.g. "She Said WHAT To Him?!")
+- Option 3: The bombshell moment (e.g. "It's OVER For Real")
+- Option 4: Hindi/Hinglish high-energy (e.g. "Sach Bol Diya Finally!")
+- Option 5: Censored shock (e.g. "That Was F***ING Crazy") — only if warranted
+
+RULES:
+- Maximum 4-6 words each
+- ALL CAPS for 1-2 shock words
+- Ellipsis (...) or !? for drama
+- Censored style (F***ING, SH*T) only if content warrants
+- Match script language (Hindi script → mix Hindi + English options)
+- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
   `;
 };
 
