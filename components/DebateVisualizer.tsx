@@ -702,9 +702,10 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
     animationRef.current = requestAnimationFrame(render);
   }, [
-      script, isPlaying, theme, showSubtitles, speakerLabels, 
+      script, isPlaying, theme, showSubtitles, subtitleBackground, speakerLabels,
       speakerScale, showTimer, showSideStats, showVuMeter, vuMeterStyle, showSpeakerImages, showSpeakers, showScores, backgroundDim, speakerPositions, showNameLabels,
-      background, speakerImages, currentSegmentBackground, segmentOffsets, currentSegmentIndex, segmentScores, activeSpeakers, showSettings, globalBackgroundColor, questionMode
+      background, speakerImages, currentSegmentBackground, segmentOffsets, currentSegmentIndex, segmentScores, activeSpeakers, showSettings, globalBackgroundColor, questionMode,
+      globalThemeConfig, narratorTextColor, showMinimalSpeakerName, showMinimalSideVU
   ]);
 
   /* OLD RENDER
