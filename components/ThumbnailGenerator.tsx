@@ -225,7 +225,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   };
 
   const textForThumbnail = selectedThumbnailText || selectedTitle;
-  const canGenerate = !!(textForThumbnail && guestName);
+  const canGenerate = !!textForThumbnail;
 
   return (
     <div className="w-full h-full bg-[#050505] text-zinc-100 flex flex-col overflow-hidden relative font-sans">
@@ -588,7 +588,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
               {!canGenerate && (
                 <p className="text-center text-xs text-gray-600">
-                  {!textForThumbnail ? 'Thumbnail text ya title chahiye' : 'Guest ka naam daalo'}
+                  Thumbnail text ya title chahiye (Step 1 ya Step 2)
                 </p>
               )}
 

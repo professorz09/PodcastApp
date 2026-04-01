@@ -1924,8 +1924,8 @@ Design a brand new, highly engaging YouTube thumbnail for the topic below. Use t
 
 TOPIC & CAST:
 - Main hook text (show this prominently, bold, exactly as written): "${title}"
-- Podcast host: ${hostName}
-- Guest / other speaker: ${guestName}
+${hostName ? `- Host: ${hostName}` : '- Host: Generate a random realistic person appropriate for this topic'}
+${guestName ? `- Guest / other speaker: ${guestName}` : '- Guest / other speaker: Generate a random realistic person appropriate for this topic'}
 
 CONTENT FREEDOM — you decide:
 - Best facial expressions and poses that match the topic energy
@@ -1945,9 +1945,9 @@ STYLE RULES (non-negotiable):
     Create a high-quality, professional YouTube podcast thumbnail in the style of the Joe Rogan Experience.
     
     COMPOSITION:
-    1. **Subjects**: Two people facing each other. On the right is ${hostName}, and on the left is ${guestName}. They should look like they are in a deep conversation.
+    1. **Subjects**: Two people facing each other in deep conversation. ${hostName ? `On the right is ${hostName}.` : 'On the right is a random realistic person fitting the topic.'} ${guestName ? `On the left is ${guestName}.` : 'On the left is a random realistic person fitting the topic.'}
     2. **Title Card**: In the center, between the two people, there is a clean white rounded rectangle title card. 
-       - Inside the card, at the top, show the guest's name "${guestName}" with a small circular profile picture and a blue verified checkmark.
+       - Inside the card, at the top, show the name "${guestName || 'Guest'}" with a small circular profile picture and a blue verified checkmark.
        - Below that, the hook text "${title}" in large, bold, black and red sans-serif typography — make it BIG and eye-catching.
     3. **Foreground**: Two professional black studio microphones (like Shure SM7B) should be visible in the bottom foreground, one for each person.
     4. **Background**: A clean, pure white background.
