@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebateSegment, ThumbnailState, YoutubeImportData } from '../types';
-import { generateThumbnail, generateTitles, generateThumbnailText, ThumbnailVideoStyle } from '../services/geminiService';
+import { generateThumbnail, generateTitles, generateThumbnailText, generateThumbnailInspiration, ThumbnailVideoStyle } from '../services/geminiService';
 import {
   Image, Loader2, RefreshCw, Download, ChevronLeft, X, ArrowRight,
   Upload, FileText, AlignLeft, Zap, Copy, Check, Wand2, Info,
@@ -42,6 +42,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [loadingStep, setLoadingStep] = useState<'inspecting' | 'generating' | null>(null);
   const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
   const [isGeneratingThumbnailText, setIsGeneratingThumbnailText] = useState(false);
+  const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
@@ -192,6 +193,20 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     } finally {
       setIsLoading(false);
       setLoadingStep(null);
+    }
+  };
+
+  const handleInspire = async () => {
+    const sourceText = getSourceText(titleSource);
+    if (!sourceText) return;
+    setIsGeneratingInspiration(true);
+    try {
+      const inspiration = await generateThumbnailInspiration(sourceText, videoStyle);
+      onUpdateThumbnailState({ ...thumbnailState, extraInstructions: inspiration });
+    } catch (err: any) {
+      console.error('Inspiration error', err);
+    } finally {
+      setIsGeneratingInspiration(false);
     }
   };
 
@@ -527,9 +542,23 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
                     {/* Extra instructions */}
                     <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
-                        Extra Instructions <span className="text-gray-700">(optional)</span>
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
+                          Extra Instructions <span className="text-gray-700">(optional)</span>
+                        </label>
+                        <button
+                          onClick={handleInspire}
+                          disabled={isGeneratingInspiration}
+                          className="flex items-center gap-1.5 text-[11px] font-semibold text-orange-400 hover:text-orange-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-orange-500/10"
+                          title="Script padh ke AI khud suggest karega"
+                        >
+                          {isGeneratingInspiration ? (
+                            <><Loader2 size={11} className="animate-spin" /> Thinking...</>
+                          ) : (
+                            <><Wand2 size={11} /> Inspire from Script</>
+                          )}
+                        </button>
+                      </div>
                       <textarea
                         value={extraInstructions}
                         onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, extraInstructions: e.target.value })}

@@ -234,6 +234,42 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
   }
 };
 
+export const generateThumbnailInspiration = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<string> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `You are a creative YouTube thumbnail director. Read the script below and write a short, specific thumbnail art direction in 2-4 sentences.
+
+SCRIPT (first 2000 chars):
+${scriptText.slice(0, 2000)}
+
+STYLE: ${videoStyle}
+
+Your output should describe:
+1. WHO should appear (person type, age, gender, look — e.g. "stressed middle-aged man in plain shirt", "young confident woman in business attire", "tired working-class man in his 40s")
+2. EXPRESSION / MOOD (e.g. "shocked and overwhelmed", "quietly sad", "determined and angry")
+3. BACKGROUND / ATMOSPHERE (e.g. "dark red dramatic background", "moody office blur", "gritty urban night")
+4. TEXT STYLE (e.g. "bold white sans-serif", "yellow highlight box", "red accent on key word")
+
+${videoStyle === 'situational' ? 'Single person composition — person right side, text left side.' : ''}
+
+Write in plain English. No bullet points. No JSON. Just a short, crisp art direction paragraph (2-4 sentences max) that a thumbnail designer can immediately follow.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
+    return response.text?.trim() || '';
+  } catch (error: any) {
+    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
+      throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
+    }
+    console.error("Error in generateThumbnailInspiration:", error);
+    throw error;
+  }
+};
+
 export const generateNarratorPrompts = async (scriptText: string): Promise<string[]> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
