@@ -40,7 +40,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   );
   // Auto speaker count + duration for Joe Rogan Style
   const [speakerCount, setSpeakerCount] = useState<number>(initialContextContent ? 3 : 2);
-  const [duration, setDuration] = useState<number | 'auto'>('auto');
+  const [duration, setDuration] = useState<number>(8);
   const [contextFileContent, setContextFileContent] = useState<string | undefined>(initialContextContent);
   const [fileName, setFileName] = useState<string | undefined>(initialFileName);
   const [isReadingFile, setIsReadingFile] = useState(false);
@@ -53,19 +53,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
     'Hindi'
   ];
 
-  const durationOptions = [1, 2, 3, 5, 10, 15, 20, 25];
-
-  // Calculate auto duration from transcript word count
-  const calculateAutoDuration = (transcript: string): number => {
-    const words = transcript.trim().split(/\s+/).length;
-    const estimatedClaims = Math.max(3, Math.round(words / 180));
-    const estimatedMinutes = Math.ceil(estimatedClaims * 2.5);
-    return Math.max(5, Math.min(30, estimatedMinutes));
-  };
-
-  const autoDurationEstimate = ((style === 'podcast_panel' || style === 'context_bridge') && contextFileContent)
-    ? calculateAutoDuration(contextFileContent)
-    : null;
+  const durationOptions = [1, 2, 3, 5, 8, 10, 15, 20, 25];
 
   const handleSubmit = async () => {
     // Filter out empty names or use defaults if needed, but we want auto-detect if empty
@@ -83,12 +71,10 @@ const DebateInput: React.FC<DebateInputProps> = ({
       finalTopic = "YouTube Podcast Review";
     }
 
-    const resolvedDuration = duration === 'auto' ? 0 : duration;
-
     onGenerate({
       topic: finalTopic,
       specificDetails,
-      duration: resolvedDuration,
+      duration: duration,
       includeNarrator,
       customScript: mode === 'script' ? customScript : undefined,
       contextFileContent: finalContext,
@@ -398,19 +384,12 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
                     <Clock size={12} className="text-green-400" />
                     <span className="text-[10px] font-semibold uppercase tracking-wider">Duration</span>
-                    {duration === 'auto' && autoDurationEstimate && (
-                      <span className="text-[9px] text-green-400/80 font-medium ml-auto">~{autoDurationEstimate} min</span>
-                    )}
                   </div>
                   <select
                     value={duration}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setDuration(val === 'auto' ? 'auto' : Number(val));
-                    }}
+                    onChange={(e) => setDuration(Number(e.target.value))}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-green-500/50 outline-none appearance-none cursor-pointer"
                   >
-                    <option value="auto">Auto (AI decides)</option>
                     {durationOptions.map(d => (
                       <option key={d} value={d}>{d} Min</option>
                     ))}
@@ -451,11 +430,11 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     if (style === 'context_bridge') {
                       setStyle('podcast_panel');
                       setSpeakerCount(3);
-                      setDuration('auto');
+                      setDuration(8);
                     } else {
                       setStyle('context_bridge');
                       setSpeakerCount(1);
-                      setDuration('auto');
+                      setDuration(8);
                     }
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left ${
