@@ -9,15 +9,15 @@ import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
 import LyricsCanvas from './LyricsCanvas';
 
 type Phase = 'write' | 'song' | 'canvas';
-type Style = 'bollywood' | 'rap' | 'pop' | 'ghazal' | 'folk';
+type Style = 'funny' | 'sarcastic' | 'hiphop' | 'hollywood' | 'viral';
 type LangKey = 'Hindi' | 'English';
 
 const STYLES: { id: Style; label: string; emoji: string; desc: string }[] = [
-  { id: 'bollywood', label: 'Bollywood', emoji: '🎬', desc: 'Filmi mukhda + antara' },
-  { id: 'rap',       label: 'Rap / Hip-Hop', emoji: '🎤', desc: 'Bars, punchlines, desi slang' },
-  { id: 'pop',       label: 'Pop', emoji: '🎵', desc: 'Catchy chorus, emotional' },
-  { id: 'ghazal',    label: 'Ghazal', emoji: '🌹', desc: 'Radif, qafia, classical' },
-  { id: 'folk',      label: 'Folk / Lok Geet', emoji: '🪘', desc: 'Traditional baithak vibe' },
+  { id: 'funny',     label: 'Funny Meme Rap',   emoji: '🤣', desc: 'Internet humor, punchlines, meme energy' },
+  { id: 'sarcastic', label: 'Sarcastic Roast',  emoji: '😏', desc: 'Dark wit, shade, savage burns' },
+  { id: 'hiphop',    label: 'Hip-Hop / Street', emoji: '🎤', desc: 'Hard bars, swagger, storytelling' },
+  { id: 'hollywood', label: 'Classic Hollywood',emoji: '🎬', desc: 'Cinematic, dramatic, orchestral feel' },
+  { id: 'viral',     label: 'Pop / Viral',      emoji: '🌟', desc: 'TikTok-ready, catchy, radio-friendly' },
 ];
 
 const LYRIA_MODELS = [
@@ -57,7 +57,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const [contextText, setContextText] = useState('');
   const [directMode, setDirectMode] = useState(false);
   const [directLyrics, setDirectLyrics] = useState('');
-  const [style, setStyle] = useState<Style>('bollywood');
+  const [style, setStyle] = useState<Style>('funny');
   const [language, setLanguage] = useState<LangKey>('Hindi');
   const [model, setModel] = useState('gemini-3-flash-preview');
 

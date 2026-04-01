@@ -1,90 +1,50 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, Play, Pause, Download, RotateCcw, ChevronLeft, ChevronRight,
-  Palette, Loader2, Video, CheckCircle,
+  Palette, Loader2, CheckCircle, ImagePlus, X,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type CanvasStyle = 'dark' | 'neon' | 'glass' | 'cinema' | 'paper';
-type BgPreset = { id: string; label: string; value: string; isGradient: boolean };
+type BgMode = 'gradient' | 'image';
 
-interface StyleDef {
-  id: CanvasStyle;
+interface BgPreset {
+  id: string;
   label: string;
-  emoji: string;
-  bg: string;
-  cardBg: string;
-  cardBorder: string;
-  nameCls: string;
-  textCls: string;
-  shadowCls: string;
+  value: string;
 }
 
-const CANVAS_STYLES: StyleDef[] = [
-  {
-    id: 'dark', label: 'TikTok Dark', emoji: '🖤',
-    bg: '#0a0a0a', cardBg: 'rgba(30,30,30,0.95)', cardBorder: 'rgba(255,255,255,0.08)',
-    nameCls: 'text-purple-400', textCls: 'text-gray-100', shadowCls: 'shadow-black/60',
-  },
-  {
-    id: 'neon', label: 'Neon City', emoji: '💜',
-    bg: '#08001f', cardBg: 'rgba(20,5,50,0.92)', cardBorder: 'rgba(180,0,255,0.5)',
-    nameCls: 'text-pink-400', textCls: 'text-cyan-100', shadowCls: 'shadow-purple-900/80',
-  },
-  {
-    id: 'glass', label: 'Glass', emoji: '🔮',
-    bg: 'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)', cardBg: 'rgba(255,255,255,0.08)', cardBorder: 'rgba(255,255,255,0.18)',
-    nameCls: 'text-blue-300', textCls: 'text-white', shadowCls: 'shadow-blue-900/60',
-  },
-  {
-    id: 'cinema', label: 'Cinema', emoji: '🎬',
-    bg: '#000000', cardBg: 'rgba(0,0,0,0.85)', cardBorder: 'rgba(255,215,0,0.4)',
-    nameCls: 'text-yellow-400', textCls: 'text-yellow-50', shadowCls: 'shadow-yellow-900/40',
-  },
-  {
-    id: 'paper', label: 'Vintage Paper', emoji: '📜',
-    bg: '#f5f0e8', cardBg: 'rgba(255,252,245,0.97)', cardBorder: 'rgba(180,140,80,0.3)',
-    nameCls: 'text-amber-700', textCls: 'text-stone-800', shadowCls: 'shadow-amber-900/20',
-  },
-];
-
 const BG_PRESETS: BgPreset[] = [
-  { id: 'black',   label: 'Black',    value: '#000000',  isGradient: false },
-  { id: 'navy',    label: 'Night',    value: '#080818',  isGradient: false },
-  { id: 'purple',  label: 'Deep Violet', value: 'linear-gradient(160deg,#1a0030,#0a0020)', isGradient: true },
-  { id: 'sunset',  label: 'Sunset',   value: 'linear-gradient(160deg,#1a0038,#5c0030,#ff4000)', isGradient: true },
-  { id: 'ocean',   label: 'Ocean',    value: 'linear-gradient(160deg,#001a2c,#003b6e,#005f8a)', isGradient: true },
-  { id: 'forest',  label: 'Forest',   value: 'linear-gradient(160deg,#001a0a,#003010,#00501a)', isGradient: true },
-  { id: 'cosmic',  label: 'Cosmic',   value: 'linear-gradient(160deg,#0a0028,#200060,#4a0080)', isGradient: true },
-  { id: 'rose',    label: 'Rose',     value: 'linear-gradient(160deg,#1a000a,#400020,#800040)', isGradient: true },
-  { id: 'white',   label: 'White',    value: '#f8f5f0',  isGradient: false },
-  { id: 'sepia',   label: 'Sepia',    value: '#e8ddc8',  isGradient: false },
+  { id: 'black',   label: 'Black',      value: '#000000' },
+  { id: 'dark',    label: 'Dark Gray',  value: '#0a0a0a' },
+  { id: 'navy',    label: 'Night Blue', value: 'linear-gradient(180deg,#060d1a,#0a1628)' },
+  { id: 'purple',  label: 'Deep Violet','value': 'linear-gradient(180deg,#1a0030,#0a0020)' },
+  { id: 'sunset',  label: 'Sunset',     value: 'linear-gradient(180deg,#1a0038,#5c0030,#ff4000)' },
+  { id: 'cosmic',  label: 'Cosmic',     value: 'linear-gradient(180deg,#0a0028,#200060,#4a0080)' },
+  { id: 'forest',  label: 'Forest',     value: 'linear-gradient(180deg,#001a0a,#003010,#00501a)' },
+  { id: 'ocean',   label: 'Ocean',      value: 'linear-gradient(180deg,#001a2c,#003b6e)' },
 ];
 
-// avatar initials palette
 const AVATAR_COLORS = [
   '#8B5CF6','#EC4899','#F97316','#14B8A6','#3B82F6','#EF4444','#10B981','#F59E0B',
+  '#6366F1','#D946EF','#0EA5E9','#22C55E',
 ];
 
-// Random username list (for fun comment-style display)
 const USERNAMES = [
-  'Arjun_beats','Priya_vibes','RajeshRaps','SonaliStar','DesiDreamer','NightOwl_SK',
-  'BombayBoy99','PunjabDiPari','Rohan_EDM','Aisha_Poetry','MumbaiMafia','DelliWala',
-  'FakeNameXD','RealOne_7','AnonymousJi','LyricsLover','MusicManiac','SoundSeeker',
+  'v3lvetring_','tyler_gies_','doubledadid69','leafybean','not_a_bot_42','memequeen99',
+  'RealOne_7','AnonymousJi','LyricsLover','MusicManiac','SoundSeeker','DarkHumor101',
+  'sarcasm_king','funny_or_die','DesiVibes','UrbanPoet','NightOwl_SK','BombayBoy99',
 ];
+
+const TIME_LABELS = ['2w','4w','1 month','3 months','6 months','22w','34w','1 year'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function parseLyrics(text: string): { isSection: boolean; text: string; lineIdx: number }[] {
+function parseLyrics(text: string) {
   return text.split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 0)
     .map((l, i) => ({ isSection: l.startsWith('['), text: l, lineIdx: i }));
-}
-
-function getAvatar(username: string): string {
-  return username.charAt(0).toUpperCase();
 }
 
 function avatarColor(username: string): string {
@@ -93,71 +53,55 @@ function avatarColor(username: string): string {
   return AVATAR_COLORS[n % AVATAR_COLORS.length];
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── YouTube Comment Card ───────────────────────────────────────────────────────
 
-interface CommentBoxProps {
+interface CommentCardProps {
   line: string;
   username: string;
-  avatarCol: string;
-  styleDef: StyleDef;
+  timeAgo: string;
   active: boolean;
-  idx: number;
+  likes: number;
 }
 
-const CommentBox: React.FC<CommentBoxProps> = ({ line, username, avatarCol, styleDef, active, idx }) => {
-  const isNeon = styleDef.id === 'neon';
-  const isCinema = styleDef.id === 'cinema';
-  const isPaper = styleDef.id === 'paper';
-
+const CommentCard: React.FC<CommentCardProps> = ({ line, username, timeAgo, active, likes }) => {
+  const col = avatarColor(username);
   return (
     <div
       style={{
-        background: styleDef.cardBg,
-        border: `1px solid ${active ? (isNeon ? '#ff00ff' : styleDef.cardBorder) : styleDef.cardBorder}`,
-        boxShadow: active
-          ? `0 0 ${isNeon ? '20px 4px rgba(255,0,255,0.5)' : '12px 2px rgba(0,0,0,0.4)'}`
-          : undefined,
-        backdropFilter: styleDef.id === 'glass' ? 'blur(16px)' : undefined,
-        transition: 'all 0.3s ease',
-        opacity: active ? 1 : 0.45,
-        transform: active ? 'scale(1.01)' : 'scale(0.98)',
-        fontFamily: isPaper ? '"Georgia", serif' : undefined,
+        background: '#ffffff',
+        transition: 'all 0.35s ease',
+        opacity: active ? 1 : 0.35,
+        transform: active ? 'translateY(0) scale(1)' : 'translateY(6px) scale(0.97)',
       }}
-      className={`flex items-start gap-3 p-3 rounded-2xl ${styleDef.shadowCls} shadow-lg`}
+      className="rounded-2xl overflow-hidden shadow-2xl"
     >
-      {/* Avatar */}
-      {!isCinema && (
+      <div className="flex items-start gap-3 px-4 pt-4 pb-3">
+        {/* Avatar */}
         <div
-          style={{ background: avatarCol, width: 36, height: 36, minWidth: 36 }}
-          className="rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+          style={{ background: col, width: 40, height: 40, minWidth: 40 }}
+          className="rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-md"
         >
-          {getAvatar(username)}
+          {username.charAt(0).toUpperCase()}
         </div>
-      )}
-
-      <div className="flex-1 min-w-0">
-        {/* Username */}
-        {!isCinema && (
-          <div className={`text-[11px] font-bold mb-0.5 truncate ${styleDef.nameCls}`}>
-            @{username}
-            {active && <span className="ml-1.5 text-[9px] opacity-60">▶ now</span>}
+        <div className="flex-1 min-w-0">
+          {/* Username + time */}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[13px] font-semibold text-gray-900">@{username}</span>
+            <span className="text-[11px] text-gray-400">{timeAgo}</span>
           </div>
-        )}
-        {/* Lyric line */}
-        <div
-          className={`text-sm leading-snug font-medium ${styleDef.textCls} ${isCinema ? 'text-base font-bold tracking-wide text-center' : ''} ${isNeon && active ? 'drop-shadow-[0_0_8px_rgba(255,100,255,0.8)]' : ''}`}
-        >
-          {line}
+          {/* Comment text = lyric */}
+          <p className="text-[14px] text-gray-800 leading-snug font-normal">{line}</p>
+          {/* Footer */}
+          <div className="flex items-center gap-4 mt-2 text-[12px] text-gray-500">
+            <button className="flex items-center gap-1 hover:text-gray-800 transition-colors">
+              <span>👍</span> {likes}
+            </button>
+            <button className="flex items-center gap-1 hover:text-gray-800 transition-colors">
+              <span>👎</span>
+            </button>
+            <button className="font-medium hover:text-gray-800 transition-colors">Reply</button>
+          </div>
         </div>
-
-        {/* Engagement bar (visual detail) */}
-        {!isCinema && !isPaper && (
-          <div className="flex items-center gap-3 mt-1.5 text-[10px] opacity-40">
-            <span>❤️ {Math.floor(Math.random() * 900 + 100)}</span>
-            <span>💬 {Math.floor(Math.random() * 50 + 5)}</span>
-            <span>↩ Reply</span>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -176,29 +120,34 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
   const lines = parseLyrics(lyricsText);
   const lyricsLines = lines.filter(l => !l.isSection);
 
-  const [styleDef, setStyleDef] = useState<StyleDef>(CANVAS_STYLES[0]);
+  const [bgMode, setBgMode] = useState<BgMode>('gradient');
   const [bgPreset, setBgPreset] = useState<BgPreset>(BG_PRESETS[0]);
-  const [customBg, setCustomBg] = useState('');
+  const [bgImageUrl, setBgImageUrl] = useState<string>('');
+  const [customBgColor, setCustomBgColor] = useState('');
+  const [overlayText, setOverlayText] = useState('CHAT MUSIC');
   const [showStylePanel, setShowStylePanel] = useState(true);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(2500); // ms per line
+  const [speed, setSpeed] = useState(2500);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
+
   const [usernames] = useState(() =>
     lyricsLines.map((_, i) => USERNAMES[i % USERNAMES.length])
   );
-  const [avatarColors] = useState(() =>
-    lyricsLines.map((_, i) => AVATAR_COLORS[i % AVATAR_COLORS.length])
+  const [timings] = useState(() =>
+    lyricsLines.map((_, i) => TIME_LABELS[i % TIME_LABELS.length])
+  );
+  const [likes] = useState(() =>
+    lyricsLines.map(() => Math.floor(Math.random() * 9000 + 100))
   );
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportDone, setExportDone] = useState(false);
 
-  const effectiveBg = customBg || bgPreset.value;
-
-  // Auto-advance lines when playing
+  // Auto-advance
   useEffect(() => {
     if (isPlaying) {
       intervalRef.current = setInterval(() => {
@@ -235,15 +184,26 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
   };
 
-  // Simple video export using MediaRecorder on canvas element
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      setBgImageUrl(ev.target?.result as string);
+      setBgMode('image');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const effectiveBg = bgMode === 'image' && bgImageUrl
+    ? bgImageUrl
+    : (customBgColor || bgPreset.value);
+
+  // Video export
   const handleExport = useCallback(async () => {
-    const el = previewRef.current;
-    if (!el) return;
     setIsExporting(true);
     setExportDone(false);
-
     try {
-      // Use html2canvas-like approach via canvas capture stream
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       canvas.height = 1920;
@@ -253,60 +213,113 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
       const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
       const chunks: Blob[] = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
       recorder.start();
 
-      // Draw each lyric line as a "frame" for `speed` ms
-      const msPerFrame = speed;
       for (let i = 0; i < lyricsLines.length; i++) {
-        // Background
-        if (effectiveBg.includes('gradient')) {
-          const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
-          grd.addColorStop(0, '#0a0010');
-          grd.addColorStop(1, '#200040');
-          ctx.fillStyle = grd;
-        } else {
-          ctx.fillStyle = effectiveBg.startsWith('#') ? effectiveBg : '#000';
-        }
+        // Black background
+        ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Draw previous lines (faded)
-        const startFrom = Math.max(0, i - 3);
-        for (let j = startFrom; j < i; j++) {
-          const alpha = 0.15 + (j - startFrom) * 0.12;
-          drawLyricCard(ctx, lyricsLines[j].text, usernames[j], avatarColors[j], styleDef, false, j - startFrom, alpha);
+        // Top image area
+        if (bgMode === 'image' && bgImageUrl) {
+          try {
+            const img = new Image();
+            img.src = bgImageUrl;
+            await new Promise(r => { img.onload = r; });
+            const imgH = canvas.height * 0.58;
+            ctx.drawImage(img, 0, 0, canvas.width, imgH);
+          } catch { /* ignore */ }
+        } else {
+          const grd = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.6);
+          grd.addColorStop(0, '#1a0030');
+          grd.addColorStop(1, '#0a0020');
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, canvas.width, canvas.height * 0.58);
         }
-        // Draw current line (highlighted)
-        drawLyricCard(ctx, lyricsLines[i].text, usernames[i], avatarColors[i], styleDef, true, i - startFrom, 1);
 
-        await new Promise(resolve => setTimeout(resolve, msPerFrame));
+        // Overlay text
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, canvas.height * 0.48, canvas.width, canvas.height * 0.1);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 80px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(overlayText, canvas.width / 2, canvas.height * 0.53);
+
+        // Comment card
+        const cardX = 60, cardY = canvas.height * 0.62, cardW = canvas.width - 120, cardH = 280;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, 24);
+        ctx.fill();
+
+        // Avatar
+        ctx.fillStyle = avatarColor(usernames[i]);
+        ctx.beginPath();
+        ctx.arc(cardX + 56, cardY + 60, 30, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(usernames[i].charAt(0).toUpperCase(), cardX + 56, cardY + 60);
+
+        // Username
+        ctx.fillStyle = '#111827';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText('@' + usernames[i], cardX + 102, cardY + 50);
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '22px sans-serif';
+        ctx.fillText(timings[i], cardX + 102, cardY + 82);
+
+        // Lyric text
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '28px sans-serif';
+        const maxW = cardW - 110;
+        const words = lyricsLines[i].text.split(' ');
+        let line = ''; let lineY = cardY + 130;
+        for (const word of words) {
+          const test = line ? line + ' ' + word : word;
+          if (ctx.measureText(test).width > maxW && line) {
+            ctx.fillText(line, cardX + 100, lineY);
+            line = word; lineY += 36;
+          } else { line = test; }
+        }
+        if (line) ctx.fillText(line, cardX + 100, lineY);
+
+        // Reply
+        ctx.fillStyle = '#6b7280';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.fillText('Reply', cardX + 100, cardY + 240);
+
+        await new Promise(resolve => setTimeout(resolve, speed));
       }
 
       recorder.stop();
       await new Promise(resolve => { recorder.onstop = resolve; });
-
       const blob = new Blob(chunks, { type: 'video/webm' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `lyrics_video_${Date.now()}.webm`;
-      a.click();
+      a.href = url; a.download = `lyrics_video_${Date.now()}.webm`; a.click();
       URL.revokeObjectURL(url);
       setExportDone(true);
     } catch (err: any) {
-      console.error('Export failed:', err);
       alert('Export failed: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsExporting(false);
-    }
-  }, [lyricsLines, usernames, avatarColors, styleDef, effectiveBg, speed]);
+    } finally { setIsExporting(false); }
+  }, [lyricsLines, usernames, timings, bgMode, bgImageUrl, overlayText, speed]);
+
+  const activeLine = lyricsLines[currentIdx];
 
   return (
     <div className="min-h-screen bg-[#050505] flex flex-col">
       {/* Top bar */}
       <div className="flex items-center justify-between px-3 sm:px-4 py-3 bg-[#0a0a0a] border-b border-white/5 gap-2">
         <button onClick={onBack} className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs sm:text-sm transition-colors shrink-0">
-          <ArrowLeft size={15} /> <span className="hidden sm:inline">Back to Studio</span><span className="sm:hidden">Back</span>
+          <ArrowLeft size={15} />
+          <span className="hidden sm:inline">Back to Studio</span>
+          <span className="sm:hidden">Back</span>
         </button>
         <span className="text-[10px] text-gray-600 font-semibold uppercase tracking-widest hidden md:block">Lyrics Canvas</span>
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -314,7 +327,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
             onClick={() => setShowStylePanel(p => !p)}
             className={`flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all ${showStylePanel ? 'border-purple-500/40 text-purple-400 bg-purple-500/10' : 'border-white/10 text-gray-500'}`}
           >
-            <Palette size={12} /> <span className="hidden xs:inline">Styles</span>
+            <Palette size={12} /> <span className="hidden sm:inline">Styles</span>
           </button>
           <button
             onClick={handleExport}
@@ -331,54 +344,76 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
       <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
         {/* ── Style Panel ── */}
         {showStylePanel && (
-          <aside className="w-full lg:w-64 bg-[#0a0a0a] border-b lg:border-b-0 lg:border-r border-white/5 overflow-y-auto p-4 space-y-5 shrink-0 max-h-[40vh] lg:max-h-none">
-            {/* Canvas Style */}
+          <aside className="w-full lg:w-64 bg-[#0a0a0a] border-b lg:border-b-0 lg:border-r border-white/5 overflow-y-auto p-4 space-y-5 shrink-0 max-h-[45vh] lg:max-h-none">
+            {/* Image Upload */}
             <div className="space-y-2">
-              <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Style</div>
-              <div className="grid grid-cols-2 lg:grid-cols-1 gap-1.5">
-                {CANVAS_STYLES.map(s => (
+              <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Background Image</div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              {bgImageUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-white/10">
+                  <img src={bgImageUrl} alt="bg" className="w-full h-24 object-cover" />
                   <button
-                    key={s.id}
-                    onClick={() => setStyleDef(s)}
-                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${styleDef.id === s.id ? 'border-purple-500/50 bg-purple-500/10 text-white' : 'border-white/5 text-gray-500 hover:text-gray-300 hover:border-white/10'}`}
+                    onClick={() => { setBgImageUrl(''); setBgMode('gradient'); }}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-black/90"
                   >
-                    <span className="text-base">{s.emoji}</span>
-                    <span className="text-xs font-medium">{s.label}</span>
+                    <X size={12} />
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 h-16 border-2 border-dashed border-white/10 rounded-xl text-gray-600 hover:text-gray-400 hover:border-white/20 transition-all text-xs"
+                >
+                  <ImagePlus size={16} /> Upload Image / Meme
+                </button>
+              )}
             </div>
 
-            {/* Background */}
+            {/* Color presets (when no image) */}
             <div className="space-y-2">
-              <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Background</div>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Background Color</div>
+              <div className="grid grid-cols-4 lg:grid-cols-2 gap-1.5">
                 {BG_PRESETS.map(bg => (
                   <button
                     key={bg.id}
-                    onClick={() => { setBgPreset(bg); setCustomBg(''); }}
+                    onClick={() => { setBgPreset(bg); setBgMode('gradient'); setCustomBgColor(''); setBgImageUrl(''); }}
                     style={{ background: bg.value }}
-                    className={`h-10 rounded-lg border-2 text-[10px] font-semibold transition-all ${bgPreset.id === bg.id && !customBg ? 'border-white scale-105' : 'border-transparent hover:border-white/30'} text-white/60`}
                     title={bg.label}
+                    className={`h-9 rounded-lg border-2 text-[9px] font-semibold transition-all ${bgPreset.id === bg.id && bgMode === 'gradient' && !customBgColor ? 'border-white scale-105' : 'border-transparent hover:border-white/30'} text-white/70 drop-shadow-sm`}
                   >
                     <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{bg.label}</span>
                   </button>
                 ))}
               </div>
-
-              {/* Custom color picker */}
               <div className="space-y-1">
-                <div className="text-[10px] text-gray-700">Custom color:</div>
+                <div className="text-[10px] text-gray-700">Custom:</div>
                 <input
                   type="color"
-                  value={customBg || '#000000'}
-                  onChange={e => setCustomBg(e.target.value)}
+                  value={customBgColor || '#000000'}
+                  onChange={e => { setCustomBgColor(e.target.value); setBgMode('gradient'); setBgImageUrl(''); }}
                   className="w-full h-8 rounded-lg cursor-pointer border border-white/10 bg-transparent"
                 />
               </div>
             </div>
 
-            {/* Playback speed */}
+            {/* Overlay Text */}
+            <div className="space-y-2">
+              <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Overlay Title</div>
+              <input
+                value={overlayText}
+                onChange={e => setOverlayText(e.target.value)}
+                placeholder="CHAT MUSIC"
+                className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-purple-500/40"
+              />
+            </div>
+
+            {/* Speed */}
             <div className="space-y-2">
               <div className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Line Speed</div>
               {[
@@ -399,101 +434,117 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
         )}
 
         {/* ── Canvas Preview ── */}
-        <main className="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto">
-          {/* Phone frame preview */}
+        <main className="flex-1 flex flex-col items-center justify-start p-4 overflow-y-auto gap-4">
+          {/* Phone-style frame */}
           <div
             ref={previewRef}
+            className="w-full flex flex-col overflow-hidden shadow-2xl"
             style={{
-              background: effectiveBg,
-              width: '100%',
-              maxWidth: 360,
-              minHeight: 640,
-              borderRadius: 24,
-              padding: '24px 16px',
-              boxShadow: '0 0 60px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.05)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              position: 'relative',
+              maxWidth: 390,
+              borderRadius: 28,
+              background: '#000',
+              boxShadow: '0 0 80px rgba(0,0,0,0.9), inset 0 0 0 1px rgba(255,255,255,0.06)',
+              minHeight: 560,
             }}
           >
-            {/* Song info header */}
-            <div className="flex items-center gap-2 mb-1 opacity-60">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shrink-0">
-                <span className="text-[10px] text-white">♪</span>
-              </div>
-              <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">
-                {songStyle || 'Song'} · Lyrics
-              </div>
+            {/* ── Top image area ── */}
+            <div
+              className="relative flex-shrink-0"
+              style={{
+                height: 300,
+                background: bgMode === 'image' && bgImageUrl
+                  ? `url(${bgImageUrl}) center/cover no-repeat`
+                  : effectiveBg,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              {/* Dark gradient at bottom of image for text readability */}
+              <div
+                className="absolute bottom-0 left-0 right-0"
+                style={{ height: 100, background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)' }}
+              />
+              {/* "CHAT MUSIC" overlay text */}
+              {overlayText && (
+                <div
+                  className="absolute bottom-4 left-0 right-0 text-center select-none"
+                  style={{
+                    fontFamily: '"Arial Black", "Impact", sans-serif',
+                    fontSize: 28,
+                    fontWeight: 900,
+                    color: '#ffffff',
+                    textShadow: '2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000, 0 3px 8px rgba(0,0,0,0.8)',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {overlayText}
+                </div>
+              )}
             </div>
 
-            {/* Lyric lines */}
-            <div className="flex-1 flex flex-col gap-2">
-              {lyricsLines.slice(
-                Math.max(0, currentIdx - 2),
-                currentIdx + 4,
-              ).map((line, i) => {
-                const absIdx = Math.max(0, currentIdx - 2) + i;
-                const isActive = absIdx === currentIdx;
-                return (
-                  <CommentBox
-                    key={absIdx}
-                    line={line.text}
-                    username={usernames[absIdx] || 'user'}
-                    avatarCol={avatarColors[absIdx] || '#8B5CF6'}
-                    styleDef={styleDef}
-                    active={isActive}
-                    idx={i}
-                  />
-                );
-              })}
-            </div>
+            {/* ── Comment area ── */}
+            <div
+              className="flex-1 px-4 py-5 space-y-3"
+              style={{ background: '#f8f9fa', minHeight: 180 }}
+            >
+              {/* Active comment (current lyric) */}
+              {activeLine && (
+                <CommentCard
+                  line={activeLine.text}
+                  username={usernames[currentIdx] || 'user'}
+                  timeAgo={timings[currentIdx] || '1 month'}
+                  active={true}
+                  likes={likes[currentIdx] || 123}
+                />
+              )}
 
-            {/* Section label overlay */}
-            {lines[currentIdx + Math.max(0, currentIdx - 2)]?.isSection && (
-              <div className="text-center text-[11px] text-purple-400 font-semibold uppercase tracking-widest opacity-70 py-1">
-                {lines[currentIdx].text}
-              </div>
-            )}
+              {/* Next comment preview (faded) */}
+              {lyricsLines[currentIdx + 1] && (
+                <CommentCard
+                  line={lyricsLines[currentIdx + 1].text}
+                  username={usernames[currentIdx + 1] || 'user'}
+                  timeAgo={timings[currentIdx + 1] || '2 months'}
+                  active={false}
+                  likes={likes[currentIdx + 1] || 50}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Playback controls */}
-          <div className="flex items-center gap-3 mt-4">
+          {/* ── Playback controls ── */}
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setCurrentIdx(p => Math.max(0, p - 1))}
               className="w-9 h-9 rounded-full border border-white/10 text-gray-500 hover:text-white hover:border-white/20 flex items-center justify-center transition-all"
             >
               <ChevronLeft size={16} />
             </button>
-
             <button
               onClick={reset}
               className="w-9 h-9 rounded-full border border-white/10 text-gray-500 hover:text-white hover:border-white/20 flex items-center justify-center transition-all"
             >
               <RotateCcw size={14} />
             </button>
-
             <button
               onClick={togglePlay}
               className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white shadow-lg shadow-purple-900/40 active:scale-95 transition-all"
             >
               {isPlaying ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
             </button>
-
             <button
               onClick={() => setCurrentIdx(p => Math.min(lyricsLines.length - 1, p + 1))}
               className="w-9 h-9 rounded-full border border-white/10 text-gray-500 hover:text-white hover:border-white/20 flex items-center justify-center transition-all"
             >
               <ChevronRight size={16} />
             </button>
-
             <div className="text-xs text-gray-600 ml-1">
               {currentIdx + 1} / {lyricsLines.length}
             </div>
           </div>
 
           {/* Progress bar */}
-          <div className="w-full max-w-[360px] mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <div className="w-full max-w-[390px] h-1.5 bg-white/5 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-purple-600 to-pink-600 rounded-full transition-all duration-300"
               style={{ width: `${((currentIdx + 1) / lyricsLines.length) * 100}%` }}
@@ -506,7 +557,7 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
           )}
 
           {/* All lyrics list */}
-          <div className="w-full max-w-[360px] mt-4 space-y-1">
+          <div className="w-full max-w-[390px] space-y-1">
             <div className="text-[10px] text-gray-700 uppercase tracking-widest font-semibold mb-2">All Lines</div>
             {lyricsLines.map((line, i) => (
               <button
@@ -523,75 +574,5 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     </div>
   );
 };
-
-// ── Canvas 2D draw helper (for video export) ──────────────────────────────────
-
-function drawLyricCard(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  username: string,
-  avatarCol: string,
-  styleDef: StyleDef,
-  active: boolean,
-  position: number,
-  alpha: number,
-) {
-  const cw = ctx.canvas.width;
-  const cardW = cw - 80;
-  const cardH = 120;
-  const x = 40;
-  const baseY = ctx.canvas.height / 2 - cardH / 2;
-  const y = baseY + position * (cardH + 16) - (active ? 0 : 0);
-
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = active ? 'rgba(80,30,120,0.9)' : 'rgba(30,30,50,0.8)';
-  ctx.beginPath();
-  ctx.roundRect(x, y, cardW, cardH, 20);
-  ctx.fill();
-
-  if (active) {
-    ctx.strokeStyle = 'rgba(180,80,255,0.8)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  // Avatar
-  ctx.fillStyle = avatarCol;
-  ctx.beginPath();
-  ctx.arc(x + 36, y + cardH / 2, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(getAvatar(username), x + 36, y + cardH / 2);
-
-  // Username
-  ctx.fillStyle = active ? '#d8b4fe' : '#9ca3af';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText('@' + username, x + 70, y + 34);
-
-  // Lyric text
-  ctx.fillStyle = active ? '#f3e8ff' : '#d1d5db';
-  ctx.font = `${active ? 'bold' : 'normal'} 20px sans-serif`;
-  ctx.textBaseline = 'alphabetic';
-  const maxW = cardW - 90;
-  const words = text.split(' ');
-  let line = '';
-  let lineY = y + 64;
-  for (const word of words) {
-    const test = line ? line + ' ' + word : word;
-    if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line, x + 70, lineY);
-      line = word;
-      lineY += 24;
-    } else { line = test; }
-  }
-  if (line) ctx.fillText(line, x + 70, lineY);
-
-  ctx.globalAlpha = 1;
-}
 
 export default LyricsCanvas;

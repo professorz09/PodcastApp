@@ -2061,11 +2061,11 @@ The first chunk's start_seconds must be 0. The last chunk's end_seconds must be 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const STYLE_PROMPTS: Record<string, string> = {
-  rap: 'Hindi/Urdu rap with hard-hitting bars, wordplay, double meanings (double entendres), internal rhymes, and powerful punchlines. Use desi slang naturally.',
-  pop: 'catchy pop song with a memorable chorus (mukhda) and emotional verses (antara). Melodic flow, relatable emotions.',
-  ghazal: 'classical Urdu ghazal with radif, qafia, and maqta (poet signature in last sher). Romantic, philosophical, profound metaphors.',
-  folk: 'traditional Hindi/Punjabi folk song with earthy imagery, simple vocabulary, storytelling, and cultural references. Baithak feel.',
-  bollywood: 'Bollywood film song with mukhda, antara, and sanchari. Mix of Hindi/Urdu, romantic or item-song energy. Filmi feel.',
+  funny: 'Funny meme rap song — internet humor, absurdist punchlines, relatable observations, unexpected wordplay. Think viral Twitter/Reddit humor turned into bars. Make people laugh out loud.',
+  sarcastic: 'Sarcastic roast song — dripping with sarcasm, dark wit, shade, and savage observations. Deadpan delivery. Every line should feel like a mic drop moment or a cutting remark.',
+  hiphop: 'Hip-hop street banger — hard-hitting bars, confident swagger, vivid storytelling, internal rhyme schemes. Real talk, no fluff. Think modern US hip-hop energy with cultural references.',
+  hollywood: 'Classic cinematic Hollywood song — dramatic, orchestral feel in the lyrics. Grand metaphors, emotional depth, sweeping imagery. Like a movie trailer anthem or a Disney villain song.',
+  viral: 'Viral pop bop — super catchy, radio-friendly, TikTok-worthy hook. Short punchy lines, repetitive chorus that sticks in your head, upbeat energy. Written to go viral on social media.',
 };
 
 export const generateLyrics = async (params: {
@@ -2140,11 +2140,11 @@ export const generateSongAudio = async (
 
   // Build a Lyria-optimized music generation prompt
   const styleMap: Record<string, string> = {
-    bollywood: 'Bollywood film song with orchestral strings, tabla, and soulful vocals',
-    rap: 'Desi hip-hop rap beat with heavy bass, 808 drums, and expressive rap vocals',
-    pop: 'Upbeat pop song with catchy chorus, acoustic guitar, and clear modern vocals',
-    ghazal: 'Classical ghazal with harmonium, tabla, and melodic Urdu-Hindi vocals',
-    folk: 'Indian folk/lok geet with dhol, flute, and warm acoustic instruments',
+    funny:     'Comedic rap beat with bouncy bass, playful synths, and upbeat humorous energy',
+    sarcastic: 'Dark satirical rap with minor key piano, punchy 808s, and dry deadpan delivery',
+    hiphop:    'Modern US hip-hop banger with heavy 808 bass, trap hi-hats, and confident rap vocals',
+    hollywood: 'Epic cinematic orchestral piece with sweeping strings, brass fanfare, and dramatic choir',
+    viral:     'Upbeat viral pop song with catchy synth hook, claps, and energetic modern production',
   };
   const musicDesc = styleMap[style] || `${style} style Indian music`;
 
