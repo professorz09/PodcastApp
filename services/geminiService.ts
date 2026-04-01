@@ -428,58 +428,75 @@ export const generateDebateScript = async (
             }
         } else if (style === 'situational') {
             prompt = `
-              विषय: "${topic}" पर एक "Situational" शैली की वीडियो स्क्रिप्ट तैयार करें।
-              ${specificDetails ? `विशिष्ट परिस्थिति/विवरण: ${specificDetails}` : ''}
+              विषय: "${topic}" पर एक "Situational" style की video script बनाओ।
+              ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
               ${durLineHi}
-              भाषा: हिंदी (Hinglish ठीक है)।
+              भाषा: हिंदी + Hinglish (जैसे real लोग America में बात करते हैं)।
+              Target Audience: USA में रहने वाला desi middle-class — $60k-$100k income, rent/mortgage, credit card debt, H1B visa tension, kids की tuition, medical bills — इन्हीं की ज़िंदगी है।
 
-              पात्र — ठीक 3 वक्ता (fixed, no changes):
+              पात्र — ठीक 3 वक्ता (fixed):
               ${speakers.length >= 3
-                ? `इन नामों का उपयोग करें: ${speakers[0]} (परिस्थिति में फंसा व्यक्ति), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
-                : `विषय के अनुरूप नाम ऑटो-डिटेक्ट करें — Speaker 1 वह व्यक्ति जो situation में फंसा है, Speaker 2 और 3 दो अलग-अलग expert advisors (जैसे financial advisor + psychologist, lawyer + life coach, doctor + counselor — topic के अनुसार चुनें)।`
+                ? `इन नामों का उपयोग करें: ${speakers[0]} (situation में फंसा इंसान), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
+                : `Topic के हिसाब से नाम चुनो — Speaker 1 वो इंसान जो situation में फंसा है, Speaker 2 और 3 दो अलग-अलग domain experts (जैसे financial advisor + immigration attorney, therapist + career coach, CPA + life coach — topic के अनुसार)।`
               }
 
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              भूमिकाएं:
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ══════════════════════════════════════════
+              【 SPEAKER 1 — STORY TELLER (situation में फंसा इंसान) 】
+              ══════════════════════════════════════════
+              ★ यह इंसान एक STORY सुनाता है — dry facts नहीं।
+              ★ SPECIFIC details दो: exact amount ($23,000 credit card debt), specific date ("March में जब layoff हुई"), real emotion ("रात को 2 बजे wife रो रही थी")
+              ★ CINEMATIC opening: सीधे moment से शुरू करो — "तीन हफ्ते पहले मुझे एक email आई जिसने सब कुछ बदल दिया..."
+              ★ कहानी में arc होनी चाहिए: पहले सब ठीक था → फिर क्या हुआ → अभी कहाँ हूँ → क्या confusion है
+              ★ Middle-class USA context: rent, credit score, 401k, H1B, student loan, car payment, medical bill — जो भी relevant हो
+              ★ अपनी गलती भी honestly बताओ — audience को relate होगा
+              ★ एक specific सवाल पूछो जो उसे सबसे ज़्यादा परेशान कर रहा है
 
-              【 Speaker 1 — परिस्थिति में फंसा व्यक्ति 】
-              - अपनी पूरी situation detail में बताएगा — कैसे फंसा, क्या हुआ, अभी कैसा feel हो रहा है
-              - Situation किसी भी तरह की हो सकती है: debt trap, financial crisis, moral dilemma, relationship problem, family pressure, job loss, legal problem, emotional pain, religious conflict, life-changing decision, etc.
-              - Language: Real, raw, emotional — जैसे कोई सच में बात कर रहा हो
-              - Judgmental नहीं, genuinely confused और stressed
+              ══════════════════════════════════════════
+              【 SPEAKER 2 — EXPERT 1 (पहला angle) 】
+              ══════════════════════════════════════════
+              ★ पहले situation को FEEL करो — "यार, यह सुनकर सच में दिल भारी हो गया" — फिर शुरू करो
+              ★ हर point 3 levels deep जाओ:
+                  Level 1: क्या है problem
+                  Level 2: क्यों होता है यह (real mechanism)
+                  Level 3: तुम specifically क्या करो — step by step
+              ★ कोई भी JARGON use करो तो IMMEDIATELY उसी वाक्य में simple language में explain करो।
+                  WRONG: "You should file for Chapter 7 bankruptcy."
+                  RIGHT: "Chapter 7 bankruptcy — matlab ek legal process जिसमें court तुम्हारे कुछ debts को completely wipe कर देती है, जैसे उन्होंने कभी exist ही नहीं किया — but इसका credit score पर 7-10 साल असर रहता है।"
+              ★ हर advice के साथ एक REAL example: "मेरे एक client थे, Rajesh, Fremont में रहते थे, $45k का medical debt था..."
+              ★ Pros AND cons दोनों बताओ — false hope मत दो
+              ★ USA specific: credit score impact, IRS rules, state laws, H1B implications जो relevant हों
 
-              【 Speaker 2 — पहला Expert 】
-              - पहले situation को पूरी तरह समझता है, ज़रूरत हो तो clarifying questions पूछता है
-              - एक angle से deep practical advice देता है
-              - Middle class Indian audience को relatable examples use करता है (real case studies, changed names)
-              - Emotional support भी देता है — judgmental नहीं
-              - दोनों sides देखता है — pros और cons
+              ══════════════════════════════════════════
+              【 SPEAKER 3 — EXPERT 2 (दूसरा angle) 】
+              ══════════════════════════════════════════
+              ★ Speaker 2 की बात repeat नहीं करना — नया angle लाओ
+              ★ Speaker 2 से politely disagree या उनकी बात को further challenge करो जहाँ ज़रूरी हो
+              ★ वो angle दो जो लोग usually miss करते हैं — emotional cost, hidden fees, long-term consequences
+              ★ एक specific analogy दो जो USA middle class को instantly समझ आए:
+                  जैसे: "यह situation उस moment जैसी है जब तुम्हारी car का check engine light आता है — ignore करोगे तो $300 का repair $3000 का हो जाएगा"
+              ★ कोई भी technical term IMMEDIATELY explain करो — कभी bare term मत छोड़ो
 
-              【 Speaker 3 — दूसरा Expert 】
-              - दूसरे angle से situation को देखता है (Speaker 2 की बातें repeat नहीं करता)
-              - नई insights, practical steps, या important considerations add करता है
-              - Real examples, analogies, या case studies (middle class Indian context) use करता है
-              - दोनों मिलकर full picture बनाते हैं
+              ══════════════════════════════════════════
+              FLOW — यह arc follow करो:
+              ══════════════════════════════════════════
+              ACT 1 — Setup (Speaker 1 की story): Cinematic opening → situation की पूरी journey → specific confusion/question
+              ACT 2 — Discovery (Experts react): First, genuinely react to the story → clarify → फिर तुरंत action में आओ
+              ACT 3 — Deep Dive (back-and-forth): Experts आपस में भी बात करें, एक-दूसरे को challenge करें, Speaker 1 बीच में questions पूछे
+              ACT 4 — Resolution: दोनों experts मिलकर 3-4 SPECIFIC, numbered, actionable steps दें — vague नहीं
+              CLOSING: Speaker 1 का एक honest reaction — hope है या doubt — real ending, not a bow
 
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              प्रवाह (Flow):
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              1. Speaker 1 अपनी पूरी situation detail में बताता है (emotional, real, raw — 3-4 exchanges)
-              2. Experts पहले situation और clearly समझते हैं (2-3 clarifying exchanges)
-              3. दोनों experts मिलकर deep advice देते हैं — practical, emotional, legal/moral जो भी relevant हो
-              4. हर बड़े point के साथ real-life example (middle class Indian context)
-              5. Natural back-and-forth — Experts आपस में भी बात करें, agree/disagree करें
-              6. अंत में: दोनों experts Speaker 1 को clear, actionable steps दें
-
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              CRITICAL RULES:
-              - कोई judgment नहीं, कोई lecture नहीं
-              - Natural conversation — जैसे असली लोग बात करते हैं
-              - Deep और relatable — surface level नहीं
-              - Middle class Indian experience से examples
-              - AI clichés ban: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में", "आइए विचार करें"
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ══════════════════════════════════════════
+              HARD RULES — इन्हें तोड़ा तो script fail:
+              ══════════════════════════════════════════
+              ✗ कोई भी jargon बिना explanation के — NEVER
+              ✗ "consult a professional" — यह coward advice है, यहाँ professional पहले से बैठे हैं, actual advice दो
+              ✗ "यह ध्यान देने योग्य है", "निष्कर्ष में", "यह सुनिश्चित करें" — banned
+              ✗ Surface level: "budget बनाओ", "savings करो" — yeh sab already pata hai, deeper जाओ
+              ✗ Lecture mode — conversation होनी चाहिए, TED talk नहीं
+              ✓ हर major point के साथ एक real, named, specific example
+              ✓ USA middle-class reality: dollars में amounts, credit score numbers, actual US laws/processes
+              ✓ Emotional truth — audience को लगे "यार यह तो मेरी ही story है"
+              ══════════════════════════════════════════
               ${durFillHi}
             `;
         } else if (style === 'podcast_panel') {
@@ -956,57 +973,74 @@ export const generateDebateScript = async (
         } else if (style === 'situational') {
           prompt = `
             Generate a "Situational" style video script on the topic: "${topic}".
-            ${specificDetails ? `Specific situation/details: ${specificDetails}` : ''}
+            ${specificDetails ? `Situation details: ${specificDetails}` : ''}
             ${durLineEn}
             Language: ${language}.
+            Target Audience: USA desi middle-class — $60k–$100k household income, dealing with rent/mortgage, credit card debt, H1B visa stress, kids' tuition, medical bills, 401k anxiety. Every example MUST feel like their real life.
 
             Characters — exactly 3 speakers (fixed):
             ${speakers.length >= 3
-              ? `Use these names: ${speakers[0]} (the person with the situation), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
-              : `Auto-detect names for the topic — Speaker 1 is the person stuck in the situation, Speakers 2 and 3 are two different expert advisors (e.g. financial advisor + psychologist, lawyer + life coach, doctor + counselor — choose based on the topic).`
+              ? `Use these names: ${speakers[0]} (the person in the situation), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
+              : `Pick names appropriate for the topic — Speaker 1 is the person stuck in the situation, Speakers 2 & 3 are two different domain experts (e.g. financial advisor + immigration attorney, therapist + career coach, CPA + life coach — pick based on topic).`
             }
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            Roles:
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ══════════════════════════════════════════
+            【 SPEAKER 1 — STORYTELLER (the person in the situation) 】
+            ══════════════════════════════════════════
+            ★ Tell a STORY — not a list of facts. Make it cinematic.
+            ★ Open with a specific moment: "Three weeks ago I got an email that changed everything..."
+            ★ Use SPECIFIC details: exact dollar amounts ($23,000 credit card debt), real dates ("when I got laid off in March"), sensory emotion ("my wife was crying at 2am and I didn't know what to say")
+            ★ Story arc: life was fine → then THIS happened → now I'm here → here's what I can't figure out
+            ★ USA middle-class context: credit score drops, rent hikes, car payments, medical surprise bills, H1B timelines, student loans — whatever fits
+            ★ Be honest about your own mistakes — audiences respect vulnerability
+            ★ End with ONE specific burning question — the thing that's keeping you up at night
 
-            【 Speaker 1 — The Person in the Situation 】
-            - Shares their full situation in detail — how they got stuck, what happened, how they feel right now
-            - The situation can be anything: debt trap, financial crisis, moral dilemma, relationship problem, family pressure, job loss, legal trouble, emotional pain, religious conflict, major life decision, etc.
-            - Language: real, raw, emotional — like someone genuinely speaking
-            - Not self-righteous — genuinely confused, stressed, or at a crossroads
+            ══════════════════════════════════════════
+            【 SPEAKER 2 — EXPERT 1 (first angle) 】
+            ══════════════════════════════════════════
+            ★ First, FEEL the story before analyzing it — "Man, hearing that… that's a lot to carry. Okay, let's actually dig into this."
+            ★ Go 3 levels deep on every point:
+                Level 1 — What is the actual problem
+                Level 2 — Why it happens (the real mechanism most people don't know)
+                Level 3 — Specifically what THIS person should do — step by step
+            ★ EVERY technical term must be explained IMMEDIATELY in plain language with an analogy:
+                WRONG: "You should look into Chapter 7 bankruptcy."
+                RIGHT: "Chapter 7 bankruptcy — think of it like hitting a financial reset button. The court legally erases certain debts as if they never existed. But here's the catch: it stays on your credit report for 10 years, which can affect everything from getting an apartment to refinancing your home."
+            ★ Every piece of advice needs a REAL named example: "I had a client — Priya, from Fremont — she was $38k in credit card debt and thought her only option was..."
+            ★ Spell out both the upside AND the downside — no false hope
+            ★ USA-specific details where relevant: credit score numbers, IRS timelines, state-specific laws, H1B implications
 
-            【 Speaker 2 — First Expert 】
-            - First fully understands the situation, asks clarifying questions if needed
-            - Then gives deep practical advice from one angle
-            - Uses relatable everyday examples (middle-class / general audience context — changed names, real case studies)
-            - Provides emotional support too — non-judgmental
-            - Sees both sides — pros and cons
+            ══════════════════════════════════════════
+            【 SPEAKER 3 — EXPERT 2 (second angle) 】
+            ══════════════════════════════════════════
+            ★ Bring a completely different angle — do NOT echo Expert 1
+            ★ Respectfully push back or add nuance where Expert 1 might have oversimplified
+            ★ Surface the angle people always miss — emotional tax, hidden costs, downstream consequences
+            ★ Use one powerful analogy that USA middle class instantly gets:
+                e.g. "This is like ignoring your check engine light — what's a $300 fix today becomes a $3,000 engine replacement in 6 months"
+            ★ Any technical term you use — explain it immediately, same sentence or the next one. No bare jargon ever.
 
-            【 Speaker 3 — Second Expert 】
-            - Views the situation from a different angle (does NOT repeat Speaker 2)
-            - Adds new insights, practical steps, or important considerations
-            - Uses real examples, analogies, or case studies (everyday context)
-            - Together, both experts build the complete picture
+            ══════════════════════════════════════════
+            STORY ARC — follow this structure:
+            ══════════════════════════════════════════
+            ACT 1 — Setup: Speaker 1's cinematic story, specific details, emotional honesty, the one burning question
+            ACT 2 — First Reaction: Experts genuinely react to the story (not just pivot to advice) → clarify a few things → then start going deep
+            ACT 3 — Deep Dive: Real back-and-forth between experts, challenge each other, Speaker 1 asks follow-up questions in the middle
+            ACT 4 — Action Plan: Both experts together give 3–5 SPECIFIC numbered steps — not vague ("consult someone") but actual instructions ("First, pull your free credit report from annualcreditreport.com — you get one per bureau per year...")
+            CLOSE: Speaker 1 gives an honest reaction — are they hopeful? still scared? both? Real ending, not a bow.
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            Flow:
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            1. Speaker 1 shares full situation in detail (emotional, real, raw — 3-4 exchanges)
-            2. Experts first understand the situation better (2-3 clarifying exchanges)
-            3. Both experts give deep advice — practical, emotional, legal/moral as relevant
-            4. Every major point backed by a real-life relatable example (everyday context)
-            5. Natural back-and-forth — experts also talk to each other, agree or respectfully differ
-            6. Closing: both experts give Speaker 1 clear, actionable steps they can take
-
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            CRITICAL RULES:
-            - No judgment, no lecturing
-            - Natural conversation — the way real people actually talk
-            - Go deep and be relatable — no surface-level advice
-            - Use everyday audience context for examples
-            - Banned AI phrases: "It's important to note", "Let's delve into", "In conclusion", "It is worth mentioning"
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ══════════════════════════════════════════
+            NON-NEGOTIABLE RULES:
+            ══════════════════════════════════════════
+            ✗ NEVER use any jargon without immediately explaining it — this is the #1 rule
+            ✗ NEVER say "consult a professional" — you ARE the professionals, give actual advice
+            ✗ NEVER give surface-level advice like "make a budget" or "save more" — go deeper
+            ✗ NO lecture mode — this is a conversation, not a TED talk
+            ✗ Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "It's worth mentioning", "I want to emphasize"
+            ✓ Every major point = one real named example with specific numbers
+            ✓ USA middle-class dollars, credit scores, real US processes and laws
+            ✓ Audience should think: "Wait — this is literally my life they're talking about"
+            ══════════════════════════════════════════
             ${durFillEn}
           `;
         } else if (style === 'podcast_panel') {
