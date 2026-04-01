@@ -721,6 +721,100 @@ export const generateDebateScript = async (
               ]
               ⚠️ नैरेटर का पहला line — कोई welcome नहीं, सीधे "पहली बात" से शुरू।
             `;
+        } else if (style === 'debate') {
+            if (includeNarrator) {
+              prompt = `
+                विषय: "${topic}" पर एक Debate style की वीडियो स्क्रिप्ट तैयार करें।
+                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                ${durLineHi}
+                भाषा: हिंदी (Hinglish ठीक है)।
+
+                पात्र:
+                - Narrator: एक (हमेशा "Narrator" नाम से)
+                - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `विषय के अनुरूप उचित नाम — जैसे एक side के support में, दूसरा side के support में`}
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                Structure (Narrator ON — Point-by-Point Debate):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                【 शुरुआत — Narrator 】
+                - Topic introduce करो: यह बहस किस बारे में है, दोनों sides क्या हैं, क्यों यह important है
+                - एक sharp hook जो audience को engage करे
+
+                【 दोनों वक्ता — Short Opening Stand 】
+                - Speaker A: अपना stand short में बताए (2-3 lines) — किस side को support करता है और क्यों
+                - Speaker B: अपना opposing stand short में बताए (2-3 lines)
+
+                【 Narrator — Point 1 रखता है 】
+                - पहला key argument/point introduce करे जो इस topic में debatable है
+                - दोनों को direct करे इस point पर
+
+                【 दोनों वक्ता — Point 1 पर Arguments 】
+                - Speaker A: इस point पर अपना तर्क, data, example
+                - Speaker B: इस point पर counter-argument, अपना data, example
+                - 1-2 sharp rebuttals — back-and-forth
+
+                【 Narrator — Point 2 रखता है 】
+                - अगला debatable point introduce करे
+
+                【 दोनों वक्ता — Point 2 पर Arguments 】
+                - Same pattern — A argues, B counters, rebuttals
+
+                【 यह pattern सभी major points तक जारी रहे 】
+                - हर point के लिए: Narrator introduce करे → A argue करे → B counter करे → Rebuttals
+
+                【 अंत — Narrator Conclusion 】
+                - दोनों sides की strongest points summarize करे
+                - Audience को think करने पर छोड़े — एक powerful closing line
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                CRITICAL RULES:
+                - Narrator सिर्फ शुरुआत में, points introduce करते time, और अंत में — debate के बीच में नहीं
+                - दोनों speakers के arguments genuinely strong हों — एक side obviously weak नहीं
+                - Natural बहस जैसी भाषा — real arguments, real examples, real rebuttals
+                - AI clichés ban: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में", "इस प्रकार"
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ${durFillHi}
+              `;
+            } else {
+              prompt = `
+                विषय: "${topic}" पर एक Debate style की वीडियो स्क्रिप्ट तैयार करें।
+                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                ${durLineHi}
+                भाषा: हिंदी (Hinglish ठीक है)।
+
+                पात्र — ठीक ${speakerCount} वक्ता (कोई Narrator नहीं):
+                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `विषय के अनुरूप उचित opposing नाम ऑटो-डिटेक्ट करें।`}
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                Structure (Narrator OFF — Direct Debate):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                【 शुरुआत 】
+                - Speaker A (जो topic support करता है) short में topic introduce करे और अपना stand बताए (2-3 lines)
+                - Speaker B अपना opposing stand बताए (2-3 lines)
+
+                【 Point-by-Point Debate 】
+                - दोनों speakers अलग-अलग cheez को support करते हुए अपने-अपने arguments देते हैं
+                - हर argument के बाद दूसरा speaker counter करे — sharp, real rebuttals
+                - हर point पर: A argues → B counters → back-and-forth
+                - Arguments में: real examples, data, logical reasoning, relatable situations
+                - दोनों sides genuinely strong हों — कोई obviously weak नहीं
+
+                【 अंत 】
+                - दोनों speakers अपना final stand reiterate करें — confident, without repeating everything
+                - कोई resolution नहीं — audience decide करे
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                CRITICAL RULES:
+                - Natural debate भाषा — जैसे real लोग argue करते हैं
+                - Robotic phrases बिल्कुल नहीं
+                - दोनों speakers की अपनी personality हो — एक emotional, दूसरा logical; या कोई और contrast
+                - AI clichés ban: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में"
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ${durFillHi}
+              `;
+            }
         } else {
             prompt = `
               विषय: "${topic}" पर एक ${style} वीडियो स्क्रिप्ट तैयार करें।
@@ -734,17 +828,11 @@ export const generateDebateScript = async (
               
               संरचना और प्रवाह:
               1. ${includeNarrator ? narratorIntroHindi : `एक परिचय के साथ शुरू करें जो विषय/केस को सीधे और सरलता से समझाता है, केंद्रीय प्रश्न पूछता है, और वक्ताओं का परिचय देता है।`}
-              2. **परिदृश्य 1 (Scenario 1)**: नैरेटर पहले परिदृश्य/केस का परिचय देता है (सीधे मुद्दे पर)।
-              3. वक्ता A (Speaker A) अपना पक्ष (POV) रखता है।
-              4. वक्ता B (Speaker B) अपना विरोधी पक्ष (POV) रखता है।
-              5. **बहस (Debate)**: वक्ता A और B आपस में तर्क-वितर्क करते हैं।
-              6. **अगला परिदृश्य (Next Scenario)**: वक्ता (Speakers) खुद अगले विषय पर जाते हैं (नैरेटर नहीं)। (जैसे: "लेकिन अगर हम [अगला विषय] की बात करें...")
-              7. वक्ता A और B अगले विषय पर बहस करते हैं।
-              8. अवधि के अनुसार जितने परिदृश्य फिट हों, इस पैटर्न को जारी रखें।
-              9. प्रवाह स्वाभाविक और आकर्षक रखें।
-              10. ${includeNarrator ? "नैरेटर केवल अंत में एक संक्षिप्त निष्कर्ष (Conclusion) देने के लिए आएगा।" : ""}
-              11. सभी ${speakerCount} वक्ताओं की समान भागीदारी सुनिश्चित करें।
-              12. पूरी स्क्रिप्ट हिंदी में होनी चाहिए।
+              2. वक्ता A और B आपस में तर्क-वितर्क करते हैं।
+              3. प्रवाह स्वाभाविक और आकर्षक रखें।
+              4. ${includeNarrator ? "नैरेटर केवल अंत में एक संक्षिप्त निष्कर्ष (Conclusion) देने के लिए आएगा।" : ""}
+              5. सभी ${speakerCount} वक्ताओं की समान भागीदारी सुनिश्चित करें।
+              6. पूरी स्क्रिप्ट हिंदी में होनी चाहिए।
               
               स्वर और भाषा (Tone & Language):
               - भाषा बहुत ही स्वाभाविक, संवादात्मक (conversational) और इंसानों जैसी (human-like) होनी चाहिए।
@@ -752,7 +840,6 @@ export const generateDebateScript = async (
               - AI वाले घिसे-पिटे वाक्यों से बचें। ऐसा लगना चाहिए जैसे असली इंसान स्वाभाविक रूप से बात कर रहे हैं।
               
               ${durFillHi}
-              सख्त नियम: नैरेटर बहस के बीच में (Middle) कभी नहीं बोलेगा। केवल Start और End में।
             `;
         }
       }
@@ -1157,6 +1244,100 @@ export const generateDebateScript = async (
             ]
             ⚠️ Narrator's first line — NO welcome, NO show name. Start directly with "First up —"
           `;
+        } else if (style === 'debate') {
+          if (includeNarrator) {
+            prompt = `
+              Generate a Debate style video script on the topic: "${topic}".
+              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              ${durLineEn}
+              Language: ${language}.
+
+              Characters:
+              - Narrator: one (always named "Narrator")
+              - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Auto-detect fitting names for the topic — one representing each side of the debate`}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Structure (Narrator ON — Point-by-Point Debate):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              【 Opening — Narrator 】
+              - Introduce the topic: what this debate is about, what both sides believe, why it matters
+              - A sharp hook that grabs the audience immediately
+
+              【 Both Speakers — Short Opening Stand 】
+              - Speaker A: states their side clearly in 2-3 lines — what they support and why
+              - Speaker B: states their opposing side clearly in 2-3 lines
+
+              【 Narrator — Introduces Point 1 】
+              - Raises the first key argument/point that is genuinely debatable in this topic
+              - Directs both speakers to respond to it
+
+              【 Both Speakers — Arguments on Point 1 】
+              - Speaker A: their argument, data, example on this point
+              - Speaker B: counter-argument, their own data, example
+              - 1-2 sharp rebuttals — back-and-forth
+
+              【 Narrator — Introduces Point 2 】
+              - Raises the next debatable point
+
+              【 Both Speakers — Arguments on Point 2 】
+              - Same pattern: A argues → B counters → rebuttals
+
+              【 This pattern continues for all major points 】
+              - For every point: Narrator introduces → A argues → B counters → Rebuttals
+
+              【 Closing — Narrator Conclusion 】
+              - Summarizes both sides' strongest points
+              - Leaves the audience to decide — ends with a powerful, thought-provoking line
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              CRITICAL RULES:
+              - Narrator appears only at the start, when introducing each point, and at the end — never mid-debate
+              - Both speakers' arguments must be genuinely strong — neither side obviously weaker
+              - Natural debate language — real arguments, real examples, real rebuttals
+              - Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "This is significant"
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ${durFillEn}
+            `;
+          } else {
+            prompt = `
+              Generate a Debate style video script on the topic: "${topic}".
+              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              ${durLineEn}
+              Language: ${language}.
+
+              Characters — exactly ${speakerCount} speakers (no Narrator):
+              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Auto-detect fitting opposing names for the topic.`}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Structure (Narrator OFF — Direct Debate):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              【 Opening 】
+              - Speaker A (who supports one side) briefly introduces the topic and states their position (2-3 lines)
+              - Speaker B states their opposing position (2-3 lines)
+
+              【 Point-by-Point Debate 】
+              - Both speakers support different sides and give their arguments
+              - After every argument, the other speaker counters — sharp, real rebuttals
+              - For every point: A argues → B counters → back-and-forth
+              - Arguments must include: real examples, data, logical reasoning, relatable situations
+              - Both sides are genuinely strong — neither is obviously weak
+
+              【 Closing 】
+              - Both speakers re-state their final position — confident, without repeating everything
+              - No resolution — leave the audience to decide
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              CRITICAL RULES:
+              - Natural debate language — the way real people argue
+              - No robotic or formal AI phrases
+              - Both speakers have distinct personalities — e.g. one more emotional, one more logical
+              - Banned phrases: "It's important to note", "In conclusion", "Let's delve into"
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ${durFillEn}
+            `;
+          }
         } else {
           prompt = `
             Generate a script for a ${style} on the topic: "${topic}".
@@ -1165,21 +1346,15 @@ export const generateDebateScript = async (
             
             Characters:
             Create or use ${speakerCount} distinct speakers.
-            ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Auto-detect appropriate names/personas for the topic (e.g. "Vegetarian" vs "Omnivore" or specific famous figures).`}
+            ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Auto-detect appropriate names/personas for the topic.`}
             
             Structure & Flow:
             1. ${includeNarrator ? narratorIntro : `Start with an introduction that explains the topic/case simply, poses the central question, and introduces the speakers.`}
-            2. **Scenario 1**: Narrator introduces the first scenario/case.
-            3. Speaker A presents their POV on Scenario 1.
-            4. Speaker B presents their opposing POV on Scenario 1.
-            5. **Scenario 2**: Narrator introduces the second scenario/case (if applicable to the topic).
-            6. Speaker A presents their POV on Scenario 2.
-            7. Speaker B presents their opposing POV on Scenario 2.
-            8. Continue this pattern for as many scenarios as fit the duration.
-            9. ${style === 'formal debate' ? "Use a structured format: Opening Statements, Rebuttals, Closing Statements." : "Maintain a natural, engaging flow."}
-            10. ${includeNarrator ? "Narrator acts as a guide/moderator, and MUST provide a VERY BRIEF summary (1-2 sentences) at the very end." : ""}
-            11. Ensure equal participation from all ${speakerCount} speakers.
-            12. The entire script MUST be in ${language}.
+            2. Speakers debate and discuss from their respective sides.
+            3. Maintain a natural, engaging flow.
+            4. ${includeNarrator ? "Narrator provides a brief conclusion at the very end." : ""}
+            5. Ensure equal participation from all ${speakerCount} speakers.
+            6. The entire script MUST be in ${language}.
             
             Tone & Language:
             - Use highly natural, conversational, and human-like language.
