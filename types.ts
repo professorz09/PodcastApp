@@ -21,6 +21,7 @@ export interface VideoScene {
 
 export enum AppState {
   IMPORT = 'IMPORT',                   // Step 0  - Unified importer (YT / IG / Reddit, skippable)
+  LYRICS = 'LYRICS',                   // Step 0b - Lyrics / Song Studio (skippable)
   // Legacy states kept for backward-compat with persisted storage
   YOUTUBE_IMPORT = 'YOUTUBE_IMPORT',
   INSTAGRAM_IMPORT = 'INSTAGRAM_IMPORT',

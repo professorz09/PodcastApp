@@ -6,6 +6,7 @@ import AudioGenerator from './components/AudioGenerator';
 import ThumbnailGenerator from './components/ThumbnailGenerator';
 import DebateVisualizer from './components/DebateVisualizer';
 import ContentImporter from './components/ContentImporter';
+import LyricsGenerator from './components/LyricsGenerator';
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
@@ -86,8 +87,8 @@ const App: React.FC = () => {
         }
 
         const isImportState = (s: AppState) =>
-          s === AppState.IMPORT || s === AppState.YOUTUBE_IMPORT ||
-          s === AppState.INSTAGRAM_IMPORT || s === AppState.REDDIT_IMPORT;
+          s === AppState.IMPORT || s === AppState.LYRICS ||
+          s === AppState.YOUTUBE_IMPORT || s === AppState.INSTAGRAM_IMPORT || s === AppState.REDDIT_IMPORT;
 
         if (stored.script.length > 0) {
           // Don't restore to import screen if user had a project in progress
@@ -347,6 +348,13 @@ const App: React.FC = () => {
               contextFileName: fileName,
             }));
           }}
+          onSkip={() => setAppState(AppState.LYRICS)}
+        />
+      )}
+
+      {appState === AppState.LYRICS && (
+        <LyricsGenerator
+          initialComments={youtubeData?.commentsFileContent || ''}
           onSkip={() => setAppState(AppState.INPUT)}
         />
       )}

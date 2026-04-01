@@ -2055,3 +2055,103 @@ The first chunk's start_seconds must be 0. The last chunk's end_seconds must be 
     return { title: sp.title || 'Section', start: s, end: e, text };
   });
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LYRICS GENERATOR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const STYLE_PROMPTS: Record<string, string> = {
+  rap: 'Hindi/Urdu rap with hard-hitting bars, wordplay, double meanings (double entendres), internal rhymes, and powerful punchlines. Use desi slang naturally.',
+  pop: 'catchy pop song with a memorable chorus (mukhda) and emotional verses (antara). Melodic flow, relatable emotions.',
+  ghazal: 'classical Urdu ghazal with radif, qafia, and maqta (poet signature in last sher). Romantic, philosophical, profound metaphors.',
+  folk: 'traditional Hindi/Punjabi folk song with earthy imagery, simple vocabulary, storytelling, and cultural references. Baithak feel.',
+  bollywood: 'Bollywood film song with mukhda, antara, and sanchari. Mix of Hindi/Urdu, romantic or item-song energy. Filmi feel.',
+};
+
+export const generateLyrics = async (params: {
+  comments: string;
+  context: string;
+  directLyrics: string;
+  style: string;
+  language: string;
+  model: string;
+}): Promise<string> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const styleDesc = STYLE_PROMPTS[params.style] || params.style;
+
+  const prompt = `You are a professional lyricist with deep expertise in ${params.language || 'Hindi/Urdu'} music.
+
+STYLE: ${styleDesc}
+LANGUAGE: ${params.language || 'Hindi/Urdu'}
+${params.context ? `THEME / CONTEXT: ${params.context}` : ''}
+${params.comments ? `\nINSPIRATION FROM COMMENTS / AUDIENCE OPINIONS:\n${params.comments.slice(0, 3000)}` : ''}
+${params.directLyrics ? `\nUSER-PROVIDED DRAFT LYRICS (refine/expand these):\n${params.directLyrics}` : ''}
+
+Write complete, polished song lyrics with:
+- [Mukhda] — the main hook/chorus (8–12 lines)
+- [Antara 1] — first verse (8–10 lines)
+- [Mukhda] — repeat
+- [Antara 2] — second verse (8–10 lines)
+- [Mukhda] — repeat
+- [Bridge/Sanchari] — optional bridge (4–6 lines)
+
+Rules:
+• Write in ${params.language || 'Hindi/Urdu'} script with natural flow
+• Make it emotionally resonant and authentic to the style
+• Use vivid imagery, metaphors, and poetic devices
+• Output ONLY the lyrics with section labels like [Mukhda], [Antara 1], etc. Nothing else.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: params.model || 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    if (!response.text) throw new Error('Gemini returned empty lyrics');
+    return response.text.trim();
+  } catch (error: any) {
+    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
+      throw new Error('Gemini API quota exceeded. Wait a few minutes and try again.');
+    }
+    throw error;
+  }
+};
+
+export const generateSongAudio = async (
+  lyrics: string,
+  style: string,
+  voiceName: string = 'Aoede',
+): Promise<Blob> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  // Strip section labels for clean TTS reading
+  const cleanLyrics = lyrics
+    .replace(/\[(Mukhda|Antara \d+|Bridge|Sanchari|Chorus|Verse \d+)\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const instruction = `Recite these ${style} song lyrics with rhythm, emotion, and musical cadence — as if performing them live:\n\n${cleanLyrics}`;
+
+  const response = await (ai.models as any).generateContent({
+    model: 'gemini-2.5-flash-preview-tts',
+    contents: [{ parts: [{ text: instruction }] }],
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName },
+        },
+      },
+    },
+  });
+
+  const part = response?.candidates?.[0]?.content?.parts?.[0];
+  if (!part?.inlineData?.data) throw new Error('Gemini TTS returned no audio data');
+
+  const raw = atob(part.inlineData.data);
+  const buf = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+  return new Blob([buf], { type: part.inlineData.mimeType || 'audio/wav' });
+};
