@@ -10,7 +10,7 @@ import LyricsCanvas from './LyricsCanvas';
 
 type Phase = 'write' | 'song' | 'canvas';
 type Style = 'bollywood' | 'rap' | 'pop' | 'ghazal' | 'folk';
-type LangKey = 'Hindi' | 'Urdu' | 'Punjabi' | 'English' | 'Hinglish';
+type LangKey = 'Hindi' | 'English';
 
 const STYLES: { id: Style; label: string; emoji: string; desc: string }[] = [
   { id: 'bollywood', label: 'Bollywood', emoji: '🎬', desc: 'Filmi mukhda + antara' },
@@ -28,7 +28,7 @@ const VOICES = [
   { id: 'Puck', label: 'Puck (Male, expressive)' },
 ];
 
-const LANGS: LangKey[] = ['Hindi', 'Urdu', 'Punjabi', 'English', 'Hinglish'];
+const LANGS: LangKey[] = ['Hindi', 'English'];
 
 const Section = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <div className={`bg-[#0f0f0f] border border-white/5 rounded-2xl p-4 space-y-3 ${className}`} >
@@ -179,7 +179,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
           </div>
           <div>
             <h2 className="font-bold text-lg text-white">Song / Lyrics Studio</h2>
-            <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">AI Lyrics → Song → Video</p>
+            <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">News · Politics · Viral Moments → Song</p>
           </div>
         </div>
         <button onClick={onSkip} className="text-xs text-gray-600 hover:text-gray-400 border border-white/5 px-3 py-2 rounded-xl transition-all">
@@ -228,14 +228,14 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                   value={commentsText}
                   onChange={e => setCommentsText(e.target.value)}
                   rows={5}
-                  placeholder="Paste comments from YouTube/Instagram/Reddit here... (ye comments lyrics ki inspiration hongi)"
+                  placeholder="Yahan comments paste karo — kisi viral video ke funny comments, news ke reactions, political post ke log kya bol rahe hain, koi bhi..."
                   className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 focus:outline-none focus:border-purple-500/40 resize-none"
                 />
                 <textarea
                   value={contextText}
                   onChange={e => setContextText(e.target.value)}
                   rows={2}
-                  placeholder="Song ka theme / topic kya ho? (e.g. dil tuta hua, zindagi ki tamanna, dosto ki yaad...)"
+                  placeholder="Topic kya hai? (e.g. petrol ke daam badhe, koi neta ki bakwas, viral meme, koi funny news, system pe gussa...)"
                   className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 focus:outline-none focus:border-purple-500/40 resize-none"
                 />
               </>

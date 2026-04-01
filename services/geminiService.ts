@@ -2081,27 +2081,30 @@ export const generateLyrics = async (params: {
 
   const styleDesc = STYLE_PROMPTS[params.style] || params.style;
 
-  const prompt = `You are a professional lyricist with deep expertise in ${params.language || 'Hindi/Urdu'} music.
+  const lang = params.language || 'Hindi';
+  const prompt = `You are a viral content lyricist who writes songs about current events, politics, news, and trending social topics — content that makes people laugh, think, or react strongly. You write for a desi social media audience (YouTube Shorts, Instagram Reels).
 
 STYLE: ${styleDesc}
-LANGUAGE: ${params.language || 'Hindi/Urdu'}
-${params.context ? `THEME / CONTEXT: ${params.context}` : ''}
-${params.comments ? `\nINSPIRATION FROM COMMENTS / AUDIENCE OPINIONS:\n${params.comments.slice(0, 3000)}` : ''}
-${params.directLyrics ? `\nUSER-PROVIDED DRAFT LYRICS (refine/expand these):\n${params.directLyrics}` : ''}
+LANGUAGE: ${lang}
+TARGET AUDIENCE: Desi social media viewers — people who follow daily news, viral videos, political drama, and funny current events. The song should feel like a roast, a satire, or an emotional reaction to what's happening around them.
+${params.context ? `TOPIC / EVENT: ${params.context}` : ''}
+${params.comments ? `\nAUDIENCE COMMENTS & REACTIONS (use the energy, opinions, and humor from these):\n${params.comments.slice(0, 3000)}` : ''}
+${params.directLyrics ? `\nUSER-PROVIDED DRAFT (refine and polish):\n${params.directLyrics}` : ''}
 
-Write complete, polished song lyrics with:
-- [Mukhda] — the main hook/chorus (8–12 lines)
-- [Antara 1] — first verse (8–10 lines)
+Write complete song lyrics with these sections:
+- [Mukhda] — punchy hook/chorus that captures the main reaction or opinion (6–10 lines)
+- [Antara 1] — first verse with specific details, facts, or funny observations (6–10 lines)
 - [Mukhda] — repeat
-- [Antara 2] — second verse (8–10 lines)
+- [Antara 2] — second verse going deeper or from another angle (6–10 lines)
 - [Mukhda] — repeat
-- [Bridge/Sanchari] — optional bridge (4–6 lines)
+- [Bridge] — optional twist, punchline, or call to action (4–6 lines)
 
 Rules:
-• Write in ${params.language || 'Hindi/Urdu'} script with natural flow
-• Make it emotionally resonant and authentic to the style
-• Use vivid imagery, metaphors, and poetic devices
-• Output ONLY the lyrics with section labels like [Mukhda], [Antara 1], etc. Nothing else.`;
+• Language: ${lang} — use natural colloquial speech, not formal. Desi slang is welcome.
+• Make it punchy, relatable, and shareable — the kind of song people screenshot or send to friends
+• If the topic is political or news-based: use wit, sarcasm, satire — don't be boring
+• If comments are funny: amplify that humor into the lyrics
+• Output ONLY the lyrics with section labels. Nothing else.`;
 
   try {
     const response = await ai.models.generateContent({
