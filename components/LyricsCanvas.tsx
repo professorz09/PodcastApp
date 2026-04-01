@@ -122,7 +122,6 @@ const CommentCard: React.FC<CommentCardProps> = ({ text, lineIdx, animMode, phas
 
         {/* Comment text */}
         <p
-          key={text + phase}
           style={{
             margin: 0,
             fontSize: 14,
@@ -131,15 +130,10 @@ const CommentCard: React.FC<CommentCardProps> = ({ text, lineIdx, animMode, phas
             fontFamily: 'sans-serif',
             fontWeight: 400,
             wordBreak: 'break-word',
-            animation: 'commentFadeIn 0.18s ease',
             minHeight: 20,
           }}
         >
           {text}
-          {/* blinking cursor during animation */}
-          {animMode === 'wbw' && (
-            <span style={{ display: 'inline-block', width: 2, height: 14, background: '#555', marginLeft: 2, verticalAlign: 'middle', animation: 'blink 0.7s step-end infinite' }} />
-          )}
         </p>
 
         {/* Reply + likes */}
@@ -531,17 +525,12 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
                 className="absolute left-0 right-0 bottom-0 flex justify-start items-end pb-[3%] px-[3%]"
                 style={{ zIndex: 10 }}
               >
-                <div
-                  key={`${currentIdx}-${animPhase}-${wordIdx > 0 ? 'typing' : 'start'}`}
-                  style={{ animation: 'cardSlideUp 0.22s cubic-bezier(0.22,1,0.36,1)' }}
-                >
-                  <CommentCard
-                    text={displayedText}
-                    lineIdx={currentIdx}
-                    animMode={animMode}
-                    phase={animPhase}
-                  />
-                </div>
+                <CommentCard
+                  text={displayedText}
+                  lineIdx={currentIdx}
+                  animMode={animMode}
+                  phase={animPhase}
+                />
               </div>
 
               {/* STT sync indicator — small dot only when live-synced */}
@@ -692,22 +681,6 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
           </aside>
         </>
       </div>
-
-      {/* CSS */}
-      <style>{`
-        @keyframes commentFadeIn {
-          from { opacity: 0.2; transform: translateY(4px); }
-          to   { opacity: 1;   transform: translateY(0); }
-        }
-        @keyframes cardSlideUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes blink {
-          0%,100% { opacity: 1; }
-          50%      { opacity: 0; }
-        }
-      `}</style>
 
       {audioUrl && <audio ref={audioRef} src={audioUrl} onEnded={() => setIsPlaying(false)} />}
     </div>
