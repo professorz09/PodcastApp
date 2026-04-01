@@ -89,7 +89,8 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
       if (saved) {
         const d = JSON.parse(saved);
         if (d.lyrics)       { setLyrics(d.lyrics); setPhase('song'); }
-        if (d.commentsText) setCommentsText(d.commentsText);
+        // Only restore saved comments if no fresh comments were passed in via prop
+        if (d.commentsText && !initialComments) setCommentsText(d.commentsText);
         if (d.contextText)  setContextText(d.contextText);
         if (d.language)     setLanguage(d.language);
         if (d.model)        setModel(d.model);
@@ -203,9 +204,9 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const lyricsLines = lyrics.split('\n').filter(l => l.trim());
 
   const PHASES: { id: Phase; label: string; icon: React.ElementType }[] = [
-    { id: 'write', label: 'Lyrics', icon: FileText },
-    { id: 'song', label: 'Song', icon: Music2 },
-    { id: 'canvas', label: 'Video Canvas', icon: Video },
+    { id: 'song',   label: 'Song',         icon: Music2    },
+    { id: 'canvas', label: 'Video Canvas', icon: Video     },
+    { id: 'write',  label: 'Lyrics',       icon: FileText  },
   ];
 
   if (showCanvas) {

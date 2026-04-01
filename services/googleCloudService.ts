@@ -1,234 +1,232 @@
-export const transcribeAudioGoogleCloud = async (audioBlob: Blob, languageCode: string = 'en-US'): Promise<{ word: string; start: number; end: number }[]> => {
+export const transcribeAudioGoogleCloud = async (
+  audioBlob: Blob,
+  languageCode: string = 'en-US'
+): Promise<{ word: string; start: number; end: number }[]> => {
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
   const audioContext = new AudioContextClass();
 
   try {
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
+
     const duration = audioBuffer.duration;
-    const sampleRate = audioBuffer.sampleRate;
-    const CHUNK_DURATION = 45; // 45 seconds chunks (safer margin below 60s limit)
-    
-    console.log(`Audio decoded: duration=${duration.toFixed(2)}s, sampleRate=${sampleRate}Hz`);
+    console.log(`Audio decoded: duration=${duration.toFixed(2)}s, sampleRate=${audioBuffer.sampleRate}Hz`);
 
     if (isNaN(duration) || duration === Infinity) {
       throw new Error('Invalid audio duration detected');
     }
-    
+
+    // ── Resample to 16kHz mono ──────────────────────────────────────────────
+    // Google STT recommends 16kHz mono.  At 16kHz/mono, a 45 s WAV chunk is
+    // only ~1.4 MB raw → ~1.9 MB base64, well under the 10 MB inline limit.
+    const TARGET_RATE = 16000;
+    const resampled = await resampleMono(audioBuffer, TARGET_RATE);
+    console.log(`Resampled to ${TARGET_RATE}Hz mono: duration=${resampled.duration.toFixed(2)}s`);
+
+    // ── Chunk into 55 s pieces (safe margin under 60 s sync limit) ──────────
+    const CHUNK_DURATION = 55;
     let allTimings: { word: string; start: number; end: number }[] = [];
 
-    if (duration > CHUNK_DURATION) {
-      console.log(`Audio duration exceeds ${CHUNK_DURATION}s, splitting into chunks...`);
-      const chunks = Math.ceil(duration / CHUNK_DURATION);
-      
+    if (resampled.duration > CHUNK_DURATION) {
+      const chunks = Math.ceil(resampled.duration / CHUNK_DURATION);
+      console.log(`Splitting into ${chunks} chunks of ≤${CHUNK_DURATION}s`);
+
       for (let i = 0; i < chunks; i++) {
         const startTime = i * CHUNK_DURATION;
-        const endTime = Math.min((i + 1) * CHUNK_DURATION, duration);
-        
-        console.log(`Transcribing chunk ${i + 1}/${chunks} (${startTime.toFixed(2)}-${endTime.toFixed(2)}s)...`);
-        
-        const chunkBuffer = extractChunk(audioBuffer, startTime, endTime, audioContext);
-        const chunkBlob = await audioBufferToWav(chunkBuffer);
-        
-        const chunkTimings = await transcribeChunk(chunkBlob, sampleRate, languageCode);
-        
-        // Adjust timings
+        const endTime = Math.min((i + 1) * CHUNK_DURATION, resampled.duration);
+        console.log(`Chunk ${i + 1}/${chunks}: ${startTime.toFixed(1)}-${endTime.toFixed(1)}s`);
+
+        const chunkBuffer = extractChunk(resampled, startTime, endTime);
+        const chunkBlob = audioBufferToWav(chunkBuffer);
+
+        const chunkTimings = await transcribeChunk(chunkBlob, TARGET_RATE, languageCode);
         chunkTimings.forEach(t => {
-          allTimings.push({
-            word: t.word,
-            start: t.start + startTime,
-            end: t.end + startTime
-          });
+          allTimings.push({ word: t.word, start: t.start + startTime, end: t.end + startTime });
         });
       }
     } else {
-      allTimings = await transcribeChunk(audioBlob, sampleRate, languageCode);
+      const blob = audioBufferToWav(resampled);
+      allTimings = await transcribeChunk(blob, TARGET_RATE, languageCode);
     }
-    
-    return allTimings;
 
+    return allTimings;
   } catch (error) {
     console.error('Transcription error:', error);
     throw error;
   } finally {
-    // Always close AudioContext to free system resources, even on error
     if (audioContext.state !== 'closed') {
       await audioContext.close();
     }
   }
 };
 
-const transcribeChunk = async (audioBlob: Blob, sampleRate?: number, languageCode: string = 'en-US'): Promise<{ word: string; start: number; end: number }[]> => {
-  const base64Audio = await blobToBase64(audioBlob);
-  const audioContent = base64Audio.split(',')[1];
-  const mimeType = audioBlob.type;
+// ── Resample to target sample rate + mix down to mono ──────────────────────
+const resampleMono = async (buffer: AudioBuffer, targetRate: number): Promise<AudioBuffer> => {
+  const duration = buffer.duration;
+  const outputLength = Math.ceil(duration * targetRate);
 
-  const response = await fetch('/api/google/speech-to-text', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ audioContent, mimeType, sampleRate, languageCode })
-  });
+  const offlineCtx = new OfflineAudioContext(1, outputLength, targetRate);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(offlineCtx.destination);
+  source.start(0);
 
-  const text = await response.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    console.error('Failed to parse transcription response:', text);
-    throw new Error(`Invalid response from server: ${text.slice(0, 100)}`);
-  }
-
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to transcribe with Google Cloud');
-  }
-  
-  // Handle long-running operation (fallback if still returned, though unlikely with chunks)
-  if (data.operationName) {
-    console.log('Long running operation started (unexpected for chunk):', data.operationName);
-    return await pollOperation(data.operationName);
-  }
-
-  const wordTimings: { word: string; start: number; end: number }[] = [];
-
-  if (data.results) {
-    processResults(data.results, wordTimings);
-  }
-
-  return wordTimings;
+  return offlineCtx.startRendering();
 };
 
-const extractChunk = (audioBuffer: AudioBuffer, startTime: number, endTime: number, context: AudioContext): AudioBuffer => {
-  const startSample = Math.floor(startTime * audioBuffer.sampleRate);
-  const endSample = Math.floor(endTime * audioBuffer.sampleRate);
+// ── Extract a sub-segment from an AudioBuffer ──────────────────────────────
+const extractChunk = (
+  audioBuffer: AudioBuffer,
+  startTime: number,
+  endTime: number
+): AudioBuffer => {
+  const sr = audioBuffer.sampleRate;
+  const startSample = Math.floor(startTime * sr);
+  const endSample = Math.min(Math.floor(endTime * sr), audioBuffer.length);
   const frameCount = endSample - startSample;
-  
-  // Create a new buffer for the chunk
-  const newBuffer = context.createBuffer(audioBuffer.numberOfChannels, frameCount, audioBuffer.sampleRate);
-  
-  for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-    const channelData = audioBuffer.getChannelData(i);
-    const newChannelData = newBuffer.getChannelData(i);
-    // Copy the segment
-    newChannelData.set(channelData.subarray(startSample, endSample));
-  }
+
+  // Use OfflineAudioContext to create a standalone buffer (avoids closed ctx issues)
+  const tmp = new OfflineAudioContext(1, frameCount, sr);
+  const newBuffer = tmp.createBuffer(1, frameCount, sr);
+  const src = audioBuffer.getChannelData(0);
+  newBuffer.getChannelData(0).set(src.subarray(startSample, endSample));
   return newBuffer;
 };
 
-const audioBufferToWav = async (buffer: AudioBuffer): Promise<Blob> => {
+// ── Encode an AudioBuffer (mono assumed) to a PCM WAV Blob ────────────────
+const audioBufferToWav = (buffer: AudioBuffer): Blob => {
   const numOfChan = buffer.numberOfChannels;
   const length = buffer.length * numOfChan * 2 + 44;
   const bufferArr = new ArrayBuffer(length);
   const view = new DataView(bufferArr);
-  const channels = [];
-  let i;
-  let sample;
-  let offset = 0;
   let pos = 0;
 
-  // write WAVE header
+  const setUint16 = (data: number) => { view.setUint16(pos, data, true); pos += 2; };
+  const setUint32 = (data: number) => { view.setUint32(pos, data, true); pos += 4; };
+
+  // RIFF header
   setUint32(0x46464952); // "RIFF"
-  setUint32(length - 8); // file length - 8
+  setUint32(length - 8);
   setUint32(0x45564157); // "WAVE"
 
-  setUint32(0x20746d66); // "fmt " chunk
-  setUint32(16); // length = 16
-  setUint16(1); // PCM (uncompressed)
+  // fmt chunk
+  setUint32(0x20746d66); // "fmt "
+  setUint32(16);
+  setUint16(1);           // PCM
   setUint16(numOfChan);
   setUint32(buffer.sampleRate);
-  setUint32(buffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
-  setUint16(numOfChan * 2); // block-align
-  setUint16(16); // 16-bit (hardcoded in this example)
+  setUint32(buffer.sampleRate * numOfChan * 2);
+  setUint16(numOfChan * 2);
+  setUint16(16);
 
-  setUint32(0x61746164); // "data" - chunk
-  setUint32(length - pos - 4); // chunk length
+  // data chunk
+  setUint32(0x61746164); // "data"
+  setUint32(length - pos - 4);
 
-  // write interleaved data
-  for (i = 0; i < buffer.numberOfChannels; i++)
-    channels.push(buffer.getChannelData(i));
+  const channels: Float32Array[] = [];
+  for (let i = 0; i < numOfChan; i++) channels.push(buffer.getChannelData(i));
 
-  const dataLength = buffer.length;
-  for (let j = 0; j < dataLength; j++) {
-    for (i = 0; i < numOfChan; i++) {
-      sample = Math.max(-1, Math.min(1, channels[i][j])); // clamp
-      sample = (sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int
-      view.setInt16(44 + offset, sample, true); // write 16-bit sample
+  let offset = 0;
+  for (let j = 0; j < buffer.length; j++) {
+    for (let i = 0; i < numOfChan; i++) {
+      const sample = Math.max(-1, Math.min(1, channels[i][j]));
+      const int = (sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(44 + offset, int, true);
       offset += 2;
     }
   }
 
   return new Blob([bufferArr], { type: 'audio/wav' });
-
-  function setUint16(data: any) {
-    view.setUint16(pos, data, true);
-    pos += 2;
-  }
-
-  function setUint32(data: any) {
-    view.setUint32(pos, data, true);
-    pos += 4;
-  }
 };
 
-const pollOperation = async (operationName: string): Promise<{ word: string; start: number; end: number }[]> => {
-  const maxRetries = 60; // 2 minutes max (assuming 2s interval)
-  let retries = 0;
+// ── Send a WAV blob to the Flask/Node STT endpoint ────────────────────────
+const transcribeChunk = async (
+  audioBlob: Blob,
+  sampleRate: number,
+  languageCode: string
+): Promise<{ word: string; start: number; end: number }[]> => {
+  const base64Audio = await blobToBase64(audioBlob);
+  const audioContent = base64Audio.split(',')[1];
 
-  while (retries < maxRetries) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const response = await fetch(`/api/google/operations?name=${encodeURIComponent(operationName)}`);
-    
+  const response = await fetch('/api/google/speech-to-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audioContent, mimeType: 'audio/wav', sampleRate, languageCode }),
+  });
+
+  const text = await response.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.error('Failed to parse STT response:', text);
+    throw new Error(`Invalid response from server: ${text.slice(0, 120)}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to transcribe with Google Cloud');
+  }
+
+  // Long-running operation (shouldn't happen with ≤55 s chunks, but handle anyway)
+  if (data.operationName) {
+    console.log('Long-running operation returned (unexpected):', data.operationName);
+    return await pollOperation(data.operationName);
+  }
+
+  const wordTimings: { word: string; start: number; end: number }[] = [];
+  if (data.results) processResults(data.results, wordTimings);
+  return wordTimings;
+};
+
+// ── Poll a long-running STT operation ─────────────────────────────────────
+const pollOperation = async (
+  operationName: string
+): Promise<{ word: string; start: number; end: number }[]> => {
+  const maxRetries = 90; // 3 minutes (2 s interval)
+  for (let i = 0; i < maxRetries; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+
+    const response = await fetch(
+      `/api/google/operations?name=${encodeURIComponent(operationName)}`
+    );
     const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error('Failed to parse operation status response:', text);
-      throw new Error(`Invalid response from server: ${text.slice(0, 100)}`);
+    let data: any;
+    try { data = JSON.parse(text); } catch {
+      throw new Error(`Invalid operation status response: ${text.slice(0, 120)}`);
     }
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to check operation status');
-    }
-    
-    if (data.error) {
-      throw new Error(data.error.message || 'Operation failed');
-    }
+    if (!response.ok) throw new Error(data.error || 'Failed to check operation status');
+    if (data.error) throw new Error(data.error.message || 'Operation failed');
 
     if (data.done) {
       const wordTimings: { word: string; start: number; end: number }[] = [];
-      if (data.response && data.response.results) {
-        processResults(data.response.results, wordTimings);
-      }
+      if (data.response?.results) processResults(data.response.results, wordTimings);
       return wordTimings;
     }
-    
-    retries++;
   }
-  
-  throw new Error('Transcription timed out');
+  throw new Error('Transcription timed out after 3 minutes');
 };
 
-const processResults = (results: any[], wordTimings: { word: string; start: number; end: number }[]) => {
+// ── Parse STT result objects into flat word timing array ──────────────────
+const processResults = (
+  results: any[],
+  wordTimings: { word: string; start: number; end: number }[]
+) => {
   results.forEach((result: any) => {
-    if (result.alternatives && result.alternatives[0] && result.alternatives[0].words) {
-      result.alternatives[0].words.forEach((w: any) => {
-        const startStr = w.startTime ? String(w.startTime) : '0s';
-        const endStr = w.endTime ? String(w.endTime) : '0s';
-        const start = parseFloat(startStr.replace('s', ''));
-        const end = parseFloat(endStr.replace('s', ''));
-        wordTimings.push({ word: w.word, start, end });
-      });
-    }
+    const words = result.alternatives?.[0]?.words;
+    if (!words) return;
+    words.forEach((w: any) => {
+      const start = parseFloat(String(w.startTime ?? '0s').replace('s', ''));
+      const end   = parseFloat(String(w.endTime   ?? '0s').replace('s', ''));
+      wordTimings.push({ word: w.word, start, end });
+    });
   });
 };
 
-const blobToBase64 = (blob: Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
+// ── Util: FileReader blob → base64 data URL ───────────────────────────────
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(blob);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
+    reader.onload  = () => resolve(reader.result as string);
+    reader.onerror = reject;
   });
-};
