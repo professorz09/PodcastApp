@@ -221,7 +221,7 @@ const RedditImporter: React.FC<Props> = ({ onAttachContext, onAttachPost, onSkip
           </p>
         )}
         <div className="text-[11px] text-gray-700">
-          Uses Reddit's public JSON API — no login required for public posts.
+          Public posts only · No login required
         </div>
       </Section>
 
@@ -365,7 +365,7 @@ const RedditImporter: React.FC<Props> = ({ onAttachContext, onAttachPost, onSkip
           </div>
 
           <p className="text-[11px] text-gray-700">
-            Reddit's public API — works for all public posts without login. NSFW / quarantined posts may be blocked.
+            Public posts only · NSFW / quarantined posts may be restricted.
           </p>
 
           {commentsError && <ErrBox msg={commentsError} />}
@@ -421,15 +421,6 @@ const RedditImporter: React.FC<Props> = ({ onAttachContext, onAttachPost, onSkip
         </Section>
       )}
 
-      {/* Skip footer */}
-      <div className="flex justify-end pt-2">
-        <button
-          onClick={onSkip}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-white transition-colors"
-        >
-          Skip to Script Generator <ChevronRight size={15} />
-        </button>
-      </div>
     </div>
   );
 };

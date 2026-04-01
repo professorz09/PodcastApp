@@ -318,8 +318,8 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
                 {veo3Loading ? <Loader2 size={20} className="animate-spin text-violet-400" /> : <Video size={20} className="text-violet-400" />}
               </div>
               <div className="text-left">
-                <p className="font-bold text-sm text-violet-200">Veo 3 Prompt Generate Karo</p>
-                <p className="text-violet-400/70 text-xs mt-0.5">AI transcript se fast-cut style ka Veo 3 prompt banata hai — copy karke use karo</p>
+                <p className="font-bold text-sm text-violet-200">Generate Veo 3 Prompt</p>
+                <p className="text-violet-400/70 text-xs mt-0.5">AI builds a fast-cut Veo 3 prompt from the transcript — copy and use directly</p>
               </div>
             </button>
 
@@ -349,7 +349,7 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
                   <p className="text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap">{veo3Prompt}</p>
                 </div>
                 <div className="px-4 pb-3">
-                  <p className="text-violet-500/60 text-[11px]">👉 Yeh prompt Google Veo 3 / VideoFX mein paste karo</p>
+                  <p className="text-violet-500/60 text-[11px]">👉 Paste this prompt in Google Veo 3 / VideoFX</p>
                 </div>
               </div>
             )}
@@ -365,7 +365,7 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
               {stage === 'ai-loading' && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-[#080810]">
                   <Loader2 size={30} className="text-indigo-400 animate-spin" />
-                  <p className="text-zinc-300 text-sm font-medium">AI best comments select kar raha hai…</p>
+                  <p className="text-zinc-300 text-sm font-medium">AI is selecting the best comments…</p>
                 </div>
               )}
               <canvas
@@ -389,9 +389,9 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
                     : <span className="text-emerald-400 text-sm">✓</span>
                   }
                   <span className="text-zinc-300 text-xs font-medium">
-                    {stage === 'ai-loading' && 'AI comments select kar raha hai…'}
+                    {stage === 'ai-loading' && 'AI is selecting comments…'}
                     {stage === 'rendering' && `Rendering… ${Math.round(progress)}%`}
-                    {stage === 'done' && 'Taiyaar! Download karo.'}
+                    {stage === 'done' && 'Ready! Download below.'}
                   </span>
                 </div>
                 {stage === 'rendering' && (

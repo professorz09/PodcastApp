@@ -289,14 +289,14 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                   value={commentsText}
                   onChange={e => setCommentsText(e.target.value)}
                   rows={5}
-                  placeholder="Yahan comments paste karo — kisi viral video ke funny comments, news ke reactions, political post ke log kya bol rahe hain, koi bhi..."
+                  placeholder="Paste comments here — from any viral video, news post, political content, or funny reactions..."
                   className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 focus:outline-none focus:border-purple-500/40 resize-none"
                 />
                 <textarea
                   value={contextText}
                   onChange={e => setContextText(e.target.value)}
                   rows={2}
-                  placeholder="Topic kya hai? (e.g. petrol ke daam badhe, koi neta ki bakwas, viral meme, koi funny news, system pe gussa...)"
+                  placeholder="Topic / theme (optional) — e.g. politics, petrol prices, viral news, funny moment..."
                   className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 focus:outline-none focus:border-purple-500/40 resize-none"
                 />
               </>
@@ -305,7 +305,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                 value={directLyrics}
                 onChange={e => setDirectLyrics(e.target.value)}
                 rows={8}
-                placeholder="Apni lyrics seedha yahan paste karo — Gemini inhe refine/polish kar dega..."
+                placeholder="Paste your lyrics here — AI will refine and polish them..."
                 className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 focus:outline-none focus:border-purple-500/40 resize-none font-mono"
               />
             )}
@@ -357,7 +357,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm py-3.5 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-purple-900/30"
           >
             {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-            {isGenerating ? 'Lyrics likh raha hoon…' : 'Generate Lyrics'}
+            {isGenerating ? 'Generating lyrics…' : 'Generate Lyrics'}
           </button>
         </div>
       )}
@@ -411,7 +411,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
               className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-all active:scale-[0.98]"
             >
               {isMakingSong ? <Loader2 size={15} className="animate-spin" /> : <Music2 size={15} />}
-              {isMakingSong ? 'Song ban raha hai…' : 'Song Banao (Lyria 3)'}
+              {isMakingSong ? 'Creating song…' : 'Make Song (Lyria 3)'}
             </button>
 
             {songError && <ErrBox msg={songError} />}
@@ -449,7 +449,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                     className="w-full flex items-center justify-center gap-2 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 text-xs font-medium py-2.5 rounded-xl transition-all disabled:opacity-40"
                   >
                     {isTranscribing ? <Loader2 size={13} className="animate-spin" /> : <Mic2 size={13} />}
-                    {isTranscribing ? 'Transcript ban raha hai…' : 'Google STT Transcript'}
+                    {isTranscribing ? 'Transcribing…' : 'Google STT Transcript'}
                   </button>
                   {transcriptError && <ErrBox msg={transcriptError} />}
                   {transcript && (
@@ -477,9 +477,9 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
         <div className="space-y-3">
           {!lyrics && (
             <div className="text-center py-10 text-gray-600 text-sm">
-              Pehle lyrics generate karo
+              Generate lyrics first
               <button onClick={() => setPhase('write')} className="block mx-auto mt-3 text-purple-400 hover:text-purple-300 text-xs">
-                ← Lyrics tab pe jao
+                ← Go to Lyrics tab
               </button>
             </div>
           )}

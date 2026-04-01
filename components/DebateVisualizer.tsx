@@ -2570,12 +2570,12 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   const handleMergeVideos = async () => {
       if (!renderedBlob) {
-          alert('Pehle video export karo, phir merge karein.');
+          alert('Please export the video first before merging.');
           return;
       }
       const introFilename = youtubeData?.editedFilename || youtubeData?.downloadedFilename;
       if (!introFilename) {
-          alert('YouTube video ka filename nahi mila. YouTube Import step mein video download karein.');
+          alert('YouTube video filename not found. Please download the video in the YouTube Import step.');
           return;
       }
       setIsMergingVideos(true);
@@ -3289,7 +3289,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                         <>
                           <div className="text-xs text-gray-500 space-y-1">
                             <p>YT: <code className="text-orange-400">{youtubeData.editedFilename || youtubeData.downloadedFilename}</code></p>
-                            <p>Rendered: <span className={renderedBlob ? 'text-green-400' : 'text-gray-600'}>{renderedBlob ? 'Ready' : 'Export karo pehle'}</span></p>
+                            <p>Rendered: <span className={renderedBlob ? 'text-green-400' : 'text-gray-600'}>{renderedBlob ? 'Ready' : 'Export first'}</span></p>
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] text-gray-600 uppercase tracking-wider">Flask Server URL</label>

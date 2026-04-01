@@ -414,9 +414,9 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
         </div>
         <button
           onClick={onSkip}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white border border-white/10 hover:border-white/20 px-3 py-2 rounded-xl transition-all"
+          className="flex items-center gap-1 text-gray-500 hover:text-gray-300 border border-white/10 hover:border-white/20 text-xs px-3 py-2 rounded-xl transition-all"
         >
-          Skip <ChevronRight size={13} />
+          Skip →
         </button>
       </div>
 
@@ -617,13 +617,13 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
                     onClick={() => setShowPasteBox(p => !p)}
                     className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
                   >
-                    {showPasteBox ? 'Hide' : 'Open paste box'}
+                    {showPasteBox ? 'Hide' : 'Paste manually'}
                   </button>
                 </div>
                 {showPasteBox && (
                   <div className="space-y-2">
                     <p className="text-[11px] text-gray-600">
-                      Open the reel on Instagram, copy comments one-by-one or use a browser extension, then paste below — one comment per line.
+                      Copy comments from the post manually or using a browser extension, then paste below — one comment per line.
                     </p>
                     <textarea
                       value={pasteText}

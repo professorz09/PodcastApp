@@ -796,8 +796,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
             onClick={onSkip}
             className="flex items-center gap-1 text-gray-500 active:text-gray-300 text-xs py-2 px-3 rounded-xl border border-white/5 active:border-white/10 transition-colors"
           >
-            <SkipForward size={13} />
-            Skip
+            Skip →
           </button>
         </div>
 
@@ -934,7 +933,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
           <>
             <Section>
               <p className="text-xs text-gray-500">
-                Fetch transcript from a YouTube video — language is detected automatically.
+                Auto-detects language. Works with most videos that have captions enabled.
               </p>
 
               <button
@@ -1038,7 +1037,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                   <span className="text-[10px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">Gemini Flash</span>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Transcript ko topic changes ke hisaab se split karo — har part 8 minute se kam. Koi bhi part directly attach karo.
+                  Split transcript by topic — each part under 8 min. Attach any section directly to script context.
                 </p>
                 <button
                   onClick={handleTopicSplit}
@@ -1070,7 +1069,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                         </span>
                       ))}
                     </div>
-                    <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} parts — neeche detail</p>
+                    <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} segments found</p>
                     {splitChunks.map((chunk, idx) => {
                       const dur = chunk.end - chunk.start;
                       const durMin = Math.floor(dur / 60);
@@ -1270,7 +1269,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm bg-green-600/20 active:bg-green-600/30 border border-green-500/30 text-green-300 disabled:opacity-40 transition-all"
               >
                 {downloadLoading ? (
-                  <><Loader2 size={15} className="animate-spin" /> Download ho raha hai...</>
+                  <><Loader2 size={15} className="animate-spin" /> Downloading…</>
                 ) : (
                   <><Download size={15} /> Download {quality}p</>
                 )}
@@ -1336,7 +1335,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                 Google Speech-to-Text
               </div>
               <p className="text-xs text-gray-500">
-                Koi bhi audio ya video file upload karo — Google Speech-to-Text se transcript banega aur automatically attach ho jayega.
+                Upload any audio or video file — Google Speech-to-Text will transcribe it and attach automatically.
               </p>
 
               {/* Hidden file input */}
@@ -1372,7 +1371,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-gray-600">
                     <Upload size={22} />
-                    <span className="text-xs text-gray-400">Audio / Video file choose karo ya drag & drop karo</span>
+                    <span className="text-xs text-gray-400">Choose or drag & drop an audio / video file</span>
                     <span className="text-[10px]">MP3 · WAV · MP4 · M4A · OGG · WEBM</span>
                   </div>
                 )}
@@ -1403,7 +1402,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                 {sttLoading ? (
                   <><Loader2 size={15} className="animate-spin" /> {sttProgress || 'Processing…'}</>
                 ) : (
-                  <><Mic size={15} /> Transcribe karo</>
+                  <><Mic size={15} /> Transcribe</>
                 )}
               </button>
 
@@ -1484,7 +1483,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                   <span className="text-[10px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">Gemini Flash</span>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Transcript ko topic changes ke hisaab se split karo — har part 8 minute se kam. Koi bhi part directly attach karo.
+                  Split transcript by topic — each part under 8 min. Attach any section directly to script context.
                 </p>
 
                 <button
@@ -1519,7 +1518,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                         </span>
                       ))}
                     </div>
-                    <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} parts — neeche detail</p>
+                    <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} segments found</p>
                     {splitChunks.map((chunk, idx) => {
                       const dur = chunk.end - chunk.start;
                       const durMin = Math.floor(dur / 60);

@@ -119,7 +119,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const intro = await generateClipIntro(transcriptText, nonNarrators);
       setClipIntro(intro);
     } catch (e: any) {
-      alert(e.message || 'Intro generate nahi hua. Try again.');
+      alert(e.message || 'Intro generation failed. Please try again.');
     } finally {
       setIsGeneratingIntro(false);
     }
@@ -138,7 +138,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const { audioUrl } = await generateSpeech(clipIntro, voice);
       setIntroAudioUrlSafe(audioUrl);
     } catch (e: any) {
-      alert(e.message || 'Intro audio generate nahi hua. Try again.');
+      alert(e.message || 'Intro audio generation failed. Please try again.');
     } finally {
       setIsGeneratingIntroAudio(false);
     }
@@ -909,7 +909,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
               </div>
               {isGeneratingIntro && !clipIntro && (
                 <div className="flex items-center gap-2 px-4 py-3 text-zinc-500 text-xs">
-                  <Loader2 size={13} className="animate-spin text-violet-400" /> Intro bana raha hai...
+                  <Loader2 size={13} className="animate-spin text-violet-400" /> Generating intro…
                 </div>
               )}
               {clipIntro && (
@@ -919,7 +919,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
               )}
               {!clipIntro && !isGeneratingIntro && (
                 <div className="px-4 py-3 text-xs text-zinc-600">
-                  Script ke basis par ek catchy intro line generate karo — alag se download karo.
+                  Generate a catchy intro line from the script — download separately as audio.
                 </div>
               )}
             </div>

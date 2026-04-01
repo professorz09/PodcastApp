@@ -156,7 +156,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       const result = await generateTopicQuote(fullText);
       setQuoteData(result);
     } catch (e: any) {
-      alert(e.message || 'Quote generate nahi hua. Try again.');
+      alert(e.message || 'Quote generation failed. Please try again.');
     } finally {
       setIsGeneratingQuote(false);
     }
@@ -202,7 +202,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     try {
       const transcript = getTimedTranscript();
       if (transcript.length === 0) {
-        alert('YouTube Import section mein pehle transcript fetch karo — woh timestamps wali transcript use hogi.');
+        alert('Please fetch the transcript in the YouTube Import section first — the timestamped transcript will be used.');
         return;
       }
       // Group segments into points: each point starts at a Narrator segment
@@ -232,13 +232,13 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       }));
 
       if (finalPoints.length === 0) {
-        alert('Script mein koi segment nahi mila.');
+        alert('No segments found in the script.');
         return;
       }
       const cuts = await analyzeTimelineCuts(finalPoints, transcript);
       setTimelineCuts(cuts);
     } catch (e: any) {
-      alert(e.message || 'Timeline analyze nahi hua. Try again.');
+      alert(e.message || 'Timeline analysis failed. Please try again.');
     } finally {
       setIsAnalyzingTimeline(false);
     }
@@ -578,7 +578,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                   {isAnalyzingContextTimeline && (
                     <div className="flex items-center gap-3 px-4 py-6 text-zinc-500 text-sm">
                       <Loader2 size={15} className="animate-spin text-cyan-400 shrink-0" />
-                      <span>Transcript se timestamps match kar raha hai... ({script.length} segments)</span>
+                      <span>Matching timestamps from transcript… ({script.length} segments)</span>
                     </div>
                   )}
 
@@ -644,7 +644,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                   {isGeneratingQuote && !quoteData && (
                     <div className="flex items-center gap-2 py-4 px-4 rounded-2xl border border-white/5 bg-white/[0.02] text-zinc-500 text-sm">
                       <Loader2 size={15} className="animate-spin text-amber-400" />
-                      Quote dhoondh raha hai...
+                      Finding quote…
                     </div>
                   )}
                   {quoteData && (
@@ -689,7 +689,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                   {isGeneratingQuote ? (
                     <>
                       <Loader2 size={17} className="animate-spin text-amber-400" />
-                      <span className="text-sm text-zinc-400 font-medium">Topic se quote dhoondh raha hai...</span>
+                      <span className="text-sm text-zinc-400 font-medium">Finding a quote for this topic…</span>
                     </>
                   ) : (
                     <>
@@ -744,7 +744,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                   {isAnalyzingTimeline ? (
                     <>
                       <Loader2 size={17} className="animate-spin text-sky-400" />
-                      <span className="text-sm text-zinc-400 font-medium">Transcript mein timestamps dhoondh raha hai...</span>
+                      <span className="text-sm text-zinc-400 font-medium">Matching timestamps in transcript…</span>
                     </>
                   ) : (
                     <>

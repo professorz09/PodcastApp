@@ -103,7 +103,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
         selectedTitle: generatedTitles[0] || '',
       });
     } catch (e: any) {
-      setGenerateError(e?.message || 'Titles generate nahi hue. Dobara try karo.');
+      setGenerateError(e?.message || 'Title generation failed. Please try again.');
     } finally {
       setIsGeneratingTitles(false);
     }
@@ -122,7 +122,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
         selectedThumbnailText: generatedTexts[0] || '',
       });
     } catch (e: any) {
-      setGenerateError(e?.message || 'Thumbnail text generate nahi hua. Dobara try karo.');
+      setGenerateError(e?.message || 'Thumbnail text generation failed. Please try again.');
     } finally {
       setIsGeneratingThumbnailText(false);
     }
@@ -165,7 +165,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       );
       onUpdateThumbnailState({ ...thumbnailState, thumbnailUrl: url });
     } catch (error: any) {
-      setGenerateError(error.message || 'Thumbnail generate nahi hua. Dobara try karo.');
+      setGenerateError(error.message || 'Thumbnail generation failed. Please try again.');
     } finally {
       setIsLoading(false);
       setLoadingStep(null);
@@ -260,7 +260,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 1 — Video Title</p>
-                    <p className="text-xs text-gray-600 mt-0.5">YouTube pe dikhne wala full title</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Full title shown on YouTube</p>
                   </div>
                   <button
                     onClick={handleGenerateTitles}
@@ -314,7 +314,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   type="text"
                   value={selectedTitle}
                   onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, selectedTitle: e.target.value })}
-                  placeholder="Ya seedha yahan type karo..."
+                  placeholder="Or type a title directly..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
                 />
               </div>
@@ -465,7 +465,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                     <div className="flex items-start gap-2 bg-orange-500/8 border border-orange-500/20 rounded-lg px-3 py-2">
                       <Info size={12} className="text-orange-400 shrink-0 mt-0.5" />
                       <p className="text-xs text-orange-300/80">
-                        Is image ki <strong>sirf visual style</strong> copy hogi (color, layout, font style). Topic aur log naye rahenge.
+                        Only the <strong>visual style</strong> will be copied (color, layout, font style). Topic and faces will stay new.
                       </p>
                     </div>
 
@@ -477,7 +477,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                       <textarea
                         value={extraInstructions}
                         onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, extraInstructions: e.target.value })}
-                        placeholder="e.g. Dark background rakho, red text use karo, dramatic expression chahiye..."
+                        placeholder="e.g. Dark background, red text, dramatic expression, bold layout..."
                         rows={3}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500 transition-colors placeholder-gray-600 resize-none"
                       />
