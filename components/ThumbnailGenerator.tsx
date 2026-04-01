@@ -46,6 +46,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
   const [videoStyle, setVideoStyle] = useState<ThumbnailVideoStyle>('situational');
+  const [isDefaultStyle, setIsDefaultStyle] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const styleOptions: { value: ThumbnailVideoStyle; label: string; desc: string; color: string }[] = [
@@ -79,6 +80,28 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
     const effectiveSource: TitleSource = hasScript ? 'script' : 'transcript';
     setTitleSource(effectiveSource);
+
+    // Pre-load default thumbnail style image if none is set
+    if (!referenceImage) {
+      fetch('/default-thumbnail-style.jpg')
+        .then(r => r.blob())
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const result = ev.target?.result as string;
+            const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+            if (match) {
+              updates.referenceImage = { mimeType: match[1], data: match[2], url: result };
+              changed = true;
+              setIsDefaultStyle(true);
+              onUpdateThumbnailState({ ...thumbnailState, ...updates });
+            }
+          };
+          reader.readAsDataURL(blob);
+        })
+        .catch(() => {});
+      return;
+    }
 
     if (changed) {
       onUpdateThumbnailState({ ...thumbnailState, ...updates });
@@ -154,7 +177,13 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
   const handleRemoveImage = () => {
     onUpdateThumbnailState({ ...thumbnailState, referenceImage: null, extraInstructions: '' });
+    setIsDefaultStyle(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleImageUploadWithFlag = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsDefaultStyle(false);
+    handleImageUpload(e);
   };
 
   const handleGenerateThumbnail = async () => {
@@ -460,9 +489,11 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 <div>
                   <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 4 — Style</p>
                   <p className="text-xs text-gray-600 mt-0.5">
-                    {isStyleCopyMode
+                    {isDefaultStyle
+                      ? 'Default style loaded — isko replace kar sakte ho apni image se'
+                      : isStyleCopyMode
                       ? 'Style Copy Mode — reference image ki style copy hogi, topic nayi hogi'
-                      : 'Default Joe Rogan style thumbnail banayega'}
+                      : 'Apni thumbnail ki reference image upload karo'}
                   </p>
                 </div>
 
@@ -483,8 +514,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                     {/* Preview */}
                     <div className="relative w-full h-28 rounded-xl overflow-hidden border border-orange-500/30 group">
                       <img src={referenceImage.url} alt="Reference" className="w-full h-full object-cover" />
-                      <div className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Copy size={9} /> Style Copy Mode
+                      <div className={`absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${isDefaultStyle ? 'bg-blue-600' : 'bg-orange-500'}`}>
+                        {isDefaultStyle ? '⭐ Default Style' : <><Copy size={9} /> Style Copy Mode</>}
                       </div>
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button
@@ -523,7 +554,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 <input
                   type="file"
                   ref={fileInputRef}
-                  onChange={handleImageUpload}
+                  onChange={handleImageUploadWithFlag}
                   accept="image/jpeg,image/png,image/webp"
                   className="hidden"
                 />
