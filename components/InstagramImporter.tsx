@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 type Tab = 'info' | 'comments' | 'download';
-type MaxComments = 50 | 100 | 500 | 'all';
+type MaxComments = 50 | 100 | 500 | 1000 | 5000 | 'all';
 
 const IG_STORAGE_KEY = 'ig_importer_v1';
 function readSaved<T>(key: string, fallback: T): T {
@@ -126,6 +126,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
 
   // Comments
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsStatus, setCommentsStatus] = useState('');
   const [comments, setComments] = useState<string[] | null>(() => readSaved('comments', null));
   const [commentsError, setCommentsError] = useState('');
   const [commentsErrorCode, setCommentsErrorCode] = useState('');
@@ -134,6 +135,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   const [attachedLabel, setAttachedLabel] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState('');
   const [showPasteBox, setShowPasteBox] = useState(false);
+  const commentsPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Download
   const [downloadLoading, setDownloadLoading] = useState(false);
@@ -160,7 +162,10 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   }, [url, activeTab, postInfo, comments, maxComments, downloadedFilename]);
 
   useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (commentsPollRef.current) clearInterval(commentsPollRef.current);
+    };
   }, []);
 
   // Check cookies on mount
@@ -205,22 +210,62 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
 
   const handleGetComments = async () => {
     if (!url.trim()) return;
+    if (commentsPollRef.current) clearInterval(commentsPollRef.current);
     setCommentsLoading(true);
     setCommentsError('');
     setCommentsErrorCode('');
+    setCommentsStatus('Starting…');
     setComments(null);
+
     try {
+      // Start background job — returns immediately with job_id
       const res = await fetch('/api/instagram/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, max_comments: maxComments }),
       });
       const data = await safeJson(res);
+
       if (!res.ok) {
         setCommentsErrorCode(data.error_code || '');
-        throw new Error(data.error || 'Failed to fetch comments');
+        throw new Error(data.error || 'Failed to start scraping');
       }
-      setComments(data.comments);
+
+      // If the cached result came back immediately (already done)
+      if (data.status === 'done') {
+        setComments(data.comments);
+        setCommentsStatus('');
+        setCommentsLoading(false);
+        return;
+      }
+
+      const jobId = data.job_id;
+
+      // Poll for status every 1.5 s
+      commentsPollRef.current = setInterval(async () => {
+        try {
+          const sr = await fetch(`/api/instagram/comments/status/${jobId}`);
+          const sd = await safeJson(sr);
+
+          if (sd.status === 'scraping') {
+            setCommentsStatus(sd.message || 'Scraping…');
+          } else if (sd.status === 'done') {
+            clearInterval(commentsPollRef.current!);
+            setComments(sd.comments);
+            setCommentsStatus('');
+            setCommentsLoading(false);
+          } else if (sd.status === 'error' || sd.status === 'not_found') {
+            clearInterval(commentsPollRef.current!);
+            setCommentsErrorCode(sd.error_code || '');
+            setCommentsError(sd.error || 'Scraping failed');
+            setCommentsStatus('');
+            setCommentsLoading(false);
+          }
+        } catch {
+          // Network hiccup — keep polling
+        }
+      }, 1500);
+
     } catch (e: any) {
       if (e.message?.includes('Failed to fetch') || e.message?.includes('connect')) {
         setCommentsError('Could not connect to Flask server. Make sure the "Flask Server" workflow is running.');
@@ -228,7 +273,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
       } else {
         setCommentsError(e.message || 'Something went wrong');
       }
-    } finally {
+      setCommentsStatus('');
       setCommentsLoading(false);
     }
   };
@@ -536,6 +581,8 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
                 <option value="50">Top 50</option>
                 <option value="100">Top 100</option>
                 <option value="500">Top 500</option>
+                <option value="1000">Top 1,000</option>
+                <option value="5000">Top 5,000</option>
                 <option value="all">All comments</option>
               </select>
             </div>
@@ -548,6 +595,10 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
               {commentsLoading ? 'Scraping…' : 'Get Comments'}
             </button>
           </div>
+
+          {commentsLoading && commentsStatus && (
+            <p className="text-[11px] text-purple-400 animate-pulse">⟳ {commentsStatus}</p>
+          )}
 
           <p className="text-[11px] text-gray-600">
             Requires Instagram login cookies for most posts. Upload cookies.txt above first.
