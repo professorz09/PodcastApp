@@ -70,6 +70,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const [songError, setSongError] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const isInitialized = useRef(false);
 
   // ── STT transcript ───────────────────────────────────────────
   const [isTranscribing, setIsTranscribing]   = useState(false);
