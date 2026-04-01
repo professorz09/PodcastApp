@@ -403,57 +403,41 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <span className="text-[10px] font-semibold uppercase tracking-wider">Style</span>
                   </div>
                   <select
-                    value={style}
+                    value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
                       const newStyle = e.target.value as any;
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
+                      if (newStyle === 'context_bridge') { setSpeakerCount(1); }
                       if (newStyle === 'debate') { setSpeakerCount(2); }
                       if (newStyle === 'explained') { setSpeakerCount(2); }
+                      if (newStyle === 'podcast_breakdown') { setSpeakerCount(2); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
                     <option value="debate">Debate</option>
                     <option value="explained">Explained</option>
                     <option value="situational">Situational</option>
-                    <option value="podcast_panel">Podcast Style</option>
+                    <option value="podcast_panel">Podcast Panel</option>
+                    <option value="podcast_breakdown">Podcast Breakdown</option>
+                    <option value="context_bridge">Context Analyst</option>
                   </select>
                 </div>
               </div>
 
-              {/* Context Analyst — separate button, only when transcript is loaded */}
-              {contextFileContent && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (style === 'context_bridge') {
-                      setStyle('podcast_panel');
-                      setSpeakerCount(3);
-                      setDuration(8);
-                    } else {
-                      setStyle('context_bridge');
-                      setSpeakerCount(1);
-                      setDuration(8);
-                    }
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left ${
-                    style === 'context_bridge'
-                      ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-300'
-                      : 'border-white/8 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/15 text-gray-400 hover:text-gray-200'
-                  }`}
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${style === 'context_bridge' ? 'bg-cyan-500/20' : 'bg-white/5'}`}>
-                    <BookOpen size={13} className={style === 'context_bridge' ? 'text-cyan-400' : 'text-gray-500'} />
+              {/* Context Analyst info — shown when selected from dropdown */}
+              {style === 'context_bridge' && (
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-cyan-500/30 bg-cyan-500/8 text-cyan-300">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-cyan-500/20">
+                    <BookOpen size={13} className="text-cyan-400" />
                   </div>
                   <div className="min-w-0">
                     <div className="text-[11px] font-semibold leading-tight">Context Analyst</div>
-                    <div className="text-[10px] opacity-60 leading-tight mt-0.5">1 speaker · Google Search · Source timeline</div>
+                    <div className="text-[10px] opacity-60 leading-tight mt-0.5">1 speaker · Deep analysis · Source timeline</div>
                   </div>
-                  {style === 'context_bridge' && (
-                    <div className="ml-auto text-[9px] font-bold text-cyan-400 bg-cyan-500/15 px-2 py-0.5 rounded-full shrink-0">ACTIVE</div>
-                  )}
-                </button>
+                  <div className="ml-auto text-[9px] font-bold text-cyan-400 bg-cyan-500/15 px-2 py-0.5 rounded-full shrink-0">ACTIVE</div>
+                </div>
               )}
 
               {/* Language & Narrator Row */}
