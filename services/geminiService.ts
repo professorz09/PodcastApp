@@ -445,32 +445,15 @@ export const generateDebateScript = async (
               ══════════════════════════════════════════
 
               ⚡ RULE #0 — HOOK: पहली LINE ही audience को रोक दे।
-              Generic openings BANNED हैं: "Hi, मैं आज एक situation share करना चाहता हूँ..." — यह मत लिखो।
-              पहली line में IMMEDIATELY punch होनी चाहिए। नीचे से कोई एक pattern choose करो:
-
-              ┌─────────────────────────────────────────────────────┐
-              │ HOOK PATTERN 1 — REVERSE REVEAL (सबसे powerful)     │
-              │ Result पहले बताओ, फिर story उलटी चलाओ              │
-              │ "तीन महीने पहले मेरे account में $178,000 थे।       │
-              │  आज मेरे पास $47 हैं। और यह कोई जुआ नहीं था।"      │
-              ├─────────────────────────────────────────────────────┤
-              │ HOOK PATTERN 2 — MID-SCENE DROP                     │
-              │ सबसे worst moment के बीच से शुरू करो               │
-              │ "मैं office parking lot में अपनी car में बैठा था,   │
-              │  lunch कर रहा था। Phone vibrate किया।               │
-              │  Screen पर था — IRS Notice: $67,000 due."           │
-              ├─────────────────────────────────────────────────────┤
-              │ HOOK PATTERN 3 — IMPOSSIBLE CONTRADICTION           │
-              │ जो impossible लगे वो सच हो                         │
-              │ "मैं एक software engineer हूँ। $130k salary है।     │
-              │  और मैं financially इतना broke हूँ कि rent नहीं    │
-              │  दे पा रहा। हाँ, यह possible है।"                  │
-              ├─────────────────────────────────────────────────────┤
-              │ HOOK PATTERN 4 — TICKING CLOCK                      │
-              │ Immediate urgency — deadline दिखाओ                  │
-              │ "मेरे पास 14 दिन हैं। उसके बाद या तो मैं decide   │
-              │  करता हूँ, या decision मेरे लिए हो जाएगा।"         │
-              └─────────────────────────────────────────────────────┘
+              BANNED openings: "Hi, मैं आज share करना चाहता हूँ...", "Toh basically...", "Mera naam X hai..."
+              पहली line audience के दिमाग में एक सवाल पैदा करे — "यह कैसे हुआ?", "आगे क्या होगा?", "यह तो मेरी ही situation है!"
+              कोई fixed formula नहीं — situation के हिसाब से जो सबसे ज़्यादा punch करे, वो लिखो।
+              Examples for inspiration only (इन्हें copy मत करो, इनसे सीखो):
+                → "तीन महीने पहले मेरे account में $178,000 थे। आज $47 हैं।" (outcome पहले)
+                → "मैं office parking lot में था। Phone आया — IRS: $67,000 due।" (moment में drop)
+                → "$130k salary है। Rent नहीं दे पा रहा। हाँ, यह possible है।" (contradiction)
+                → "मेरे पास 14 दिन हैं decide करने के लिए। अभी तक नहीं पता क्या करूँ।" (urgency)
+              Hook 1-2 lines — बाकी story naturally build हो।
 
               Hook के बाद STORY आती है — यह arc follow करो:
               → Scene: कहाँ थे, क्या सोच रहे थे, life normal थी
@@ -1024,34 +1007,16 @@ export const generateDebateScript = async (
             【 SPEAKER 1 — THE HOOK + STORY (the person in the situation) 】
             ══════════════════════════════════════════
 
-            ⚡ RULE #0 — THE HOOK: The very first line must STOP the audience cold.
-            BANNED openers: "Hi, so today I want to share something...", "Okay so basically...", "Let me tell you my story..." — NEVER write these.
-            The first line must create INSTANT curiosity. Choose one of these proven hook patterns:
-
-            ┌──────────────────────────────────────────────────────────┐
-            │ HOOK PATTERN 1 — REVERSE REVEAL (most powerful)          │
-            │ State the shocking outcome first, then unravel the story  │
-            │ "Three months ago I had $178,000 in my savings account.  │
-            │  Today I have $47. And it wasn't gambling."              │
-            ├──────────────────────────────────────────────────────────┤
-            │ HOOK PATTERN 2 — MID-SCENE DROP                          │
-            │ Drop into the exact worst moment — already in progress   │
-            │ "I was eating lunch in my car in the office parking lot. │
-            │  My phone buzzed. IRS Notice: $67,000 due. I just sat    │
-            │  there. Couldn't move."                                  │
-            ├──────────────────────────────────────────────────────────┤
-            │ HOOK PATTERN 3 — IMPOSSIBLE CONTRADICTION                │
-            │ Something that sounds impossible — but is true           │
-            │ "I'm a software engineer making $130k a year in          │
-            │  California. And I can't pay my rent this month.         │
-            │  Yeah. That's possible."                                 │
-            ├──────────────────────────────────────────────────────────┤
-            │ HOOK PATTERN 4 — TICKING CLOCK                           │
-            │ Immediate hard deadline creates urgency                  │
-            │ "I have 14 days to make a decision. After that, the      │
-            │  decision gets made for me. And I still don't know       │
-            │  what to do."                                            │
-            └──────────────────────────────────────────────────────────┘
+            ⚡ RULE #0 — THE HOOK: The very first line must stop the audience cold.
+            BANNED openers: "Hi, so today I want to share...", "Okay so basically...", "Let me tell you my story..." — never write these.
+            The first line should plant a question in the listener's head: "How did that happen?", "What comes next?", "Wait — that's me."
+            No fixed formula — write whatever hits hardest for THIS specific situation.
+            Examples for inspiration only (don't copy, learn the principle):
+              → "Three months ago I had $178,000 in savings. Today I have $47." (outcome first)
+              → "I was eating lunch in my car. Phone buzzed — IRS: $67,000 due." (drop mid-scene)
+              → "I make $130k a year in California. I can't pay rent this month." (contradiction)
+              → "I have 14 days to decide. I still have no idea what to do." (urgency)
+            Hook = 1–2 lines max. The story builds naturally from there.
 
             After the hook, the STORY unfolds — follow this arc:
             → Scene: where you were, what life looked like before
