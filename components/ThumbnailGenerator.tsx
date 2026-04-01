@@ -60,53 +60,59 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const hasEitherSource = hasScript || hasTranscript;
   const isStyleCopyMode = !!referenceImage;
 
+  const defaultStyleImageMap: Record<ThumbnailVideoStyle, string> = {
+    situational: '/default-style-situational.jpg',
+    debate: '/default-style-debate.jpg',
+    podcast: '/default-thumbnail-style.jpg',
+  };
+
+  const loadDefaultImage = (style: ThumbnailVideoStyle, extraUpdates: Partial<ThumbnailState> = {}) => {
+    fetch(defaultStyleImageMap[style])
+      .then(r => r.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const result = ev.target?.result as string;
+          const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+          if (match) {
+            setIsDefaultStyle(true);
+            onUpdateThumbnailState({
+              ...thumbnailState,
+              ...extraUpdates,
+              referenceImage: { mimeType: match[1], data: match[2], url: result },
+            });
+          }
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {});
+  };
+
   // Only initialize speaker names on mount — NO auto-generate
   useEffect(() => {
     const speakers = Array.from(new Set<string>(script.map(s => s.speaker))).filter(s => s !== 'Narrator');
     const updates: Partial<ThumbnailState> = {};
     let changed = false;
 
-    if (!hostName && speakers.length >= 1) {
-      updates.hostName = speakers[0];
-      changed = true;
-    }
-    if (!guestName && speakers.length >= 2) {
-      updates.guestName = speakers[1];
-      changed = true;
-    } else if (!guestName && speakers.length === 1) {
-      updates.guestName = speakers[0];
-      changed = true;
-    }
+    if (!hostName && speakers.length >= 1) { updates.hostName = speakers[0]; changed = true; }
+    if (!guestName && speakers.length >= 2) { updates.guestName = speakers[1]; changed = true; }
+    else if (!guestName && speakers.length === 1) { updates.guestName = speakers[0]; changed = true; }
 
     const effectiveSource: TitleSource = hasScript ? 'script' : 'transcript';
     setTitleSource(effectiveSource);
 
-    // Pre-load default thumbnail style image if none is set
     if (!referenceImage) {
-      fetch('/default-thumbnail-style.jpg')
-        .then(r => r.blob())
-        .then(blob => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const result = ev.target?.result as string;
-            const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-            if (match) {
-              updates.referenceImage = { mimeType: match[1], data: match[2], url: result };
-              changed = true;
-              setIsDefaultStyle(true);
-              onUpdateThumbnailState({ ...thumbnailState, ...updates });
-            }
-          };
-          reader.readAsDataURL(blob);
-        })
-        .catch(() => {});
+      loadDefaultImage(videoStyle, changed ? updates : {});
       return;
     }
 
-    if (changed) {
-      onUpdateThumbnailState({ ...thumbnailState, ...updates });
-    }
+    if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates });
   }, []);
+
+  // Swap default image when style changes (only if current image is a default)
+  useEffect(() => {
+    if (isDefaultStyle) loadDefaultImage(videoStyle);
+  }, [videoStyle]);
 
   const getSourceText = (source: TitleSource): string => {
     if (source === 'transcript' && hasTranscript) return youtubeData!.fullText;
