@@ -234,6 +234,56 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
   }
 };
 
+export const generateTitleTextPair = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<{ title: string; thumbnailText: string }[]> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const styleGuide = videoStyle === 'situational'
+    ? `STYLE — Situational / Personal Story:
+- Title: Full YouTube title. Specific story hook, emotionally charged. 55-70 chars. E.g. "Maine Apni Naukri, Biwi Aur Ghar 6 Mahine Mein Kho Diya"
+- Thumbnail text: 2-5 word BOLD CAPS hook on thumbnail. Must COMPLEMENT the title (not repeat it). E.g. if title says "lost everything" → thumbnail says "IT COLLAPSED" or "NO WAY BACK"
+- The pair should together tell a bigger story than either alone.`
+    : videoStyle === 'debate'
+    ? `STYLE — Debate / Two Sides:
+- Title: Clear two-sides framing. Who's right, who's wrong, big clash. 55-70 chars.
+- Thumbnail text: 2-5 word confrontational CAPS question or claim. Complements title — adds heat.
+- E.g. Title: "Is Hustle Culture Destroying Your Life?" → Thumbnail: "STOP GRINDING"`
+    : `STYLE — Podcast / High Energy:
+- Title: Shocking revelation or curiosity bait. Drop a bombshell. 55-65 chars.
+- Thumbnail text: 2-5 word explosive CAPS hook. Amplifies what the title hints at.
+- E.g. Title: "He Walked Away From a $10M Deal — Here's Why" → Thumbnail: "WALKED AWAY"`;
+
+  const prompt = `You are a viral YouTube content strategist. Read the script and generate 3 paired combos — each combo has a (Title + Thumbnail Text) that COMPLEMENT each other perfectly.
+
+${styleGuide}
+
+RULES:
+- Title: Full YouTube video title. Specific, emotional, clear. Under 70 chars.
+- Thumbnail text: 2-5 words MAX. ALL CAPS for power words. NO repetition from the title — it should ADD to it, not echo it.
+- Together they should create more curiosity than either alone.
+- Match script language: Hindi-heavy script → Hinglish okay. English script → English.
+- Return ONLY valid JSON: array of 3 objects with keys "title" and "thumbnailText". No markdown.
+
+SCRIPT:
+${scriptText.slice(0, 3000)}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
+    let jsonText = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(jsonText);
+    return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
+  } catch (error: any) {
+    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
+      throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
+    }
+    console.error("Error in generateTitleTextPair:", error);
+    throw error;
+  }
+};
+
 export const generateThumbnailInspiration = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<string> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebateSegment, ThumbnailState, YoutubeImportData } from '../types';
-import { generateThumbnail, generateTitles, generateThumbnailText, generateThumbnailInspiration, ThumbnailVideoStyle } from '../services/geminiService';
+import { generateThumbnail, generateTitles, generateThumbnailText, generateThumbnailInspiration, generateTitleTextPair, ThumbnailVideoStyle } from '../services/geminiService';
 import {
   Image, Loader2, RefreshCw, Download, ChevronLeft, X, ArrowRight,
   Upload, FileText, AlignLeft, Zap, Copy, Check, Wand2, Info,
@@ -43,6 +43,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
   const [isGeneratingThumbnailText, setIsGeneratingThumbnailText] = useState(false);
   const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
+  const [pairs, setPairs] = useState<{ title: string; thumbnailText: string }[]>([]);
+  const [isGeneratingPair, setIsGeneratingPair] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
@@ -196,6 +198,28 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     }
   };
 
+  const handleGeneratePair = async () => {
+    const sourceText = getSourceText(titleSource);
+    if (!sourceText) return;
+    setIsGeneratingPair(true);
+    try {
+      const result = await generateTitleTextPair(sourceText, videoStyle);
+      setPairs(result);
+    } catch (err: any) {
+      console.error('Pair generation error', err);
+    } finally {
+      setIsGeneratingPair(false);
+    }
+  };
+
+  const handleSelectPair = (pair: { title: string; thumbnailText: string }) => {
+    onUpdateThumbnailState({
+      ...thumbnailState,
+      selectedTitle: pair.title,
+      selectedThumbnailText: pair.thumbnailText,
+    });
+  };
+
   const handleInspire = async () => {
     const sourceText = getSourceText(titleSource);
     if (!sourceText) return;
@@ -320,6 +344,64 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* ── COMBO: Generate Both Together ── */}
+              <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-500/25 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] text-yellow-400/90 uppercase tracking-widest font-semibold flex items-center gap-1.5">
+                      <Zap size={11} className="text-yellow-400" />
+                      Combo — Title + Thumbnail Text
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">Dono ek saath milenge — ek dusre ke complement hote hain</p>
+                  </div>
+                  <button
+                    onClick={handleGeneratePair}
+                    disabled={isGeneratingPair || !hasEitherSource}
+                    className="flex items-center gap-1.5 bg-yellow-500/20 hover:bg-yellow-500/35 border border-yellow-400/40 text-yellow-300 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
+                  >
+                    {isGeneratingPair
+                      ? <Loader2 size={12} className="animate-spin" />
+                      : <Zap size={12} />
+                    }
+                    {pairs.length > 0 ? 'Regenerate' : 'Generate Both'}
+                  </button>
+                </div>
+
+                {isGeneratingPair ? (
+                  <div className="flex items-center gap-2 text-gray-500 py-3">
+                    <Loader2 className="animate-spin" size={14} />
+                    <span className="text-sm">Matched pairs ban rahe hain...</span>
+                  </div>
+                ) : pairs.length > 0 ? (
+                  <div className="space-y-2">
+                    {pairs.map((pair, idx) => {
+                      const isSelected = selectedTitle === pair.title && selectedThumbnailText === pair.thumbnailText;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => handleSelectPair(pair)}
+                          className={`group cursor-pointer rounded-xl border p-3 transition-all space-y-1.5 ${
+                            isSelected
+                              ? 'bg-yellow-600/20 border-yellow-400/60'
+                              : 'bg-white/3 border-white/8 hover:bg-white/6 hover:border-white/15'
+                          }`}
+                        >
+                          <p className="text-xs text-gray-400 leading-snug">{pair.title}</p>
+                          <p className={`text-base font-black tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>{pair.thumbnailText}</p>
+                          {isSelected && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-semibold">
+                              <Check size={9} /> Selected
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-600 py-1">"Generate Both" dabao → 3 matched pairs milenge. Ek click mein dono set ho jaayenge.</p>
+                )}
+              </div>
 
               {/* ── STEP 1: Video Title ── */}
               <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
