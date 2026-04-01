@@ -87,7 +87,7 @@ const App: React.FC = () => {
         }
 
         const isImportState = (s: AppState) =>
-          s === AppState.IMPORT || s === AppState.LYRICS ||
+          s === AppState.IMPORT ||
           s === AppState.YOUTUBE_IMPORT || s === AppState.INSTAGRAM_IMPORT || s === AppState.REDDIT_IMPORT;
 
         if (stored.script.length > 0) {
@@ -281,18 +281,18 @@ const App: React.FC = () => {
 
             {/* Text */}
             <h2 className="text-white font-bold text-lg leading-snug mb-1">
-              New Project shuru karo?
+              Start a New Project?
             </h2>
             <p className="text-gray-500 text-sm leading-relaxed mb-1">
-              Current project ki <span className="text-gray-300 font-medium">saari progress</span> hamesha ke liye delete ho jayegi.
+              All current project <span className="text-gray-300 font-medium">progress will be permanently deleted.</span>
             </p>
-            <p className="text-gray-700 text-xs">Script, audio, thumbnail — sab kuch.</p>
+            <p className="text-gray-700 text-xs">Script, audio, thumbnail — everything.</p>
 
             {/* Warning box */}
             <div className="mt-4 flex items-start gap-2.5 bg-red-500/5 border border-red-500/15 rounded-xl px-3.5 py-3">
               <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
               <p className="text-red-300/80 text-xs leading-relaxed">
-                Yeh action undo nahi ho sakta.
+                This action cannot be undone.
               </p>
             </div>
 
@@ -308,7 +308,7 @@ const App: React.FC = () => {
                 onClick={confirmReset}
                 className="flex-1 py-3 rounded-xl text-sm font-bold bg-red-600/80 hover:bg-red-600 text-white border border-red-500/30 transition-all shadow-lg shadow-red-900/30"
               >
-                Haan, Reset Karo
+                Yes, Reset
               </button>
             </div>
           </div>
@@ -348,7 +348,7 @@ const App: React.FC = () => {
               contextFileName: fileName,
             }));
           }}
-          onSkip={() => setAppState(AppState.LYRICS)}
+          onSkip={() => setAppState(AppState.INPUT)}
         />
       )}
 

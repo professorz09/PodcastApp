@@ -124,6 +124,14 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
     isInitialized.current = true;
   }, []);
 
+  // ── Cleanup: revoke object URL on unmount ────────────────────
+  useEffect(() => {
+    return () => {
+      if (songUrl) URL.revokeObjectURL(songUrl);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Persistence: save lyrics + form data ─────────────────────
   // Guard: only save AFTER initial load is done (prevents race condition
   // where mount-time save with empty state overwrites restored data)
@@ -214,9 +222,9 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const lyricsLines = lyrics.split('\n').filter(l => l.trim());
 
   const PHASES: { id: Phase; label: string; icon: React.ElementType }[] = [
+    { id: 'write',  label: 'Lyrics',       icon: FileText  },
     { id: 'song',   label: 'Song',         icon: Music2    },
     { id: 'canvas', label: 'Video Canvas', icon: Video     },
-    { id: 'write',  label: 'Lyrics',       icon: FileText  },
   ];
 
   if (showCanvas) {
