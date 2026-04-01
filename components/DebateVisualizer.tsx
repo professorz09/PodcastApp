@@ -1221,17 +1221,33 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
       const y = yPct * canvas.height;
       
       if (theme === 'minimal') {
-          // Minimal: Large Vertical Rectangles
-          const w = 240 * speakerScale;
-          const h = 320 * speakerScale;
+          // Minimal: Large Vertical Rectangles with audio-reactive pulse + VU meter
+          const baseW = 240 * speakerScale;
+          const baseH = 320 * speakerScale;
+          const pulse = isActive ? 1 + (audioLevel * 0.06) : 1;
+          const w = baseW * pulse;
+          const h = baseH * pulse;
           const rectX = x - w/2;
           const rectY = y - h/2 + 50; // Shift down a bit
-          
+
+          // Glow halo when active
+          if (isActive) {
+              ctx.save();
+              ctx.shadowColor = color;
+              ctx.shadowBlur = 36 * audioLevel;
+              ctx.beginPath();
+              ctx.roundRect(rectX - 4, rectY - 4, w + 8, h + 8, 32);
+              ctx.strokeStyle = color;
+              ctx.lineWidth = 3;
+              ctx.stroke();
+              ctx.restore();
+          }
+
           ctx.save();
           ctx.beginPath();
           ctx.roundRect(rectX, rectY, w, h, 30);
           ctx.clip();
-          
+
           if (image) {
               // Draw image cover to fill the entire rectangle
               const scale = Math.max(w / image.width, h / image.height);
@@ -1240,19 +1256,18 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
               ctx.drawImage(image, rectX + w/2 - imgW/2, rectY + h/2 - imgH/2, imgW, imgH);
           } else {
               // Fallback to avatar rectangle if no image
-              ctx.fillStyle = '#1e1e1e'; // Dark background
+              ctx.fillStyle = '#1e1e1e';
               ctx.fill();
-              
-              const boxW = 120 * speakerScale;
-              const boxH = 120 * speakerScale;
+
+              const boxW = 120 * speakerScale * pulse;
+              const boxH = 120 * speakerScale * pulse;
               ctx.beginPath();
               ctx.roundRect(x - boxW/2, rectY + h/2 - 40 - boxH/2, boxW, boxH, 20);
               ctx.fillStyle = '#27272a';
               ctx.fill();
-              
-              // Initial
+
               ctx.fillStyle = '#fff';
-              ctx.font = 'bold 40px sans-serif';
+              ctx.font = `bold ${40 * pulse}px sans-serif`;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText(label.charAt(0), x, rectY + h/2 - 40);
@@ -1267,6 +1282,123 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
           ctx.stroke();
 
           drawNameLowerThird(label, color, rectX, rectY, w, h, 30);
+
+          // ── VU meter (same styles as transparent-avatars) ───────────────────
+          if (showVuMeter && isActive) {
+
+              // ── RING: semicircular arc on top of frame ──────────────────────
+              if (vuMeterStyle === 'ring') {
+                  const lv = Math.max(0.02, audioLevel);
+                  const cx = rectX + w / 2;
+                  const cy = rectY;
+                  const R  = w / 2 + 20;
+                  const TW = 11;
+                  ctx.save();
+                  ctx.lineCap = 'round';
+                  ctx.beginPath();
+                  ctx.arc(cx, cy, R, Math.PI, 0, false);
+                  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                  ctx.lineWidth = TW + 4;
+                  ctx.stroke();
+                  const endA = Math.PI + lv * Math.PI;
+                  const grd2 = ctx.createLinearGradient(cx - R, cy, cx + R, cy);
+                  grd2.addColorStop(0,    '#6366f1');
+                  grd2.addColorStop(0.25, '#06b6d4');
+                  grd2.addColorStop(0.5,  '#10b981');
+                  grd2.addColorStop(0.75, '#f59e0b');
+                  grd2.addColorStop(1,    '#ef4444');
+                  ctx.beginPath();
+                  ctx.arc(cx, cy, R, Math.PI, endA, false);
+                  ctx.strokeStyle = grd2;
+                  ctx.lineWidth = TW;
+                  ctx.shadowColor = lv > 0.7 ? '#f59e0b' : lv > 0.4 ? '#06b6d4' : '#6366f1';
+                  ctx.shadowBlur  = 14 + lv * 18;
+                  ctx.stroke();
+                  const capX2 = cx + Math.cos(endA) * R;
+                  const capY2 = cy + Math.sin(endA) * R;
+                  ctx.beginPath();
+                  ctx.arc(capX2, capY2, TW / 2, 0, Math.PI * 2);
+                  ctx.fillStyle = '#ffffff';
+                  ctx.shadowColor = '#ffffff';
+                  ctx.shadowBlur  = 12;
+                  ctx.fill();
+                  ctx.restore();
+              }
+
+              // ── GLOW: pulsing concentric rings around entire photo frame ────
+              if (vuMeterStyle === 'glow') {
+                  const lv = Math.max(0.05, audioLevel);
+                  const RING_COUNT = 4;
+                  ctx.save();
+                  for (let ri = 0; ri < RING_COUNT; ri++) {
+                      const spread = 8 + ri * 14 + lv * (ri + 1) * 18;
+                      const alpha  = (0.55 - ri * 0.11) * lv;
+                      const lw     = Math.max(0.5, 3.5 - ri * 0.7);
+                      ctx.globalAlpha = alpha;
+                      ctx.shadowColor = color;
+                      ctx.shadowBlur  = 18 + ri * 8 + lv * 20;
+                      ctx.strokeStyle = color;
+                      ctx.lineWidth   = lw;
+                      ctx.beginPath();
+                      ctx.roundRect(
+                          rectX - spread, rectY - spread,
+                          w + spread * 2, h + spread * 2,
+                          30 + spread * 0.5
+                      );
+                      ctx.stroke();
+                      ctx.shadowBlur = 0;
+                  }
+                  ctx.globalAlpha = lv * 0.7;
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.lineWidth   = 1.5;
+                  ctx.shadowColor = '#ffffff';
+                  ctx.shadowBlur  = 12 + lv * 16;
+                  ctx.beginPath();
+                  ctx.roundRect(rectX - 3, rectY - 3, w + 6, h + 6, 33);
+                  ctx.stroke();
+                  ctx.globalAlpha = 1;
+                  ctx.restore();
+              }
+
+              // ── WAVE: waveform bars below the photo frame ──────────────────
+              if (vuMeterStyle === 'wave') {
+                  const lv  = Math.max(0.04, audioLevel);
+                  const BAR = 30;
+                  const BAR_W   = (w * 0.92) / (BAR * 1.45);
+                  const GAP_W   = BAR_W * 0.45;
+                  const MAX_H   = h * 0.55;
+                  const MIN_H   = 3 * speakerScale;
+                  const waveY   = rectY + h + 10 * speakerScale;
+                  const startX  = rectX + w * 0.04;
+                  const t       = audioRef.current ? audioRef.current.currentTime : (Date.now() / 1000);
+
+                  ctx.save();
+                  for (let bi = 0; bi < BAR; bi++) {
+                      const frac = bi / (BAR - 1);
+                      const centreBoost = 1 - Math.abs(frac - 0.5) * 1.3;
+                      const sineA = Math.sin(t * 4.5 + bi * 0.55) * 0.35;
+                      const sineB = Math.sin(t * 7.0 + bi * 0.9  + 1.2) * 0.15;
+                      const raw   = Math.max(0, centreBoost * lv + sineA * lv + sineB);
+                      const barH  = Math.max(MIN_H, raw * MAX_H);
+                      const bx2   = startX + bi * (BAR_W + GAP_W);
+                      const stops = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444'];
+                      const ci    = Math.min(stops.length - 1, Math.floor(frac * stops.length));
+                      const barColor = stops[ci];
+                      ctx.globalAlpha = 0.5 + 0.5 * lv;
+                      ctx.shadowColor = barColor;
+                      ctx.shadowBlur  = 6 + lv * 10;
+                      ctx.fillStyle   = barColor;
+                      ctx.beginPath();
+                      ctx.roundRect(bx2, waveY - barH, BAR_W, barH, 2);
+                      ctx.fill();
+                      ctx.shadowBlur  = 0;
+                  }
+                  ctx.globalAlpha = 1;
+                  ctx.restore();
+              }
+          }
+
+          return; // VU effects drawn — skip outer ring block
 
       } else if (theme === 'split') {
           // Split: Wide Rectangles with LIVE badge
