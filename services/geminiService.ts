@@ -1897,7 +1897,7 @@ Return ONLY a structured list — no commentary, no explanation. Be extremely sp
   return text.trim();
 };
 
-export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'generating') => void): Promise<string> => {
+export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'generating') => void, videoStyle?: string, scriptText?: string): Promise<string> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
@@ -1914,7 +1914,48 @@ export const generateThumbnail = async (title: string, hostName: string, guestNa
 
     // Step 2: Generate using extracted style, creative content based on topic
     onStep?.('generating');
-    prompt = `You are a world-class YouTube thumbnail designer.
+
+    if (videoStyle === 'situational') {
+      const scriptSnippet = scriptText?.slice(0, 2000) || '';
+      prompt = `You are a world-class YouTube thumbnail designer specializing in personal story / situational content.
+
+VISUAL STYLE GUIDE (extracted from a reference thumbnail — follow this religiously):
+${styleAnalysis}
+
+YOUR TASK:
+Create a powerful single-person YouTube thumbnail for the story/situation below.
+
+CRITICAL — ANALYZE THE SCRIPT AND DETERMINE THE PERSON TYPE:
+Read the script carefully and identify WHO the main person is. Choose the person appearance from these types:
+- Young man (22-30, modern casual clothes, city person)
+- Middle-class man (30-45, plain shirt or simple suit, ordinary look)
+- Wealthy/rich man (40-55, expensive suit, watch, polished look)
+- Young woman (22-32, modern professional or casual)
+- Middle-aged woman (35-50, everyday practical look)
+- Attractive/stylish woman (25-38, fashionable, confident)
+- Elderly man or woman (60+, aged face, life-worn look)
+- Working class / simple person (any age, plain worn clothes)
+Pick the type that EXACTLY matches who this story is about. Generate a PHOTOREALISTIC person of that type.
+
+SCRIPT / TOPIC CONTENT:
+${scriptSnippet}
+
+HOOK TEXT: "${title}"
+
+LAYOUT (follow this strictly):
+- ONE person only — positioned on the RIGHT side of the frame, looking slightly left (toward the text), seated or slightly turned, natural pose
+- Hook text on the LEFT side — bold, large, prominent, 2-3 lines max
+- Background: match the style guide (dark, dramatic, textured)
+- Expression: matches the emotional weight of the topic — stressed, reflective, shocked, or determined based on the content
+- A studio microphone visible near the person (subtle, not dominant)
+- NO second person. NO split screen. ONE compelling face that tells the whole story.
+
+STYLE RULES (non-negotiable):
+- Match color palette, typography, background mood from the style guide EXACTLY
+- Photorealistic, high quality, 16:9 YouTube thumbnail
+- Do NOT copy any people, text, or logos from the reference${extraNote}`;
+    } else {
+      prompt = `You are a world-class YouTube thumbnail designer.
 
 VISUAL STYLE GUIDE (extracted from a reference thumbnail — follow this religiously):
 ${styleAnalysis}
@@ -1939,6 +1980,7 @@ STYLE RULES (non-negotiable):
 - The text "${title}" must be clearly readable and prominent
 - Photorealistic, high quality, 16:9 YouTube thumbnail
 - Do NOT copy any people, text, or logos from the reference${extraNote}`;
+    }
 
   } else {
     prompt = `

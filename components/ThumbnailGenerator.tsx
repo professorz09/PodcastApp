@@ -72,6 +72,29 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     const effectiveSource: TitleSource = hasScript ? 'script' : 'transcript';
     setTitleSource(effectiveSource);
 
+    // Auto-load Situational default style image
+    if (videoStyle === 'situational' && !referenceImage) {
+      fetch('/default-style-situational.jpg')
+        .then(r => r.blob())
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const result = ev.target?.result as string;
+            const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+            if (match) {
+              onUpdateThumbnailState({
+                ...thumbnailState,
+                ...( changed ? updates : {}),
+                referenceImage: { mimeType: match[1], data: match[2], url: result },
+              });
+            }
+          };
+          reader.readAsDataURL(blob);
+        })
+        .catch(() => { if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates }); });
+      return;
+    }
+
     if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates });
   }, []);
 
@@ -156,9 +179,12 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       const refImgData = referenceImage
         ? { data: referenceImage.data, mimeType: referenceImage.mimeType }
         : undefined;
+      const scriptTextForGen = videoStyle === 'situational' ? getSourceText(titleSource) : undefined;
       const url = await generateThumbnail(
         textForThumbnail, hostName, guestName, refImgData, extraInstructions,
-        (step) => setLoadingStep(step)
+        (step) => setLoadingStep(step),
+        videoStyle,
+        scriptTextForGen
       );
       onUpdateThumbnailState({ ...thumbnailState, thumbnailUrl: url });
     } catch (error: any) {
