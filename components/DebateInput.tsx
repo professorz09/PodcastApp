@@ -500,7 +500,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <button
                       onClick={() => {
                         setIncludeNarrator(false);
-                        if (style === 'situational') setSpeakerCount(2);
+                        if (style === 'situational') setSpeakerCount(3);
                       }}
                       className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${
                         !includeNarrator

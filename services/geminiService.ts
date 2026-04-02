@@ -631,7 +631,7 @@ export const generateDebateScript = async (
               `;
             }
         } else if (style === 'situational') {
-          if (includeNarrator) {
+          if (!includeNarrator) {
             prompt = `
               विषय: "${topic}" पर एक "Situational" style की video script बनाओ।
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
@@ -1238,7 +1238,7 @@ export const generateDebateScript = async (
             `;
           }
         } else if (style === 'situational') {
-          if (includeNarrator) {
+          if (!includeNarrator) {
           prompt = `
             Generate a "Situational" style video script on the topic: "${topic}".
             ${specificDetails ? `Situation details: ${specificDetails}` : ''}
