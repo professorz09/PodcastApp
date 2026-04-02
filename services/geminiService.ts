@@ -453,7 +453,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' = 'debate',
+  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -701,6 +701,46 @@ export const generateDebateScript = async (
               ✗ Lecture mode — conversation होनी चाहिए
               ✓ हर major point = एक real, named example
               ✓ Emotional truth — audience को लगे "यार यह तो मेरी ही story है"
+              ══════════════════════════════════════════
+              ${durFillHi}
+            `;
+        } else if (style === 'documentary') {
+            prompt = `
+              विषय/Case: "${topic}" पर एक Documentary / True Crime style वीडियो script बनाओ।
+              ${specificDetails ? `Case की details और context: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: हिंदी + Hinglish (serious, gripping, cinematic tone)।
+
+              पात्र — ठीक 2 वक्ता:
+              ${speakers.length >= 2
+                ? `इन नामों का उपयोग करें: ${speakers[0]} और ${speakers[1]}.`
+                : `दो ऐसे नाम चुनो जो documentary anchor / investigative journalist जैसे लगें — topic और case के हिसाब से।`
+              }
+
+              ══════════════════════════════════════════
+              【 OPENING — Hook Intro (short, gripping) 】
+              ══════════════════════════════════════════
+              पहले 2-3 lines में case को tease करो — पूरा मत बताओ, बस इतना कि audience रुक जाए:
+              जैसे: "आज हम बात करेंगे [YEAR] के एक ऐसे case के बारे में जो..."
+              या: "[जगह], [DATE/TIME]... [एक chilling detail]"
+              Tone: serious, cinematic — news anchor का नहीं, documentary filmmaker का।
+
+              ══════════════════════════════════════════
+              【 STORY — Suspenseful Documentary Unfold 】
+              ══════════════════════════════════════════
+              → Scene setting: जगह, समय, माहौल — जैसे camera वहाँ मौजूद हो
+              → घटना step by step reveal हो — एक साथ dump नहीं
+              → हर reveal के साथ tension build हो — cliffhangers जहाँ audience सोचे "फिर क्या हुआ?"
+              → दोनों speakers एक-दूसरे को pass करते हुए आगे बढ़ें — जैसे Anchor + Investigative Journalist
+              → Facts और details को cinematic तरीके से present करो — dry reading नहीं
+
+              ══════════════════════════════════════════
+              RULES:
+              ══════════════════════════════════════════
+              ✗ "यह घटना बड़ी चौंकाने वाली थी", "आइए जानते हैं", "तो दोस्तों" — बिल्कुल banned
+              ✗ Generic filler — हर line में substance हो
+              ✓ Suspense पहले, facts बाद में — audience को खींचो
+              ✓ Cinematic, immersive — जैसे Netflix documentary चल रही हो
               ══════════════════════════════════════════
               ${durFillHi}
             `;
@@ -1229,6 +1269,46 @@ export const generateDebateScript = async (
             ✗ Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "I want to emphasize"
             ✓ Every major point = one real example with specific detail
             ✓ Audience should think: "Wait — this is literally my situation"
+            ══════════════════════════════════════════
+            ${durFillEn}
+          `;
+        } else if (style === 'documentary') {
+          prompt = `
+            Write a Documentary / True Crime style video script on: "${topic}".
+            ${specificDetails ? `Case details and context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}. Tone: serious, gripping, cinematic.
+
+            Characters — exactly 2 speakers:
+            ${speakers.length >= 2
+              ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
+              : `Choose two names that feel like documentary anchors or investigative journalists — fitting the tone and subject of the case.`
+            }
+
+            ══════════════════════════════════════════
+            【 OPENING — Hook Intro (short, gripping) 】
+            ══════════════════════════════════════════
+            First 2–3 lines only — tease the case, don't reveal it yet. Make the audience unable to look away:
+            e.g. "Today we're talking about a [YEAR] case that..." 
+            or: "[Location], [DATE/TIME]... [one chilling detail that raises questions]"
+            Tone: documentary filmmaker, not news anchor. Pull them in quietly.
+
+            ══════════════════════════════════════════
+            【 STORY — Suspenseful Documentary Unfold 】
+            ══════════════════════════════════════════
+            → Set the scene: place, time, atmosphere — like a camera is there
+            → Reveal the case step by step — don't dump everything at once
+            → Build tension with each reveal — cliffhangers that make the audience think "then what?"
+            → Both speakers pass the story to each other — like Anchor + Investigative Journalist
+            → Present facts cinematically — not dry reading, immersive storytelling
+
+            ══════════════════════════════════════════
+            RULES:
+            ══════════════════════════════════════════
+            ✗ Banned: "This was a shocking incident", "Let us find out", "So folks today"
+            ✗ No generic filler — every line must carry weight
+            ✓ Suspense first, facts second — draw them in, then reveal
+            ✓ Cinematic, immersive — like a Netflix documentary
             ══════════════════════════════════════════
             ${durFillEn}
           `;
