@@ -97,7 +97,15 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
   const maxWidth = subtitleConfig.w - (60 * fs);
-  const mode = (subtitleConfig.mode as string) || 'phrase';
+  // Normalise legacy mode strings → new mode keys
+  const rawMode = (subtitleConfig.mode as string) || 'phrase';
+  const modeMap: Record<string, string> = {
+    'full-word':   'phrase',   // old: full box word-by-word → phrase
+    'line-word':   'line',     // old: line word-by-word → line
+    'line-static': 'line',     // old: line static → line
+    // 'full-static' and all new keys pass through unchanged
+  };
+  const mode = modeMap[rawMode] ?? rawMode;
 
   // ── Helper: word-wrap ──────────────────────────────────────────
   const wrapText = (t: string): string[] => {
@@ -140,7 +148,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   // ── Determine visible lines based on mode + timing ────────────
   let visibleLines: string[] = [];
   const segStartTime = segmentOffsets[currentSegmentIndex] || 0;
-  const relTime = time - segStartTime;
+  const relTime = Math.max(0, time - segStartTime); // clamp to 0 — prevents negative offset glitches
 
   if (isQuestionModeActive || mode === 'full-static') {
     visibleLines = wrapText(text);
@@ -235,6 +243,9 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
       visibleLines = [allLines[activeLine] || ''];
     }
   }
+
+  // ── Guard: nothing to draw ────────────────────────────────────
+  if (!visibleLines.length || !visibleLines.join('').trim()) return;
 
   // ── Layout ────────────────────────────────────────────────────
   const lineHeight = fontSize * 1.5;

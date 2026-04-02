@@ -726,7 +726,8 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
       script, isPlaying, theme, showSubtitles, subtitleBackground, speakerLabels,
       speakerScale, showTimer, showSideStats, showVuMeter, vuMeterStyle, showSpeakerImages, showSpeakers, showScores, backgroundDim, speakerPositions, showNameLabels,
       background, speakerImages, currentSegmentBackground, segmentOffsets, currentSegmentIndex, segmentScores, activeSpeakers, showSettings, globalBackgroundColor, questionMode,
-      globalThemeConfig, narratorTextColor, showMinimalSpeakerName, showMinimalSideVU
+      globalThemeConfig, narratorTextColor, showMinimalSpeakerName, showMinimalSideVU,
+      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB
   ]);
 
   /* OLD RENDER
@@ -2224,11 +2225,11 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                 const rectY = sy - h/2 + 30;
                 if (x >= rectX && x <= rectX + w && y >= rectY && y <= rectY + h) hit = true;
             } else if (theme === 'arena') {
-                const w = 160 * speakerScale;
-                const h = 200 * speakerScale;
-                // rectX = x - w/2, rectY = y - h/2
+                const w = 240 * speakerScale;
+                const h = 320 * speakerScale;
+                // rectX = x - w/2, rectY = y - h/2 + 50 (matches arena drawSpeaker)
                 const rectX = sx - w/2;
-                const rectY = sy - h/2;
+                const rectY = sy - h/2 + 50;
                 if (x >= rectX && x <= rectX + w && y >= rectY && y <= rectY + h) hit = true;
             } else {
                 // Default Circle Hit Detection
