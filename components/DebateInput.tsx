@@ -31,7 +31,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [specificDetails, setSpecificDetails] = useState('');
   const [customScript, setCustomScript] = useState('');
-  const [includeNarrator, setIncludeNarrator] = useState(true);
+  const [includeNarrator, setIncludeNarrator] = useState(false);
   const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview'>('gemini-3-flash-preview');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
@@ -487,7 +487,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <button
                       onClick={() => {
                         setIncludeNarrator(true);
-                        if (style === 'situational') setSpeakerCount(3);
+                        setSpeakerCount(2);
                       }}
                       className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${
                         includeNarrator
