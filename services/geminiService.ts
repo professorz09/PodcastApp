@@ -720,13 +720,12 @@ export const generateDebateScript = async (
               }
 
               ══════════════════════════════════════════
-              【 NARRATOR — OPENING ONLY 】
+              【 NARRATOR 】
               ══════════════════════════════════════════
-              Narrator सिर्फ शुरुआत में आएगा — 2-3 lines में situation/dilemma को simple तरीके से explain करे।
+              Narrator शुरुआत में situation/dilemma को 2-3 lines में simple तरीके से explain करे — opening एक clear question पर खत्म हो।
               जैसे: "एक आदमी है जिसने loan लिया... bank ने उसके पैसे काट लिए... अब उसके पास दो रास्ते हैं।"
               या concept के लिए: "Trolley Problem — एक ट्राली है जो 5 लोगों की तरफ बढ़ रही है..."
-              Opening एक clear question पर खत्म हो — जो दोनों speakers के लिए debate का दरवाज़ा खोले।
-              Narrator के बाद debate शुरू — Narrator अब वापस नहीं आएगा।
+              Narrator बीच में भी आ सकता है — नया angle लाने के लिए, debate को नई direction देने के लिए, या दूसरा question पूछने के लिए।
 
               ══════════════════════════════════════════
               【 SPEAKERS — DILEMMA DEBATE 】
@@ -738,7 +737,7 @@ export const generateDebateScript = async (
 
               RULES:
               - Natural, human भाषा — AI clichés बिल्कुल नहीं
-              - Narrator सिर्फ opening में — बीच में या अंत में नहीं
+              - दोनों sides genuinely strong — कोई side obvious winner नहीं
               ══════════════════════════════════════════
               ${durFillHi}
             `;
@@ -1327,13 +1326,12 @@ export const generateDebateScript = async (
               }
 
               ══════════════════════════════════════════
-              【 NARRATOR — OPENING ONLY 】
+              【 NARRATOR 】
               ══════════════════════════════════════════
-              Narrator appears ONLY at the start — 2–3 lines to explain the situation/dilemma simply and clearly.
+              Narrator opens by explaining the situation/dilemma simply in 2–3 lines — end with one clear question that kicks off the debate.
               e.g. "A man took out a loan. The bank deducted money he never owed. Now he has two choices..."
               Or for a concept: "The Trolley Problem — a trolley is headed toward five people..."
-              End the opening with one clear question that opens the debate for both speakers.
-              Narrator does NOT return after this.
+              Narrator can also appear mid-debate — to introduce a new angle, shift the direction, or ask a follow-up question.
 
               ══════════════════════════════════════════
               【 SPEAKERS — DILEMMA DEBATE 】
@@ -1345,7 +1343,7 @@ export const generateDebateScript = async (
 
               RULES:
               - Natural, human language — no AI-speak
-              - Narrator only in the opening — never mid-debate or at the end
+              - Both sides genuinely strong — no obvious winner
               ══════════════════════════════════════════
               ${durFillEn}
             `;
