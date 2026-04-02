@@ -944,92 +944,85 @@ export const generateDebateScript = async (
         } else if (style === 'debate') {
             if (includeNarrator) {
               prompt = `
-                विषय: "${topic}" पर एक Debate style की वीडियो स्क्रिप्ट तैयार करें।
-                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                विषय: "${topic}" पर एक Debate style वीडियो स्क्रिप्ट लिखो।
+                ${specificDetails ? `अतिरिक्त संदर्भ: ${specificDetails}` : ''}
                 ${durLineHi}
-                भाषा: हिंदी (Hinglish ठीक है)।
+                भाषा: हिंदी / Hinglish (जैसा topic हो वैसा)।
 
                 पात्र:
-                - Narrator: एक (हमेशा "Narrator" नाम से)
-                - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `विषय के अनुरूप उचित नाम — जैसे एक side के support में, दूसरा side के support में`}
+                - Narrator: एक (हमेशा "Narrator" label से)
+                - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से सही नाम या persona चुनो — अगर real लोग हैं (Joe Rogan, Trump, Marx) तो उनकी real style में, अगर concept है (Veg vs Non-Veg, Socialism vs Capitalism) तो उस side के strong representative persona बनाओ`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Structure (Narrator ON — Point-by-Point Debate):
+                OPENING — NARRATOR (यही सबसे important है):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                - एक single, sharp, provocative QUESTION से शुरू करो जो topic का essence capture करे
+                - फिर 1-2 lines में Speaker A को introduce करो (कौन हैं, किस side पर)
+                - फिर 1-2 lines में Speaker B को introduce करो (कौन हैं, किस side पर)
+                - छोटा, punchy, engaging — ज़्यादा नहीं
 
-                【 शुरुआत — Narrator 】
-                - Topic introduce करो: यह बहस किस बारे में है, दोनों sides क्या हैं, क्यों यह important है
-                - एक sharp hook जो audience को engage करे
-
-                【 दोनों वक्ता — Short Opening Stand 】
-                - Speaker A: अपना stand short में बताए (2-3 lines) — किस side को support करता है और क्यों
-                - Speaker B: अपना opposing stand short में बताए (2-3 lines)
-
-                【 Narrator — Point 1 रखता है 】
-                - पहला key argument/point introduce करे जो इस topic में debatable है
-                - दोनों को direct करे इस point पर
-
-                【 दोनों वक्ता — Point 1 पर Arguments 】
-                - Speaker A: इस point पर अपना तर्क, data, example
-                - Speaker B: इस point पर counter-argument, अपना data, example
-                - 1-2 sharp rebuttals — back-and-forth
-
-                【 Narrator — Point 2 रखता है 】
-                - अगला debatable point introduce करे
-
-                【 दोनों वक्ता — Point 2 पर Arguments 】
-                - Same pattern — A argues, B counters, rebuttals
-
-                【 यह pattern सभी major points तक जारी रहे 】
-                - हर point के लिए: Narrator introduce करे → A argue करे → B counter करे → Rebuttals
-
-                【 अंत — Narrator Conclusion 】
-                - दोनों sides की strongest points summarize करे
-                - Audience को think करने पर छोड़े — एक powerful closing line
+                उदाहरण format (topic के हिसाब से adapt करो):
+                "क्या सच में मेहनत से अमीर बना जा सकता है? आज एक तरफ हैं Rahul — जो मानते हैं hard work ही सब कुछ है। और दूसरी तरफ हैं Priya — जो कहती हैं system ही rigged है। आइए सुनते हैं।"
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                CRITICAL RULES:
-                - Narrator सिर्फ शुरुआत में, points introduce करते time, और अंत में — debate के बीच में नहीं
-                - दोनों speakers के arguments genuinely strong हों — एक side obviously weak नहीं
-                - Natural बहस जैसी भाषा — real arguments, real examples, real rebuttals
-                - AI clichés ban: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में", "इस प्रकार"
+                DEBATE BODY (flexible, natural flow):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                - दोनों speakers अपने-अपने side से freely argue करें
+                - Real back-and-forth — एक बोले, दूसरा काटे, counter करे, agree या disagree करे
+                - Arguments में: real examples, facts, personal experiences, analogies — जो भी topic fit करे
+                - कोई rigid point-by-point structure नहीं — organic conversation जैसा बहे
+                - अगर real personalities हैं तो उनकी actual speaking style, mannerisms, known views को reflect करो
+                - दोनों sides genuinely strong हों — कोई side obviously weak नहीं
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                CLOSING — NARRATOR:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                - दोनों sides के core argument को एक line में capture करे
+                - Audience को choose करने दे — एक thought-provoking closing question या statement
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                RULES:
+                - Narrator सिर्फ शुरुआत और अंत में — बीच में नहीं
+                - भाषा bilkul natural, human — जैसे real लोग बात करते हैं
+                - AI clichés बिल्कुल नहीं: "यह ध्यान देने योग्य है", "निष्कर्ष में", "इस प्रकार"
+                - Topic कुछ भी हो सकता है — flexible रहो
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ${durFillHi}
               `;
             } else {
               prompt = `
-                विषय: "${topic}" पर एक Debate style की वीडियो स्क्रिप्ट तैयार करें।
-                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                विषय: "${topic}" पर एक Debate style वीडियो स्क्रिप्ट लिखो।
+                ${specificDetails ? `अतिरिक्त संदर्भ: ${specificDetails}` : ''}
                 ${durLineHi}
-                भाषा: हिंदी (Hinglish ठीक है)।
+                भाषा: हिंदी / Hinglish।
 
                 पात्र — ठीक ${speakerCount} वक्ता (कोई Narrator नहीं):
-                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `विषय के अनुरूप उचित opposing नाम ऑटो-डिटेक्ट करें।`}
+                ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `Topic के हिसाब से सही opposing personas चुनो — real लोग हों तो उनकी real style, concept debate हो तो strong representative बनाओ।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Structure (Narrator OFF — Direct Debate):
+                OPENING — Speaker A:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-                【 शुरुआत 】
-                - Speaker A (जो topic support करता है) short में topic introduce करे और अपना stand बताए (2-3 lines)
-                - Speaker B अपना opposing stand बताए (2-3 lines)
-
-                【 Point-by-Point Debate 】
-                - दोनों speakers अलग-अलग cheez को support करते हुए अपने-अपने arguments देते हैं
-                - हर argument के बाद दूसरा speaker counter करे — sharp, real rebuttals
-                - हर point पर: A argues → B counters → back-and-forth
-                - Arguments में: real examples, data, logical reasoning, relatable situations
-                - दोनों sides genuinely strong हों — कोई obviously weak नहीं
-
-                【 अंत 】
-                - दोनों speakers अपना final stand reiterate करें — confident, without repeating everything
-                - कोई resolution नहीं — audience decide करे
+                - एक provocative question या bold statement से शुरू करे जो topic को instantly set करे
+                - अपनी side briefly बताए — 2-3 sentences, punchy
+                - Speaker B तुरंत respond करे — अपनी opposing side clear करे
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                CRITICAL RULES:
-                - Natural debate भाषा — जैसे real लोग argue करते हैं
-                - Robotic phrases बिल्कुल नहीं
-                - दोनों speakers की अपनी personality हो — एक emotional, दूसरा logical; या कोई और contrast
+                DEBATE BODY (natural, flexible):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                - Real back-and-forth — organic conversation, rigid structure नहीं
+                - Arguments में: examples, facts, experiences, analogies
+                - अगर real personalities हैं — उनकी known views, actual speaking style use करो
+                - Interruptions, agreements, sharp disagreements — सब natural है
+                - दोनों sides equally strong हों
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                CLOSING:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                - दोनों अपना final position बोलें — confident, brief
+                - कोई resolution नहीं — audience को choose करना है
+
+                RULES:
+                - Natural, human भाषा — robotic phrases बिल्कुल नहीं
                 - AI clichés ban: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में"
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ${durFillHi}
@@ -1481,93 +1474,85 @@ export const generateDebateScript = async (
         } else if (style === 'debate') {
           if (includeNarrator) {
             prompt = `
-              Generate a Debate style video script on the topic: "${topic}".
-              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              Write a Debate style video script on the topic: "${topic}".
+              ${specificDetails ? `Additional context: ${specificDetails}` : ''}
               ${durLineEn}
               Language: ${language}.
 
               Characters:
-              - Narrator: one (always named "Narrator")
-              - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Auto-detect fitting names for the topic — one representing each side of the debate`}
+              - Narrator: one (always labeled "Narrator")
+              - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Pick the right names or personas for this topic — if real people are involved (Joe Rogan, Elon Musk, Karl Marx, Trump) use their actual names and mirror their real speaking style and known views; if it's a concept debate (Veg vs Non-Veg, Socialism vs Capitalism, Believer vs Atheist) create strong representative personas for each side`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Structure (Narrator ON — Point-by-Point Debate):
+              OPENING — NARRATOR (this sets everything):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Open with ONE sharp, provocative question that captures the heart of the debate
+              - Then introduce Speaker A in 1-2 lines (who they are, what side they're on)
+              - Then introduce Speaker B in 1-2 lines (who they are, what side they're on)
+              - Keep it short, punchy, and engaging — not a lecture
 
-              【 Opening — Narrator 】
-              - Introduce the topic: what this debate is about, what both sides believe, why it matters
-              - A sharp hook that grabs the audience immediately
-
-              【 Both Speakers — Short Opening Stand 】
-              - Speaker A: states their side clearly in 2-3 lines — what they support and why
-              - Speaker B: states their opposing side clearly in 2-3 lines
-
-              【 Narrator — Introduces Point 1 】
-              - Raises the first key argument/point that is genuinely debatable in this topic
-              - Directs both speakers to respond to it
-
-              【 Both Speakers — Arguments on Point 1 】
-              - Speaker A: their argument, data, example on this point
-              - Speaker B: counter-argument, their own data, example
-              - 1-2 sharp rebuttals — back-and-forth
-
-              【 Narrator — Introduces Point 2 】
-              - Raises the next debatable point
-
-              【 Both Speakers — Arguments on Point 2 】
-              - Same pattern: A argues → B counters → rebuttals
-
-              【 This pattern continues for all major points 】
-              - For every point: Narrator introduces → A argues → B counters → Rebuttals
-
-              【 Closing — Narrator Conclusion 】
-              - Summarizes both sides' strongest points
-              - Leaves the audience to decide — ends with a powerful, thought-provoking line
+              Example format (adapt to topic):
+              "Can hard work alone make you rich? On one side — Rahul, who believes hustle is everything. On the other — Priya, who says the system is rigged. Let's find out."
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              CRITICAL RULES:
-              - Narrator appears only at the start, when introducing each point, and at the end — never mid-debate
-              - Both speakers' arguments must be genuinely strong — neither side obviously weaker
-              - Natural debate language — real arguments, real examples, real rebuttals
+              DEBATE BODY (flexible, organic):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Both speakers argue freely from their side — no rigid point-by-point required
+              - Real back-and-forth: one speaks, the other cuts in, counters, challenges
+              - Arguments: real examples, facts, personal experiences, analogies — whatever fits
+              - If real personalities are used — reflect their actual views, speech style, mannerisms
+              - Both sides are genuinely strong — neither is obviously weak or a strawman
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              CLOSING — NARRATOR:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Capture each side's core argument in one line
+              - Leave the audience to decide — a thought-provoking final question or statement
+
+              RULES:
+              - Narrator only at the start and end — never mid-debate
+              - Completely natural, human language — no AI-speak
               - Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "This is significant"
+              - Topic can be anything — stay flexible, don't force a rigid structure
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
             `;
           } else {
             prompt = `
-              Generate a Debate style video script on the topic: "${topic}".
-              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              Write a Debate style video script on the topic: "${topic}".
+              ${specificDetails ? `Additional context: ${specificDetails}` : ''}
               ${durLineEn}
               Language: ${language}.
 
               Characters — exactly ${speakerCount} speakers (no Narrator):
-              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Auto-detect fitting opposing names for the topic.`}
+              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Pick appropriate opposing personas for this topic — if real people are involved use their actual names and real style; if it's a concept debate create strong representative personas.`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Structure (Narrator OFF — Direct Debate):
+              OPENING — Speaker A:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-              【 Opening 】
-              - Speaker A (who supports one side) briefly introduces the topic and states their position (2-3 lines)
-              - Speaker B states their opposing position (2-3 lines)
-
-              【 Point-by-Point Debate 】
-              - Both speakers support different sides and give their arguments
-              - After every argument, the other speaker counters — sharp, real rebuttals
-              - For every point: A argues → B counters → back-and-forth
-              - Arguments must include: real examples, data, logical reasoning, relatable situations
-              - Both sides are genuinely strong — neither is obviously weak
-
-              【 Closing 】
-              - Both speakers re-state their final position — confident, without repeating everything
-              - No resolution — leave the audience to decide
+              - Open with a bold question or provocative statement that immediately frames the debate
+              - State their side briefly — 2-3 sentences, punchy
+              - Speaker B responds immediately — states their opposing position
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              CRITICAL RULES:
-              - Natural debate language — the way real people argue
-              - No robotic or formal AI phrases
-              - Both speakers have distinct personalities — e.g. one more emotional, one more logical
-              - Banned phrases: "It's important to note", "In conclusion", "Let's delve into"
+              DEBATE BODY (natural, flexible):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Real back-and-forth — organic conversation, not rigid structure
+              - Arguments: examples, facts, experiences, analogies
+              - If real personalities — use their known views and actual speaking style
+              - Interruptions, sharp disagreements, occasional agreements — all natural
+              - Both sides equally strong — no strawmanning
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              CLOSING:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Each speaker briefly restates their core position — confident, not repetitive
+              - No resolution — audience decides
+
+              RULES:
+              - Natural, human language — the way real people actually argue
+              - Banned: "It's important to note", "In conclusion", "Let's delve into"
+              - Stay flexible — work for any topic type
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
             `;
