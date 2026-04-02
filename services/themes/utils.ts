@@ -289,7 +289,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
                   const nameW = nameMetrics.width + 40;
                   const nameH = 40 * subtitleConfig.fontSize;
                   const nameX = bx + (bw / 2) - (nameW / 2);
-                  const nameY = by - nameH - 6;
+                  const nameY = by - (nameH / 2);
                   
                   ctx.fillStyle = '#000000';
                   ctx.beginPath();

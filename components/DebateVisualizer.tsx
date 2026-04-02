@@ -3091,17 +3091,81 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
                 {/* ── SUBTITLE TAB ── */}
                 {settingsTab === 'subtitle' && (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
+
+                    {/* Master toggle */}
                     <label className="flex items-center justify-between cursor-pointer bg-[#111] border border-white/5 rounded-xl px-4 py-3">
                       <span className="text-sm font-semibold text-white">Show Subtitles</span>
                       <input type="checkbox" checked={showSubtitles} onChange={(e) => setShowSubtitles(e.target.checked)} className="accent-red-500 w-4 h-4" />
                     </label>
-                    <div className={`space-y-4 transition-opacity ${showSubtitles ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
 
-                      {/* Background Presets */}
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Background Style</label>
-                        <div className="flex flex-wrap gap-1.5">
+                    <div className={`space-y-3 transition-opacity ${showSubtitles ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+
+                      {/* ─── 1. VISIBILITY ─── */}
+                      <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-2.5">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Visibility</p>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-xs text-gray-300">Background Box</span>
+                          <input type="checkbox" checked={subtitleBackground} onChange={(e) => setSubtitleBackground(e.target.checked)} className="accent-red-500" />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-xs text-gray-300">Speaker Name Badge</span>
+                          <input type="checkbox" checked={showNameBadge} onChange={(e) => setShowNameBadge(e.target.checked)} className="accent-red-500" />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-xs text-gray-300">Sync Position (All Segments)</span>
+                          <input type="checkbox" checked={syncSubtitlePosition} onChange={(e) => setSyncSubtitlePosition(e.target.checked)} className="accent-red-500" />
+                        </label>
+                      </div>
+
+                      {/* ─── 2. TEXT ─── */}
+                      <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Text</p>
+
+                        {/* Font Size */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-400">Font Size</span>
+                            <span className="text-xs font-mono text-red-400">{currentSubtitleConfig.fontSize.toFixed(1)}x</span>
+                          </div>
+                          <input type="range" min={0.5} max={2} step={0.1} value={currentSubtitleConfig.fontSize}
+                            onChange={(e) => { const val = parseFloat(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), fontSize: val } } }))); }}
+                            className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Speaker Text Color */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Speaker Color</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono text-gray-500">{currentSubtitleConfig.textColor}</span>
+                            <input type="color" value={currentSubtitleConfig.textColor}
+                              onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: val } } }))); }}
+                              className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Narrator Text Color */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Narrator Color</span>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setNarratorTextColor('#ef4444')} className="text-[10px] text-gray-500 hover:text-red-400 uppercase font-bold">Reset</button>
+                            <span className="text-[10px] font-mono text-gray-500">{narratorTextColor}</span>
+                            <input type="color" value={narratorTextColor}
+                              onChange={(e) => setNarratorTextColor(e.target.value)}
+                              className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ─── 3. BOX BACKGROUND ─── */}
+                      <div className={`bg-[#111] border border-white/5 rounded-xl p-3 space-y-3 transition-opacity ${subtitleBackground ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Box Background</p>
+
+                        {/* Presets */}
+                        <div className="grid grid-cols-4 gap-1.5">
                           {[
                             { label: 'Dark', value: 'rgba(0,0,0,0.85)' },
                             { label: 'Semi', value: 'rgba(0,0,0,0.50)' },
@@ -3113,23 +3177,20 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                           ].map(opt => (
                             <button key={opt.label}
                               onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: opt.value } } })))}
-                              className={`px-3 py-1.5 text-xs font-bold rounded-lg border-2 transition-all ${currentSubtitleConfig.backgroundColor === opt.value ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
+                              className={`py-1.5 text-xs font-bold rounded-lg border-2 transition-all ${currentSubtitleConfig.backgroundColor === opt.value ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
                             >{opt.label}</button>
                           ))}
                         </div>
-                      </div>
 
-                      {/* Custom BG Color + Opacity */}
-                      <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Custom Background</label>
-                        <div className="flex items-center gap-3">
+                        {/* Custom Color + Opacity */}
+                        <div className="flex items-center gap-3 pt-1 border-t border-white/5">
                           <input type="color" value={subtitleBgHex}
                             onChange={(e) => { setSubtitleBgHex(e.target.value); applySubtitleBg(e.target.value, subtitleBgOpacity); }}
                             className="w-9 h-9 rounded-lg cursor-pointer bg-transparent border-0 p-0 shrink-0"
                           />
                           <div className="flex-1 space-y-1">
                             <div className="flex justify-between">
-                              <span className="text-[10px] text-gray-500">Opacity</span>
+                              <span className="text-[10px] text-gray-500">Custom Opacity</span>
                               <span className="text-[10px] font-mono text-red-400">{subtitleBgOpacity}%</span>
                             </div>
                             <input type="range" min={0} max={100} step={5} value={subtitleBgOpacity}
@@ -3138,144 +3199,108 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                             />
                           </div>
                         </div>
-                        <span className="text-[10px] text-gray-600 font-mono">{subtitleBgHex} @ {subtitleBgOpacity}%</span>
                       </div>
 
-                      {/* Text Color + Narrator Color */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Text Color</label>
-                        <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-2">
-                          <input type="color" value={currentSubtitleConfig.textColor}
-                            onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: val } } }))); }}
-                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
-                          />
-                          <span className="text-xs text-gray-400 font-mono">{currentSubtitleConfig.textColor}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Narrator Text Color</label>
-                        <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-2">
-                          <input type="color" value={narratorTextColor}
-                            onChange={(e) => setNarratorTextColor(e.target.value)}
-                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
-                          />
-                          <span className="text-xs text-gray-400 font-mono">{narratorTextColor}</span>
-                          <button onClick={() => setNarratorTextColor('#ef4444')} className="text-[10px] text-gray-500 hover:text-white uppercase font-bold ml-auto">Reset</button>
-                        </div>
-                      </div>
+                      {/* ─── 4. BOX SHAPE & BORDER ─── */}
+                      <div className={`bg-[#111] border border-white/5 rounded-xl p-3 space-y-3 transition-opacity ${subtitleBackground ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Box Shape & Border</p>
 
-                      {/* Font Size */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <label className="text-xs text-gray-500">Font Size</label>
-                          <span className="text-xs font-mono text-red-400">{currentSubtitleConfig.fontSize.toFixed(1)}x</span>
-                        </div>
-                        <input type="range" min={0.5} max={2} step={0.1} value={currentSubtitleConfig.fontSize}
-                          onChange={(e) => { const val = parseFloat(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), fontSize: val } } }))); }}
-                          className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                        />
-                      </div>
-
-                      {/* Box Shape / Corner Radius */}
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Box Shape</label>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {[
-                            { label: 'Sharp', radius: 0 },
-                            { label: 'Slight', radius: 6 },
-                            { label: 'Round', radius: 20 },
-                            { label: 'Pill', radius: 60 },
-                          ].map(opt => (
-                            <button key={opt.label}
-                              onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: opt.radius } } })))}
-                              className={`flex-1 py-2 text-xs font-bold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5 ${(currentSubtitleConfig.borderRadius ?? 20) === opt.radius ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
-                            >
-                              <span className={`inline-block w-4 h-3 border border-current shrink-0 ${opt.radius === 0 ? '' : opt.radius <= 6 ? 'rounded-sm' : opt.radius <= 20 ? 'rounded' : 'rounded-full'}`} />
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <label className="text-[10px] text-gray-500 shrink-0">Custom</label>
-                          <input type="range" min={0} max={80} step={2}
-                            value={currentSubtitleConfig.borderRadius ?? 20}
-                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: val } } }))); }}
-                            className="flex-1 accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <span className="text-xs font-mono text-red-400 w-8 text-right">{currentSubtitleConfig.borderRadius ?? 20}px</span>
-                        </div>
-                      </div>
-
-                      {/* Box Border */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Box Border</label>
-                          <span className="text-xs font-mono text-red-400">{Math.round(currentSubtitleConfig.borderWidth ?? 0)}px</span>
-                        </div>
-                        <input type="range" min={0} max={8} step={1}
-                          value={currentSubtitleConfig.borderWidth ?? 0}
-                          onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderWidth: val } } }))); }}
-                          className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                        />
-                        {(currentSubtitleConfig.borderWidth ?? 0) > 0 && (
-                          <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-2 mt-1">
-                            <input type="color"
-                              value={currentSubtitleConfig.borderColor || '#ffffff'}
-                              onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderColor: val } } }))); }}
-                              className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
-                            />
-                            <span className="text-xs text-gray-400 font-mono">{currentSubtitleConfig.borderColor || '#ffffff'}</span>
-                            <span className="text-[10px] text-gray-500 ml-auto">Border Color</span>
+                        {/* Corner Shape presets */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] text-gray-500">Corner Radius</span>
+                          <div className="flex gap-1.5">
+                            {[
+                              { label: 'Sharp', radius: 0 },
+                              { label: 'Slight', radius: 6 },
+                              { label: 'Round', radius: 20 },
+                              { label: 'Pill', radius: 60 },
+                            ].map(opt => (
+                              <button key={opt.label}
+                                onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: opt.radius } } })))}
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg border-2 transition-all flex flex-col items-center gap-1 ${(currentSubtitleConfig.borderRadius ?? 20) === opt.radius ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
+                              >
+                                <span className={`inline-block w-4 h-3 border border-current ${opt.radius === 0 ? '' : opt.radius <= 6 ? 'rounded-sm' : opt.radius <= 20 ? 'rounded' : 'rounded-full'}`} />
+                                <span className="text-[9px]">{opt.label}</span>
+                              </button>
+                            ))}
                           </div>
-                        )}
-                      </div>
-
-                      {/* Vertical Position */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <label className="text-xs text-gray-500">Vertical Position</label>
-                          <span className="text-xs font-mono text-gray-400">{Math.round(currentSubtitleConfig.y)}px</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input type="range" min={0} max={80} step={2}
+                              value={currentSubtitleConfig.borderRadius ?? 20}
+                              onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: val } } }))); }}
+                              className="flex-1 accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <span className="text-xs font-mono text-red-400 w-9 text-right">{currentSubtitleConfig.borderRadius ?? 20}px</span>
+                          </div>
                         </div>
-                        <input type="range" min={0} max={720} step={10} value={currentSubtitleConfig.y}
-                          onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
-                          className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                        />
+
+                        {/* Border Width */}
+                        <div className="space-y-1.5 pt-2 border-t border-white/5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-gray-500">Border Width</span>
+                            <span className="text-xs font-mono text-red-400">{Math.round(currentSubtitleConfig.borderWidth ?? 0)}px</span>
+                          </div>
+                          <input type="range" min={0} max={8} step={1}
+                            value={currentSubtitleConfig.borderWidth ?? 0}
+                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderWidth: val } } }))); }}
+                            className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                          {(currentSubtitleConfig.borderWidth ?? 0) > 0 && (
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-[10px] text-gray-500">Border Color</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono text-gray-500">{currentSubtitleConfig.borderColor || '#ffffff'}</span>
+                                <input type="color"
+                                  value={currentSubtitleConfig.borderColor || '#ffffff'}
+                                  onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderColor: val } } }))); }}
+                                  className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Display Mode */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Display Mode</label>
-                        <select value={currentSubtitleConfig.mode || 'full-word'}
-                          onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), mode: val as any } } }))); }}
-                          className="w-full bg-[#111] text-gray-200 text-xs rounded-xl px-3 py-2.5 border border-white/5 focus:border-red-500 outline-none appearance-none cursor-pointer"
-                        >
-                          <option value="full-static">Full Box (Static)</option>
-                          <option value="full-word">Full Box (Word-by-Word)</option>
-                          <option value="line-static">Single Line (Static)</option>
-                          <option value="line-word">Single Line (Word-by-Word)</option>
-                        </select>
+                      {/* ─── 5. LAYOUT & BEHAVIOR ─── */}
+                      <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Layout & Behavior</p>
+
+                        {/* Vertical Position */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-400">Vertical Position</span>
+                            <span className="text-xs font-mono text-gray-400">{Math.round(currentSubtitleConfig.y)}px</span>
+                          </div>
+                          <input type="range" min={0} max={720} step={10} value={currentSubtitleConfig.y}
+                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
+                            className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Display Mode */}
+                        <div className="space-y-1">
+                          <span className="text-xs text-gray-400 block">Display Mode</span>
+                          <select value={currentSubtitleConfig.mode || 'full-word'}
+                            onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), mode: val as any } } }))); }}
+                            className="w-full bg-[#0a0a0a] text-gray-200 text-xs rounded-lg px-3 py-2 border border-white/5 focus:border-red-500 outline-none appearance-none cursor-pointer"
+                          >
+                            <option value="full-static">Full Box — Static</option>
+                            <option value="full-word">Full Box — Word by Word</option>
+                            <option value="line-static">Single Line — Static</option>
+                            <option value="line-word">Single Line — Word by Word</option>
+                          </select>
+                        </div>
+
+                        {/* Question Mode */}
+                        <label className="flex items-center justify-between cursor-pointer pt-1 border-t border-white/5">
+                          <div>
+                            <span className="text-xs text-gray-300 block">Question Mode</span>
+                            <span className="text-[10px] text-gray-600">Show last Narrator text while others speak</span>
+                          </div>
+                          <input type="checkbox" checked={questionMode} onChange={(e) => setQuestionMode(e.target.checked)} className="accent-red-500 shrink-0" />
+                        </label>
                       </div>
 
-                      {/* Toggles */}
-                      <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-2.5">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Options</label>
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-xs text-gray-400">Show Background Box</span>
-                          <input type="checkbox" checked={subtitleBackground} onChange={(e) => setSubtitleBackground(e.target.checked)} className="accent-red-500" />
-                        </label>
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-xs text-gray-400">Show Speaker Name Badge</span>
-                          <input type="checkbox" checked={showNameBadge} onChange={(e) => setShowNameBadge(e.target.checked)} className="accent-red-500" />
-                        </label>
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-xs text-gray-400">Sync Position (All Segments)</span>
-                          <input type="checkbox" checked={syncSubtitlePosition} onChange={(e) => setSyncSubtitlePosition(e.target.checked)} className="accent-red-500" />
-                        </label>
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-xs text-gray-400">Question Mode (Narrator Only)</span>
-                          <input type="checkbox" checked={questionMode} onChange={(e) => setQuestionMode(e.target.checked)} className="accent-red-500" />
-                        </label>
-                      </div>
                     </div>
                   </div>
                 )}
