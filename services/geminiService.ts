@@ -631,6 +631,7 @@ export const generateDebateScript = async (
               `;
             }
         } else if (style === 'situational') {
+          if (includeNarrator) {
             prompt = `
               विषय: "${topic}" पर एक "Situational" style की video script बनाओ।
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
@@ -703,6 +704,45 @@ export const generateDebateScript = async (
               ══════════════════════════════════════════
               ${durFillHi}
             `;
+          } else {
+            prompt = `
+              विषय/Situation: "${topic}" पर एक Situational Dilemma style की video script बनाओ।
+              ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: हिंदी + Hinglish (natural, conversational)।
+
+              पात्र — ठीक 3 (fixed):
+              - Narrator: situation/concept को शुरू में explain करेगा — बस opening में
+              - 2 Speakers:
+              ${speakers.length >= 2
+                ? `इन नामों का उपयोग करें: ${speakers[0]} और ${speakers[1]}.`
+                : `Topic के हिसाब से 2 अलग-अलग perspective वाले लोग चुनो — जो genuinely अलग सोचते हों।`
+              }
+
+              ══════════════════════════════════════════
+              【 NARRATOR — OPENING ONLY 】
+              ══════════════════════════════════════════
+              Narrator सिर्फ शुरुआत में आएगा — 2-3 lines में situation/dilemma को simple तरीके से explain करे।
+              जैसे: "एक आदमी है जिसने loan लिया... bank ने उसके पैसे काट लिए... अब उसके पास दो रास्ते हैं।"
+              या concept के लिए: "Trolley Problem — एक ट्राली है जो 5 लोगों की तरफ बढ़ रही है..."
+              Opening एक clear question पर खत्म हो — जो दोनों speakers के लिए debate का दरवाज़ा खोले।
+              Narrator के बाद debate शुरू — Narrator अब वापस नहीं आएगा।
+
+              ══════════════════════════════════════════
+              【 SPEAKERS — DILEMMA DEBATE 】
+              ══════════════════════════════════════════
+              दोनों speakers genuinely अलग choice/perspective रखते हैं।
+              Real back-and-forth — एक बोले, दूसरा challenge करे।
+              दोनों sides genuinely strong — कोई side obviously weak नहीं।
+              Closing: दोनों अपनी final position रखें — audience को decide करने दो।
+
+              RULES:
+              - Natural, human भाषा — AI clichés बिल्कुल नहीं
+              - Narrator सिर्फ opening में — बीच में या अंत में नहीं
+              ══════════════════════════════════════════
+              ${durFillHi}
+            `;
+          }
         } else if (style === 'documentary') {
             prompt = `
               विषय/Case: "${topic}" पर एक Documentary / True Crime style वीडियो script बनाओ।
@@ -1198,6 +1238,7 @@ export const generateDebateScript = async (
             `;
           }
         } else if (style === 'situational') {
+          if (includeNarrator) {
           prompt = `
             Generate a "Situational" style video script on the topic: "${topic}".
             ${specificDetails ? `Situation details: ${specificDetails}` : ''}
@@ -1270,6 +1311,45 @@ export const generateDebateScript = async (
             ══════════════════════════════════════════
             ${durFillEn}
           `;
+          } else {
+            prompt = `
+              Write a Situational Dilemma style video script on: "${topic}".
+              ${specificDetails ? `Situation details: ${specificDetails}` : ''}
+              ${durLineEn}
+              Language: ${language}. Tone: natural, conversational.
+
+              Characters — exactly 3 (fixed):
+              - Narrator: explains the situation/concept at the start only
+              - 2 Speakers:
+              ${speakers.length >= 2
+                ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
+                : `Choose 2 people with genuinely different perspectives — who would naturally take opposite sides on this dilemma.`
+              }
+
+              ══════════════════════════════════════════
+              【 NARRATOR — OPENING ONLY 】
+              ══════════════════════════════════════════
+              Narrator appears ONLY at the start — 2–3 lines to explain the situation/dilemma simply and clearly.
+              e.g. "A man took out a loan. The bank deducted money he never owed. Now he has two choices..."
+              Or for a concept: "The Trolley Problem — a trolley is headed toward five people..."
+              End the opening with one clear question that opens the debate for both speakers.
+              Narrator does NOT return after this.
+
+              ══════════════════════════════════════════
+              【 SPEAKERS — DILEMMA DEBATE 】
+              ══════════════════════════════════════════
+              Both speakers hold genuinely different positions on what to do.
+              Real back-and-forth — one speaks, the other challenges.
+              Both sides genuinely strong — no obvious winner.
+              Closing: each states their final position — audience decides.
+
+              RULES:
+              - Natural, human language — no AI-speak
+              - Narrator only in the opening — never mid-debate or at the end
+              ══════════════════════════════════════════
+              ${durFillEn}
+            `;
+          }
         } else if (style === 'documentary') {
           prompt = `
             Write a Documentary / True Crime style video script on: "${topic}".

@@ -485,7 +485,10 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   </div>
                   <div className="flex bg-[#111111] p-0.5 rounded-lg border border-white/5">
                     <button
-                      onClick={() => setIncludeNarrator(true)}
+                      onClick={() => {
+                        setIncludeNarrator(true);
+                        if (style === 'situational') setSpeakerCount(3);
+                      }}
                       className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${
                         includeNarrator
                           ? 'bg-white/10 text-white shadow-sm'
@@ -495,7 +498,10 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       On
                     </button>
                     <button
-                      onClick={() => setIncludeNarrator(false)}
+                      onClick={() => {
+                        setIncludeNarrator(false);
+                        if (style === 'situational') setSpeakerCount(2);
+                      }}
                       className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${
                         !includeNarrator
                           ? 'bg-white/10 text-white shadow-sm'
