@@ -106,7 +106,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [subtitleBgHex, setSubtitleBgHex] = useState('#000000');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(80);
   const [showNameBadge, setShowNameBadge] = useState(true);
-  const [nameBadgeStyle, setNameBadgeStyle] = useState<'classic' | 'comic' | 'pill' | 'minimal'>('classic');
+  const [nameBadgeStyle, setNameBadgeStyle] = useState<'classic' | 'comic' | 'pill' | 'minimal'>('comic');
   const [nameBadgeColorA, setNameBadgeColorA] = useState('#3b82f6');
   const [nameBadgeColorB, setNameBadgeColorB] = useState('#ef4444');
   const [segmentScores, setSegmentScores] = useState<number[]>([]);
@@ -3054,6 +3054,16 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                                   onChange={(e) => setGlobalThemeConfig(prev => ({ ...prev, [theme]: { ...(prev[theme] || {}), [prop.id]: parseFloat(e.target.value) } }))}
                                   className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                                 />
+                              )}
+                              {prop.type === 'select' && prop.options && (
+                                <div className="flex gap-1.5 flex-wrap">
+                                  {prop.options.map((opt: string) => (
+                                    <button key={opt}
+                                      onClick={() => setGlobalThemeConfig(prev => ({ ...prev, [theme]: { ...(prev[theme] || {}), [prop.id]: opt } }))}
+                                      className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg border-2 capitalize transition-all ${currentValue === opt ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
+                                    >{opt}</button>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           );
