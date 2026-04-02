@@ -645,22 +645,24 @@ export const generateDebateScript = async (
               }
 
               ══════════════════════════════════════════
-              【 SPEAKER 1 — HOOK + STORY (situation में फंसा इंसान) 】
+              【 SPEAKER 1 — INTRO + STORY (situation में फंसा इंसान) 】
               ══════════════════════════════════════════
 
-              पहली LINE ही audience को रोक दे — एक ऐसी line जो दिमाग में सवाल पैदा करे:
-              "यह कैसे हुआ?", "आगे क्या होगा?", "यह तो मेरी ही situation है!"
-              कोई formula नहीं — इस specific topic के हिसाब से जो सबसे ज़्यादा punch करे, वो लिखो।
-              Hook: 1-2 lines। फिर story naturally build हो।
+              Speaker 1 की opening EXACTLY इस structure में होगी:
 
-              BANNED openings: "Hi, मैं आज share करना चाहता हूँ...", "Toh basically...", "Mera naam X hai..."
+              Line 1 — अपना नाम और identity:
+              "मेरा नाम [नाम] है। मैं एक [middle class आदमी / engineer / artist / student / single mom / introvert / ...] हूँ।"
+              (topic के हिसाब से सबसे relevant identity चुनो — 1-2 words में)
 
-              Hook के बाद STORY arc:
-              → पहले सब ठीक था — वो normal life
-              → वो exact moment जब सब बदला — specific detail के साथ
-              → चीज़ें कैसे complicated होती गईं — एक-एक कदम
+              Line 2 — triggering moment:
+              "और कल रात..." / "पिछले कुछ हफ्तों से..." / "Recently एक situation हो गई..."
+              (topic के हिसाब से जो सबसे natural लगे — यही story का दरवाज़ा है)
+
+              फिर story naturally build हो:
+              → क्या हुआ — specific details के साथ, summary नहीं
+              → कैसे complicated होता गया — step by step
               → आज कहाँ हूँ — emotionally और practically
-              → वो ONE burning question जो सोने नहीं देता — specific, topic-relevant
+              → अपने सवालों से end करे — वो specific questions जो सोने नहीं देते, topic-relevant
 
               ══════════════════════════════════════════
               【 SPEAKER 2 — EXPERT 1 (पहला angle) 】
@@ -1171,20 +1173,24 @@ export const generateDebateScript = async (
             }
 
             ══════════════════════════════════════════
-            【 SPEAKER 1 — HOOK + STORY (the person in the situation) 】
+            【 SPEAKER 1 — INTRO + STORY (the person in the situation) 】
             ══════════════════════════════════════════
 
-            The very first line must stop the audience cold — plant a question in their head:
-            "How did that happen?", "What comes next?", "Wait — that's literally me."
-            No fixed formula — write whatever hits hardest for THIS specific topic and situation.
-            Hook = 1–2 lines max. BANNED openers: "Hi, today I want to share...", "So basically...", "Let me tell you my story..."
+            Speaker 1 opens EXACTLY in this structure:
 
-            After the hook, the STORY unfolds:
-            → Life before — what normal looked like
-            → The exact moment everything changed — specific detail, place, feeling
-            → How things got complicated — step by step, not a summary
-            → Where you are now — emotionally and practically
-            → The ONE burning question this person can't figure out — specific to this topic
+            Line 1 — name and identity:
+            "My name is [name]. I'm a [middle class guy / engineer / artist / student / single mom / introvert / ...]."
+            (Pick the most relevant identity for this topic — keep it to 1–2 words)
+
+            Line 2 — the triggering moment:
+            "And last night..." / "These past few weeks..." / "Something happened recently that I can't stop thinking about..."
+            (whichever feels most natural for the topic — this is the door into the story)
+
+            Then the story builds naturally:
+            → What happened — specific details, not a summary
+            → How it got complicated — step by step
+            → Where they are now — emotionally and practically
+            → Ends with their own questions — specific things they can't figure out, relevant to this topic
 
             ══════════════════════════════════════════
             【 SPEAKER 2 — EXPERT 1 (first angle) 】
