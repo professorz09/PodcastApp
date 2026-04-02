@@ -84,8 +84,10 @@ const App: React.FC = () => {
       const stored = await loadState();
       if (stored) {
         // Restore youtubeData regardless of script length
+        // Strip contextFileContent + contextFileName — user must re-attach each session
         if (stored.youtubeData) {
-          setYoutubeData(stored.youtubeData);
+          const { contextFileContent: _c, contextFileName: _f, ...restYoutube } = stored.youtubeData as any;
+          setYoutubeData(restYoutube);
         }
 
         const isImportState = (s: AppState) =>
