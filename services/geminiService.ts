@@ -966,13 +966,8 @@ export const generateDebateScript = async (
                 बस इतना। Opening यहीं खत्म। Debate शुरू।
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                DEBATE BODY (flexible, natural flow):
+                DEBATE BODY:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                - दोनों speakers अपने-अपने side से freely argue करें
-                - Real back-and-forth — एक बोले, दूसरा काटे, counter करे, agree या disagree करे
-                - Arguments में: real examples, facts, personal experiences, analogies — जो भी topic fit करे
-                - कोई rigid point-by-point structure नहीं — organic conversation जैसा बहे
-                - अगर real personalities हैं तो उनकी actual speaking style, mannerisms, known views को reflect करो
                 - दोनों sides genuinely strong हों — कोई side obviously weak नहीं
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -983,10 +978,8 @@ export const generateDebateScript = async (
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 RULES:
-                - Narrator सिर्फ शुरुआत और अंत में — बीच में नहीं
                 - भाषा bilkul natural, human — जैसे real लोग बात करते हैं
                 - AI clichés बिल्कुल नहीं: "यह ध्यान देने योग्य है", "निष्कर्ष में", "इस प्रकार"
-                - Topic कुछ भी हो सकता है — flexible रहो
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ${durFillHi}
               `;
@@ -1008,12 +1001,8 @@ export const generateDebateScript = async (
                 - Speaker B तुरंत respond करे — अपनी opposing side clear करे
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                DEBATE BODY (natural, flexible):
+                DEBATE BODY:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                - Real back-and-forth — organic conversation, rigid structure नहीं
-                - Arguments में: examples, facts, experiences, analogies
-                - अगर real personalities हैं — उनकी known views, actual speaking style use करो
-                - Interruptions, agreements, sharp disagreements — सब natural है
                 - दोनों sides equally strong हों
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1497,12 +1486,8 @@ export const generateDebateScript = async (
               That's it. Opening ends here. Debate begins immediately after.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              DEBATE BODY (flexible, organic):
+              DEBATE BODY:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              - Both speakers argue freely from their side — no rigid point-by-point required
-              - Real back-and-forth: one speaks, the other cuts in, counters, challenges
-              - Arguments: real examples, facts, personal experiences, analogies — whatever fits
-              - If real personalities are used — reflect their actual views, speech style, mannerisms
               - Both sides are genuinely strong — neither is obviously weak or a strawman
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1512,10 +1497,8 @@ export const generateDebateScript = async (
               - Leave the audience to decide — a thought-provoking final question or statement
 
               RULES:
-              - Narrator only at the start and end — never mid-debate
               - Completely natural, human language — no AI-speak
               - Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "This is significant"
-              - Topic can be anything — stay flexible, don't force a rigid structure
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
             `;
@@ -1537,12 +1520,8 @@ export const generateDebateScript = async (
               - Speaker B responds immediately — states their opposing position
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              DEBATE BODY (natural, flexible):
+              DEBATE BODY:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              - Real back-and-forth — organic conversation, not rigid structure
-              - Arguments: examples, facts, experiences, analogies
-              - If real personalities — use their known views and actual speaking style
-              - Interruptions, sharp disagreements, occasional agreements — all natural
               - Both sides equally strong — no strawmanning
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1554,7 +1533,6 @@ export const generateDebateScript = async (
               RULES:
               - Natural, human language — the way real people actually argue
               - Banned: "It's important to note", "In conclusion", "Let's delve into"
-              - Stay flexible — work for any topic type
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
             `;
