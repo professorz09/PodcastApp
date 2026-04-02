@@ -360,16 +360,24 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
     } else {
       // Badge background — use roundRect that rounds ONLY top corners so badge
       // merges seamlessly with the subtitle box below it
+      // Top radius: pill → full curve; classic → moderate; matches badge style
       const topR = badgeStyle === 'pill' ? badgeH / 2 : 8 * fs;
-      const bottomR = 0; // flat bottom = joins box top flush
+      // Bottom radius: inherit from the subtitle box so badge looks connected when box is pill/rounded
+      const bottomR = Math.min(br, badgeH / 2);
 
       ctx.beginPath();
-      // Manual top-rounded, bottom-flat roundRect
+      // top-left corner
       ctx.moveTo(badgeX + topR, badgeY);
+      // top-right corner
       ctx.lineTo(badgeX + badgeW - topR, badgeY);
       ctx.quadraticCurveTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + topR);
-      ctx.lineTo(badgeX + badgeW, badgeY + badgeH);
-      ctx.lineTo(badgeX, badgeY + badgeH);
+      // bottom-right corner
+      ctx.lineTo(badgeX + badgeW, badgeY + badgeH - bottomR);
+      ctx.quadraticCurveTo(badgeX + badgeW, badgeY + badgeH, badgeX + badgeW - bottomR, badgeY + badgeH);
+      // bottom-left corner
+      ctx.lineTo(badgeX + bottomR, badgeY + badgeH);
+      ctx.quadraticCurveTo(badgeX, badgeY + badgeH, badgeX, badgeY + badgeH - bottomR);
+      // back to top-left
       ctx.lineTo(badgeX, badgeY + topR);
       ctx.quadraticCurveTo(badgeX, badgeY, badgeX + topR, badgeY);
       ctx.closePath();
