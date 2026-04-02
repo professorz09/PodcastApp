@@ -11,6 +11,7 @@ export const arenaTheme: Theme = {
     { id: 'speakerColorA', label: 'Speaker A Color', type: 'color', defaultValue: '#3b82f6' },
     { id: 'speakerColorB', label: 'Speaker B Color', type: 'color', defaultValue: '#ef4444' },
     { id: 'showSpeakers', label: 'Show Speakers', type: 'boolean', defaultValue: true },
+    { id: 'focusActiveSpeaker', label: '🎙 Sirf Bolne Wala Dikhao (Narrator pe dono hide)', type: 'boolean', defaultValue: false },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -199,8 +200,18 @@ export const arenaTheme: Theme = {
     };
 
     if (showSpeakers) {
+        const focusMode = themeConfig?.focusActiveSpeaker === true;
+        const isNarratorTurn = currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator';
+
         speakerIds.forEach((id, index) => {
             const isSpeaking = isPlaying && currentSegment.speaker === id;
+
+            // Focus mode: show only the active speaker; hide all on narrator
+            if (focusMode) {
+                if (isNarratorTurn) return;       // narrator → dono hide
+                if (!isSpeaking) return;           // jo nahi bol raha → hide
+            }
+
             const label = speakerLabels[index] || id;
             const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
             const color = colors[index % colors.length];
