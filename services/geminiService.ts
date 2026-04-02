@@ -954,23 +954,16 @@ export const generateDebateScript = async (
                 - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से सही नाम या persona चुनो — अगर real लोग हैं (Joe Rogan, Trump, Marx) तो उनकी real style में, अगर concept है (Veg vs Non-Veg, Socialism vs Capitalism) तो उस side के strong representative persona बनाओ`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                OPENING — NARRATOR (यही सबसे important है):
+                OPENING — NARRATOR (exact format, word for word):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Narrator का opening तीन beats में होगा — इसी exact format में:
+                Narrator की पहली line EXACTLY इस structure में होगी — कोई बदलाव नहीं:
 
-                BEAT 1 — AI Characters का meta-acknowledgment (1-2 sentences):
-                "हमने [topic/personas] को represent करने के लिए AI से दो characters तैयार किए हैं — एक [Speaker A का brief identity], दूसरा [Speaker B का brief identity]।"
-                अगर real historical/famous personalities हैं (Marx, Rand, Joe Rogan, Trump):
-                "हमने AI को [Speaker A] और [Speaker B] की writings, speeches, aur known views se train किया है — और आज ये दोनों आमने-सामने हैं।"
+                "हमने सबसे advanced AI models को configure किया है ताकि [Speaker A का नाम] और [Speaker B का नाम] को represent करने वाले दो characters बना सकें। इनकी debate इस सवाल से शुरू होती है:"
 
-                BEAT 2 — The Debate Question (1 sentence, sharp, provocative):
-                Topic का core tension एक single question में — यही debate का heart है।
-                जैसे: "क्या एक इंसान को खुद के लिए जीना चाहिए — या समाज के लिए?"
+                फिर अगली line में — एक sharp, provocative debate question:
+                "[Topic का core tension — एक sentence में, सवाल के रूप में]"
 
-                BEAT 3 — Let the debate begin (1 short line):
-                "आइए सुनते हैं।" / "यही सवाल इनके बीच है।" — कुछ ऐसा।
-
-                पूरा opening 4-6 lines max — punchy, not a lecture।
+                बस इतना। Opening यहीं खत्म। Debate शुरू।
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 DEBATE BODY (flexible, natural flow):
@@ -1492,25 +1485,16 @@ export const generateDebateScript = async (
               - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Pick the right names or personas for this topic — if real people are involved (Joe Rogan, Elon Musk, Karl Marx, Trump) use their actual names and mirror their real speaking style and known views; if it's a concept debate (Veg vs Non-Veg, Socialism vs Capitalism, Believer vs Atheist) create strong representative personas for each side`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              OPENING — NARRATOR (this is everything):
+              OPENING — NARRATOR (exact wording, no variation):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              The Narrator's opening must follow these three beats exactly:
+              The Narrator's FIRST LINE must be EXACTLY this structure — word for word:
 
-              BEAT 1 — AI Characters meta-acknowledgment (1-2 sentences):
-              "We configured the most advanced AI models to create two characters representing [X] and [Y]."
-              If real historical/famous personalities (Marx, Rand, Joe Rogan, Trump, Elon):
-              "We trained AI on [Speaker A]'s writings, speeches, and known views — and [Speaker B]'s — to bring them face to face."
-              If concept debate (Veg vs Non-Veg, Socialism vs Capitalism, Believer vs Atheist):
-              "We used AI to build two characters — one representing [Side A], and one representing [Side B]."
+              "We configured the most advanced AI models to create two characters representing [Speaker A name] and [Speaker B name]. Their debate starts with this question:"
 
-              BEAT 2 — The Debate Question (1 sentence, sharp and provocative):
-              The core tension of this debate distilled into one question — this is the heart of everything.
-              Example: "Should a person live for themselves — or for the collective?"
+              Then on the very next line — one sharp, provocative debate question:
+              "[The core tension of this topic as a single question]"
 
-              BEAT 3 — Hand it off (1 brief line):
-              "Their debate starts now." / "Let's hear them out." — something minimal that kicks it off.
-
-              Total opening: 4-6 lines max. Punchy, not a lecture.
+              That's it. Opening ends here. Debate begins immediately after.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               DEBATE BODY (flexible, organic):
