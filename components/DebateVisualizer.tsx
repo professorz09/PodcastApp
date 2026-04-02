@@ -106,6 +106,9 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [subtitleBgHex, setSubtitleBgHex] = useState('#000000');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(80);
   const [showNameBadge, setShowNameBadge] = useState(true);
+  const [nameBadgeStyle, setNameBadgeStyle] = useState<'classic' | 'comic' | 'pill' | 'minimal'>('classic');
+  const [nameBadgeColorA, setNameBadgeColorA] = useState('#3b82f6');
+  const [nameBadgeColorB, setNameBadgeColorB] = useState('#ef4444');
   const [segmentScores, setSegmentScores] = useState<number[]>([]);
   const [showScorecard, setShowScorecard] = useState(false);
   const [scorecardData, setScorecardData] = useState<{ scores: { model: string, score: number }[], average: number } | null>(null);
@@ -682,7 +685,10 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         showMinimalSpeakerName,
         showMinimalSideVU,
         showNameLabels,
-        showNameBadge
+        showNameBadge,
+        nameBadgeStyle,
+        nameBadgeColorA,
+        nameBadgeColorB,
     };
 
     const assets: RenderAssets = {
@@ -2494,7 +2500,10 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             showMinimalSpeakerName,
             showMinimalSideVU,
             showNameLabels,
-            showNameBadge
+            showNameBadge,
+            nameBadgeStyle,
+            nameBadgeColorA,
+            nameBadgeColorB,
         };
 
         const videoBlob = await renderVideoOffline({
@@ -3118,6 +3127,58 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                         </label>
                       </div>
 
+                      {/* ─── 1b. BADGE STYLE ─── */}
+                      {showNameBadge && (
+                        <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
+                          <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Badge Style</p>
+
+                          {/* Style selector */}
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {([
+                              { key: 'classic', label: 'Classic', icon: '▬' },
+                              { key: 'comic', label: 'Comic', icon: '💬' },
+                              { key: 'pill', label: 'Pill', icon: '⬭' },
+                              { key: 'minimal', label: 'Text', icon: 'T' },
+                            ] as const).map(opt => (
+                              <button key={opt.key}
+                                onClick={() => setNameBadgeStyle(opt.key)}
+                                className={`py-2 text-xs font-bold rounded-lg border-2 transition-all flex flex-col items-center gap-0.5 ${nameBadgeStyle === opt.key ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
+                              >
+                                <span className="text-sm leading-none">{opt.icon}</span>
+                                <span className="text-[9px]">{opt.label}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Badge Colors */}
+                          <div className="space-y-2 pt-1 border-t border-white/5">
+                            <p className="text-[10px] text-gray-500">Badge Colors</p>
+                            <div className="flex gap-3">
+                              <div className="flex-1 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ background: nameBadgeColorA }} />
+                                <span className="text-[10px] text-gray-400 flex-1">Speaker 1</span>
+                                <input type="color" value={nameBadgeColorA}
+                                  onChange={(e) => setNameBadgeColorA(e.target.value)}
+                                  className="w-7 h-7 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                                />
+                              </div>
+                              <div className="flex-1 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ background: nameBadgeColorB }} />
+                                <span className="text-[10px] text-gray-400 flex-1">Speaker 2</span>
+                                <input type="color" value={nameBadgeColorB}
+                                  onChange={(e) => setNameBadgeColorB(e.target.value)}
+                                  className="w-7 h-7 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                                />
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => { setNameBadgeColorA('#3b82f6'); setNameBadgeColorB('#ef4444'); }}
+                              className="text-[10px] text-gray-600 hover:text-gray-300 font-semibold uppercase tracking-wide"
+                            >Reset to defaults</button>
+                          </div>
+                        </div>
+                      )}
+
                       {/* ─── 2. TEXT ─── */}
                       <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
                         <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Text</p>
@@ -3280,15 +3341,24 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                         {/* Display Mode */}
                         <div className="space-y-1">
                           <span className="text-xs text-gray-400 block">Display Mode</span>
-                          <select value={currentSubtitleConfig.mode || 'full-word'}
+                          <select value={currentSubtitleConfig.mode || 'phrase'}
                             onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), mode: val as any } } }))); }}
                             className="w-full bg-[#0a0a0a] text-gray-200 text-xs rounded-lg px-3 py-2 border border-white/5 focus:border-red-500 outline-none appearance-none cursor-pointer"
                           >
-                            <option value="full-static">Full Box — Static</option>
-                            <option value="full-word">Full Box — Word by Word</option>
-                            <option value="line-static">Single Line — Static</option>
-                            <option value="line-word">Single Line — Word by Word</option>
+                            <option value="phrase">Phrase — show whole phrase at once</option>
+                            <option value="word">Word — one word at a time</option>
+                            <option value="mix">Mix — words build up in phrase</option>
+                            <option value="line">Line — one line at a time</option>
+                            <option value="full-static">Full Static — all text always visible</option>
                           </select>
+                          <p className="text-[10px] text-gray-600 mt-1">
+                            {currentSubtitleConfig.mode === 'phrase' && 'Shows each phrase/sentence at once. Clean & readable.'}
+                            {currentSubtitleConfig.mode === 'word' && 'One word at a time — very minimal, karaoke style.'}
+                            {currentSubtitleConfig.mode === 'mix' && 'Words appear one-by-one within each phrase, then reset.'}
+                            {currentSubtitleConfig.mode === 'line' && 'Shows one wrapped line at a time.'}
+                            {currentSubtitleConfig.mode === 'full-static' && 'Always shows the full segment text — no animation.'}
+                            {!currentSubtitleConfig.mode && 'Shows each phrase/sentence at once. Clean & readable.'}
+                          </p>
                         </div>
 
                         {/* Question Mode */}

@@ -69,453 +69,390 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
 export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, context: DrawContext) => {
   const { config, currentSegmentIndex, script, time, segmentOffsets, themeConfig } = context;
   let currentSegment = script[currentSegmentIndex];
-  
+
   if (!config.showSubtitles) return;
 
+  // Question Mode: freeze on last Narrator segment
   let isQuestionModeActive = false;
   if (config.questionMode) {
-      // Find the most recent Narrator segment
-      let lastNarratorSegment = null;
-      for (let i = currentSegmentIndex; i >= 0; i--) {
-          if (script[i].speaker === 'Narrator') {
-              lastNarratorSegment = script[i];
-              break;
-          }
-      }
-      
-      if (lastNarratorSegment) {
-          currentSegment = lastNarratorSegment;
-          isQuestionModeActive = true;
-      } else {
-          // If there's no Narrator segment before this, don't show subtitles in question mode
-          return;
-      }
+    let lastNarrator = null;
+    for (let i = currentSegmentIndex; i >= 0; i--) {
+      if (script[i].speaker === 'Narrator') { lastNarrator = script[i]; break; }
+    }
+    if (lastNarrator) { currentSegment = lastNarrator; isQuestionModeActive = true; }
+    else return;
   }
 
   if (!currentSegment || !currentSegment.text) return;
 
   const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || {
-      x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.8)', textColor: '#ffffff'
+    x: 192, y: 550, w: 896, h: 150, fontSize: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff',
+    borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
   };
 
   const text = currentSegment.text;
-  const fontSize = 32 * subtitleConfig.fontSize;
+  const fs = subtitleConfig.fontSize;
+  const fontSize = 32 * fs;
   ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
-  
-  const maxWidth = subtitleConfig.w - (60 * subtitleConfig.fontSize);
-  
-  let visibleLines: string[] = [];
-  const segmentStartTime = segmentOffsets[currentSegmentIndex] || 0;
-  const relativeTime = time - segmentStartTime;
+  const maxWidth = subtitleConfig.w - (60 * fs);
+  const mode = (subtitleConfig.mode as string) || 'phrase';
 
-  if (isQuestionModeActive) {
-      // In question mode, we want to show the full text statically, no animation.
-      const words = text.split(' ');
-      let line = '';
-      for(let n = 0; n < words.length; n++) {
-        const testLine = line + words[n] + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && n > 0) {
-          visibleLines.push(line.trim());
-          line = words[n] + ' ';
+  // ── Helper: word-wrap ──────────────────────────────────────────
+  const wrapText = (t: string): string[] => {
+    if (!t.trim()) return [];
+    const words = t.trim().split(/\s+/);
+    const lines: string[] = [];
+    let line = '';
+    for (const word of words) {
+      const test = line + word + ' ';
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line.trim());
+        line = word + ' ';
+      } else {
+        line = test;
+      }
+    }
+    if (line.trim()) lines.push(line.trim());
+    return lines;
+  };
+
+  // ── Compute wordTimings phrase boundary ───────────────────────
+  const getPhraseWindow = (wt: {word: string; start: number; end: number}[], currentIndex: number) => {
+    let startIndex = currentIndex;
+    while (startIndex > 0) {
+      const prev = wt[startIndex - 1];
+      const curr = wt[startIndex];
+      if (/[.!?]$/.test(prev.word) || (curr.start - prev.end) > 0.8 || (currentIndex - startIndex >= 12)) break;
+      startIndex--;
+    }
+    let endIndex = currentIndex;
+    while (endIndex < wt.length - 1) {
+      const curr = wt[endIndex];
+      const next = wt[endIndex + 1];
+      if (/[.!?]$/.test(curr.word) || (next.start - curr.end) > 0.8 || (endIndex - startIndex >= 12)) break;
+      endIndex++;
+    }
+    return { startIndex, endIndex };
+  };
+
+  // ── Determine visible lines based on mode + timing ────────────
+  let visibleLines: string[] = [];
+  const segStartTime = segmentOffsets[currentSegmentIndex] || 0;
+  const relTime = time - segStartTime;
+
+  if (isQuestionModeActive || mode === 'full-static') {
+    visibleLines = wrapText(text);
+
+  } else if (currentSegment.phraseTimings && currentSegment.phraseTimings.length > 0) {
+    const pastPhrases = currentSegment.phraseTimings.filter((p: any) => p.start <= relTime);
+    if (pastPhrases.length > 0) {
+      const activePhrase = pastPhrases[pastPhrases.length - 1];
+      if (relTime <= activePhrase.end + 0.5) {
+        const phraseWords = activePhrase.text.trim().split(/\s+/);
+        const pDur = Math.max(0.1, activePhrase.end - activePhrase.start);
+        const pElapsed = relTime - activePhrase.start;
+        const progress = Math.min(pElapsed / pDur, 1);
+
+        if (mode === 'word') {
+          const idx = Math.min(Math.floor(progress * phraseWords.length), phraseWords.length - 1);
+          visibleLines = [phraseWords[idx] || ''];
+        } else if (mode === 'mix') {
+          const count = Math.max(1, Math.ceil(progress * phraseWords.length));
+          visibleLines = wrapText(phraseWords.slice(0, count).join(' '));
+        } else if (mode === 'line') {
+          const allLines = wrapText(activePhrase.text);
+          const lineIdx = Math.min(Math.floor(progress * allLines.length), allLines.length - 1);
+          visibleLines = [allLines[lineIdx] || ''];
         } else {
-          line = testLine;
+          // phrase (default)
+          visibleLines = wrapText(activePhrase.text);
         }
       }
-      if (line.trim()) visibleLines.push(line.trim());
-  } else if (currentSegment.phraseTimings && currentSegment.phraseTimings.length > 0) {
-      // Find the active phrase based on current time
-      // Find the most recent phrase that has started
-      const pastPhrases = currentSegment.phraseTimings.filter(p => p.start <= relativeTime);
-      
-      let currentText = "";
-      if (pastPhrases.length > 0) {
-          const activePhrase = pastPhrases[pastPhrases.length - 1];
-          // Keep showing the phrase for a short moment after it ends, 
-          // but ONLY if the next phrase hasn't started yet.
-          // Since we took the last phrase that started, if we are here, the next phrase hasn't started.
-          if (relativeTime <= activePhrase.end + 0.5) {
-              currentText = activePhrase.text;
-          }
-      }
-
-      // Word wrap the current phrase
-      const words = currentText.split(' ');
-      let line = '';
-      for(let n = 0; n < words.length; n++) {
-          const testLine = line + words[n] + ' ';
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && n > 0) {
-              visibleLines.push(line.trim());
-              line = words[n] + ' ';
-          } else {
-              line = testLine;
-          }
-      }
-      if (line.trim()) visibleLines.push(line.trim());
+    }
 
   } else if (currentSegment.wordTimings && currentSegment.wordTimings.length > 0) {
-      // Find the active word based on current time
-      const pastWords = currentSegment.wordTimings.filter(w => w.start <= relativeTime);
-      
-      let currentIndex = -1;
-      if (pastWords.length > 0) {
-          const lastWord = pastWords[pastWords.length - 1];
-          if (relativeTime <= lastWord.end + 0.5) {
-              currentIndex = currentSegment.wordTimings.indexOf(lastWord);
-          }
-      }
-
-      let currentText = "";
-      if (currentIndex !== -1) {
-          // Find phrase start
-          let startIndex = currentIndex;
-          while (startIndex > 0) {
-              const prevWord = currentSegment.wordTimings[startIndex - 1];
-              const currWord = currentSegment.wordTimings[startIndex];
-              const isPunctuation = /[.!?]$/.test(prevWord.word);
-              const isGap = (currWord.start - prevWord.end) > 0.8;
-              if (isPunctuation || isGap || (currentIndex - startIndex >= 12)) {
-                  break;
-              }
-              startIndex--;
-          }
-          
-          // Find phrase end
-          let endIndex = currentIndex;
-          while (endIndex < currentSegment.wordTimings.length - 1) {
-              const currWord = currentSegment.wordTimings[endIndex];
-              const nextWord = currentSegment.wordTimings[endIndex + 1];
-              const isPunctuation = /[.!?]$/.test(currWord.word);
-              const isGap = (nextWord.start - currWord.end) > 0.8;
-              if (isPunctuation || isGap || (endIndex - startIndex >= 12)) {
-                  break;
-              }
-              endIndex++;
-          }
-
-          const phraseWords = currentSegment.wordTimings.slice(startIndex, endIndex + 1);
-          currentText = phraseWords.map(w => w.word).join(' ');
-      }
-
-      // Word wrap the current phrase
-      const words = currentText.split(' ');
-      let line = '';
-      for(let n = 0; n < words.length; n++) {
-          const testLine = line + words[n] + ' ';
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && n > 0) {
-              visibleLines.push(line.trim());
-              line = words[n] + ' ';
-          } else {
-              line = testLine;
-          }
-      }
-      if (line.trim()) visibleLines.push(line.trim());
-
-  } else {
-      // Fallback to old linear logic if no phrase timings
-      const words = text.split(' ');
-      let line = '';
-      const lines: string[] = [];
-      for(let n = 0; n < words.length; n++) {
-        const testLine = line + words[n] + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && n > 0) {
-          lines.push(line.trim());
-          line = words[n] + ' ';
+    const wt = currentSegment.wordTimings;
+    const past = wt.filter((w: any) => w.start <= relTime);
+    if (past.length > 0) {
+      const lastWord = past[past.length - 1];
+      if (relTime <= lastWord.end + 0.5) {
+        const currentIdx = wt.indexOf(lastWord);
+        if (mode === 'word') {
+          visibleLines = [lastWord.word];
         } else {
-          line = testLine;
+          const { startIndex, endIndex } = getPhraseWindow(wt, currentIdx);
+          if (mode === 'mix') {
+            const acc = wt.slice(startIndex, currentIdx + 1).map((w: any) => w.word).join(' ');
+            visibleLines = wrapText(acc);
+          } else if (mode === 'line') {
+            const phraseTxt = wt.slice(startIndex, endIndex + 1).map((w: any) => w.word).join(' ');
+            const allLines = wrapText(phraseTxt);
+            const posInPhrase = currentIdx - startIndex;
+            let wordsCount = 0, activeLine = 0;
+            for (let i = 0; i < allLines.length; i++) {
+              const lw = allLines[i].split(' ').length;
+              if (posInPhrase < wordsCount + lw) { activeLine = i; break; }
+              wordsCount += lw; activeLine = i;
+            }
+            visibleLines = [allLines[activeLine] || ''];
+          } else {
+            // phrase (default)
+            const phraseTxt = wt.slice(startIndex, endIndex + 1).map((w: any) => w.word).join(' ');
+            visibleLines = wrapText(phraseTxt);
+          }
         }
       }
-      lines.push(line.trim());
+    }
 
-      let duration = currentSegment.duration || 1;
-      if (!isFinite(duration) || duration <= 0) duration = 1;
-      
-      const progress = Math.min(relativeTime / duration, 1);
-      const visibleWordCount = Math.floor(progress * words.length);
+  } else {
+    // Fallback: no timing data — progress-based
+    const words = text.split(/\s+/);
+    const allLines = wrapText(text);
+    let dur = currentSegment.duration || 1;
+    if (!isFinite(dur) || dur <= 0) dur = 1;
+    const progress = Math.min(relTime / dur, 1);
 
-      let wordCounter = 0;
-      let activeLineIndex = 0;
-      for (let i = 0; i < lines.length; i++) {
-          const lineWords = lines[i].split(' ').length;
-          if (visibleWordCount >= wordCounter && visibleWordCount < wordCounter + lineWords) {
-              activeLineIndex = i;
-              break;
-          }
-          wordCounter += lineWords;
+    if (mode === 'word') {
+      const idx = Math.min(Math.floor(progress * words.length), words.length - 1);
+      visibleLines = [words[idx] || ''];
+    } else if (mode === 'mix') {
+      const count = Math.max(1, Math.ceil(progress * words.length));
+      visibleLines = wrapText(words.slice(0, count).join(' '));
+    } else if (mode === 'line') {
+      const lineIdx = Math.min(Math.floor(progress * allLines.length), allLines.length - 1);
+      visibleLines = [allLines[lineIdx] || ''];
+    } else {
+      // phrase: show current line at progress
+      const wordIdx = Math.floor(progress * words.length);
+      let counter = 0, activeLine = 0;
+      for (let i = 0; i < allLines.length; i++) {
+        const lw = allLines[i].split(' ').length;
+        if (wordIdx >= counter && wordIdx < counter + lw) { activeLine = i; break; }
+        counter += lw; activeLine = i;
       }
-      if (visibleWordCount >= words.length) activeLineIndex = lines.length - 1;
-
-      const mode = subtitleConfig.mode || 'full-word';
-      if (mode === 'full-static') {
-          visibleLines = lines;
-      } else if (mode === 'line-static' || mode === 'line-word' || mode === 'full-word') {
-          visibleLines = [lines[activeLineIndex] || ''];
-      }
+      visibleLines = [allLines[activeLine] || ''];
+    }
   }
 
+  // ── Layout ────────────────────────────────────────────────────
   const lineHeight = fontSize * 1.5;
   const totalHeight = visibleLines.length * lineHeight;
   const bx = subtitleConfig.x;
   const by = subtitleConfig.y;
   const bw = subtitleConfig.w;
-  const bh = Math.max(subtitleConfig.h, totalHeight + (60 * subtitleConfig.fontSize));
-  const br = (subtitleConfig.borderRadius ?? 20) * subtitleConfig.fontSize;
+  const bh = Math.max(subtitleConfig.h, totalHeight + (60 * fs));
+  const br = (subtitleConfig.borderRadius ?? 20) * fs;
 
+  // ── Speaker theme colours ─────────────────────────────────────
+  const themeColors = [
+    themeConfig?.speakerColorA || (config.theme === 'neon' ? '#00ff00' : '#3b82f6'),
+    themeConfig?.speakerColorB || (config.theme === 'neon' ? '#ff0000' : '#ef4444'),
+    '#eab308',
+    '#22c55e',
+  ];
+  const badgeCustomColors = [
+    config.nameBadgeColorA || themeColors[0],
+    config.nameBadgeColorB || themeColors[1],
+    themeColors[2],
+    themeColors[3],
+  ];
+
+  // Effective badge style
+  // transparent-avatars comic box-style overrides badge style to 'comic'
+  const comicBoxActive = config.theme === 'transparent-avatars' &&
+    (themeConfig?.subtitleBoxStyle === 'comic' || !themeConfig?.subtitleBoxStyle);
+  const badgeStyle = comicBoxActive ? 'comic' : (config.nameBadgeStyle || 'classic');
+
+  // ── Draw Box ──────────────────────────────────────────────────
   if (config.subtitleBackground) {
-      const boxStyle = (config.theme === 'transparent-avatars' && themeConfig?.subtitleBoxStyle) ? themeConfig.subtitleBoxStyle : 'classic';
-      
-      if (config.theme === 'transparent-avatars' && boxStyle === 'comic') {
-          // White background with black border
-          ctx.fillStyle = '#ffffff';
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.roundRect(bx, by, bw, bh, br);
-          ctx.fill();
-          ctx.stroke();
-          
-          if (currentSegment.speaker !== 'Narrator' && config.showNameBadge !== false) {
-              const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
-              if (speakerIndex !== -1) {
-                  const speakerName = config.speakerLabels[speakerIndex] || currentSegment.speaker;
-                  const shortName = speakerName.split(' ')[0];
-                  
-                  ctx.font = `bold ${24 * subtitleConfig.fontSize}px 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif`;
-                  const nameMetrics = ctx.measureText(shortName);
-                  const nameW = nameMetrics.width + 40;
-                  const nameH = 40 * subtitleConfig.fontSize;
-                  const nameX = bx + (bw / 2) - (nameW / 2);
-                  const nameY = by - (nameH / 2);
-                  
-                  ctx.fillStyle = '#000000';
-                  ctx.beginPath();
-                  ctx.roundRect(nameX, nameY, nameW, nameH, 8);
-                  ctx.fill();
-                  
-                  ctx.fillStyle = '#ffffff';
-                  ctx.textAlign = 'center';
-                  ctx.textBaseline = 'middle';
-                  ctx.fillText(shortName, nameX + nameW / 2, nameY + nameH / 2 + 2);
-              }
-          }
-      } else if (config.theme === 'transparent-avatars' && boxStyle === 'minimal') {
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-          ctx.beginPath();
-          ctx.roundRect(bx, by, bw, bh, br);
-          ctx.fill();
-      } else {
-          // Classic style
-          ctx.fillStyle = subtitleConfig.backgroundColor;
-          ctx.beginPath();
-          ctx.roundRect(bx, by, bw, bh, br);
-          ctx.fill();
-
-          // Border
-          const borderW = subtitleConfig.borderWidth ?? 0;
-          if (borderW > 0) {
-              ctx.strokeStyle = subtitleConfig.borderColor || '#ffffff';
-              ctx.lineWidth = borderW * subtitleConfig.fontSize;
-              ctx.beginPath();
-              ctx.roundRect(bx, by, bw, bh, br);
-              ctx.stroke();
-          }
-          
-          if (currentSegment.speaker !== 'Narrator' && config.showNameBadge !== false) {
-              const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
-              if (speakerIndex !== -1) {
-                  const colors = [
-                      themeConfig?.speakerColorA || (config.theme === 'neon' ? '#00ff00' : '#3b82f6'),
-                      themeConfig?.speakerColorB || (config.theme === 'neon' ? '#ff0000' : '#ef4444'),
-                      '#eab308',
-                      '#22c55e'
-                  ];
-                  const speakerColor = colors[speakerIndex % colors.length];
-                  const speakerName = config.speakerLabels[speakerIndex] || currentSegment.speaker;
-                  
-                  ctx.save();
-                  ctx.font = `bold ${24 * subtitleConfig.fontSize}px sans-serif`;
-                  const badgeText = speakerName.toUpperCase();
-                  const textMetrics = ctx.measureText(badgeText);
-                  const textWidth = textMetrics.width;
-                  const textHeight = 24 * subtitleConfig.fontSize;
-                  const paddingX = 16 * subtitleConfig.fontSize;
-                  const paddingY = 8 * subtitleConfig.fontSize;
-                  
-                  const badgeW = textWidth + paddingX * 2;
-                  const badgeH = textHeight + paddingY * 2;
-                  
-                  let badgeX = speakerIndex % 2 === 0 ? bx + 20 : bx + bw - badgeW - 20;
-                  const badgeY = by - badgeH - 6;
-                  
-                  ctx.beginPath();
-                  ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8 * subtitleConfig.fontSize);
-                  ctx.fillStyle = speakerColor;
-                  ctx.fill();
-                  
-                  ctx.shadowColor = speakerColor;
-                  ctx.shadowBlur = 8;
-                  ctx.fill();
-                  ctx.shadowBlur = 0;
-                  ctx.shadowColor = 'transparent';
-                  
-                  ctx.fillStyle = '#ffffff';
-                  ctx.textAlign = 'center';
-                  ctx.textBaseline = 'middle';
-                  ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2);
-                  ctx.restore();
-              }
-          }
-      }
-  } else {
-      // If background is off, add shadow/stroke to make text readable
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-  }
-
-  if (config.showVuMeter && config.vuMeterStyle === 'bar' && currentSegment.speaker !== 'Narrator' && config.subtitleBackground) {
-      const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
-      if (speakerIndex !== -1) {
-          const colors = [
-              themeConfig?.speakerColorA || (config.theme === 'neon' ? '#00ff00' : '#3b82f6'),
-              themeConfig?.speakerColorB || (config.theme === 'neon' ? '#ff0000' : '#ef4444'),
-              '#eab308',
-              '#22c55e'
-          ];
-          const speakerColor = colors[speakerIndex % colors.length];
-
-          const barWidth = 12 * subtitleConfig.fontSize;
-          const barX = (speakerIndex % 2 === 0) ? bx - barWidth - 8 : bx + bw + 8;
-          // Background: always full box height
-          ctx.fillStyle = 'rgba(255,255,255,0.08)';
-          ctx.fillRect(barX, by, barWidth, bh);
-          // Active fill: grows from bottom based on audioLevel
-          const fillH = bh * Math.min(1, context.audioLevel);
-          const fillY = by + bh - fillH;
-          ctx.fillStyle = speakerColor;
-          ctx.shadowColor = speakerColor;
-          ctx.shadowBlur = 12;
-          ctx.fillRect(barX, fillY, barWidth, fillH);
-          // White cap at top of fill
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(barX - 2, fillY - 2, barWidth + 4, 3);
-          ctx.shadowBlur = 0;
-      }
-  }
-
-  if (currentSegment.speaker === 'Narrator') {
-      // Narrator Style: use configured color (default gold)
-      ctx.fillStyle = config.narratorTextColor || '#eab308';
-      const boxStyle = (config.theme === 'transparent-avatars' && themeConfig?.subtitleBoxStyle) ? themeConfig.subtitleBoxStyle : 'classic';
-      if (config.theme === 'transparent-avatars' && config.subtitleBackground && boxStyle === 'comic') {
-          ctx.font = `bold ${fontSize}px 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif`;
-      } else {
-          ctx.font = `bold ${fontSize}px sans-serif`;
-      }
-      
-      if (!config.subtitleBackground) {
-          // If background is off, add shadow/stroke to make text readable
-          ctx.shadowColor = 'rgba(0,0,0,0.8)';
-          ctx.shadowBlur = 4;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
-      } else {
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-      }
-  } else {
-      // Regular Speaker Style
-      const boxStyle = (config.theme === 'transparent-avatars' && themeConfig?.subtitleBoxStyle) ? themeConfig.subtitleBoxStyle : 'classic';
-      if (config.theme === 'transparent-avatars' && config.subtitleBackground && boxStyle === 'comic') {
-          ctx.fillStyle = '#000000'; // Black text on white background
-          ctx.font = `bold ${fontSize}px 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif`;
-      } else {
-          ctx.fillStyle = subtitleConfig.textColor;
-          ctx.font = `bold ${fontSize}px sans-serif`;
-      }
-
-      if (!config.subtitleBackground) {
-          // If background is off, add shadow/stroke to make text readable
-          ctx.shadowColor = 'rgba(0,0,0,0.8)';
-          ctx.shadowBlur = 4;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
-      } else {
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-      }
-  }
-
-  // Draw Narrator name above subtitle box
-  if (currentSegment.speaker === 'Narrator' && config.subtitleBackground && config.showNameBadge !== false) {
-      ctx.save();
-      ctx.font = `bold ${24 * subtitleConfig.fontSize}px sans-serif`;
-      const text = 'NARRATOR';
-      const textMetrics = ctx.measureText(text);
-      const textWidth = textMetrics.width;
-      const textHeight = 24 * subtitleConfig.fontSize;
-      const paddingX = 16 * subtitleConfig.fontSize;
-      const paddingY = 8 * subtitleConfig.fontSize;
-      
-      const badgeW = textWidth + paddingX * 2;
-      const badgeH = textHeight + paddingY * 2;
-      const badgeX = bx + bw / 2 - badgeW / 2;
-      const badgeY = by - badgeH - 6;
-      const fs = subtitleConfig.fontSize;
-
-      ctx.fillStyle = subtitleConfig.backgroundColor || 'rgba(0, 0, 0, 0.85)';
-      ctx.beginPath();
-      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8 * fs);
-      ctx.fill();
-      
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2 * fs;
-      ctx.stroke();
-      
+    if (comicBoxActive) {
+      // transparent-avatars comic: white box, black border
       ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, br);
+      ctx.fill();
+      ctx.stroke();
+    } else if (config.theme === 'transparent-avatars' && themeConfig?.subtitleBoxStyle === 'minimal') {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, br);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = subtitleConfig.backgroundColor;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, br);
+      ctx.fill();
+      const borderW = subtitleConfig.borderWidth ?? 0;
+      if (borderW > 0) {
+        ctx.strokeStyle = subtitleConfig.borderColor || '#ffffff';
+        ctx.lineWidth = borderW * fs;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, br);
+        ctx.stroke();
+      }
+    }
+  } else {
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+  }
+
+  // ── Draw Badge (speaker or narrator) ─────────────────────────
+  if (config.subtitleBackground && config.showNameBadge !== false) {
+    const isNarratorSeg = currentSegment.speaker === 'Narrator';
+    const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
+    const hasKnownSpeaker = !isNarratorSeg && speakerIndex !== -1;
+
+    const badgeFontSize = 22 * fs;
+    ctx.save();
+    ctx.font = `bold ${badgeFontSize}px sans-serif`;
+
+    const rawName = isNarratorSeg ? 'NARRATOR' : (config.speakerLabels[speakerIndex] || currentSegment.speaker);
+    const badgeText = rawName.toUpperCase();
+    const tW = ctx.measureText(badgeText).width;
+    const padX = 14 * fs;
+    const padY = 7 * fs;
+    const badgeW = tW + padX * 2;
+    const badgeH = badgeFontSize + padY * 2;
+    const badgeRadius = badgeStyle === 'pill' ? badgeH / 2 : 8 * fs;
+
+    // X position: speaker alternates left/right; narrator centered
+    let badgeX: number;
+    if (isNarratorSeg || badgeStyle === 'comic') {
+      badgeX = bx + bw / 2 - badgeW / 2;
+    } else {
+      badgeX = speakerIndex % 2 === 0 ? bx + 20 : bx + bw - badgeW - 20;
+    }
+
+    // Y position based on style
+    let badgeY: number;
+    if (badgeStyle === 'comic') {
+      badgeY = by - badgeH / 2; // half inside box (transparent-avatars original style)
+    } else {
+      badgeY = by - badgeH - 6; // fully above box
+    }
+
+    // Colors
+    let bgColor: string;
+    let textColor = '#ffffff';
+    if (badgeStyle === 'comic') {
+      bgColor = '#000000';
+    } else if (isNarratorSeg) {
+      bgColor = subtitleConfig.backgroundColor || 'rgba(0,0,0,0.85)';
+    } else {
+      bgColor = badgeCustomColors[speakerIndex % badgeCustomColors.length];
+    }
+
+    if (badgeStyle === 'minimal') {
+      // No background, just floating text with shadow
+      ctx.shadowColor = 'rgba(0,0,0,0.9)';
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = hasKnownSpeaker ? badgeCustomColors[speakerIndex % badgeCustomColors.length] : '#ffffff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2);
-      ctx.restore();
+      ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2);
+      ctx.shadowBlur = 0;
+    } else {
+      // Draw badge background
+      ctx.beginPath();
+      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, badgeRadius);
+      ctx.fillStyle = bgColor;
+      ctx.fill();
+
+      if (badgeStyle !== 'comic' && !isNarratorSeg) {
+        ctx.shadowColor = bgColor;
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+      }
+
+      if (badgeStyle === 'comic' || isNarratorSeg) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2 * fs;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = textColor;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 1);
+    }
+    ctx.restore();
   }
 
+  // ── VU Meter bar on subtitle ───────────────────────────────────
+  if (config.showVuMeter && config.vuMeterStyle === 'bar' && currentSegment.speaker !== 'Narrator' && config.subtitleBackground) {
+    const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
+    if (speakerIndex !== -1) {
+      const speakerColor = themeColors[speakerIndex % themeColors.length];
+      const barWidth = 12 * fs;
+      const barX = speakerIndex % 2 === 0 ? bx - barWidth - 8 : bx + bw + 8;
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(barX, by, barWidth, bh);
+      const fillH = bh * Math.min(1, context.audioLevel);
+      const fillY = by + bh - fillH;
+      ctx.fillStyle = speakerColor;
+      ctx.shadowColor = speakerColor;
+      ctx.shadowBlur = 12;
+      ctx.fillRect(barX, fillY, barWidth, fillH);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(barX - 2, fillY - 2, barWidth + 4, 3);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // ── Set text style ────────────────────────────────────────────
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+
+  if (currentSegment.speaker === 'Narrator') {
+    ctx.fillStyle = config.narratorTextColor || '#eab308';
+  } else if (comicBoxActive && config.subtitleBackground) {
+    ctx.fillStyle = '#000000';
+  } else {
+    ctx.fillStyle = subtitleConfig.textColor || '#ffffff';
+  }
+
+  if (!config.subtitleBackground) {
+    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+  }
+
+  ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
-  const textBlockHeight = visibleLines.length * lineHeight;
-  
-  // Center vertically
-  const textStartY = by + (bh - textBlockHeight) / 2 + (fontSize * 0.3);
 
+  // ── Draw Text ─────────────────────────────────────────────────
+  const textBlockHeight = visibleLines.length * lineHeight;
+  const textStartY = by + (bh - textBlockHeight) / 2 + (fontSize * 0.3);
   visibleLines.forEach((l, i) => {
-      ctx.fillText(l, bx + bw / 2, textStartY + (i * lineHeight));
+    ctx.fillText(l, bx + bw / 2, textStartY + i * lineHeight);
   });
-  
-  // Draw Settings Handles
+
+  // ── Settings Handles ──────────────────────────────────────────
   if (config.showSettings) {
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = '#000';
-      const handleSize = 10;
-      const sh = bh; // Use actual drawn height for handles
-      
-      ctx.fillRect(bx - handleSize/2, by - handleSize/2, handleSize, handleSize);
-      ctx.fillRect(bx + bw - handleSize/2, by - handleSize/2, handleSize, handleSize);
-      ctx.fillRect(bx - handleSize/2, by + sh - handleSize/2, handleSize, handleSize);
-      ctx.fillRect(bx + bw - handleSize/2, by + sh - handleSize/2, handleSize, handleSize);
-      
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(bx, by, bw, sh);
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    const hSize = 10;
+    ctx.fillRect(bx - hSize/2, by - hSize/2, hSize, hSize);
+    ctx.fillRect(bx + bw - hSize/2, by - hSize/2, hSize, hSize);
+    ctx.fillRect(bx - hSize/2, by + bh - hSize/2, hSize, hSize);
+    ctx.fillRect(bx + bw - hSize/2, by + bh - hSize/2, hSize, hSize);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, bw, bh);
   }
 
-  // Reset shadow
+  // Reset
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;

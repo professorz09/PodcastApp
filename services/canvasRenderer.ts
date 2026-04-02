@@ -25,6 +25,9 @@ export interface VisualConfig {
   showMinimalSideVU?: boolean;
   showNameLabels?: boolean;
   showNameBadge?: boolean;
+  nameBadgeStyle?: 'classic' | 'comic' | 'pill' | 'minimal';
+  nameBadgeColorA?: string;
+  nameBadgeColorB?: string;
 }
 
 export interface RenderAssets {
