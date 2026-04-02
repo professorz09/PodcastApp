@@ -2973,6 +2973,30 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                       <span className="text-xs text-gray-400">Show Speakers</span>
                       <input type="checkbox" checked={showSpeakers} onChange={(e) => setShowSpeakers(e.target.checked)} className="accent-red-500" />
                     </label>
+
+                    {/* ── VU METER ── */}
+                    <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-2.5">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">VU Meter</p>
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-xs text-gray-300">Show VU Meter</span>
+                        <input type="checkbox" checked={showVuMeter} onChange={(e) => setShowVuMeter(e.target.checked)} className="accent-red-500" />
+                      </label>
+                      {showVuMeter && (
+                        <>
+                          <p className="text-[10px] text-gray-600">Style</p>
+                          <div className="flex gap-1 bg-black/40 rounded-lg p-1 flex-wrap">
+                            {(theme === 'transparent-avatars'
+                              ? ['ring', 'glow', 'wave', 'dots'] as const
+                              : ['ring', 'bar', 'dots'] as const
+                            ).map(s => (
+                              <button key={s} onClick={() => setVuMeterStyle(s as any)}
+                                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all capitalize ${vuMeterStyle === s ? 'bg-white/15 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                              >{s}</button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -3402,7 +3426,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                         { label: 'Show Timer', state: showTimer, set: setShowTimer },
                         { label: 'Show Scores', state: showScores, set: setShowScores },
                         { label: 'Show Side Stats', state: showSideStats, set: setShowSideStats },
-                        { label: 'Show VU Meter', state: showVuMeter, set: setShowVuMeter },
                         { label: 'Show Name Labels', state: showNameLabels, set: setShowNameLabels },
                       ].map(({ label, state, set }) => (
                         <label key={label} className="flex items-center justify-between cursor-pointer">
@@ -3421,18 +3444,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                             <input type="checkbox" checked={showMinimalSideVU} onChange={(e) => setShowMinimalSideVU(e.target.checked)} className="accent-red-500" />
                           </label>
                         </>
-                      )}
-                      {showVuMeter && (
-                        <div className="flex gap-1 bg-black/40 rounded-lg p-1 flex-wrap">
-                          {(theme === 'transparent-avatars'
-                            ? ['ring', 'glow', 'wave', 'dots'] as const
-                            : ['ring', 'bar', 'dots'] as const
-                          ).map(s => (
-                            <button key={s} onClick={() => setVuMeterStyle(s as any)}
-                              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all capitalize ${vuMeterStyle === s ? 'bg-white/15 text-white' : 'text-gray-500'}`}
-                            >{s}</button>
-                          ))}
-                        </div>
                       )}
                     </div>
                     <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
