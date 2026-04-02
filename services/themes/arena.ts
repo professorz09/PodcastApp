@@ -96,84 +96,117 @@ export const arenaTheme: Theme = {
         ctx.restore();
     }
 
-    // --- Speaker Cards ---
-    const drawArenaCard = (label: string, subLabel: string, score: string, xPct: number, yPct: number, isActive: boolean, color: string, image: HTMLImageElement | null) => {
+    // --- Speaker Cards (Minimal style) ---
+    const drawSpeaker = (label: string, xPct: number, yPct: number, isActive: boolean, color: string, image: HTMLImageElement | null) => {
         const x = xPct * canvasWidth;
         const y = yPct * canvasHeight;
-        
-        const cardW = 160 * config.speakerScale;
-        const cardH = 200 * config.speakerScale;
-        const scale = isActive ? 1.05 : 1.0;
-        const w = cardW * scale;
-        const h = cardH * scale;
-        
+        const w = 240 * config.speakerScale;
+        const h = 320 * config.speakerScale;
         const rectX = x - w / 2;
-        const rectY = y - h / 2;
+        const rectY = y - h / 2 + 50;
 
         ctx.save();
-        
-        // Card Body
-        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.roundRect(rectX, rectY, w, h, 20);
-        ctx.fill();
+        ctx.roundRect(rectX, rectY, w, h, 30);
+        ctx.clip();
 
-        // Active Glow
+        if (image) {
+            const scale = Math.max(w / image.width, h / image.height);
+            const imgW = image.width * scale;
+            const imgH = image.height * scale;
+            ctx.drawImage(image, rectX + w / 2 - imgW / 2, rectY + h / 2 - imgH / 2, imgW, imgH);
+        } else {
+            ctx.fillStyle = '#1e1e1e';
+            ctx.fill();
+            const radius = 60 * config.speakerScale;
+            ctx.beginPath();
+            ctx.arc(x, rectY + h / 2 - 40, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#27272a';
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 40px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label.charAt(0).toUpperCase(), x, rectY + h / 2 - 40);
+        }
+        ctx.restore();
+
+        // Border — active: colored glow; inactive: subtle dark
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(rectX, rectY, w, h, 30);
         if (isActive) {
             ctx.shadowColor = color;
-            ctx.shadowBlur = 30;
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 4;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.shadowBlur = 28 + audioLevel * 20;
         }
-
-        // Score
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${48 * scale}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(score, x, rectY + h * 0.4);
-
-        // Divider
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(rectX + 20, rectY + h * 0.65);
-        ctx.lineTo(rectX + w - 20, rectY + h * 0.65);
+        ctx.lineWidth = isActive ? 4 : 2;
+        ctx.strokeStyle = isActive ? color : '#333';
         ctx.stroke();
-
-        // Name
-        ctx.font = `bold ${18 * scale}px sans-serif`;
-        ctx.fillText(label.toUpperCase(), x, rectY + h * 0.75);
-
-        // Sublabel
-        ctx.font = `${12 * scale}px sans-serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.fillText(subLabel.toUpperCase(), x, rectY + h * 0.88);
-
-        // VU Meter (Subtle)
-        if (config.showVuMeter && isActive) {
-            const meterW = w - 40;
-            const meterH = 8;
-            const meterX = rectX + 20;
-            const meterY = rectY + h - 15;
-            
-            ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.beginPath();
-            ctx.roundRect(meterX, meterY, meterW, meterH, 4);
-            ctx.fill();
-            
-            ctx.fillStyle = '#fff';
-            ctx.shadowColor = '#fff';
-            ctx.shadowBlur = 10 + (audioLevel * 10);
-            ctx.beginPath();
-            ctx.roundRect(meterX, meterY, meterW * audioLevel, meterH, 4);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        }
-
+        ctx.shadowBlur = 0;
         ctx.restore();
+
+        // Name label below card
+        ctx.save();
+        ctx.font = `bold ${20 * config.speakerScale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        if (isActive) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 12;
+        }
+        ctx.fillStyle = isActive ? color : 'rgba(255,255,255,0.6)';
+        ctx.fillText(label.toUpperCase(), x, rectY + h + 10);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // Side VU meter
+        if (config.showVuMeter && isActive) {
+            const barX = rectX + w + 10;
+
+            if (config.vuMeterStyle === 'dots') {
+                const DOTS = 12;
+                const dotR = Math.max(3, Math.min(6, h / (DOTS * 3)));
+                const spacing = (h - DOTS * dotR * 2) / (DOTS - 1);
+                const dotCX = barX + dotR + 1;
+                const activeDots = Math.round(Math.max(0.18, audioLevel) * DOTS);
+
+                for (let d = 0; d < DOTS; d++) {
+                    const dotY = rectY + h - d * (dotR * 2 + spacing) - dotR;
+                    const isLit = d < activeDots;
+                    const pct = d / (DOTS - 1);
+                    let dotColor: string;
+                    if (!isLit) {
+                        dotColor = 'rgba(255,255,255,0.10)';
+                    } else if (pct < 0.5) {
+                        dotColor = color;
+                    } else if (pct < 0.8) {
+                        dotColor = '#facc15';
+                    } else {
+                        dotColor = '#ef4444';
+                    }
+                    ctx.beginPath();
+                    ctx.arc(dotCX, dotY, dotR, 0, Math.PI * 2);
+                    ctx.fillStyle = dotColor;
+                    ctx.shadowColor = isLit ? dotColor : 'transparent';
+                    ctx.shadowBlur = isLit ? 5 + audioLevel * 8 : 0;
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0;
+            } else {
+                const barW = 10;
+                ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                ctx.fillRect(barX, rectY, barW, h);
+                const fillH = h * Math.min(1, audioLevel);
+                const fillY = rectY + h - fillH;
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8;
+                ctx.fillRect(barX, fillY, barW, fillH);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(barX - 1, fillY - 2, barW + 2, 3);
+                ctx.shadowBlur = 0;
+            }
+        }
     };
 
     if (showSpeakers) {
@@ -182,28 +215,13 @@ export const arenaTheme: Theme = {
             const label = speakerLabels[index] || id;
             const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
             const color = colors[index % colors.length];
-            
-            // Determine sublabel and score
-            // For now, map index 0 to 'SUPPORTER' and index 1 to 'OPPONENT' if 2 speakers
-            // Otherwise just 'SPEAKER X'
-            let subLabel = `SPEAKER ${index + 1}`;
-            if (speakerIds.length === 2) {
-                subLabel = index === 0 ? 'SUPPORTER' : 'OPPONENT';
-            }
-            
-            // Map scores: index 0 -> scoreA, index 1 -> scoreB, others -> 0
-            let score = "0";
-            if (index === 0) score = context.scores.scoreA;
-            if (index === 1) score = context.scores.scoreB;
 
-            drawArenaCard(
-                label, 
-                subLabel, 
-                score, 
-                pos.x, 
-                pos.y, 
-                isSpeaking, 
-                color, 
+            drawSpeaker(
+                label,
+                pos.x,
+                pos.y,
+                isSpeaking,
+                color,
                 config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null
             );
         });
