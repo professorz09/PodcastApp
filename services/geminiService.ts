@@ -655,8 +655,8 @@ export const generateDebateScript = async (
               (topic के हिसाब से सबसे relevant identity चुनो — 1-2 words में)
 
               Line 2 — triggering moment:
-              "और कल रात..." / "पिछले कुछ हफ्तों से..." / "Recently एक situation हो गई..."
-              (topic के हिसाब से जो सबसे natural लगे — यही story का दरवाज़ा है)
+              Topic और situation के हिसाब से एक natural time reference से शुरू करो — जो सबसे believable लगे।
+              (जैसे: "पिछले महीने...", "तीन हफ्ते पहले...", "उस रात जब...", "जब से यह हुआ...", "कुछ दिनों से..." — topic fit करे वो चुनो, "कल रात" default नहीं है)
 
               फिर story naturally build हो:
               → क्या हुआ — specific details के साथ, summary नहीं
@@ -1183,8 +1183,8 @@ export const generateDebateScript = async (
             (Pick the most relevant identity for this topic — keep it to 1–2 words)
 
             Line 2 — the triggering moment:
-            "And last night..." / "These past few weeks..." / "Something happened recently that I can't stop thinking about..."
-            (whichever feels most natural for the topic — this is the door into the story)
+            Pick a natural time reference that fits the topic and feels believable — not a default phrase.
+            (e.g. "Three weeks ago...", "Ever since that day...", "A month back...", "When it first started..." — choose what fits, do NOT default to "last night")
 
             Then the story builds naturally:
             → What happened — specific details, not a summary
