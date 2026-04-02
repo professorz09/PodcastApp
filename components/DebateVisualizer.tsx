@@ -1906,16 +1906,34 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         }
 
         if (showSettings) {
-            ctx.fillStyle = '#fff';
-            ctx.strokeStyle = '#000';
-            const handleSize = 10;
-            ctx.fillRect(bx - handleSize/2, by - handleSize/2, handleSize, handleSize);
-            ctx.fillRect(bx + bw - handleSize/2, by - handleSize/2, handleSize, handleSize);
-            ctx.fillRect(bx - handleSize/2, by + bh - handleSize/2, handleSize, handleSize);
-            ctx.fillRect(bx + bw - handleSize/2, by + bh - handleSize/2, handleSize, handleSize);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.lineWidth = 1;
+            const handleSize = 14;
+            const corners = [
+              [bx, by],
+              [bx + bw, by],
+              [bx, by + bh],
+              [bx + bw, by + bh],
+            ];
+
+            // Dashed selection border
+            ctx.save();
+            ctx.setLineDash([8, 5]);
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 2;
             ctx.strokeRect(bx, by, bw, bh);
+            ctx.setLineDash([]);
+            ctx.restore();
+
+            // Corner handles — yellow fill with black border so always visible
+            corners.forEach(([cx, cy]) => {
+              ctx.save();
+              // Black outer ring for contrast
+              ctx.fillStyle = '#000000';
+              ctx.fillRect(cx - handleSize/2 - 1, cy - handleSize/2 - 1, handleSize + 2, handleSize + 2);
+              // Yellow inner square
+              ctx.fillStyle = '#facc15';
+              ctx.fillRect(cx - handleSize/2, cy - handleSize/2, handleSize, handleSize);
+              ctx.restore();
+            });
         }
 
         if (!isNarrator && showNameBadge) {
