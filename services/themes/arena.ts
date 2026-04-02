@@ -100,8 +100,11 @@ export const arenaTheme: Theme = {
     const drawSpeaker = (label: string, xPct: number, yPct: number, isActive: boolean, color: string, image: HTMLImageElement | null) => {
         const x = xPct * canvasWidth;
         const y = yPct * canvasHeight;
-        const w = 240 * config.speakerScale;
-        const h = 320 * config.speakerScale;
+
+        // Audio-reactive pulse: active speaker card grows with voice level
+        const pulse = isActive ? (1 + audioLevel * 0.07) : 1;
+        const w = 240 * config.speakerScale * pulse;
+        const h = 320 * config.speakerScale * pulse;
         const rectX = x - w / 2;
         const rectY = y - h / 2 + 50;
 
@@ -111,51 +114,37 @@ export const arenaTheme: Theme = {
         ctx.clip();
 
         if (image) {
-            const scale = Math.max(w / image.width, h / image.height);
-            const imgW = image.width * scale;
-            const imgH = image.height * scale;
+            const imgScale = Math.max(w / image.width, h / image.height);
+            const imgW = image.width * imgScale;
+            const imgH = image.height * imgScale;
             ctx.drawImage(image, rectX + w / 2 - imgW / 2, rectY + h / 2 - imgH / 2, imgW, imgH);
         } else {
             ctx.fillStyle = '#1e1e1e';
             ctx.fill();
-            const radius = 60 * config.speakerScale;
+            const radius = 60 * config.speakerScale * pulse;
             ctx.beginPath();
             ctx.arc(x, rectY + h / 2 - 40, radius, 0, Math.PI * 2);
             ctx.fillStyle = '#27272a';
             ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 40px sans-serif';
+            ctx.font = `bold ${40 * pulse}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(label.charAt(0).toUpperCase(), x, rectY + h / 2 - 40);
         }
         ctx.restore();
 
-        // Border — active: colored glow; inactive: subtle dark
+        // Border — active: colored glow reacts to audio; inactive: subtle dark
         ctx.save();
         ctx.beginPath();
         ctx.roundRect(rectX, rectY, w, h, 30);
         if (isActive) {
             ctx.shadowColor = color;
-            ctx.shadowBlur = 28 + audioLevel * 20;
+            ctx.shadowBlur = 20 + audioLevel * 30;
         }
         ctx.lineWidth = isActive ? 4 : 2;
         ctx.strokeStyle = isActive ? color : '#333';
         ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.restore();
-
-        // Name label below card
-        ctx.save();
-        ctx.font = `bold ${20 * config.speakerScale}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        if (isActive) {
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 12;
-        }
-        ctx.fillStyle = isActive ? color : 'rgba(255,255,255,0.6)';
-        ctx.fillText(label.toUpperCase(), x, rectY + h + 10);
         ctx.shadowBlur = 0;
         ctx.restore();
 
