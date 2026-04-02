@@ -3234,15 +3234,38 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                           />
                         </div>
 
-                        {/* Speaker Text Color */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-400">Speaker Color</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-gray-500">{currentSubtitleConfig.textColor}</span>
-                            <input type="color" value={currentSubtitleConfig.textColor}
-                              onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: val } } }))); }}
-                              className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
-                            />
+                        {/* Subtitle Text Color */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">Subtitle Text Color</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono text-gray-500">{currentSubtitleConfig.textColor}</span>
+                              <input type="color" value={currentSubtitleConfig.textColor}
+                                onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: val } } }))); }}
+                                className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                              />
+                            </div>
+                          </div>
+                          {/* Quick color presets */}
+                          <div className="flex gap-1.5 flex-wrap">
+                            {[
+                              { label: 'White', hex: '#ffffff' },
+                              { label: 'Yellow', hex: '#facc15' },
+                              { label: 'Cyan', hex: '#22d3ee' },
+                              { label: 'Green', hex: '#4ade80' },
+                              { label: 'Orange', hex: '#fb923c' },
+                              { label: 'Pink', hex: '#f472b6' },
+                              { label: 'Red', hex: '#ef4444' },
+                              { label: 'Black', hex: '#000000' },
+                            ].map(({ label, hex }) => (
+                              <button
+                                key={hex}
+                                title={label}
+                                onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: hex } } })))}
+                                className={`w-6 h-6 rounded-lg border-2 transition-all shrink-0 ${currentSubtitleConfig.textColor === hex ? 'border-white scale-110' : 'border-white/10 hover:border-white/40'}`}
+                                style={{ backgroundColor: hex }}
+                              />
+                            ))}
                           </div>
                         </div>
 
