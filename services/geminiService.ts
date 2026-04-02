@@ -688,8 +688,7 @@ export const generateDebateScript = async (
               ACT 1 — Speaker 1 की story: Hook → journey → ONE burning question
               ACT 2 — Experts react genuinely → clarify → advice शुरू करें
               ACT 3 — Back-and-forth: Experts एक-दूसरे को challenge करें, Speaker 1 बीच में सवाल पूछे
-              ACT 4 — दोनों experts मिलकर 3-4 SPECIFIC, numbered, actionable steps दें — vague नहीं, actual instructions
-              ENDING — Conversation naturally खत्म हो। एक meaningful final thought जो याद रहे — forced summary नहीं, artificial bow नहीं।
+              ENDING — दोनों experts मिलकर (एक साथ, दोनों की आवाज़ में) Speaker को SPECIFIC numbered actionable steps दें — vague नहीं, actual step-by-step instructions। यहीं script खत्म होती है — इसके बाद कुछ नहीं।
 
               ══════════════════════════════════════════
               HARD RULES:
@@ -1256,8 +1255,7 @@ export const generateDebateScript = async (
             ACT 1 — Speaker 1's story: Hook → full journey → ONE burning question
             ACT 2 — Experts genuinely react → clarify → start going deep
             ACT 3 — Real back-and-forth: experts challenge each other, Speaker 1 asks follow-up questions
-            ACT 4 — Both experts together give 3–5 SPECIFIC numbered actionable steps — actual instructions, not vague suggestions
-            ENDING — The conversation ends naturally. Leave the audience with one memorable thought — no forced summary, no artificial bow.
+            ENDING — Both experts together (both voices, one combined segment) give Speaker 1 SPECIFIC numbered actionable steps — actual instructions, not vague suggestions. Script ends here. Nothing after this.
 
             ══════════════════════════════════════════
             NON-NEGOTIABLE RULES:
