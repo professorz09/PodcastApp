@@ -102,6 +102,8 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [showMinimalSpeakerName, setShowMinimalSpeakerName] = useState<boolean>(true);
   const [showMinimalSideVU, setShowMinimalSideVU] = useState<boolean>(true);
   const [syncSubtitlePosition, setSyncSubtitlePosition] = useState(true);
+  const [subtitleBgHex, setSubtitleBgHex] = useState('#000000');
+  const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(80);
   const [segmentScores, setSegmentScores] = useState<number[]>([]);
   const [showScorecard, setShowScorecard] = useState(false);
   const [scorecardData, setScorecardData] = useState<{ scores: { model: string, score: number }[], average: number } | null>(null);
@@ -218,6 +220,14 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const currentSegment = script?.[currentSegmentIndex];
   const currentSubtitleConfig = currentSegment?.visualConfig?.subtitleConfig || { 
       x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.8)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0
+  };
+
+  const applySubtitleBg = (hex: string, opacity: number) => {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    const rgba = `rgba(${r},${g},${b},${(opacity/100).toFixed(2)})`;
+    setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: rgba } } })));
   };
 
   // Merge Audio on Mount
@@ -2767,6 +2777,175 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* ── Subtitle Style Panel (always visible in all layouts) ── */}
+          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-3 space-y-3">
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Type size={13} className="text-red-400" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-300">Subtitle Style</span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-[10px] text-gray-500">Show</span>
+                <input type="checkbox" checked={showSubtitles} onChange={(e) => setShowSubtitles(e.target.checked)} className="accent-red-500 w-3.5 h-3.5" />
+              </label>
+            </div>
+
+            <div className={`space-y-3 transition-opacity duration-200 ${showSubtitles ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+
+              {/* Background Presets */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Background Style</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: 'Dark', value: 'rgba(0,0,0,0.85)' },
+                    { label: 'Semi', value: 'rgba(0,0,0,0.50)' },
+                    { label: 'Light', value: 'rgba(255,255,255,0.90)' },
+                    { label: 'Blue', value: 'rgba(10,20,60,0.85)' },
+                    { label: 'Red', value: 'rgba(80,10,10,0.85)' },
+                    { label: 'None', value: 'transparent' },
+                  ].map(opt => (
+                    <button key={opt.label}
+                      onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: opt.value } } })))}
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all ${currentSubtitleConfig.backgroundColor === opt.value ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
+                    >{opt.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom BG Color + Opacity row */}
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">Custom BG Color</label>
+                  <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-1.5">
+                    <input type="color" value={subtitleBgHex}
+                      onChange={(e) => { setSubtitleBgHex(e.target.value); applySubtitleBg(e.target.value, subtitleBgOpacity); }}
+                      className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
+                    />
+                    <span className="text-[10px] text-gray-400 font-mono">{subtitleBgHex}</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between">
+                    <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest">Opacity</label>
+                    <span className="text-[10px] font-mono text-red-400">{subtitleBgOpacity}%</span>
+                  </div>
+                  <input type="range" min={0} max={100} step={5} value={subtitleBgOpacity}
+                    onChange={(e) => { const v = parseInt(e.target.value); setSubtitleBgOpacity(v); applySubtitleBg(subtitleBgHex, v); }}
+                    className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Text color + Narrator color */}
+              <div className="flex gap-3">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Text Color</label>
+                  <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-1.5">
+                    <input type="color" value={currentSubtitleConfig.textColor}
+                      onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: val } } }))); }}
+                      className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
+                    />
+                    <span className="text-[10px] text-gray-400 font-mono">{currentSubtitleConfig.textColor}</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Narrator Color</label>
+                  <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-1.5">
+                    <input type="color" value={narratorTextColor}
+                      onChange={(e) => setNarratorTextColor(e.target.value)}
+                      className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
+                    />
+                    <span className="text-[10px] text-gray-400 font-mono">{narratorTextColor}</span>
+                    <button onClick={() => setNarratorTextColor('#ef4444')} className="text-[9px] text-gray-500 hover:text-white uppercase font-bold ml-auto">↩</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Font Size + Border Width */}
+              <div className="flex gap-3 items-start">
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between">
+                    <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Font Size</label>
+                    <span className="text-[10px] font-mono text-red-400">{currentSubtitleConfig.fontSize.toFixed(1)}x</span>
+                  </div>
+                  <input type="range" min={0.5} max={2} step={0.1} value={currentSubtitleConfig.fontSize}
+                    onChange={(e) => { const val = parseFloat(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), fontSize: val } } }))); }}
+                    className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between">
+                    <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Border Width</label>
+                    <span className="text-[10px] font-mono text-red-400">{currentSubtitleConfig.borderWidth ?? 0}px</span>
+                  </div>
+                  <input type="range" min={0} max={8} step={1}
+                    value={currentSubtitleConfig.borderWidth ?? 0}
+                    onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderWidth: val } } }))); }}
+                    className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Border Color (when width > 0) */}
+              {(currentSubtitleConfig.borderWidth ?? 0) > 0 && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Border Color</label>
+                  <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-1.5">
+                    <input type="color"
+                      value={currentSubtitleConfig.borderColor || '#ffffff'}
+                      onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderColor: val } } }))); }}
+                      className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
+                    />
+                    <span className="text-[10px] text-gray-400 font-mono">{currentSubtitleConfig.borderColor || '#ffffff'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Display Mode + Vertical Position */}
+              <div className="flex gap-3 items-start">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Display Mode</label>
+                  <select value={currentSubtitleConfig.mode || 'full-word'}
+                    onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), mode: val as any } } }))); }}
+                    className="w-full bg-[#111] text-gray-200 text-[10px] rounded-xl px-2 py-1.5 border border-white/5 outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="full-static">Full (Static)</option>
+                    <option value="full-word">Full (Word-by-Word)</option>
+                    <option value="line-static">Line (Static)</option>
+                    <option value="line-word">Line (Word-by-Word)</option>
+                  </select>
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between">
+                    <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">V. Position</label>
+                    <span className="text-[10px] font-mono text-gray-400">{Math.round(currentSubtitleConfig.y)}px</span>
+                  </div>
+                  <input type="range" min={0} max={720} step={10} value={currentSubtitleConfig.y}
+                    onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
+                    className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Toggle row */}
+              <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1 border-t border-white/5">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={subtitleBackground} onChange={(e) => setSubtitleBackground(e.target.checked)} className="accent-red-500 w-3 h-3" />
+                  <span className="text-[10px] text-gray-400">Show BG Box</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={syncSubtitlePosition} onChange={(e) => setSyncSubtitlePosition(e.target.checked)} className="accent-red-500 w-3 h-3" />
+                  <span className="text-[10px] text-gray-400">Sync Position</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={questionMode} onChange={(e) => setQuestionMode(e.target.checked)} className="accent-red-500 w-3 h-3" />
+                  <span className="text-[10px] text-gray-400">Question Mode</span>
+                </label>
+              </div>
             </div>
           </div>
 
