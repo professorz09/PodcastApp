@@ -103,6 +103,7 @@ export interface DebateSegment {
       mode?: 'full-static' | 'full-word' | 'line-static' | 'line-word';
       borderWidth?: number;
       borderColor?: string;
+      borderRadius?: number;
     };
   };
 }

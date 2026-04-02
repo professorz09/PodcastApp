@@ -31,7 +31,8 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                   backgroundColor: 'rgba(0,0,0,0.8)',
                   textColor: '#ffffff',
                   borderColor: '#ffffff',
-                  borderWidth: 0
+                  borderWidth: 0,
+                  borderRadius: 20
               }
           }
       }));
@@ -1879,11 +1880,19 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         const bh = Math.max(subtitleConfig.h, totalHeight + (60 * subtitleConfig.fontSize));
 
         ctx.fillStyle = subtitleConfig.backgroundColor;
-        const br = 20 * subtitleConfig.fontSize;
+        const br = (subtitleConfig.borderRadius ?? 20) * subtitleConfig.fontSize;
         ctx.beginPath();
         ctx.roundRect(bx, by, bw, bh, br);
         ctx.fill();
-        
+
+        if ((subtitleConfig.borderWidth ?? 0) > 0) {
+            ctx.strokeStyle = subtitleConfig.borderColor || '#ffffff';
+            ctx.lineWidth = subtitleConfig.borderWidth! * subtitleConfig.fontSize;
+            ctx.beginPath();
+            ctx.roundRect(bx, by, bw, bh, br);
+            ctx.stroke();
+        }
+
         if (showSettings) {
             ctx.fillStyle = '#fff';
             ctx.strokeStyle = '#000';
@@ -3158,6 +3167,36 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                           onChange={(e) => { const val = parseFloat(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), fontSize: val } } }))); }}
                           className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                         />
+                      </div>
+
+                      {/* Box Shape / Corner Radius */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Box Shape</label>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {[
+                            { label: 'Sharp', radius: 0 },
+                            { label: 'Slight', radius: 6 },
+                            { label: 'Round', radius: 20 },
+                            { label: 'Pill', radius: 60 },
+                          ].map(opt => (
+                            <button key={opt.label}
+                              onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: opt.radius } } })))}
+                              className={`flex-1 py-2 text-xs font-bold rounded-lg border-2 transition-all flex items-center justify-center gap-1.5 ${(currentSubtitleConfig.borderRadius ?? 20) === opt.radius ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
+                            >
+                              <span className={`inline-block w-4 h-3 border border-current shrink-0 ${opt.radius === 0 ? '' : opt.radius <= 6 ? 'rounded-sm' : opt.radius <= 20 ? 'rounded' : 'rounded-full'}`} />
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <label className="text-[10px] text-gray-500 shrink-0">Custom</label>
+                          <input type="range" min={0} max={80} step={2}
+                            value={currentSubtitleConfig.borderRadius ?? 20}
+                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: val } } }))); }}
+                            className="flex-1 accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="text-xs font-mono text-red-400 w-8 text-right">{currentSubtitleConfig.borderRadius ?? 20}px</span>
+                        </div>
                       </div>
 
                       {/* Box Border */}
