@@ -10,7 +10,6 @@ export const neonTheme: Theme = {
     { id: 'glowColorB', label: 'Glow Color B', type: 'color', defaultValue: '#ff0000' },
     { id: 'showBar', label: 'Show Top Bar', type: 'boolean', defaultValue: true },
     { id: 'barColor', label: 'Bar Color', type: 'color', defaultValue: 'rgba(0,0,0,0.8)' },
-    { id: 'showSpeakers', label: 'Show Speakers', type: 'boolean', defaultValue: false },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -22,7 +21,7 @@ export const neonTheme: Theme = {
     const { speakerIds, speakerLabels, speakerPositions } = config;
     
     // Use theme-specific override if available, otherwise fallback to global config
-    const showSpeakers = themeConfig?.showSpeakers !== undefined ? themeConfig.showSpeakers : config.showSpeakers;
+    const showSpeakers = config.showSpeakers;
     const showBar = themeConfig?.showBar !== undefined ? themeConfig.showBar : true;
 
     // Background

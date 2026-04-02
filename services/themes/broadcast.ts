@@ -10,7 +10,6 @@ export const broadcastTheme: Theme = {
     { id: 'timerBgColor', label: 'Timer BG Color', type: 'color', defaultValue: '#1e293b' },
     { id: 'speakerColorA', label: 'Speaker A Color', type: 'color', defaultValue: '#3b82f6' },
     { id: 'speakerColorB', label: 'Speaker B Color', type: 'color', defaultValue: '#ef4444' },
-    { id: 'showSpeakers', label: 'Show Speakers', type: 'boolean', defaultValue: false },
     { id: 'showWaveforms', label: 'Show Waveforms', type: 'boolean', defaultValue: true },
   ],
   draw: (context: DrawContext) => {
@@ -28,7 +27,7 @@ export const broadcastTheme: Theme = {
         '#22c55e'  // Green
     ];
     
-    const showSpeakers = themeConfig?.showSpeakers !== undefined ? themeConfig.showSpeakers : config.showSpeakers;
+    const showSpeakers = config.showSpeakers;
     const showWaveforms = themeConfig?.showWaveforms !== undefined ? themeConfig.showWaveforms : true;
 
     const isNarrator = currentSegment.speaker === 'Narrator';

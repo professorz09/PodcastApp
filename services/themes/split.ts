@@ -9,7 +9,6 @@ export const splitTheme: Theme = {
     { id: 'timerColor', label: 'Timer Color', type: 'color', defaultValue: '#eab308' },
     { id: 'speakerColorA', label: 'Speaker A Color', type: 'color', defaultValue: '#3b82f6' },
     { id: 'speakerColorB', label: 'Speaker B Color', type: 'color', defaultValue: '#ef4444' },
-    { id: 'showSpeakers', label: 'Show Speakers', type: 'boolean', defaultValue: true },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -27,7 +26,7 @@ export const splitTheme: Theme = {
     ];
     
     // Use theme-specific override if available, otherwise fallback to global config
-    const showSpeakers = themeConfig?.showSpeakers !== undefined ? themeConfig.showSpeakers : config.showSpeakers;
+    const showSpeakers = config.showSpeakers;
 
     // Background
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);

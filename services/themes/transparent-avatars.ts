@@ -13,7 +13,6 @@ export const transparentAvatarsTheme: Theme = {
     { id: 'nameBackgroundOpacity', label: 'Name Box Opacity', type: 'number', defaultValue: 1, min: 0, max: 1, step: 0.1 },
     { id: 'baseSize', label: 'Image Size', type: 'number', defaultValue: 150, min: 50, max: 400 },
     { id: 'pulseIntensity', label: 'Pulse Intensity', type: 'number', defaultValue: 15, min: 0, max: 50 },
-    { id: 'showSpeakers', label: 'Show Speakers', type: 'boolean', defaultValue: true },
     { id: 'showSpeakerNames', label: 'Show Speaker Names', type: 'boolean', defaultValue: true },
     { id: 'showScores', label: 'Show Scores', type: 'boolean', defaultValue: false },
     { id: 'subtitleBoxStyle', label: 'Subtitle Box Style', type: 'select', defaultValue: 'comic', options: ['comic', 'classic', 'minimal'] },
@@ -33,7 +32,7 @@ export const transparentAvatarsTheme: Theme = {
         '#22c55e'  // Green
     ];
     
-    const showSpeakers = themeConfig?.showSpeakers !== undefined ? themeConfig.showSpeakers : config.showSpeakers;
+    const showSpeakers = config.showSpeakers;
     const showSpeakerNames = themeConfig?.showSpeakerNames !== undefined ? themeConfig.showSpeakerNames : true;
 
     // Background

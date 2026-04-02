@@ -196,20 +196,6 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
     }
     setSpeakerPositions(newPositions);
 
-    // Update global showSpeakers and showScores toggle based on theme defaults
-    const themeProps = getThemeProperties(theme);
-    const showSpeakersProp = themeProps.find(p => p.id === 'showSpeakers');
-    const showScoresProp = themeProps.find(p => p.id === 'showScores');
-    
-    if (showSpeakersProp) {
-        const val = globalThemeConfig[theme]?.showSpeakers ?? showSpeakersProp.defaultValue;
-        setShowSpeakers(val);
-    }
-    
-    if (showScoresProp) {
-        const val = globalThemeConfig[theme]?.showScores ?? showScoresProp.defaultValue;
-        setShowScores(val);
-    }
   }, [theme, activeSpeakers.length]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);

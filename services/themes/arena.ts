@@ -10,7 +10,6 @@ export const arenaTheme: Theme = {
     { id: 'vsColor',            label: 'VS Color',          type: 'color',   defaultValue: '#f97316' },
     { id: 'speakerColorA',      label: 'Speaker A Color',   type: 'color',   defaultValue: '#3b82f6' },
     { id: 'speakerColorB',      label: 'Speaker B Color',   type: 'color',   defaultValue: '#ef4444' },
-    { id: 'showSpeakers',       label: 'Show Speakers',     type: 'boolean', defaultValue: true },
     { id: 'focusActiveSpeaker', label: '🎙 Sirf Bolne Wala Dikhao (Narrator pe dono hide)', type: 'boolean', defaultValue: false },
     { id: 'speakerShape',       label: 'Speaker Image Shape', type: 'select', defaultValue: 'rect',
       options: ['rect', 'circle', 'triangle'] },
@@ -30,7 +29,7 @@ export const arenaTheme: Theme = {
         '#22c55e',
     ];
 
-    const showSpeakers = themeConfig?.showSpeakers !== undefined ? themeConfig.showSpeakers : config.showSpeakers;
+    const showSpeakers = config.showSpeakers;
     const speakerShape: 'rect' | 'circle' | 'triangle' = themeConfig?.speakerShape || 'rect';
 
     // Background

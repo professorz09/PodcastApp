@@ -10,7 +10,6 @@ export const modernAltTheme: Theme = {
     { id: 'speakerColorB', label: 'Speaker B Color', type: 'color', defaultValue: '#ef4444' },
     { id: 'baseRadius', label: 'Circle Radius', type: 'number', defaultValue: 80, min: 40, max: 150 },
     { id: 'pulseIntensity', label: 'Pulse Intensity', type: 'number', defaultValue: 10, min: 0, max: 50 },
-    { id: 'showSpeakers', label: 'Show Speakers', type: 'boolean', defaultValue: false },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -27,7 +26,7 @@ export const modernAltTheme: Theme = {
         '#22c55e'  // Green
     ];
     
-    const showSpeakers = themeConfig?.showSpeakers !== undefined ? themeConfig.showSpeakers : config.showSpeakers;
+    const showSpeakers = config.showSpeakers;
 
     // Background
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
