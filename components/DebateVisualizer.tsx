@@ -680,7 +680,9 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         questionMode,
         narratorTextColor,
         showMinimalSpeakerName,
-        showMinimalSideVU
+        showMinimalSideVU,
+        showNameLabels,
+        showNameBadge
     };
 
     const assets: RenderAssets = {
@@ -2491,7 +2493,8 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             narratorTextColor,
             showMinimalSpeakerName,
             showMinimalSideVU,
-            showNameLabels
+            showNameLabels,
+            showNameBadge
         };
 
         const videoBlob = await renderVideoOffline({

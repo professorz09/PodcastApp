@@ -263,6 +263,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   const by = subtitleConfig.y;
   const bw = subtitleConfig.w;
   const bh = Math.max(subtitleConfig.h, totalHeight + (60 * subtitleConfig.fontSize));
+  const br = (subtitleConfig.borderRadius ?? 20) * subtitleConfig.fontSize;
 
   if (config.subtitleBackground) {
       const boxStyle = (config.theme === 'transparent-avatars' && themeConfig?.subtitleBoxStyle) ? themeConfig.subtitleBoxStyle : 'classic';
@@ -272,32 +273,29 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
           ctx.fillStyle = '#ffffff';
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = 4;
-          const br = 12 * subtitleConfig.fontSize;
           ctx.beginPath();
           ctx.roundRect(bx, by, bw, bh, br);
           ctx.fill();
           ctx.stroke();
           
-          if (currentSegment.speaker !== 'Narrator') {
+          if (currentSegment.speaker !== 'Narrator' && config.showNameBadge !== false) {
               const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
               if (speakerIndex !== -1) {
                   const speakerName = config.speakerLabels[speakerIndex] || currentSegment.speaker;
-                  const shortName = speakerName.split(' ')[0]; // First word only
+                  const shortName = speakerName.split(' ')[0];
                   
                   ctx.font = `bold ${24 * subtitleConfig.fontSize}px 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif`;
                   const nameMetrics = ctx.measureText(shortName);
                   const nameW = nameMetrics.width + 40;
                   const nameH = 40 * subtitleConfig.fontSize;
                   const nameX = bx + (bw / 2) - (nameW / 2);
-                  const nameY = by - (nameH / 2);
+                  const nameY = by - nameH - 6;
                   
-                  // Black box for name
                   ctx.fillStyle = '#000000';
                   ctx.beginPath();
                   ctx.roundRect(nameX, nameY, nameW, nameH, 8);
                   ctx.fill();
                   
-                  // White text for name
                   ctx.fillStyle = '#ffffff';
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'middle';
@@ -305,44 +303,43 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
               }
           }
       } else if (config.theme === 'transparent-avatars' && boxStyle === 'minimal') {
-          // Minimal style: just a semi-transparent dark box, no speaker name
           ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-          const br = 12 * subtitleConfig.fontSize;
           ctx.beginPath();
           ctx.roundRect(bx, by, bw, bh, br);
           ctx.fill();
       } else {
           // Classic style
           ctx.fillStyle = subtitleConfig.backgroundColor;
-          const br = 20 * subtitleConfig.fontSize;
           ctx.beginPath();
           ctx.roundRect(bx, by, bw, bh, br);
           ctx.fill();
 
-          // Configurable border (borderWidth 0 = no border)
-          const bw2 = subtitleConfig.borderWidth ?? 0;
-          if (bw2 > 0) {
+          // Border
+          const borderW = subtitleConfig.borderWidth ?? 0;
+          if (borderW > 0) {
               ctx.strokeStyle = subtitleConfig.borderColor || '#ffffff';
-              ctx.lineWidth = bw2 * subtitleConfig.fontSize;
+              ctx.lineWidth = borderW * subtitleConfig.fontSize;
+              ctx.beginPath();
+              ctx.roundRect(bx, by, bw, bh, br);
               ctx.stroke();
           }
           
-          if (currentSegment.speaker !== 'Narrator') {
+          if (currentSegment.speaker !== 'Narrator' && config.showNameBadge !== false) {
               const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
               if (speakerIndex !== -1) {
                   const colors = [
                       themeConfig?.speakerColorA || (config.theme === 'neon' ? '#00ff00' : '#3b82f6'),
                       themeConfig?.speakerColorB || (config.theme === 'neon' ? '#ff0000' : '#ef4444'),
-                      '#eab308', // Yellow
-                      '#22c55e'  // Green
+                      '#eab308',
+                      '#22c55e'
                   ];
                   const speakerColor = colors[speakerIndex % colors.length];
                   const speakerName = config.speakerLabels[speakerIndex] || currentSegment.speaker;
                   
                   ctx.save();
                   ctx.font = `bold ${24 * subtitleConfig.fontSize}px sans-serif`;
-                  const text = speakerName.toUpperCase();
-                  const textMetrics = ctx.measureText(text);
+                  const badgeText = speakerName.toUpperCase();
+                  const textMetrics = ctx.measureText(badgeText);
                   const textWidth = textMetrics.width;
                   const textHeight = 24 * subtitleConfig.fontSize;
                   const paddingX = 16 * subtitleConfig.fontSize;
@@ -351,27 +348,24 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
                   const badgeW = textWidth + paddingX * 2;
                   const badgeH = textHeight + paddingY * 2;
                   
-                  let badgeX;
-                  if (speakerIndex % 2 === 0) {
-                      badgeX = bx + 20;
-                  } else {
-                      badgeX = bx + bw - badgeW - 20;
-                  }
-                  const badgeY = by - badgeH / 2;
+                  let badgeX = speakerIndex % 2 === 0 ? bx + 20 : bx + bw - badgeW - 20;
+                  const badgeY = by - badgeH - 6;
                   
-                  ctx.fillStyle = subtitleConfig.backgroundColor || 'rgba(0, 0, 0, 0.8)';
                   ctx.beginPath();
                   ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8 * subtitleConfig.fontSize);
+                  ctx.fillStyle = speakerColor;
                   ctx.fill();
                   
-                  ctx.strokeStyle = '#000000';
-                  ctx.lineWidth = 2 * subtitleConfig.fontSize;
-                  ctx.stroke();
+                  ctx.shadowColor = speakerColor;
+                  ctx.shadowBlur = 8;
+                  ctx.fill();
+                  ctx.shadowBlur = 0;
+                  ctx.shadowColor = 'transparent';
                   
-                  ctx.fillStyle = speakerColor;
+                  ctx.fillStyle = '#ffffff';
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'middle';
-                  ctx.fillText(text, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2);
+                  ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2);
                   ctx.restore();
               }
           }
@@ -462,7 +456,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   }
 
   // Draw Narrator name above subtitle box
-  if (currentSegment.speaker === 'Narrator' && config.subtitleBackground) {
+  if (currentSegment.speaker === 'Narrator' && config.subtitleBackground && config.showNameBadge !== false) {
       ctx.save();
       ctx.font = `bold ${24 * subtitleConfig.fontSize}px sans-serif`;
       const text = 'NARRATOR';
@@ -475,11 +469,10 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
       const badgeW = textWidth + paddingX * 2;
       const badgeH = textHeight + paddingY * 2;
       const badgeX = bx + bw / 2 - badgeW / 2;
-      const badgeY = by - badgeH / 2;
-      const badgeCY = badgeY + badgeH / 2;
+      const badgeY = by - badgeH - 6;
       const fs = subtitleConfig.fontSize;
 
-      ctx.fillStyle = subtitleConfig.backgroundColor || 'rgba(0, 0, 0, 0.8)';
+      ctx.fillStyle = subtitleConfig.backgroundColor || 'rgba(0, 0, 0, 0.85)';
       ctx.beginPath();
       ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8 * fs);
       ctx.fill();
@@ -491,7 +484,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, badgeX + badgeW / 2, badgeCY + 2);
+      ctx.fillText(text, badgeX + badgeW / 2, badgeY + badgeH / 2 + 2);
       ctx.restore();
   }
 

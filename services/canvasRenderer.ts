@@ -24,6 +24,7 @@ export interface VisualConfig {
   showMinimalSpeakerName?: boolean;
   showMinimalSideVU?: boolean;
   showNameLabels?: boolean;
+  showNameBadge?: boolean;
 }
 
 export interface RenderAssets {
