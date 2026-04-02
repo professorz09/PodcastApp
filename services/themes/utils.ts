@@ -329,12 +329,12 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
       badgeX = speakerIndex % 2 === 0 ? bx + 20 : bx + bw - badgeW - 20;
     }
 
-    // Y position based on style
+    // Y position: badge bottom always touches box top (visually connected)
     let badgeY: number;
     if (badgeStyle === 'comic') {
       badgeY = by - badgeH / 2; // half inside box (transparent-avatars original style)
     } else {
-      badgeY = by - badgeH - 6; // fully above box
+      badgeY = by - badgeH; // bottom edge of badge = top edge of box (attached/connected)
     }
 
     // Colors
@@ -349,7 +349,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
     }
 
     if (badgeStyle === 'minimal') {
-      // No background, just floating text with shadow
+      // No background, just text floating just above box
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
       ctx.shadowBlur = 6;
       ctx.fillStyle = hasKnownSpeaker ? badgeCustomColors[speakerIndex % badgeCustomColors.length] : '#ffffff';
@@ -358,15 +358,27 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
       ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2);
       ctx.shadowBlur = 0;
     } else {
-      // Draw badge background
+      // Badge background — use roundRect that rounds ONLY top corners so badge
+      // merges seamlessly with the subtitle box below it
+      const topR = badgeStyle === 'pill' ? badgeH / 2 : 8 * fs;
+      const bottomR = 0; // flat bottom = joins box top flush
+
       ctx.beginPath();
-      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, badgeRadius);
+      // Manual top-rounded, bottom-flat roundRect
+      ctx.moveTo(badgeX + topR, badgeY);
+      ctx.lineTo(badgeX + badgeW - topR, badgeY);
+      ctx.quadraticCurveTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + topR);
+      ctx.lineTo(badgeX + badgeW, badgeY + badgeH);
+      ctx.lineTo(badgeX, badgeY + badgeH);
+      ctx.lineTo(badgeX, badgeY + topR);
+      ctx.quadraticCurveTo(badgeX, badgeY, badgeX + topR, badgeY);
+      ctx.closePath();
       ctx.fillStyle = bgColor;
       ctx.fill();
 
       if (badgeStyle !== 'comic' && !isNarratorSeg) {
         ctx.shadowColor = bgColor;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 6;
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.shadowColor = 'transparent';
