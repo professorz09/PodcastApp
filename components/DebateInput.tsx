@@ -35,9 +35,10 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview'>('gemini-3-flash-preview');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'explained' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary'>(
+  const [style, setStyle] = useState<'debate' | 'explained' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
+  const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
   // Auto speaker count + duration for Joe Rogan Style
   const [speakerCount, setSpeakerCount] = useState<number>(initialContextContent ? 3 : 3);
   const [duration, setDuration] = useState<number>(8);
@@ -81,19 +82,24 @@ const DebateInput: React.FC<DebateInputProps> = ({
       finalTopic = "YouTube Podcast Review";
     }
 
+    const isJoeRogan = style === 'joe_rogan';
+    const finalSpeakerNames = isJoeRogan
+      ? ['Joe Rogan', joeRoganGuest]
+      : (activeNames.length > 0 ? activeNames : undefined);
+
     onGenerate({
       topic: finalTopic,
       specificDetails,
       duration: duration,
-      includeNarrator,
+      includeNarrator: isJoeRogan ? false : includeNarrator,
       customScript: mode === 'script' ? customScript : undefined,
       contextFileContent: finalContext,
       commentsFileContent: initialCommentsContent,
       model,
       language,
       style,
-      speakerCount,
-      speakerNames: activeNames.length > 0 ? activeNames : undefined,
+      speakerCount: isJoeRogan ? 2 : speakerCount,
+      speakerNames: finalSpeakerNames,
       youtubeUrl: mode === 'youtube' ? youtubeUrl : undefined
     });
   };
@@ -276,29 +282,46 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
               </div>
 
-              <div className="grid gap-2 grid-cols-2">
-                {Array.from({ length: speakerCount }).map((_, index) => (
-                  <div key={index} className="group">
-                    <input
-                      type="text"
-                      value={speakerNames[index]}
-                      onChange={(e) => handleSpeakerNameChange(index, e.target.value)}
-                      placeholder={
-                        index === 0 
-                          ? (style.includes('podcast') ? "Host (e.g. Joe Rogan)" : "e.g. Pro") 
-                          : index === 1 
-                            ? (style.includes('podcast') ? "Guest Name" : "e.g. Con") 
-                            : `Speaker ${index + 1}`
-                      }
-                      className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all group-hover:border-white/10 placeholder:text-gray-700"
-                    />
+              {style === 'joe_rogan' ? (
+                <div className="grid gap-2 grid-cols-2">
+                  <div className="group">
+                    <div className="w-full bg-[#111111] border border-orange-500/30 rounded-lg px-2.5 py-1.5 text-xs text-orange-300 font-semibold flex items-center gap-1.5">
+                      <Mic size={10} className="text-orange-400 shrink-0" /> Joe Rogan
+                    </div>
                   </div>
-                ))}
-              </div>
-              <p className="text-[9px] text-gray-500 mt-2 flex items-center gap-1 opacity-80">
-                <Sparkles size={8} />
-                Leave empty to auto-detect.
-              </p>
+                  <div className="group">
+                    <div className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white truncate">
+                      {joeRoganGuest || 'Select guest above'}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-2 grid-cols-2">
+                  {Array.from({ length: speakerCount }).map((_, index) => (
+                    <div key={index} className="group">
+                      <input
+                        type="text"
+                        value={speakerNames[index]}
+                        onChange={(e) => handleSpeakerNameChange(index, e.target.value)}
+                        placeholder={
+                          index === 0
+                            ? (style.includes('podcast') ? "Host (e.g. Joe Rogan)" : "e.g. Pro")
+                            : index === 1
+                              ? (style.includes('podcast') ? "Guest Name" : "e.g. Con")
+                              : `Speaker ${index + 1}`
+                        }
+                        className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all group-hover:border-white/10 placeholder:text-gray-700"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {style !== 'joe_rogan' && (
+                <p className="text-[9px] text-gray-500 mt-2 flex items-center gap-1 opacity-80">
+                  <Sparkles size={8} />
+                  Leave empty to auto-detect.
+                </p>
+              )}
             </div>
 
             {/* Context File Upload */}
@@ -415,7 +438,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'explained' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary';
+                      const newStyle = e.target.value as 'debate' | 'explained' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
@@ -424,6 +447,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'explained') { setSpeakerCount(2); }
                       if (newStyle === 'podcast_breakdown') { setSpeakerCount(2); }
                       if (newStyle === 'documentary') { setSpeakerCount(2); }
+                      if (newStyle === 'joe_rogan') { setSpeakerCount(2); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
@@ -434,9 +458,42 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="podcast_panel">Podcast Panel</option>
                     <option value="podcast_breakdown">Podcast Breakdown</option>
                     <option value="context_bridge">Context Analyst</option>
+                    <option value="joe_rogan">🎙 Joe Rogan Experience</option>
                   </select>
                 </div>
               </div>
+
+              {/* Joe Rogan Experience — guest picker */}
+              {style === 'joe_rogan' && (
+                <div className="flex items-start gap-3 px-3 py-3 rounded-xl border border-orange-500/30 bg-orange-500/8">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-orange-500/20 mt-0.5">
+                    <Mic size={13} className="text-orange-400" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-2.5">
+                    <div>
+                      <div className="text-[11px] font-semibold text-orange-300 leading-tight">Joe Rogan Experience</div>
+                      <div className="text-[10px] text-orange-200/50 leading-tight mt-0.5">Joe Rogan interviews a guest — pick who sits across from him</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-400 mb-1.5 font-semibold uppercase tracking-wider">Guest</div>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {['Elon Musk', 'Andrew Tate', 'Donald Trump', 'Bill Gates', 'Mark Zuckerberg', 'Kanye West', 'Bernie Sanders', 'Jordan Peterson'].map(name => (
+                          <button key={name} onClick={() => setJoeRoganGuest(name)}
+                            className={`px-2 py-1 text-[10px] font-semibold rounded-lg border transition-all ${joeRoganGuest === name ? 'border-orange-500 text-orange-300 bg-orange-500/15' : 'border-white/10 text-gray-400 hover:border-white/25 hover:text-white'}`}
+                          >{name}</button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={joeRoganGuest}
+                        onChange={(e) => setJoeRoganGuest(e.target.value)}
+                        placeholder="Or type any name..."
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-orange-500/50 outline-none placeholder:text-gray-700"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Context Analyst info — shown when selected from dropdown */}
               {style === 'context_bridge' && (
@@ -477,7 +534,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   </div>
                 </div>
 
-                {/* Narrator */}
+                {/* Narrator — hidden for Joe Rogan style */}
+                {style !== 'joe_rogan' && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
                     <Mic size={12} className="text-blue-400" />
@@ -512,6 +570,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     </button>
                   </div>
                 </div>
+                )}
               </div>
             </div>
 

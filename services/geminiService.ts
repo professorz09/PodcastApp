@@ -453,7 +453,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' = 'debate',
+  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1098,6 +1098,55 @@ export const generateDebateScript = async (
                 ${durFillHi}
               `;
             }
+        } else if (style === 'joe_rogan') {
+          const guest = speakers.length >= 2 ? speakers[1] : (speakers[0] && speakers[0] !== 'Joe Rogan' ? speakers[0] : 'Elon Musk');
+          prompt = `
+            तुम Joe Rogan Experience podcast की एक episode की script लिख रहे हो।
+            ${specificDetails ? `विशेष संदर्भ: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: हिंदी / Hinglish (natural बोलचाल की भाषा — जैसे असली podcast हो)।
+
+            दो ही speakers हैं:
+            - Joe Rogan (Host) — curious, direct, kabhi kabhi challenge karta hai, "bro", "that's insane", "a hundred percent", "for real though" जैसे phrases use karta hai
+            - ${guest} (Guest) — इनकी real life, views, controversies, achievements के हिसाब से authentic dialogue
+
+            ══════════════════════════════════════════
+            EPISODE STRUCTURE (इसी order में, exactly):
+            ══════════════════════════════════════════
+
+            【 1. Joe का Opening — Guest Introduction 】
+            Joe Rogan की style में show शुरू करो:
+            - Show introduce करो briefly (JRE style — casual नहीं formal)
+            - ${guest} को warmly introduce करो — कौन हैं, क्यों famous/controversial हैं, एक-दो known facts
+            - Topic hint करो — "आज हम बात करेंगे [topic] के बारे में..."
+            - फिर एक sharp, open-ended opening question से conversation शुरू करो
+            Example tone: "यार, मैं काफी excited था तुमसे मिलने के लिए। तुम्हारे बारे में बहुत कुछ सुना है — [fact]। तो बताओ, सच क्या है?"
+
+            【 2. Main Conversation (एपिसोड का 80% हिस्सा) 】
+            Free-flowing, long-form conversation — कोई structured debate नहीं:
+            - ${guest} detailed, thoughtful answers देते हैं (अपनी real known views के साथ)
+            - Joe curious follow-ups पूछता है, tangents explore करता है
+            - Joe kabhi kabhi pushback देता है — gently challenge karta hai
+            - Personal stories, controversies, behind-the-scenes moments mix karo
+            - Deep topics explore karo — philosophy, science, conspiracy, personal life
+            - Authentic Joe phrases mix karo: "That's insane bro", "Is that from a study?", "A hundred percent", "Pull that up", "For real though", "I think there's something to that", "Powerful", "That makes sense actually"
+
+            【 3. Closing 】
+            - Joe wrap up karo naturally — no forced conclusion
+            - Where to find the guest, any plug (book, company, social)
+            - Joe का final thought — appreciative, genuine
+
+            ══════════════════════════════════════════
+            TONE RULES (strictly follow):
+            ══════════════════════════════════════════
+            - Completely natural banter — jaise real dost baat kar rahe ho
+            - ${guest} की ACTUAL known views, statements, controversies use karo — generic mat bolo
+            - Tangents OK hain — real conversations go off-track naturally
+            - Banned: "यह ध्यान देने योग्य है", "निष्कर्ष में", "इस महत्वपूर्ण विषय पर"
+            - ${durFillHi}
+
+            Topic for today's episode: "${topic}"
+          `;
         } else {
             prompt = `
               विषय: "${topic}" पर एक ${style} वीडियो स्क्रिप्ट तैयार करें।
@@ -1699,6 +1748,56 @@ export const generateDebateScript = async (
               ${durFillEn}
             `;
           }
+        } else if (style === 'joe_rogan') {
+          const guest = speakers.length >= 2 ? speakers[1] : (speakers[0] && speakers[0] !== 'Joe Rogan' ? speakers[0] : 'Elon Musk');
+          prompt = `
+            You are writing a script for a Joe Rogan Experience (JRE) podcast episode.
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            There are EXACTLY 2 speakers:
+            - Joe Rogan (Host) — curious, direct, occasionally challenges the guest, uses phrases like "bro", "that's insane", "a hundred percent", "for real though", "is that from a study?", "pull that up Jamie", "i think there's something to that", "powerful"
+            - ${guest} (Guest) — use their ACTUAL known views, controversies, achievements, and personality for authentic dialogue
+
+            ══════════════════════════════════════════
+            EPISODE STRUCTURE (follow in exact order):
+            ══════════════════════════════════════════
+
+            【 1. Joe's Opening — Guest Introduction 】
+            Joe opens in his classic JRE style:
+            - Brief casual show intro (no stiff formal intro — just Joe being Joe)
+            - Warm, genuine intro of ${guest}: who they are, why they're famous/controversial, 1-2 known facts that set up the conversation
+            - Hint at today's topic: "We're gonna get into [topic] today..."
+            - End opening with a sharp, open-ended first question to kick off the conversation
+            Example tone: "Man, I've been wanting to have you on for a while. I've heard a lot about [fact/controversy]. So tell me — what actually happened?"
+
+            【 2. Main Conversation (80% of the episode) 】
+            Free-flowing, long-form conversation — NOT a structured debate:
+            - ${guest} gives detailed, thoughtful, authentic answers (based on their REAL known views and statements)
+            - Joe asks curious follow-up questions, goes down interesting tangents
+            - Joe occasionally pushes back gently — challenges but stays genuinely curious
+            - Mix in: personal stories, controversies, behind-the-scenes moments, philosophy, science, life advice
+            - Let the conversation breathe — real conversations drift off-topic and come back
+            - Mix in authentic Joe expressions: "That's insane bro", "Is that from a study?", "A hundred percent", "Pull that up", "For real though", "I think there's something to that", "Powerful", "That makes sense actually", "Dude", "No way"
+
+            【 3. Closing 】
+            - Joe wraps up naturally — no forced summary
+            - Where to find the guest (socials, company, book, etc.)
+            - Joe's final genuine thought — appreciative, real
+
+            ══════════════════════════════════════════
+            TONE RULES (strictly follow):
+            ══════════════════════════════════════════
+            - 100% natural banter — like two people who are genuinely interested in each other
+            - Use ${guest}'s ACTUAL known views, quotes, and controversial positions — not generic filler
+            - Tangents are welcome — real conversations naturally drift
+            - Banned phrases: "It's important to note", "In conclusion", "This is significant", "Let's delve into", "Furthermore"
+            - The guest should sound EXACTLY like ${guest} — their specific communication style, known opinions, vocabulary
+            ${durFillEn}
+
+            Topic for today's episode: "${topic}"
+          `;
         } else {
           prompt = `
             Generate a script for a ${style} on the topic: "${topic}".
