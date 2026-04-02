@@ -28,7 +28,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                   w: 896,
                   h: 150,
                   fontSize: 1,
-                  backgroundColor: 'rgba(0,0,0,0.8)',
+                  backgroundColor: 'rgba(0,0,0,0.85)',
                   textColor: '#ffffff',
                   borderColor: '#ffffff',
                   borderWidth: 0,
@@ -105,6 +105,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [syncSubtitlePosition, setSyncSubtitlePosition] = useState(true);
   const [subtitleBgHex, setSubtitleBgHex] = useState('#000000');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(80);
+  const [showNameBadge, setShowNameBadge] = useState(true);
   const [segmentScores, setSegmentScores] = useState<number[]>([]);
   const [showScorecard, setShowScorecard] = useState(false);
   const [scorecardData, setScorecardData] = useState<{ scores: { model: string, score: number }[], average: number } | null>(null);
@@ -220,7 +221,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   const currentSegment = script?.[currentSegmentIndex];
   const currentSubtitleConfig = currentSegment?.visualConfig?.subtitleConfig || { 
-      x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.8)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0
+      x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
   };
 
   const applySubtitleBg = (hex: string, opacity: number) => {
@@ -1783,7 +1784,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
     // --- SUBTITLES (Improved Phrase-wise Sync) ---
     if (showSubtitles && currentSegment.text) {
         const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || {
-            x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.8)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0
+            x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
         };
 
         const text = currentSegment.text;
@@ -1879,18 +1880,21 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         const bw = subtitleConfig.w;
         const bh = Math.max(subtitleConfig.h, totalHeight + (60 * subtitleConfig.fontSize));
 
-        ctx.fillStyle = subtitleConfig.backgroundColor;
         const br = (subtitleConfig.borderRadius ?? 20) * subtitleConfig.fontSize;
-        ctx.beginPath();
-        ctx.roundRect(bx, by, bw, bh, br);
-        ctx.fill();
 
-        if ((subtitleConfig.borderWidth ?? 0) > 0) {
-            ctx.strokeStyle = subtitleConfig.borderColor || '#ffffff';
-            ctx.lineWidth = subtitleConfig.borderWidth! * subtitleConfig.fontSize;
+        if (subtitleBackground) {
+            ctx.fillStyle = subtitleConfig.backgroundColor;
             ctx.beginPath();
             ctx.roundRect(bx, by, bw, bh, br);
-            ctx.stroke();
+            ctx.fill();
+
+            if ((subtitleConfig.borderWidth ?? 0) > 0) {
+                ctx.strokeStyle = subtitleConfig.borderColor || '#ffffff';
+                ctx.lineWidth = subtitleConfig.borderWidth! * subtitleConfig.fontSize;
+                ctx.beginPath();
+                ctx.roundRect(bx, by, bw, bh, br);
+                ctx.stroke();
+            }
         }
 
         if (showSettings) {
@@ -1906,7 +1910,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             ctx.strokeRect(bx, by, bw, bh);
         }
 
-        if (!isNarrator) {
+        if (!isNarrator && showNameBadge) {
             const speakerName = isSpeakingA ? speakerALabel : speakerBLabel;
             const fontSize = 24 * subtitleConfig.fontSize;
             ctx.font = `bold ${fontSize}px sans-serif`;
@@ -3253,12 +3257,16 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                       <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-2.5">
                         <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Options</label>
                         <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-xs text-gray-400">Sync Position (All Segments)</span>
-                          <input type="checkbox" checked={syncSubtitlePosition} onChange={(e) => setSyncSubtitlePosition(e.target.checked)} className="accent-red-500" />
-                        </label>
-                        <label className="flex items-center justify-between cursor-pointer">
                           <span className="text-xs text-gray-400">Show Background Box</span>
                           <input type="checkbox" checked={subtitleBackground} onChange={(e) => setSubtitleBackground(e.target.checked)} className="accent-red-500" />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-xs text-gray-400">Show Speaker Name Badge</span>
+                          <input type="checkbox" checked={showNameBadge} onChange={(e) => setShowNameBadge(e.target.checked)} className="accent-red-500" />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-xs text-gray-400">Sync Position (All Segments)</span>
+                          <input type="checkbox" checked={syncSubtitlePosition} onChange={(e) => setSyncSubtitlePosition(e.target.checked)} className="accent-red-500" />
                         </label>
                         <label className="flex items-center justify-between cursor-pointer">
                           <span className="text-xs text-gray-400">Question Mode (Narrator Only)</span>
