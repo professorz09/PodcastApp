@@ -638,14 +638,17 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
     
     let currentScoreA = 0;
     let currentScoreB = 0;
+    let currentScoreC = 0;
     const speakerA = activeSpeakers[0];
     const speakerB = activeSpeakers[1];
+    const speakerC = activeSpeakers[2];
 
     for (let i = 0; i < realTimeIndex; i++) {
         const seg = script[i];
         const score = segmentScores[i] || 0;
         if (seg.speaker === speakerA) currentScoreA += score;
         if (seg.speaker === speakerB) currentScoreB += score;
+        if (speakerC && seg.speaker === speakerC) currentScoreC += score;
     }
 
     const config: VisualConfig = {
@@ -702,7 +705,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         segmentOffsets,
         realTimeIndex,
         audioRef.current?.duration || 0,
-        { scoreA: currentScoreA.toFixed(1), scoreB: currentScoreB.toFixed(1) },
+        { scoreA: currentScoreA.toFixed(1), scoreB: currentScoreB.toFixed(1), ...(speakerC ? { scoreC: currentScoreC.toFixed(1) } : {}) },
         config,
         assets
     );
@@ -2539,13 +2542,16 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                 // Calculate Scores
                 let currentScoreA = 0;
                 let currentScoreB = 0;
+                let currentScoreC = 0;
                 const spA = activeSpeakers[0];
                 const spB = activeSpeakers[1];
+                const spC = activeSpeakers[2];
                 for (let i = 0; i < index; i++) {
                     const seg = script[i];
                     const score = segmentScores[i] || 0;
                     if (seg.speaker === spA) currentScoreA += score;
                     if (seg.speaker === spB) currentScoreB += score;
+                    if (spC && seg.speaker === spC) currentScoreC += score;
                 }
 
                 const currentAssets: RenderAssets = {
@@ -2561,7 +2567,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                     segmentOffsets,
                     index,
                     duration,
-                    { scoreA: currentScoreA.toFixed(1), scoreB: currentScoreB.toFixed(1) },
+                    { scoreA: currentScoreA.toFixed(1), scoreB: currentScoreB.toFixed(1), ...(spC ? { scoreC: currentScoreC.toFixed(1) } : {}) },
                     config,
                     currentAssets
                 );

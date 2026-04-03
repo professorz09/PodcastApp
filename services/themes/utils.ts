@@ -791,8 +791,108 @@ export const drawDebatePointCounter = (
         ctx.restore();
     };
 
+    // ── 3rd speaker (center bottom for side / center column for bottom) ──
+    const drawThird = (count: string, color: string) => {
+        const n = parseInt(count) || 0;
+        const show = Math.min(n, MAX);
+        const more = n > MAX;
+        ctx.save();
+
+        if (position === 'side') {
+            const baseY = H - 60;
+            if (style === 'numbers') {
+                const bW = 52, bH = 52;
+                const x = W / 2 - bW / 2, y = baseY - bH / 2;
+                ctx.fillStyle = color; glow(color);
+                ctx.beginPath(); ctx.roundRect(x, y, bW, bH, 12); ctx.fill();
+                noGlow();
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 26px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(count, x + bW / 2, y + bH / 2);
+            } else if (style === 'dots') {
+                const r = 7, gap = 8;
+                const totalW = show * (r * 2 + gap) - (show > 0 ? gap : 0);
+                const sx = W / 2 - totalW / 2;
+                for (let i = 0; i < show; i++) {
+                    const cx = sx + i * (r * 2 + gap) + r;
+                    ctx.fillStyle = color; glow(color);
+                    ctx.beginPath(); ctx.arc(cx, baseY, r, 0, Math.PI * 2); ctx.fill();
+                }
+                noGlow();
+                if (more) {
+                    ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('•••', W / 2, baseY + 20);
+                }
+            } else {
+                const bW = 5, bH = 20, gap = 8;
+                const totalW = show * (bW + gap) - (show > 0 ? gap : 0);
+                const sx = W / 2 - totalW / 2;
+                for (let i = 0; i < show; i++) {
+                    const x = sx + i * (bW + gap);
+                    ctx.fillStyle = color; glow(color);
+                    ctx.beginPath(); ctx.roundRect(x, baseY - bH / 2, bW, bH, 3); ctx.fill();
+                }
+                noGlow();
+                if (more) {
+                    ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('•••', W / 2, baseY + 16);
+                }
+            }
+        } else {
+            // Bottom position center column
+            const baseY = H - 80;
+            if (style === 'numbers') {
+                const bW = 52, bH = 52;
+                const x = W / 2 - bW / 2, y = baseY - bH / 2;
+                ctx.fillStyle = color; glow(color);
+                ctx.beginPath(); ctx.roundRect(x, y, bW, bH, 12); ctx.fill();
+                noGlow();
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 26px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(count, x + bW / 2, y + bH / 2);
+            } else if (style === 'dots') {
+                const r = 7, gap = 8;
+                const totalW = show * (r * 2 + gap) - (show > 0 ? gap : 0);
+                const sx = W / 2 - totalW / 2;
+                for (let i = 0; i < show; i++) {
+                    const cx = sx + i * (r * 2 + gap) + r;
+                    ctx.fillStyle = color; glow(color);
+                    ctx.beginPath(); ctx.arc(cx, baseY, r, 0, Math.PI * 2); ctx.fill();
+                }
+                noGlow();
+                if (more) {
+                    ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('•••', W / 2, baseY + 20);
+                }
+            } else {
+                const bW = 5, bH = 28, gap = 10;
+                const totalW = show * (bW + gap) - (show > 0 ? gap : 0);
+                const sx = W / 2 - totalW / 2;
+                for (let i = 0; i < show; i++) {
+                    const x = sx + i * (bW + gap);
+                    ctx.fillStyle = color; glow(color);
+                    ctx.beginPath(); ctx.roundRect(x, baseY - bH / 2, bW, bH, 3); ctx.fill();
+                }
+                noGlow();
+                if (more) {
+                    ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('•••', W / 2, baseY + 22);
+                }
+            }
+        }
+        ctx.restore();
+    };
+
     // ── dispatch ─────────────────────────────────────────────────────
+    const hasThird = !!scores.scoreC && config.speakerIds.length >= 3;
+    const colorC = '#eab308';
+
     const draw = style === 'dots' ? drawDots : style === 'numbers' ? drawNumbers : drawBars;
     draw(scores.scoreA, true,  colorA);
     draw(scores.scoreB, false, colorB);
+    if (hasThird) drawThird(scores.scoreC!, colorC);
 };
