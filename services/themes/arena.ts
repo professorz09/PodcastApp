@@ -90,11 +90,10 @@ export const arenaTheme: Theme = {
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
     };
 
-    // Equilateral triangle centered at (cx, cy) with given "radius" (circumradius)
     const clipTriangle = (cx: number, cy: number, R: number) => {
         ctx.beginPath();
         for (let i = 0; i < 3; i++) {
-            const angle = (Math.PI / 2) + (i * 2 * Math.PI / 3) * -1 + Math.PI; // point up
+            const angle = (Math.PI / 2) + (i * 2 * Math.PI / 3) * -1 + Math.PI;
             const px = cx + R * Math.cos(angle - Math.PI / 2);
             const py = cy + R * Math.sin(angle - Math.PI / 2);
             if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
@@ -110,10 +109,7 @@ export const arenaTheme: Theme = {
         const sc = config.speakerScale * pulse;
 
         if (speakerShape === 'circle') {
-            // ── CIRCLE ─────────────────────────────────────────────
             const R = 120 * sc;
-
-            // Clipped image / avatar
             ctx.save();
             clipCircle(cx, cy, R);
             ctx.clip();
@@ -133,21 +129,14 @@ export const arenaTheme: Theme = {
                 ctx.fillText(label.charAt(0).toUpperCase(), cx, cy);
             }
             ctx.restore();
-
-            // Outer ring border
             ctx.save();
             clipCircle(cx, cy, R);
-            if (isActive) {
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 18 + audioLevel * 28;
-            }
+            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 18 + audioLevel * 28; }
             ctx.strokeStyle = isActive ? color : '#333';
             ctx.lineWidth = isActive ? 4 : 2;
             ctx.stroke();
             ctx.shadowBlur = 0;
             ctx.restore();
-
-            // VU meter: pulsing concentric ring
             if (config.showVuMeter && isActive) {
                 const ringCount = 3;
                 for (let r = 0; r < ringCount; r++) {
@@ -166,9 +155,7 @@ export const arenaTheme: Theme = {
             }
 
         } else if (speakerShape === 'triangle') {
-            // ── TRIANGLE ───────────────────────────────────────────
-            const R = 140 * sc; // circumradius
-
+            const R = 140 * sc;
             ctx.save();
             clipTriangle(cx, cy, R);
             ctx.clip();
@@ -185,21 +172,14 @@ export const arenaTheme: Theme = {
                 ctx.fillText(label.charAt(0).toUpperCase(), cx, cy + R * 0.1);
             }
             ctx.restore();
-
-            // Triangle border
             ctx.save();
             clipTriangle(cx, cy, R);
-            if (isActive) {
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 18 + audioLevel * 28;
-            }
+            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 18 + audioLevel * 28; }
             ctx.strokeStyle = isActive ? color : '#333';
             ctx.lineWidth = isActive ? 4 : 2;
             ctx.stroke();
             ctx.shadowBlur = 0;
             ctx.restore();
-
-            // VU meter: glowing expanding triangle outline
             if (config.showVuMeter && isActive) {
                 for (let r = 0; r < 3; r++) {
                     const expandR = R + 12 * (r + 1) + audioLevel * 20 * (r + 1);
@@ -217,10 +197,8 @@ export const arenaTheme: Theme = {
             }
 
         } else {
-            // ── RECT (default) ─────────────────────────────────────
             const w = 240 * sc, h = 320 * sc;
             const rx = cx - w / 2, ry = cy - h / 2;
-
             ctx.save();
             clipRect(cx, cy, w, h, 30);
             ctx.clip();
@@ -240,8 +218,6 @@ export const arenaTheme: Theme = {
                 ctx.fillText(label.charAt(0).toUpperCase(), cx, ry + h / 2 - 40);
             }
             ctx.restore();
-
-            // Border
             ctx.save();
             clipRect(cx, cy, w, h, 30);
             if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 20 + audioLevel * 30; }
@@ -250,8 +226,6 @@ export const arenaTheme: Theme = {
             ctx.stroke();
             ctx.shadowBlur = 0;
             ctx.restore();
-
-            // VU meter: side bar or dots
             if (config.showVuMeter && isActive) {
                 const barX = rx + w + 10;
                 if (config.vuMeterStyle === 'dots') {
@@ -307,6 +281,71 @@ export const arenaTheme: Theme = {
             drawSpeaker(label, pos.x, pos.y, isSpeaking, color,
                 config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null);
         });
+    }
+
+    // ── Segment Count Dots (both sides) ──────────────────────────
+    if (speakerIds.length >= 2) {
+        // Count how many segments each speaker has had so far (up to current)
+        const speakerSegCounts = speakerIds.map(id =>
+            script.slice(0, currentSegmentIndex + 1).filter(s => s.speaker === id).length
+        );
+        // Total segments each speaker has in the whole script
+        const speakerSegTotals = speakerIds.map(id =>
+            script.filter(s => s.speaker === id).length
+        );
+
+        const DOT_R = 7;
+        const DOT_GAP = 5;
+        const PER_ROW = 5;
+        const ROW_GAP = 20;
+        const SIDE_MARGIN = 14;
+        const START_Y = canvasHeight * 0.68;
+
+        const drawSegDots = (isLeft: boolean, done: number, total: number, color: string) => {
+            const rows = Math.ceil(total / PER_ROW);
+            const rowW = PER_ROW * (DOT_R * 2) + (PER_ROW - 1) * DOT_GAP;
+
+            for (let i = 0; i < total; i++) {
+                const row = Math.floor(i / PER_ROW);
+                const col = i % PER_ROW;
+                const isDone = i < done;
+
+                const dotX = isLeft
+                    ? SIDE_MARGIN + DOT_R + col * (DOT_R * 2 + DOT_GAP)
+                    : canvasWidth - SIDE_MARGIN - DOT_R - col * (DOT_R * 2 + DOT_GAP);
+                const dotY = START_Y + row * ROW_GAP;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, DOT_R, 0, Math.PI * 2);
+
+                if (isDone) {
+                    ctx.fillStyle = color;
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 10;
+                } else {
+                    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                    ctx.shadowBlur = 0;
+                }
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Count label below dots
+            const labelY = START_Y + rows * ROW_GAP + 8;
+            ctx.save();
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = isLeft ? 'left' : 'right';
+            ctx.textBaseline = 'top';
+            const labelX = isLeft ? SIDE_MARGIN : canvasWidth - SIDE_MARGIN;
+            ctx.fillText(`${done}/${total}`, labelX, labelY);
+            ctx.restore();
+        };
+
+        // Only draw for first 2 speakers (left/right sides)
+        drawSegDots(true,  speakerSegCounts[0], Math.max(1, speakerSegTotals[0]), colors[0]);
+        drawSegDots(false, speakerSegCounts[1], Math.max(1, speakerSegTotals[1]), colors[1]);
     }
 
     // Subtitles
