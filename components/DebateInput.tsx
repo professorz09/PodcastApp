@@ -454,15 +454,15 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
                     <option value="debate">Debate</option>
+                    <option value="situational">Situational</option>
+                    <option value="finance_deep_dive">💰 Finance Deep Dive</option>
                     <option value="explained">Explained</option>
                     <option value="explained_solo">🎙 Explained Solo</option>
-                    <option value="situational">Situational</option>
                     <option value="documentary">Documentary</option>
+                    <option value="joe_rogan">🎙 Joe Rogan Experience</option>
                     <option value="podcast_panel">Podcast Panel</option>
                     <option value="podcast_breakdown">Podcast Breakdown</option>
                     <option value="context_bridge">Context Analyst</option>
-                    <option value="joe_rogan">🎙 Joe Rogan Experience</option>
-                    <option value="finance_deep_dive">💰 Finance Deep Dive</option>
                   </select>
                 </div>
               </div>

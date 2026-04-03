@@ -682,6 +682,12 @@ export const generateDebateScript = async (
             }
         } else if (style === 'explained_solo') {
           prompt = `
+            ═══════════════════════════════════════
+            STYLE: EXPLAINED SOLO — SINGLE VOICE YOUTUBE EXPLAINER
+            यह एक solo explainer है। एक ही आवाज़, कोई dialogue नहीं, कोई debate नहीं।
+            Conversational YouTube tone — जैसे Dhruv Rathee या similar channel।
+            किसी और style से बिल्कुल अलग — यहाँ सिर्फ एक इंसान camera पर बोल रहा है।
+            ═══════════════════════════════════════
             विषय: "${topic}"
             ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
             ${durLineHi}
@@ -750,6 +756,12 @@ export const generateDebateScript = async (
         } else if (style === 'situational') {
           if (!includeNarrator) {
             prompt = `
+              ═══════════════════════════════════════
+              STYLE: SITUATIONAL — REAL PERSON + 2 EXPERTS
+              यह debate नहीं है, explanation नहीं है, podcast नहीं है।
+              एक असली इंसान अपनी real-life situation बताता है — फिर 2 experts उसे actually help करते हैं।
+              Tone: emotional, raw, genuine — जैसे Reddit thread या real confession।
+              ═══════════════════════════════════════
               विषय: "${topic}" पर एक "Situational" style की video script बनाओ।
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
               ${durLineHi}
@@ -1292,6 +1304,12 @@ export const generateDebateScript = async (
         } else if (style === 'finance_deep_dive') {
           if (includeNarrator) {
             prompt = `
+              ═══════════════════════════════════════
+              STYLE: FINANCE DEEP DIVE — USA FINANCE DISCUSSION WITH REAL NUMBERS
+              Yeh situational nahi hai, debate nahi hai, general podcast nahi hai।
+              Ek relatable USA-based scenario + 2 finance experts jo real calculations ke saath actual advice dete hain।
+              Har point pe numbers aane chahiye — formulas, dollar amounts, year-by-year breakdown।
+              ═══════════════════════════════════════
               Topic: "${topic}"
               ${specificDetails ? `Additional context: ${specificDetails}` : ''}
               ${durLineHi}
@@ -1345,6 +1363,13 @@ export const generateDebateScript = async (
             `;
           } else {
             prompt = `
+              ═══════════════════════════════════════
+              STYLE: FINANCE DEEP DIVE — SITUATIONAL (NO NARRATOR)
+              Yeh general situational nahi hai — yeh FINANCE topic pe focused hai।
+              Ek normal person apni real USA-based financial problem batata hai।
+              2 finance experts actual numbers aur calculations ke saath help karte hain।
+              Har point pe real math dikhao — no vague advice।
+              ═══════════════════════════════════════
               Topic: "${topic}"
               ${specificDetails ? `Additional context: ${specificDetails}` : ''}
               ${durLineHi}
@@ -1591,6 +1616,12 @@ export const generateDebateScript = async (
           }
         } else if (style === 'explained_solo') {
           prompt = `
+            ═══════════════════════════════════════
+            STYLE: EXPLAINED SOLO — SINGLE VOICE YOUTUBE EXPLAINER
+            This is NOT a debate, NOT a conversation, NOT a podcast.
+            ONE voice only — like a YouTube creator talking directly to camera.
+            Think: Kurzgesagt, Wendover Productions, or Dhruv Rathee style.
+            ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Additional context: ${specificDetails}` : ''}
             ${durLineEn}
@@ -1658,6 +1689,12 @@ export const generateDebateScript = async (
         } else if (style === 'situational') {
           if (!includeNarrator) {
           prompt = `
+            ═══════════════════════════════════════
+            STYLE: SITUATIONAL — REAL PERSON + 2 EXPERTS
+            This is NOT a debate. NOT a podcast. NOT an explanation video.
+            A real person shares their genuine life situation → 2 domain experts actually help them.
+            Tone: raw, human, emotionally grounded — like a Reddit confession thread meets expert panel.
+            ═══════════════════════════════════════
             Generate a "Situational" style video script on the topic: "${topic}".
             ${specificDetails ? `Situation details: ${specificDetails}` : ''}
             ${durLineEn}
@@ -1807,6 +1844,12 @@ export const generateDebateScript = async (
         } else if (style === 'finance_deep_dive') {
           if (includeNarrator) {
           prompt = `
+            ═══════════════════════════════════════
+            STYLE: FINANCE DEEP DIVE — USA FINANCIAL DISCUSSION WITH CALCULATIONS
+            This is NOT a general podcast. NOT a situational drama. NOT vague advice.
+            Narrator sets a vivid USA financial scenario → 2 finance experts break it down with REAL NUMBERS.
+            Every point must have formulas, dollar amounts, year-by-year math. No exceptions.
+            ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Additional context: ${specificDetails}` : ''}
             ${durLineEn}
@@ -1861,6 +1904,12 @@ export const generateDebateScript = async (
           `;
           } else {
           prompt = `
+            ═══════════════════════════════════════
+            STYLE: FINANCE DEEP DIVE — SITUATIONAL (NO NARRATOR)
+            This is NOT general situational drama. This is FINANCE-specific.
+            A regular American shares their real financial problem → 2 finance experts help with ACTUAL MATH.
+            Every claim must have numbers — no vague statements ever.
+            ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Additional context: ${specificDetails}` : ''}
             ${durLineEn}
