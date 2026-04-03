@@ -703,13 +703,16 @@ export const generateDebateScript = async (
             STRUCTURE (इसी order में):
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-            【 HOOK (2-3 lines) 】
-            एक interesting fact, question, या shocking statement से शुरू करो जो audience को रोके।
-            Topic-specific — generic "kya aapne kabhi socha hai" नहीं।
+            【 OPENING — SEEDHA TOPIC SE (कोई warmup नहीं) 】
+            पहली line में TOPIC का नाम लो — directly।
+            जैसे:
+            • "Robert Greene ki 48 Laws of Power — Law 1: Never Outshine The Master। आज हम इसी के बारे में बात करेंगे।"
+            • "Trump का stock manipulation — क्या था ये, कैसे काम किया, कब-कब हुआ, और Americans के लिए क्यों ख़राब था।"
+            • "Love और sex — आज हम इस topic पर बिना filter के बात करेंगे।"
 
-            【 INTRO 】
-            "Is video mein hum cover karenge:" — फिर 3-5 bullet points में briefly बताओ kya-kya cover होगा।
-            Short aur crisp।
+            फिर 2-3 lines में बताओ इस video में क्या-क्या cover होगा — specific angles:
+            "इस video में हम देखेंगे — [angle 1], [angle 2], [angle 3]..." — topic के हिसाब से।
+            Generic list नहीं — इस specific topic के actual angles।
 
             【 BASICS — यह topic है क्या? 】
             2-4 lines में: यह topic zero से explain करो।
@@ -1609,13 +1612,15 @@ export const generateDebateScript = async (
             STRUCTURE (in this exact order):
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-            【 HOOK (2-3 lines) 】
-            Start with an interesting fact, question, or shocking statement that stops the viewer.
-            Topic-specific — never generic "Have you ever wondered..."
+            【 OPENING — START WITH THE TOPIC (no warmup) 】
+            First line names the topic directly — no generic opener.
+            Examples of how it should feel:
+            • "Robert Greene's 48 Laws of Power — Law 1: Never Outshine The Master. That's what we're covering today."
+            • "Trump's stock manipulation — what it was, how it worked, who was involved, and why it hurt everyday Americans."
+            • "Love and sex — let's talk about it honestly, no filter."
 
-            【 INTRO 】
-            "In this video, we're going to cover:" — then 3-5 bullet points briefly listing what will be covered.
-            Short and crisp.
+            Then in 2-3 lines, tell the viewer exactly what angles this video covers — specific to THIS topic:
+            "In this video we'll look at — [angle 1], [angle 2], [angle 3]..." — not a generic list, real angles for this specific topic.
 
             【 BASICS — What is this topic? 】
             2-4 lines: explain this topic from absolute zero.
