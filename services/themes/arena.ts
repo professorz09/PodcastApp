@@ -6,13 +6,16 @@ export const arenaTheme: Theme = {
   name: 'Arena',
   description: 'Versus layout with central VS indicator and score cards.',
   properties: [
-    { id: 'timerColor',         label: 'Timer Color',       type: 'color',   defaultValue: '#eab308' },
-    { id: 'vsColor',            label: 'VS Color',          type: 'color',   defaultValue: '#f97316' },
-    { id: 'speakerColorA',      label: 'Speaker A Color',   type: 'color',   defaultValue: '#3b82f6' },
-    { id: 'speakerColorB',      label: 'Speaker B Color',   type: 'color',   defaultValue: '#ef4444' },
-    { id: 'focusActiveSpeaker', label: '🎙 Sirf Bolne Wala Dikhao (Narrator pe dono hide)', type: 'boolean', defaultValue: false },
-    { id: 'speakerShape',       label: 'Speaker Image Shape', type: 'select', defaultValue: 'rect',
+    { id: 'timerColor',         label: 'Timer Color',              type: 'color',   defaultValue: '#eab308' },
+    { id: 'vsColor',            label: 'VS Color',                 type: 'color',   defaultValue: '#f97316' },
+    { id: 'speakerColorA',      label: 'Speaker A Color',          type: 'color',   defaultValue: '#3b82f6' },
+    { id: 'speakerColorB',      label: 'Speaker B Color',          type: 'color',   defaultValue: '#ef4444' },
+    { id: 'focusActiveSpeaker', label: '🎙 Sirf Bolne Wala Dikhao', type: 'boolean', defaultValue: false },
+    { id: 'speakerShape',       label: 'Speaker Image Shape',      type: 'select',  defaultValue: 'rect',
       options: ['rect', 'circle', 'triangle'] },
+    { id: 'segmentCountPos',    label: 'Segment Count Position',   type: 'select',  defaultValue: 'bottom',
+      options: ['bottom', 'side'] },
+    { id: 'showVuMeter',        label: 'Show VU Meter',            type: 'boolean', defaultValue: false },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -29,8 +32,11 @@ export const arenaTheme: Theme = {
         '#22c55e',
     ];
 
-    const showSpeakers = config.showSpeakers;
+    const showSpeakers   = config.showSpeakers;
     const speakerShape: 'rect' | 'circle' | 'triangle' = themeConfig?.speakerShape || 'rect';
+    const segCountPos    = themeConfig?.segmentCountPos || 'bottom';
+    // VU meter: arena theme has its own default (off); respects global toggle too
+    const vuEnabled      = config.showVuMeter && (themeConfig?.showVuMeter ?? false);
 
     // Background
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
@@ -84,12 +90,10 @@ export const arenaTheme: Theme = {
         ctx.beginPath();
         ctx.roundRect(cx - w / 2, cy - h / 2, w, h, r);
     };
-
     const clipCircle = (cx: number, cy: number, r: number) => {
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
     };
-
     const clipTriangle = (cx: number, cy: number, R: number) => {
         ctx.beginPath();
         for (let i = 0; i < 3; i++) {
@@ -110,140 +114,103 @@ export const arenaTheme: Theme = {
 
         if (speakerShape === 'circle') {
             const R = 120 * sc;
-            ctx.save();
-            clipCircle(cx, cy, R);
-            ctx.clip();
+            ctx.save(); clipCircle(cx, cy, R); ctx.clip();
             if (image) {
-                const s = Math.max((R * 2) / image.width, (R * 2) / image.height);
-                ctx.drawImage(image, cx - image.width * s / 2, cy - image.height * s / 2, image.width * s, image.height * s);
+                const s = Math.max((R*2)/image.width, (R*2)/image.height);
+                ctx.drawImage(image, cx - image.width*s/2, cy - image.height*s/2, image.width*s, image.height*s);
             } else {
-                ctx.fillStyle = '#1e1e1e';
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(cx, cy, R * 0.45, 0, Math.PI * 2);
-                ctx.fillStyle = '#27272a';
-                ctx.fill();
-                ctx.fillStyle = '#fff';
-                ctx.font = `bold ${R * 0.55}px sans-serif`;
+                ctx.fillStyle = '#1e1e1e'; ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.font = `bold ${R*0.55}px sans-serif`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(label.charAt(0).toUpperCase(), cx, cy);
             }
             ctx.restore();
-            ctx.save();
-            clipCircle(cx, cy, R);
-            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 18 + audioLevel * 28; }
-            ctx.strokeStyle = isActive ? color : '#333';
-            ctx.lineWidth = isActive ? 4 : 2;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-            ctx.restore();
-            if (config.showVuMeter && isActive) {
+            ctx.save(); clipCircle(cx, cy, R);
+            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 18 + audioLevel*28; }
+            ctx.strokeStyle = isActive ? color : '#333'; ctx.lineWidth = isActive ? 4 : 2;
+            ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+
+            if (vuEnabled && isActive) {
                 const ringCount = 3;
                 for (let r = 0; r < ringCount; r++) {
-                    const expand = R + 14 * (r + 1) + audioLevel * 22 * (r + 1);
-                    const alpha = Math.max(0, 0.55 - r * 0.18) * audioLevel;
-                    ctx.save();
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = Math.max(1, 3 - r);
-                    ctx.globalAlpha = alpha;
-                    ctx.shadowColor = color;
-                    ctx.shadowBlur = 12;
-                    clipCircle(cx, cy, expand);
-                    ctx.stroke();
-                    ctx.restore();
+                    const expand = R + 14*(r+1) + audioLevel*22*(r+1);
+                    const alpha = Math.max(0, 0.55 - r*0.18) * audioLevel;
+                    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, 3-r);
+                    ctx.globalAlpha = alpha; ctx.shadowColor = color; ctx.shadowBlur = 12;
+                    clipCircle(cx, cy, expand); ctx.stroke(); ctx.restore();
                 }
             }
 
         } else if (speakerShape === 'triangle') {
             const R = 140 * sc;
-            ctx.save();
-            clipTriangle(cx, cy, R);
-            ctx.clip();
+            ctx.save(); clipTriangle(cx, cy, R); ctx.clip();
             if (image) {
                 const size = R * 1.8;
-                const s = Math.max(size / image.width, size / image.height);
-                ctx.drawImage(image, cx - image.width * s / 2, cy - image.height * s / 2, image.width * s, image.height * s);
+                const s = Math.max(size/image.width, size/image.height);
+                ctx.drawImage(image, cx - image.width*s/2, cy - image.height*s/2, image.width*s, image.height*s);
             } else {
-                ctx.fillStyle = '#1e1e1e';
-                ctx.fill();
-                ctx.fillStyle = '#fff';
-                ctx.font = `bold ${R * 0.42}px sans-serif`;
+                ctx.fillStyle = '#1e1e1e'; ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.font = `bold ${R*0.42}px sans-serif`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(label.charAt(0).toUpperCase(), cx, cy + R * 0.1);
+                ctx.fillText(label.charAt(0).toUpperCase(), cx, cy + R*0.1);
             }
             ctx.restore();
-            ctx.save();
-            clipTriangle(cx, cy, R);
-            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 18 + audioLevel * 28; }
-            ctx.strokeStyle = isActive ? color : '#333';
-            ctx.lineWidth = isActive ? 4 : 2;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-            ctx.restore();
-            if (config.showVuMeter && isActive) {
+            ctx.save(); clipTriangle(cx, cy, R);
+            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 18 + audioLevel*28; }
+            ctx.strokeStyle = isActive ? color : '#333'; ctx.lineWidth = isActive ? 4 : 2;
+            ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+
+            if (vuEnabled && isActive) {
                 for (let r = 0; r < 3; r++) {
-                    const expandR = R + 12 * (r + 1) + audioLevel * 20 * (r + 1);
-                    const alpha = Math.max(0, 0.6 - r * 0.2) * audioLevel;
-                    ctx.save();
-                    clipTriangle(cx, cy, expandR);
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = Math.max(1, 3 - r);
-                    ctx.globalAlpha = alpha;
-                    ctx.shadowColor = color;
-                    ctx.shadowBlur = 14;
-                    ctx.stroke();
-                    ctx.restore();
+                    const expandR = R + 12*(r+1) + audioLevel*20*(r+1);
+                    const alpha = Math.max(0, 0.6 - r*0.2) * audioLevel;
+                    ctx.save(); clipTriangle(cx, cy, expandR);
+                    ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, 3-r);
+                    ctx.globalAlpha = alpha; ctx.shadowColor = color; ctx.shadowBlur = 14;
+                    ctx.stroke(); ctx.restore();
                 }
             }
 
         } else {
+            // ── RECT (default) ─────────────────────────────────────
             const w = 240 * sc, h = 320 * sc;
-            const rx = cx - w / 2, ry = cy - h / 2;
-            ctx.save();
-            clipRect(cx, cy, w, h, 30);
-            ctx.clip();
+            const rx = cx - w/2, ry = cy - h/2;
+            ctx.save(); clipRect(cx, cy, w, h, 30); ctx.clip();
             if (image) {
-                const s = Math.max(w / image.width, h / image.height);
-                ctx.drawImage(image, rx + w / 2 - image.width * s / 2, ry + h / 2 - image.height * s / 2, image.width * s, image.height * s);
+                const s = Math.max(w/image.width, h/image.height);
+                ctx.drawImage(image, rx+w/2 - image.width*s/2, ry+h/2 - image.height*s/2, image.width*s, image.height*s);
             } else {
-                ctx.fillStyle = '#1e1e1e';
-                ctx.fill();
+                ctx.fillStyle = '#1e1e1e'; ctx.fill();
                 const avatarR = 60 * sc;
-                ctx.beginPath();
-                ctx.arc(cx, ry + h / 2 - 40, avatarR, 0, Math.PI * 2);
+                ctx.beginPath(); ctx.arc(cx, ry+h/2-40, avatarR, 0, Math.PI*2);
                 ctx.fillStyle = '#27272a'; ctx.fill();
-                ctx.fillStyle = '#fff';
-                ctx.font = `bold ${40 * pulse}px sans-serif`;
+                ctx.fillStyle = '#fff'; ctx.font = `bold ${40*pulse}px sans-serif`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(label.charAt(0).toUpperCase(), cx, ry + h / 2 - 40);
+                ctx.fillText(label.charAt(0).toUpperCase(), cx, ry+h/2-40);
             }
             ctx.restore();
-            ctx.save();
-            clipRect(cx, cy, w, h, 30);
-            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 20 + audioLevel * 30; }
-            ctx.strokeStyle = isActive ? color : '#333';
-            ctx.lineWidth = isActive ? 4 : 2;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-            ctx.restore();
-            if (config.showVuMeter && isActive) {
+            ctx.save(); clipRect(cx, cy, w, h, 30);
+            if (isActive) { ctx.shadowColor = color; ctx.shadowBlur = 20 + audioLevel*30; }
+            ctx.strokeStyle = isActive ? color : '#333'; ctx.lineWidth = isActive ? 4 : 2;
+            ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+
+            if (vuEnabled && isActive) {
                 const barX = rx + w + 10;
                 if (config.vuMeterStyle === 'dots') {
                     const DOTS = 12;
-                    const dotR = Math.max(3, Math.min(6, h / (DOTS * 3)));
-                    const spacing = (h - DOTS * dotR * 2) / (DOTS - 1);
+                    const dotR = Math.max(3, Math.min(6, h/(DOTS*3)));
+                    const spacing = (h - DOTS*dotR*2) / (DOTS-1);
                     const dotCX = barX + dotR + 1;
                     const activeDots = Math.round(Math.max(0.18, audioLevel) * DOTS);
                     for (let d = 0; d < DOTS; d++) {
-                        const dotY = ry + h - d * (dotR * 2 + spacing) - dotR;
+                        const dotY = ry + h - d*(dotR*2+spacing) - dotR;
                         const isLit = d < activeDots;
-                        const pct = d / (DOTS - 1);
+                        const pct = d / (DOTS-1);
                         const dotColor = !isLit ? 'rgba(255,255,255,0.10)' : pct < 0.5 ? color : pct < 0.8 ? '#facc15' : '#ef4444';
-                        ctx.beginPath();
-                        ctx.arc(dotCX, dotY, dotR, 0, Math.PI * 2);
+                        ctx.beginPath(); ctx.arc(dotCX, dotY, dotR, 0, Math.PI*2);
                         ctx.fillStyle = dotColor;
                         ctx.shadowColor = isLit ? dotColor : 'transparent';
-                        ctx.shadowBlur = isLit ? 5 + audioLevel * 8 : 0;
+                        ctx.shadowBlur = isLit ? 5 + audioLevel*8 : 0;
                         ctx.fill();
                     }
                     ctx.shadowBlur = 0;
@@ -257,7 +224,7 @@ export const arenaTheme: Theme = {
                     ctx.shadowColor = color; ctx.shadowBlur = 8;
                     ctx.fillRect(barX, fillY, barW, fillH);
                     ctx.fillStyle = '#fff';
-                    ctx.fillRect(barX - 1, fillY - 2, barW + 2, 3);
+                    ctx.fillRect(barX-1, fillY-2, barW+2, 3);
                     ctx.shadowBlur = 0;
                 }
             }
@@ -268,13 +235,9 @@ export const arenaTheme: Theme = {
     if (showSpeakers) {
         const focusMode = themeConfig?.focusActiveSpeaker === true;
         const isNarratorTurn = currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator';
-
         speakerIds.forEach((id, index) => {
             const isSpeaking = isPlaying && currentSegment.speaker === id;
-            if (focusMode) {
-                if (isNarratorTurn) return;
-                if (!isSpeaking) return;
-            }
+            if (focusMode) { if (isNarratorTurn || !isSpeaking) return; }
             const label = speakerLabels[index] || id;
             const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
             const color = colors[index % colors.length];
@@ -283,69 +246,112 @@ export const arenaTheme: Theme = {
         });
     }
 
-    // ── Segment Count Dots (both sides) ──────────────────────────
+    // ── Segment Count Display ──────────────────────────────────────
     if (speakerIds.length >= 2) {
-        // Count how many segments each speaker has had so far (up to current)
         const speakerSegCounts = speakerIds.map(id =>
             script.slice(0, currentSegmentIndex + 1).filter(s => s.speaker === id).length
         );
-        // Total segments each speaker has in the whole script
         const speakerSegTotals = speakerIds.map(id =>
             script.filter(s => s.speaker === id).length
         );
 
-        const DOT_R = 7;
-        const DOT_GAP = 5;
-        const PER_ROW = 5;
-        const ROW_GAP = 20;
-        const SIDE_MARGIN = 14;
-        const START_Y = canvasHeight * 0.68;
+        if (segCountPos === 'side') {
+            // ── SIDE: vertical column on left/right edges ─────────
+            const DOT_R = 7;
+            const DOT_GAP = 6;
+            const SIDE_X_L = 14 + DOT_R;
+            const SIDE_X_R = canvasWidth - 14 - DOT_R;
+            const START_Y = canvasHeight * 0.62;
 
-        const drawSegDots = (isLeft: boolean, done: number, total: number, color: string) => {
-            const rows = Math.ceil(total / PER_ROW);
-            const rowW = PER_ROW * (DOT_R * 2) + (PER_ROW - 1) * DOT_GAP;
+            const drawSideDots = (isLeft: boolean, done: number, total: number, color: string, label: string) => {
+                const cx = isLeft ? SIDE_X_L : SIDE_X_R;
 
-            for (let i = 0; i < total; i++) {
-                const row = Math.floor(i / PER_ROW);
-                const col = i % PER_ROW;
-                const isDone = i < done;
-
-                const dotX = isLeft
-                    ? SIDE_MARGIN + DOT_R + col * (DOT_R * 2 + DOT_GAP)
-                    : canvasWidth - SIDE_MARGIN - DOT_R - col * (DOT_R * 2 + DOT_GAP);
-                const dotY = START_Y + row * ROW_GAP;
-
+                // Label at top
                 ctx.save();
-                ctx.beginPath();
-                ctx.arc(dotX, dotY, DOT_R, 0, Math.PI * 2);
-
-                if (isDone) {
-                    ctx.fillStyle = color;
-                    ctx.shadowColor = color;
-                    ctx.shadowBlur = 10;
-                } else {
-                    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-                    ctx.shadowBlur = 0;
-                }
-                ctx.fill();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                ctx.shadowColor = color; ctx.shadowBlur = 8;
+                ctx.fillText(label.slice(0, 3).toUpperCase(), cx, START_Y - 4);
                 ctx.restore();
-            }
 
-            // Count label below dots
-            const labelY = START_Y + rows * ROW_GAP + 8;
-            ctx.save();
-            ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.font = 'bold 12px sans-serif';
-            ctx.textAlign = isLeft ? 'left' : 'right';
-            ctx.textBaseline = 'top';
-            const labelX = isLeft ? SIDE_MARGIN : canvasWidth - SIDE_MARGIN;
-            ctx.fillText(`${done}/${total}`, labelX, labelY);
-            ctx.restore();
-        };
+                for (let i = 0; i < total; i++) {
+                    const dotY = START_Y + i * (DOT_R * 2 + DOT_GAP) + DOT_R;
+                    const isDone = i < done;
+                    ctx.save();
+                    ctx.beginPath(); ctx.arc(cx, dotY, DOT_R, 0, Math.PI * 2);
+                    ctx.fillStyle = isDone ? color : 'rgba(255,255,255,0.10)';
+                    ctx.shadowColor = isDone ? color : 'transparent';
+                    ctx.shadowBlur = isDone ? 10 : 0;
+                    ctx.fill(); ctx.restore();
+                }
 
-        // Only draw for first 2 speakers (left/right sides)
-        drawSegDots(true,  speakerSegCounts[0], Math.max(1, speakerSegTotals[0]), colors[0]);
-        drawSegDots(false, speakerSegCounts[1], Math.max(1, speakerSegTotals[1]), colors[1]);
+                // Count below
+                const labelY = START_Y + total * (DOT_R * 2 + DOT_GAP) + 6;
+                ctx.save();
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.fillText(`${done}/${total}`, cx, labelY);
+                ctx.restore();
+            };
+
+            drawSideDots(true,  speakerSegCounts[0], Math.max(1, speakerSegTotals[0]), colors[0], speakerLabels[0] || speakerIds[0]);
+            drawSideDots(false, speakerSegCounts[1], Math.max(1, speakerSegTotals[1]), colors[1], speakerLabels[1] || speakerIds[1]);
+
+        } else {
+            // ── BOTTOM: horizontal rows, left-group & right-group ─
+            const DOT_R = 7;
+            const DOT_GAP = 5;
+            const PER_ROW = 5;
+            const ROW_GAP = 20;
+            const BASE_Y = canvasHeight - 52;
+            const CENTER = canvasWidth / 2;
+            const GROUP_GAP = 24; // gap between two groups
+
+            const drawBottomDots = (isLeft: boolean, done: number, total: number, color: string, label: string) => {
+                const rows = Math.ceil(total / PER_ROW);
+                const rowW = Math.min(total, PER_ROW) * (DOT_R * 2) + (Math.min(total, PER_ROW) - 1) * DOT_GAP;
+
+                for (let i = 0; i < total; i++) {
+                    const row  = Math.floor(i / PER_ROW);
+                    const col  = i % PER_ROW;
+                    const isDone = i < done;
+                    const rowCount = Math.min(total - row * PER_ROW, PER_ROW);
+                    const thisRowW = rowCount * (DOT_R * 2) + (rowCount - 1) * DOT_GAP;
+
+                    let dotX: number;
+                    if (isLeft) {
+                        // right-align group to CENTER - GROUP_GAP
+                        dotX = (CENTER - GROUP_GAP) - (thisRowW) + col * (DOT_R * 2 + DOT_GAP) + DOT_R;
+                    } else {
+                        // left-align group from CENTER + GROUP_GAP
+                        dotX = (CENTER + GROUP_GAP) + col * (DOT_R * 2 + DOT_GAP) + DOT_R;
+                    }
+                    const dotY = BASE_Y - (rows - 1 - row) * ROW_GAP;
+
+                    ctx.save();
+                    ctx.beginPath(); ctx.arc(dotX, dotY, DOT_R, 0, Math.PI * 2);
+                    ctx.fillStyle = isDone ? color : 'rgba(255,255,255,0.12)';
+                    ctx.shadowColor = isDone ? color : 'transparent';
+                    ctx.shadowBlur = isDone ? 10 : 0;
+                    ctx.fill(); ctx.restore();
+                }
+
+                // Label + count
+                const labelY = BASE_Y + DOT_R + 8;
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = isLeft ? 'right' : 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`${label.slice(0,4).toUpperCase()}  ${done}/${total}`, isLeft ? CENTER - GROUP_GAP : CENTER + GROUP_GAP, labelY);
+                ctx.restore();
+            };
+
+            drawBottomDots(true,  speakerSegCounts[0], Math.max(1, speakerSegTotals[0]), colors[0], speakerLabels[0] || speakerIds[0]);
+            drawBottomDots(false, speakerSegCounts[1], Math.max(1, speakerSegTotals[1]), colors[1], speakerLabels[1] || speakerIds[1]);
+        }
     }
 
     // Subtitles

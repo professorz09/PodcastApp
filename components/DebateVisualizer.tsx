@@ -3305,6 +3305,22 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                       <div className={`bg-[#111] border border-white/5 rounded-xl p-3 space-y-3 transition-opacity ${subtitleBackground ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                         <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Box Background</p>
 
+                        {/* Liquid Glass Preset */}
+                        <button
+                          onClick={() => setScript(prev => prev.map(seg => ({
+                            ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: {
+                              ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig),
+                              backgroundColor: 'rgba(255,255,255,0.08)',
+                              borderColor: 'rgba(255,255,255,0.28)',
+                              borderWidth: 1.5,
+                              borderRadius: 22,
+                            }}
+                          })))}
+                          className="w-full py-2 rounded-xl text-xs font-bold border-2 border-cyan-400/40 text-cyan-300 bg-cyan-400/5 hover:bg-cyan-400/10 transition-all flex items-center justify-center gap-2"
+                        >
+                          <span className="text-sm">🫧</span> Liquid Glass
+                        </button>
+
                         {/* Presets */}
                         <div className="grid grid-cols-4 gap-1.5">
                           {[

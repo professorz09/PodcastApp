@@ -12,7 +12,7 @@ export const neonTheme: Theme = {
     { id: 'barColor',         label: 'Bar Color',                   type: 'color',   defaultValue: 'rgba(0,0,0,0.88)' },
     { id: 'speakerShape',     label: 'Speaker Shape',               type: 'select',  defaultValue: 'circle',
       options: ['circle', 'rect', 'hexagon'] },
-    { id: 'showSpeakerLabel', label: 'Speaker Name Below Circle',   type: 'boolean', defaultValue: true },
+    { id: 'showSpeakerLabel', label: 'Speaker Name Below Shape',     type: 'boolean', defaultValue: false },
     { id: 'scoreStyle',       label: 'Score Style',                 type: 'select',  defaultValue: 'neon-badge',
       options: ['neon-badge', 'glitch', 'dots', 'bar'] },
     { id: 'scorePosition',    label: 'Score Position',              type: 'select',  defaultValue: 'bottom',
