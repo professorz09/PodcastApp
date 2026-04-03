@@ -16,6 +16,7 @@ export const arenaTheme: Theme = {
       options: ['rect', 'circle', 'triangle'] },
     { id: 'focusActiveSpeaker', label: 'Focus Active Speaker',     type: 'boolean', defaultValue: false,      group: 'Speaker' },
     // ── Elements ──────────────────────────────────────────────────
+    { id: 'showArenaScore',     label: 'Show Corner Scores',       type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showTimerNames',     label: 'Speaker Names by Timer',   type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showVsBadge',        label: 'Show VS Badge',            type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showSegmentCount',   label: 'Show Segment Count Dots',  type: 'boolean', defaultValue: false,      group: 'Elements' },
@@ -41,6 +42,7 @@ export const arenaTheme: Theme = {
 
     const showSpeakers     = config.showSpeakers;
     const speakerShape: 'rect' | 'circle' | 'triangle' = themeConfig?.speakerShape || 'rect';
+    const showArenaScore   = themeConfig?.showArenaScore ?? false;
     const showTimerNames   = themeConfig?.showTimerNames ?? false;
     const showVsBadge      = themeConfig?.showVsBadge ?? false;
     const showSegmentCount = themeConfig?.showSegmentCount ?? false;
@@ -100,6 +102,122 @@ export const arenaTheme: Theme = {
             ctx.shadowBlur   = isSpeaking ? 14 : 0;
             ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
             ctx.restore();
+        });
+    }
+
+    // ── Corner Scores (animated) ───────────────────────────────────
+    if (showArenaScore && context.scores && speakerIds.length >= 2) {
+        const scoreA     = context.scores.scoreA || '0';
+        const scoreB     = context.scores.scoreB || '0';
+        const scoreVals  = [scoreA, scoreB];
+        const labelVals  = [speakerLabels[0] || speakerIds[0], speakerLabels[1] || speakerIds[1]];
+        const activeSide = currentSegment.speaker === speakerIds[0] ? 0
+                         : currentSegment.speaker === speakerIds[1] ? 1 : -1;
+
+        const BOX_W = 170, BOX_H = 80;
+        const MARGIN = 20;
+        const RADIUS = 16;
+
+        [0, 1].forEach(idx => {
+            const isLeft   = idx === 0;
+            const color    = colors[idx];
+            const label    = labelVals[idx];
+            const score    = scoreVals[idx];
+            const isActive = activeSide === idx;
+
+            // Animation: active side pulses with audio
+            const pulse    = isActive ? audioLevel * 0.06 : 0;
+            const scale    = 1 + pulse;
+            const glowR    = isActive ? 18 + audioLevel * 28 : 8;
+
+            const bx = isLeft ? MARGIN : canvasWidth - MARGIN - BOX_W;
+            const by = MARGIN;
+            const cx = bx + BOX_W / 2;
+            const cy = by + BOX_H / 2;
+
+            ctx.save();
+            // Scale from center of box (active animation)
+            ctx.translate(cx, cy);
+            ctx.scale(scale, scale);
+            ctx.translate(-cx, -cy);
+
+            // ── Outer glow ring (active side) ──────────────────
+            if (isActive) {
+                ctx.save();
+                ctx.shadowColor = color;
+                ctx.shadowBlur  = glowR;
+                ctx.strokeStyle = color;
+                ctx.lineWidth   = 2;
+                ctx.globalAlpha = 0.35 + audioLevel * 0.45;
+                ctx.beginPath();
+                ctx.roundRect(bx - 3, by - 3, BOX_W + 6, BOX_H + 6, RADIUS + 3);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // ── Dark glass background ───────────────────────────
+            ctx.save();
+            ctx.fillStyle = 'rgba(6, 8, 18, 0.88)';
+            ctx.beginPath();
+            ctx.roundRect(bx, by, BOX_W, BOX_H, RADIUS);
+            ctx.fill();
+            ctx.restore();
+
+            // ── Colored top accent bar ──────────────────────────
+            ctx.save();
+            const grad = ctx.createLinearGradient(bx, by, bx + BOX_W, by);
+            grad.addColorStop(0, color);
+            grad.addColorStop(1, isLeft ? 'transparent' : color);
+            const grad2 = ctx.createLinearGradient(bx, by, bx + BOX_W, by);
+            grad2.addColorStop(0, isLeft ? color : 'transparent');
+            grad2.addColorStop(1, isLeft ? 'transparent' : color);
+            ctx.fillStyle = isLeft ? grad : grad2;
+            ctx.shadowColor = color;
+            ctx.shadowBlur  = isActive ? 12 + audioLevel * 18 : 4;
+            ctx.beginPath();
+            ctx.roundRect(bx, by, BOX_W, 4, [RADIUS, RADIUS, 0, 0]);
+            ctx.fill();
+            ctx.restore();
+
+            // ── Subtle side accent stripe ───────────────────────
+            ctx.save();
+            const stripeX = isLeft ? bx : bx + BOX_W - 4;
+            const stripeGrad = ctx.createLinearGradient(0, by, 0, by + BOX_H);
+            stripeGrad.addColorStop(0, color);
+            stripeGrad.addColorStop(0.5, `${color}88`);
+            stripeGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = stripeGrad;
+            ctx.globalAlpha = isActive ? 0.7 + audioLevel * 0.3 : 0.35;
+            ctx.beginPath();
+            ctx.roundRect(stripeX, by + 4, 4, BOX_H - 4, isLeft ? [0, 0, 0, RADIUS] : [0, 0, RADIUS, 0]);
+            ctx.fill();
+            ctx.restore();
+
+            // ── Speaker label (small, top area) ────────────────
+            ctx.save();
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font      = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(label.toUpperCase(), bx + BOX_W / 2, by + 12);
+            ctx.restore();
+
+            // ── Score number (big, center) ──────────────────────
+            ctx.save();
+            ctx.textAlign    = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold 36px sans-serif`;
+            if (isActive) {
+                ctx.shadowColor = color;
+                ctx.shadowBlur  = 14 + audioLevel * 20;
+                ctx.fillStyle   = '#fff';
+            } else {
+                ctx.fillStyle   = 'rgba(255,255,255,0.70)';
+            }
+            ctx.fillText(score, bx + BOX_W / 2, by + BOX_H / 2 + 6);
+            ctx.restore();
+
+            ctx.restore(); // end scale transform
         });
     }
 
