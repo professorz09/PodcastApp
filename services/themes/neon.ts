@@ -6,16 +6,20 @@ export const neonTheme: Theme = {
   name: 'Neon',
   description: 'Cyberpunk style with glowing text and borders.',
   properties: [
-    { id: 'glowColorA',       label: 'Glow Color A',               type: 'color',   defaultValue: '#00ff00' },
-    { id: 'glowColorB',       label: 'Glow Color B',               type: 'color',   defaultValue: '#ff0000' },
-    { id: 'showBar',          label: 'Show Top Bar',                type: 'boolean', defaultValue: true },
-    { id: 'barColor',         label: 'Bar Color',                   type: 'color',   defaultValue: 'rgba(0,0,0,0.88)' },
-    { id: 'speakerShape',     label: 'Speaker Shape',               type: 'select',  defaultValue: 'circle',
-      options: ['circle', 'rect', 'hexagon'] },
-    { id: 'showSpeakerLabel', label: 'Speaker Name Below Shape',     type: 'boolean', defaultValue: false },
-    { id: 'scoreStyle',       label: 'Score Style',                 type: 'select',  defaultValue: 'neon-badge',
+    // ── Colors ────────────────────────────────────────────────────
+    { id: 'glowColorA',       label: 'Glow Color A',              type: 'color',   defaultValue: '#00ff00',       group: 'Colors' },
+    { id: 'glowColorB',       label: 'Glow Color B',              type: 'color',   defaultValue: '#ff0000',       group: 'Colors' },
+    { id: 'barColor',         label: 'Top Bar Color',             type: 'color',   defaultValue: 'rgba(0,0,0,0.88)', group: 'Colors' },
+    // ── Speaker ───────────────────────────────────────────────────
+    { id: 'speakerShape',     label: 'Speaker Shape',             type: 'select',  defaultValue: 'circle',        group: 'Speaker',
+      options: ['circle', 'square', 'hexagon'] },
+    { id: 'showSpeakerLabel', label: 'Speaker Name Below Shape',  type: 'boolean', defaultValue: false,           group: 'Speaker' },
+    // ── Elements ──────────────────────────────────────────────────
+    { id: 'showBar',          label: 'Show Top Bar',              type: 'boolean', defaultValue: true,            group: 'Elements' },
+    // ── Scores ────────────────────────────────────────────────────
+    { id: 'scoreStyle',       label: 'Score Style',               type: 'select',  defaultValue: 'neon-badge',    group: 'Scores',
       options: ['neon-badge', 'glitch', 'dots', 'bar'] },
-    { id: 'scorePosition',    label: 'Score Position',              type: 'select',  defaultValue: 'bottom',
+    { id: 'scorePosition',    label: 'Score Position',            type: 'select',  defaultValue: 'bottom',        group: 'Scores',
       options: ['top-bar', 'bottom'] },
   ],
   draw: (context: DrawContext) => {
@@ -101,7 +105,7 @@ export const neonTheme: Theme = {
         ctx.shadowBlur = 0;
     });
 
-    // ── Speaker draw (circle / rect / hexagon) ─────────────────────
+    // ── Speaker draw (circle / square / hexagon) ───────────────────
     const baseRadius = 80 * config.speakerScale;
 
     const drawHexPath = (x: number, y: number, r: number) => {
@@ -120,10 +124,10 @@ export const neonTheme: Theme = {
         const y = yPct * canvasHeight;
         const pulse = isActive ? 10 * audioLevel : 0;
 
-        if (speakerShape === 'rect') {
-            // ── Rect ──────────────────────────────────────
-            const w = (baseRadius * 2.2) + pulse;
-            const h = (baseRadius * 2.8) + pulse;
+        if (speakerShape === 'square') {
+            // ── Square ────────────────────────────────────
+            const side = (baseRadius * 2.0) + pulse;
+            const w = side, h = side;
             const rx = x - w / 2, ry = y - h / 2;
 
             ctx.save();

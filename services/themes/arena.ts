@@ -6,16 +6,19 @@ export const arenaTheme: Theme = {
   name: 'Arena',
   description: 'Versus layout with central VS indicator and score cards.',
   properties: [
-    { id: 'timerColor',         label: 'Timer Color',              type: 'color',   defaultValue: '#eab308' },
-    { id: 'vsColor',            label: 'VS Color',                 type: 'color',   defaultValue: '#f97316' },
-    { id: 'speakerColorA',      label: 'Speaker A Color',          type: 'color',   defaultValue: '#3b82f6' },
-    { id: 'speakerColorB',      label: 'Speaker B Color',          type: 'color',   defaultValue: '#ef4444' },
-    { id: 'focusActiveSpeaker', label: '🎙 Sirf Bolne Wala Dikhao', type: 'boolean', defaultValue: false },
-    { id: 'speakerShape',       label: 'Speaker Image Shape',      type: 'select',  defaultValue: 'rect',
+    // ── Colors ────────────────────────────────────────────────────
+    { id: 'speakerColorA',      label: 'Speaker A Color',          type: 'color',   defaultValue: '#3b82f6',  group: 'Colors' },
+    { id: 'speakerColorB',      label: 'Speaker B Color',          type: 'color',   defaultValue: '#ef4444',  group: 'Colors' },
+    { id: 'timerColor',         label: 'Timer Color',              type: 'color',   defaultValue: '#eab308',  group: 'Colors' },
+    { id: 'vsColor',            label: 'VS Badge Color',           type: 'color',   defaultValue: '#f97316',  group: 'Colors' },
+    // ── Speaker ───────────────────────────────────────────────────
+    { id: 'speakerShape',       label: 'Speaker Shape',            type: 'select',  defaultValue: 'rect',     group: 'Speaker',
       options: ['rect', 'circle', 'triangle'] },
-    { id: 'segmentCountPos',    label: 'Segment Count Position',   type: 'select',  defaultValue: 'bottom',
-      options: ['bottom', 'side'] },
-    { id: 'showVuMeter',        label: 'Show VU Meter',            type: 'boolean', defaultValue: false },
+    { id: 'focusActiveSpeaker', label: 'Focus Active Speaker',     type: 'boolean', defaultValue: false,      group: 'Speaker' },
+    // ── Elements ──────────────────────────────────────────────────
+    { id: 'showVsBadge',        label: 'Show VS Badge',            type: 'boolean', defaultValue: false,      group: 'Elements' },
+    { id: 'showSegmentCount',   label: 'Show Segment Count Dots',  type: 'boolean', defaultValue: false,      group: 'Elements' },
+    { id: 'showVuMeter',        label: 'Show VU Meter',            type: 'boolean', defaultValue: false,      group: 'Elements' },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -32,11 +35,12 @@ export const arenaTheme: Theme = {
         '#22c55e',
     ];
 
-    const showSpeakers   = config.showSpeakers;
+    const showSpeakers     = config.showSpeakers;
     const speakerShape: 'rect' | 'circle' | 'triangle' = themeConfig?.speakerShape || 'rect';
-    const segCountPos    = themeConfig?.segmentCountPos || 'bottom';
+    const showVsBadge      = themeConfig?.showVsBadge ?? false;
+    const showSegmentCount = themeConfig?.showSegmentCount ?? false;
     // VU meter: arena theme has its own default (off); respects global toggle too
-    const vuEnabled      = config.showVuMeter && (themeConfig?.showVuMeter ?? false);
+    const vuEnabled        = config.showVuMeter && (themeConfig?.showVuMeter ?? false);
 
     // Background
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
@@ -65,7 +69,7 @@ export const arenaTheme: Theme = {
     }
 
     // ── VS badge ───────────────────────────────────────────────────
-    if (speakerIds.length === 2) {
+    if (showVsBadge && speakerIds.length === 2) {
         const cx = canvasWidth / 2, cy = canvasHeight / 2 + 50;
         const vsRadius = 45, vsColor = themeConfig?.vsColor || '#f97316';
         ctx.save();
@@ -246,112 +250,42 @@ export const arenaTheme: Theme = {
         });
     }
 
-    // ── Segment Count Display ──────────────────────────────────────
-    if (speakerIds.length >= 2) {
+    // ── Segment Count Dots — side-centered, no names ──────────────
+    if (showSegmentCount && speakerIds.length >= 2) {
         const speakerSegCounts = speakerIds.map(id =>
             script.slice(0, currentSegmentIndex + 1).filter(s => s.speaker === id).length
         );
         const speakerSegTotals = speakerIds.map(id =>
-            script.filter(s => s.speaker === id).length
+            Math.max(1, script.filter(s => s.speaker === id).length)
         );
 
-        if (segCountPos === 'side') {
-            // ── SIDE: vertical column on left/right edges ─────────
-            const DOT_R = 7;
-            const DOT_GAP = 6;
-            const SIDE_X_L = 14 + DOT_R;
-            const SIDE_X_R = canvasWidth - 14 - DOT_R;
-            const START_Y = canvasHeight * 0.62;
+        const DOT_R    = 6;
+        const DOT_GAP  = 7;
+        const SIDE_X_L = 14 + DOT_R;
+        const SIDE_X_R = canvasWidth - 14 - DOT_R;
 
-            const drawSideDots = (isLeft: boolean, done: number, total: number, color: string, label: string) => {
-                const cx = isLeft ? SIDE_X_L : SIDE_X_R;
+        const drawSideDots = (isLeft: boolean, done: number, total: number, color: string) => {
+            const cx  = isLeft ? SIDE_X_L : SIDE_X_R;
+            // Vertically center the dot column in the canvas
+            const colH = total * (DOT_R * 2) + (total - 1) * DOT_GAP;
+            const startY = (canvasHeight - colH) / 2;
 
-                // Label at top
+            for (let i = 0; i < total; i++) {
+                const dotY = startY + i * (DOT_R * 2 + DOT_GAP) + DOT_R;
+                const isDone = i < done;
                 ctx.save();
-                ctx.fillStyle = color;
-                ctx.font = 'bold 11px sans-serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                ctx.shadowColor = color; ctx.shadowBlur = 8;
-                ctx.fillText(label.slice(0, 3).toUpperCase(), cx, START_Y - 4);
+                ctx.beginPath();
+                ctx.arc(cx, dotY, DOT_R, 0, Math.PI * 2);
+                ctx.fillStyle = isDone ? color : 'rgba(255,255,255,0.10)';
+                ctx.shadowColor = isDone ? color : 'transparent';
+                ctx.shadowBlur = isDone ? 12 : 0;
+                ctx.fill();
                 ctx.restore();
+            }
+        };
 
-                for (let i = 0; i < total; i++) {
-                    const dotY = START_Y + i * (DOT_R * 2 + DOT_GAP) + DOT_R;
-                    const isDone = i < done;
-                    ctx.save();
-                    ctx.beginPath(); ctx.arc(cx, dotY, DOT_R, 0, Math.PI * 2);
-                    ctx.fillStyle = isDone ? color : 'rgba(255,255,255,0.10)';
-                    ctx.shadowColor = isDone ? color : 'transparent';
-                    ctx.shadowBlur = isDone ? 10 : 0;
-                    ctx.fill(); ctx.restore();
-                }
-
-                // Count below
-                const labelY = START_Y + total * (DOT_R * 2 + DOT_GAP) + 6;
-                ctx.save();
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.font = 'bold 11px sans-serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-                ctx.fillText(`${done}/${total}`, cx, labelY);
-                ctx.restore();
-            };
-
-            drawSideDots(true,  speakerSegCounts[0], Math.max(1, speakerSegTotals[0]), colors[0], speakerLabels[0] || speakerIds[0]);
-            drawSideDots(false, speakerSegCounts[1], Math.max(1, speakerSegTotals[1]), colors[1], speakerLabels[1] || speakerIds[1]);
-
-        } else {
-            // ── BOTTOM: horizontal rows, left-group & right-group ─
-            const DOT_R = 7;
-            const DOT_GAP = 5;
-            const PER_ROW = 5;
-            const ROW_GAP = 20;
-            const BASE_Y = canvasHeight - 52;
-            const CENTER = canvasWidth / 2;
-            const GROUP_GAP = 24; // gap between two groups
-
-            const drawBottomDots = (isLeft: boolean, done: number, total: number, color: string, label: string) => {
-                const rows = Math.ceil(total / PER_ROW);
-                const rowW = Math.min(total, PER_ROW) * (DOT_R * 2) + (Math.min(total, PER_ROW) - 1) * DOT_GAP;
-
-                for (let i = 0; i < total; i++) {
-                    const row  = Math.floor(i / PER_ROW);
-                    const col  = i % PER_ROW;
-                    const isDone = i < done;
-                    const rowCount = Math.min(total - row * PER_ROW, PER_ROW);
-                    const thisRowW = rowCount * (DOT_R * 2) + (rowCount - 1) * DOT_GAP;
-
-                    let dotX: number;
-                    if (isLeft) {
-                        // right-align group to CENTER - GROUP_GAP
-                        dotX = (CENTER - GROUP_GAP) - (thisRowW) + col * (DOT_R * 2 + DOT_GAP) + DOT_R;
-                    } else {
-                        // left-align group from CENTER + GROUP_GAP
-                        dotX = (CENTER + GROUP_GAP) + col * (DOT_R * 2 + DOT_GAP) + DOT_R;
-                    }
-                    const dotY = BASE_Y - (rows - 1 - row) * ROW_GAP;
-
-                    ctx.save();
-                    ctx.beginPath(); ctx.arc(dotX, dotY, DOT_R, 0, Math.PI * 2);
-                    ctx.fillStyle = isDone ? color : 'rgba(255,255,255,0.12)';
-                    ctx.shadowColor = isDone ? color : 'transparent';
-                    ctx.shadowBlur = isDone ? 10 : 0;
-                    ctx.fill(); ctx.restore();
-                }
-
-                // Label + count
-                const labelY = BASE_Y + DOT_R + 8;
-                ctx.save();
-                ctx.fillStyle = color;
-                ctx.font = 'bold 11px sans-serif';
-                ctx.textAlign = isLeft ? 'right' : 'left';
-                ctx.textBaseline = 'top';
-                ctx.fillText(`${label.slice(0,4).toUpperCase()}  ${done}/${total}`, isLeft ? CENTER - GROUP_GAP : CENTER + GROUP_GAP, labelY);
-                ctx.restore();
-            };
-
-            drawBottomDots(true,  speakerSegCounts[0], Math.max(1, speakerSegTotals[0]), colors[0], speakerLabels[0] || speakerIds[0]);
-            drawBottomDots(false, speakerSegCounts[1], Math.max(1, speakerSegTotals[1]), colors[1], speakerLabels[1] || speakerIds[1]);
-        }
+        drawSideDots(true,  speakerSegCounts[0], speakerSegTotals[0], colors[0]);
+        drawSideDots(false, speakerSegCounts[1], speakerSegTotals[1], colors[1]);
     }
 
     // Subtitles

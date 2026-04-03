@@ -20,7 +20,8 @@ export interface ThemeProperty {
   label: string;
   type: 'color' | 'number' | 'boolean' | 'select';
   defaultValue: any;
-  options?: string[]; // For select
+  group?: string;   // Optional group/section header
+  options?: string[];
   min?: number;
   max?: number;
   step?: number;

@@ -105,7 +105,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [syncSubtitlePosition, setSyncSubtitlePosition] = useState(true);
   const [subtitleBgHex, setSubtitleBgHex] = useState('#000000');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(80);
-  const [showNameBadge, setShowNameBadge] = useState(true);
+  const [showNameBadge, setShowNameBadge] = useState(false);
   const [nameBadgeStyle, setNameBadgeStyle] = useState<'classic' | 'comic' | 'pill' | 'minimal'>('comic');
   const [nameBadgeColorA, setNameBadgeColorA] = useState('#3b82f6');
   const [nameBadgeColorB, setNameBadgeColorB] = useState('#ef4444');
@@ -3014,56 +3014,81 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                         ))}
                       </div>
                     </div>
-                    {getThemeProperties(theme).length > 0 && (
-                      <div className="bg-[#111] p-3 rounded-xl border border-white/5 space-y-3">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Theme Options</label>
-                        {getThemeProperties(theme).map(prop => {
-                          const currentValue = globalThemeConfig[theme]?.[prop.id] ?? prop.defaultValue;
-                          return (
-                            <div key={prop.id} className="space-y-1">
-                              <div className="flex justify-between">
-                                <span className="text-[11px] text-gray-500">{prop.label}</span>
-                                {prop.type === 'number' && <span className="text-[10px] font-mono text-red-400">{currentValue}</span>}
-                              </div>
-                              {prop.type === 'color' && (
-                                <div className="flex items-center gap-2">
-                                  <input type="color" value={currentValue}
-                                    onChange={(e) => setGlobalThemeConfig(prev => ({ ...prev, [theme]: { ...(prev[theme] || {}), [prop.id]: e.target.value } }))}
-                                    className="w-7 h-7 rounded cursor-pointer bg-transparent border-0 p-0"
-                                  />
-                                  <span className="text-[10px] text-gray-400 font-mono">{currentValue}</span>
-                                </div>
-                              )}
-                              {prop.type === 'boolean' && (
+                    {getThemeProperties(theme).length > 0 && (() => {
+                      const props = getThemeProperties(theme);
+                      // Group properties by their group field
+                      const groups: { name: string; items: typeof props }[] = [];
+                      props.forEach(prop => {
+                        const gName = prop.group || 'General';
+                        let g = groups.find(x => x.name === gName);
+                        if (!g) { g = { name: gName, items: [] }; groups.push(g); }
+                        g.items.push(prop);
+                      });
+                      const renderPropControl = (prop: typeof props[0]) => {
+                        const currentValue = globalThemeConfig[theme]?.[prop.id] ?? prop.defaultValue;
+                        const setVal = (v: any) => setGlobalThemeConfig(prev => ({ ...prev, [theme]: { ...(prev[theme] || {}), [prop.id]: v } }));
+                        return (
+                          <div key={prop.id}>
+                            {prop.type === 'boolean' ? (
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] text-gray-400">{prop.label}</span>
                                 <label className="relative inline-flex items-center cursor-pointer">
-                                  <input type="checkbox" checked={currentValue === true}
-                                    onChange={(e) => setGlobalThemeConfig(prev => ({ ...prev, [theme]: { ...(prev[theme] || {}), [prop.id]: e.target.checked } }))}
-                                    className="sr-only peer"
-                                  />
+                                  <input type="checkbox" checked={currentValue === true} onChange={e => setVal(e.target.checked)} className="sr-only peer" />
                                   <div className="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500"></div>
                                 </label>
-                              )}
-                              {prop.type === 'number' && (
+                              </div>
+                            ) : prop.type === 'color' ? (
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] text-gray-400">{prop.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-gray-500 font-mono">{currentValue}</span>
+                                  <input type="color" value={currentValue.startsWith('rgba') ? '#000000' : currentValue}
+                                    onChange={e => setVal(e.target.value)}
+                                    className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0"
+                                  />
+                                </div>
+                              </div>
+                            ) : prop.type === 'number' ? (
+                              <div className="space-y-1">
+                                <div className="flex justify-between">
+                                  <span className="text-[11px] text-gray-400">{prop.label}</span>
+                                  <span className="text-[10px] font-mono text-red-400">{currentValue}</span>
+                                </div>
                                 <input type="range" min={prop.min} max={prop.max} step={prop.step || 1} value={currentValue}
-                                  onChange={(e) => setGlobalThemeConfig(prev => ({ ...prev, [theme]: { ...(prev[theme] || {}), [prop.id]: parseFloat(e.target.value) } }))}
+                                  onChange={e => setVal(parseFloat(e.target.value))}
                                   className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                                 />
-                              )}
-                              {prop.type === 'select' && prop.options && (
-                                <div className="flex gap-1.5 flex-wrap">
+                              </div>
+                            ) : prop.type === 'select' && prop.options ? (
+                              <div className="space-y-1">
+                                <span className="text-[11px] text-gray-400 block">{prop.label}</span>
+                                <div className="flex gap-1 flex-wrap">
                                   {prop.options.map((opt: string) => (
-                                    <button key={opt}
-                                      onClick={() => setGlobalThemeConfig(prev => ({ ...prev, [theme]: { ...(prev[theme] || {}), [prop.id]: opt } }))}
-                                      className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg border-2 capitalize transition-all ${currentValue === opt ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
+                                    <button key={opt} onClick={() => setVal(opt)}
+                                      className={`flex-1 py-1 px-1.5 text-[10px] font-bold rounded-lg border capitalize transition-all ${currentValue === opt ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/8 text-gray-500 hover:border-white/20 hover:text-gray-300'}`}
                                     >{opt}</button>
                                   ))}
                                 </div>
-                              )}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      };
+                      return (
+                        <div className="space-y-2">
+                          {groups.map((g, gi) => (
+                            <div key={g.name} className="bg-[#111] rounded-xl border border-white/5 overflow-hidden">
+                              <div className="px-3 py-1.5 bg-white/[0.03] border-b border-white/5">
+                                <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">{g.name}</span>
+                              </div>
+                              <div className="p-3 space-y-3">
+                                {g.items.map(renderPropControl)}
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      );
+                    })()}
                     <div className="space-y-2">
                       <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Global Color</label>
                       <div className="flex items-center gap-2 bg-[#111] border border-white/5 rounded-xl p-2">
