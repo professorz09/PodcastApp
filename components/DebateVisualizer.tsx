@@ -7,6 +7,7 @@ import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
 import { generateSegmentImage, generateSpeakerImage, generateVideoBackground } from '../services/geminiService';
+import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface DebateVisualizerProps {
@@ -208,6 +209,9 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const smoothedAudioLevelRef = useRef(0);
+  const floatDataRef = useRef<Float32Array | null>(null);
+  const isMountedRef = useRef(true);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentSegment = script?.[currentSegmentIndex];
   const currentSubtitleConfig = currentSegment?.visualConfig?.subtitleConfig || { 
@@ -221,6 +225,30 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
     const rgba = `rgba(${r},${g},${b},${(opacity/100).toFixed(2)})`;
     setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: rgba } } })));
   };
+
+  // ── Component lifetime tracking (prevents setState after unmount) ──
+  useEffect(() => {
+      isMountedRef.current = true;
+      return () => {
+          isMountedRef.current = false;
+          if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+          cancelAnimationFrame(animationRef.current);
+          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+              audioContextRef.current.close().catch(() => {});
+          }
+      };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setStatusSafe = useCallback((msg: string, clearAfterMs?: number) => {
+      if (!isMountedRef.current) return;
+      setStatusMessage(msg);
+      if (clearAfterMs) {
+          if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+          statusTimerRef.current = setTimeout(() => {
+              if (isMountedRef.current) setStatusMessage('');
+          }, clearAfterMs);
+      }
+  }, []);
 
   // Merge Audio on Mount
   useEffect(() => {
@@ -564,22 +592,26 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
       });
   };
 
-  // Generate scores when script changes
+  // On script load: try saved scores first, otherwise analyze
   useEffect(() => {
-      const newScores = script.map(() => {
-          return Math.floor((Math.random() * 3.9 + 6) * 10) / 10;
-      });
-      setSegmentScores(newScores);
-  }, [script.length]);
+      if (script.length === 0) return;
+      const saved = loadScores(script);
+      if (saved) {
+          setSegmentScores(saved);
+      } else {
+          const analyzed = analyzeAllScores(script);
+          setSegmentScores(analyzed);
+          saveScores(script, analyzed);
+      }
+  }, [script.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Manual: regenerate all segment scores at once
+  // Manual: re-analyze all segment scores and save
   const handleRegenerateAllScores = useCallback(() => {
       if (script.length === 0) return;
-      const newScores = script.map(() => Math.floor((Math.random() * 3.9 + 6) * 10) / 10);
+      const newScores = analyzeAllScores(script);
       setSegmentScores(newScores);
-      // Auto-enable score display so user sees the result immediately
+      saveScores(script, newScores);
       setShowScores(true);
-      // For Arena theme: also enable corner scores
       if (theme === 'arena') {
           setGlobalThemeConfig(prev => ({
               ...prev,
@@ -602,7 +634,11 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
     // Get Audio Data — float time-domain RMS
     let rawAudioLevel = 0;
     if (analyserRef.current && isPlaying) {
-        const floatData = new Float32Array(analyserRef.current.fftSize);
+        // Reuse buffer to avoid GC pressure (1024 floats allocated once, not every frame)
+        if (!floatDataRef.current || floatDataRef.current.length !== analyserRef.current.fftSize) {
+            floatDataRef.current = new Float32Array(analyserRef.current.fftSize);
+        }
+        const floatData = floatDataRef.current;
         analyserRef.current.getFloatTimeDomainData(floatData);
         let sum = 0;
         for (let i = 0; i < floatData.length; i++) sum += floatData[i] * floatData[i];
@@ -2412,8 +2448,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                 "Do you want to proceed?"
             );
             if (!proceed) {
-                setStatusMessage("Cancelled by user");
-                setTimeout(() => setStatusMessage(""), 3000);
+                setStatusSafe("Cancelled by user", 3000);
                 return;
             }
         }
@@ -2603,8 +2638,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            // Clear success message after a delay
-            setTimeout(() => setStatusMessage(""), 6000);
+            setStatusSafe("", 6000);
         }
         
 
@@ -2698,8 +2732,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
               setImageGenProgress(Math.round((completed / total) * 100));
           }
           
-          setStatusMessage("Images generated!");
-          setTimeout(() => setStatusMessage(""), 3000);
+          setStatusSafe("Images generated!", 3000);
 
       } catch (e) {
           console.error("Image generation failed", e);
@@ -3538,15 +3571,15 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
                     {/* Score Generator */}
                     <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-2">
-                      <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Score Generator</label>
-                      <p className="text-[10px] text-gray-600 leading-relaxed">Sabke segments ke liye naye random scores generate karo (6.0 – 9.9 range)</p>
+                      <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Score Analyzer</label>
+                      <p className="text-[10px] text-gray-600 leading-relaxed">Har segment ka text analyze karke score generate hota hai — word count, vocabulary, argument keywords, transition words ke basis par (6.0–9.9). Scores save ho jaate hain.</p>
                       <button
                         onClick={handleRegenerateAllScores}
                         disabled={script.length === 0}
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-bold bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/25 text-yellow-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         <RefreshCw size={12} />
-                        Generate All Scores ({script.length} segments)
+                        Re-Analyze Scores ({script.length} segments)
                       </button>
                     </div>
 
@@ -3601,8 +3634,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                           try {
                             const url = await generateSegmentImage(currentSegment.text);
                             setScript(prev => { const s = [...prev]; s[currentSegmentIndex] = { ...s[currentSegmentIndex], visualConfig: { ...s[currentSegmentIndex].visualConfig, backgroundUrl: url } }; return s; });
-                            setStatusMessage("Image generated!");
-                            setTimeout(() => setStatusMessage(""), 3000);
+                            setStatusSafe("Image generated!", 3000);
                           } catch (e) { setStatusMessage("Generation failed"); }
                         }}
                         disabled={isGeneratingImages}
