@@ -86,27 +86,19 @@ export const arenaTheme: Theme = {
         const rightEdge = canvasWidth / 2 + timerW / 2 + GAP;
 
         speakerIds.slice(0, 2).forEach((id, index) => {
-            const isLeft    = index === 0;
-            const label     = speakerLabels[index] || id;
-            const color     = colors[index];
+            const isLeft     = index === 0;
+            const label      = speakerLabels[index] || id;
+            const color      = colors[index];
             const isSpeaking = currentSegment.speaker === id;
 
             ctx.save();
-            ctx.font = `${isSpeaking ? 'bold' : ''} 16px sans-serif`;
+            ctx.font        = `bold 16px sans-serif`;
             ctx.textBaseline = 'middle';
             ctx.textAlign    = isLeft ? 'right' : 'left';
-            ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.45)';
+            ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.38)';
             ctx.shadowColor  = isSpeaking ? color : 'transparent';
             ctx.shadowBlur   = isSpeaking ? 14 : 0;
             ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
-
-            // Small color dot indicator
-            const dotX = isLeft ? leftEdge - ctx.measureText(label.toUpperCase()).width - 8 : rightEdge + ctx.measureText(label.toUpperCase()).width + 8;
-            ctx.beginPath();
-            ctx.arc(dotX, timerCY, 4, 0, Math.PI * 2);
-            ctx.fillStyle = isSpeaking ? color : 'rgba(255,255,255,0.2)';
-            ctx.shadowBlur = isSpeaking ? 10 : 0;
-            ctx.fill();
             ctx.restore();
         });
     }
