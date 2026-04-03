@@ -650,7 +650,7 @@ export const generateDebateScript = async (
                 Speaker A hook से शुरू करे → Speaker B deepen करे → curiosity बने।
 
                 【 Main Explanation 】
-                Topic को 3-5 points/concepts में break करो (topic के हिसाब से — forcefully equal मत करो)।
+                Topic को जितने concepts में naturally break हो, उतने करो — topic के हिसाब से decide करो।
                 हर point के लिए:
                 → Core idea: 1-2 simple lines में — technical language नहीं
                 → एक SPECIFIC example जो इस exact topic के लिए relevant हो:
@@ -1358,7 +1358,7 @@ export const generateDebateScript = async (
               Speaker A hooks → Speaker B deepens → curiosity builds naturally.
 
               【 Main Explanation — cover the real content 】
-              Break the topic into 3-5 natural sections based on what THIS topic actually needs.
+              Break the topic into as many sections as it naturally needs — let the topic decide, not a fixed number.
               For each section:
               → State the core idea in 1-2 simple sentences — no jargon
               → Give ONE specific, concrete example tailored to THIS exact topic:
