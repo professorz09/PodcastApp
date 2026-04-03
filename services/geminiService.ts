@@ -728,8 +728,8 @@ export const generateDebateScript = async (
             Simple, memorable।
 
             【 OUTRO 】
-            "Agar yeh video helpful lagi toh like karo, aur subscribe karo aur se cheezein seekhne ke liye।"
-            Ya similar natural CTA — robotic nahi।
+            "I hope you find this video informative. Thanks for watching."
+            Exactly yahi line use karo — word for word।
 
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             RULES:
@@ -1523,8 +1523,8 @@ export const generateDebateScript = async (
             Simple and memorable.
 
             【 OUTRO 】
-            "If you found this video helpful, give it a like and subscribe for more content like this."
-            Or similar natural CTA — not robotic.
+            End with exactly this line: "I hope you find this video informative. Thanks for watching."
+            Use these exact words — do not paraphrase.
 
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             RULES:
