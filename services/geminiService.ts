@@ -453,7 +453,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' = 'debate',
+  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1289,6 +1289,125 @@ export const generateDebateScript = async (
 
             Topic for today's episode: "${topic}"
           `;
+        } else if (style === 'finance_deep_dive') {
+          const finSeed = Math.floor(Math.random() * 10000);
+          prompt = `
+            TOPIC: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineHi}
+            Language: Hinglish — simple, conversational, jaise ek knowledgeable dost samjha raha ho।
+            Target Audience: USA mein rehne wale Indians — jo real financial decisions face kar rahe hain।
+
+            ══════════════════════════════════════════
+            RANDOMIZATION SEED: ${finSeed}
+            — Is seed ka use karo ensure karne ke liye ki script unique ho har baar।
+            — Niche diye gaye scenario mein SPECIFIC values pick karo (generic mat karo):
+              • Age: 28 se 65 ke beech — seed ke basis pe pick karo
+              • Salary: $38,000 se $145,000/year ke beech — US state aur job ke hisaab se realistic
+              • City: in mein se ek pick karo — Austin TX, Seattle WA, Chicago IL, Denver CO, Atlanta GA, Phoenix AZ, Nashville TN, Miami FL, Dallas TX, Portland OR, Minneapolis MN, San Diego CA — har baar alag
+              • Family situation: single / married no kids / married with 2 kids / single parent — vary karo
+            ══════════════════════════════════════════
+
+            CHARACTERS — exactly 2:
+            ${speakers.length >= 2
+              ? `Narrator: ${speakers[0]} | Finance Expert: ${speakers[1]}`
+              : `Narrator: "Narrator" (seedha viewer se baat karta hai) | Finance Expert: topic ke hisaab se relevant naam — ek CFP (Certified Financial Planner), CFA, ya Senior Finance Advisor — har baar fresh naam`
+            }
+
+            ══════════════════════════════════════════
+            【 NARRATOR — OPENING SCENARIO (CRITICAL — vary karo har baar) 】
+            ══════════════════════════════════════════
+            Narrator seedha viewer se baat karta hai — "aap" use karo।
+
+            Step 1 — एक vivid, specific scenario set karo:
+            "Picture this. Aap [EXACT AGE] saal ke ho. [CITY] mein rehte ho. [SPECIFIC JOB TITLE] ho aur aapki salary hai $[EXACT AMOUNT]/year — yaani roughly $[MONTHLY] per month hand mein aate hain taxes ke baad।"
+
+            Phir ek sharply RELATABLE problem state karo jo is topic se directly related ho:
+            Examples:
+            • Compounding: "Aapke $12,000 savings account mein pade hain — 0.05% interest pe. Koi bolta hai 'invest karo', koi bolta hai 'safe rakho'. Aaj hum dekhenge actually kya hoga agar aap..."
+            • Stock: "Kisi ne [STOCK NAME] ke baare mein bataya. YouTube pe videos hain, Twitter pe sab bold hai. Lekin aapke paas [AMOUNT] hain invest karne ke liye — aur aap nahi jaante kahan se shuru karein।"
+            • Car: "Aapki car abhi [BRAND/MODEL] hai — [MILEAGE] miles ho gaye. Dealer ne bola $[AMOUNT]/month ki EMI pe [NEW MODEL] le lo. Lagta hai affordable — lekin kya SACH MEIN hai?"
+            • Home loan: "Aap $[PRICE] ka ghar dekhte ho. 20% down = $[AMOUNT]. 30-yr mortgage pe monthly payment hogi $[AMOUNT]. Aap soch rahe ho — kya yeh financially sahi hai mere liye abhi?"
+
+            VARY the OPENING STRUCTURE each time — use one of these (pick based on seed):
+            Option A: Direct scenario → shocking number → question
+            Option B: Start with a real surprising stat → then personalize to viewer's situation
+            Option C: Start with a common MISTAKE people make → then show viewer's scenario
+            Option D: Start with a "Friend told me..." story → connect to viewer
+
+            Narrator phir Finance Expert se puchta hai: ek sharp, specific question।
+
+            ══════════════════════════════════════════
+            【 FINANCE EXPERT — DEEP DIVE (core content) 】
+            ══════════════════════════════════════════
+            Expert seedha calculations dikhata hai — no vague advice।
+
+            Har point ke liye is structure ko follow karo:
+
+            POINT [X]: [Clear naam]
+            → Yeh actually kya hai — zero se explain karo, assume karo audience ko kuch nahi pata
+            → MATH DIKHAO explicitly:
+               "Agar aap $[AMOUNT] aaj invest karo at [X]% return, toh 10 saal mein:
+               Year 1: $[AMOUNT] → Year 5: $[AMOUNT] → Year 10: $[AMOUNT]
+               Formula: A = P(1 + r)^n → [numbers daal ke solve karo]"
+            → Real example with SPECIFIC NAMES/COMPANIES (generic mat karo)
+            → Pros — kab yeh sahi hai, numbers ke saath
+            → Cons — kab yeh galat ja sakta hai, real examples se
+            → Verdict: "Is [AGE] aur [SALARY] ke saath — yeh aapke liye [RECOMMENDED/NOT RECOMMENDED] hai kyunki..."
+
+            STOCK TOPICS ke liye specifically:
+            → Company ki 5-year history: highs, lows, key events
+            → PE ratio, market cap — simple bhasha mein explain karo
+            → Pros: [3 specific points]
+            → Cons: [3 specific points + risks]
+            → Historical returns vs S&P 500 benchmark
+            → Conclusion: "Iss stock mein invest karna is profile ke liye [YES/NO/MAYBE] — agar YES toh kitna % portfolio mein, agar NO toh better alternative kya hai"
+
+            HOME LOAN TOPICS ke liye:
+            → Mortgage breakdown: Principal + Interest + Property Tax + Insurance (PITI) = actual monthly cost
+            → 30-yr vs 15-yr comparison with REAL NUMBERS
+            → Rent vs Buy: opportunity cost calculation
+            → "Rule of thumb: monthly payment should be under [X]% of take-home pay — viewer ke liye yeh hai $[AMOUNT]"
+
+            CAR BUYING TOPICS ke liye:
+            → True cost of ownership: EMI + Insurance + Maintenance + Depreciation/year
+            → Loan vs Cash purchase comparison
+            → "Iss salary pe car budget should be max $[AMOUNT] — yeh rule kaise kaam karta hai"
+
+            ══════════════════════════════════════════
+            【 NARRATOR — FOLLOW-UP QUESTIONS (natural back-and-forth) 】
+            ══════════════════════════════════════════
+            Narrator woh questions puchta hai jo viewer ke mann mein aa rahe hain:
+            "Lekin agar [specific scenario]... toh?"
+            "Yeh toh samajh aaya, lekin [EDGE CASE] ke baare mein?"
+            "Agar main galat ho gaya pehle, toh ab kya?"
+
+            Expert in questions ka SPECIFIC jawab deta hai — "it depends" ya "consult a professional" STRICTLY BANNED।
+
+            ══════════════════════════════════════════
+            【 CLOSING — CONCRETE ACTION PLAN 】
+            ══════════════════════════════════════════
+            Expert gives a NUMBERED action plan for THIS specific viewer's profile:
+            "Aapki [AGE]/[SALARY]/[CITY] profile ke liye mere specific steps hain:
+            1. [Specific action with amount/timeline]
+            2. [Specific action with amount/timeline]
+            3. [Specific action with amount/timeline]"
+
+            Narrator wraps up with ONE memorable line jo viewer yaad rakhega।
+
+            ══════════════════════════════════════════
+            NON-NEGOTIABLE RULES:
+            ══════════════════════════════════════════
+            ✗ KABHI "consult a professional" mat kaho — aap HI professional ho
+            ✗ KABHI generic advice mat do — har cheez is viewer ke specific numbers ke saath ho
+            ✗ KABHI same opening scenario use mat karo jo ek common template lagti ho
+            ✗ KABHI bare jargon mat chodo — har term immediately explain karo
+            ✓ Har calculation EXPLICITLY dikhao — numbers step-by-step
+            ✓ Har point ke saath ek SPECIFIC real company/person/event ka example
+            ✓ Simple Hinglish — expert ki soch, dost ki bhaasha
+            ✓ Viewer ko lagni chahiye "yeh MERI situation hai"
+            ${durFillHi}
+          `;
         } else {
             prompt = `
               विषय: "${topic}" पर एक ${style} वीडियो स्क्रिप्ट तैयार करें।
@@ -1689,6 +1808,130 @@ export const generateDebateScript = async (
             ✓ Suspense first, facts second — draw them in, then reveal
             ✓ Cinematic, immersive — like a Netflix documentary
             ══════════════════════════════════════════
+            ${durFillEn}
+          `;
+        } else if (style === 'finance_deep_dive') {
+          const finSeedEn = Math.floor(Math.random() * 10000);
+          prompt = `
+            TOPIC: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: Plain American English — like a knowledgeable friend who happens to be a financial expert.
+            Target Audience: USA adults making real financial decisions.
+
+            ══════════════════════════════════════════
+            RANDOMIZATION SEED: ${finSeedEn}
+            Use this seed to make EVERY script feel fresh and different. Pick SPECIFIC values — never generic:
+              • Age: anywhere 28–65 (vary using the seed)
+              • Annual salary: $38,000–$145,000 (realistic for the city and job)
+              • City: pick ONE — Austin TX, Seattle WA, Chicago IL, Denver CO, Atlanta GA, Phoenix AZ, Nashville TN, Miami FL, Dallas TX, Portland OR, Minneapolis MN, San Diego CA — rotate cities
+              • Family situation: single / married no kids / married 2 kids / single parent — vary each time
+            ══════════════════════════════════════════
+
+            CHARACTERS — exactly 2:
+            ${speakers.length >= 2
+              ? `Narrator: ${speakers[0]} | Finance Expert: ${speakers[1]}`
+              : `Narrator: "Narrator" (speaks directly to the viewer using "you") | Finance Expert: a CFP, CFA, or Senior Financial Advisor — pick a fresh realistic name every time, relevant to the topic`
+            }
+
+            ══════════════════════════════════════════
+            【 NARRATOR — OPENING SCENARIO (MUST vary every time — use the seed) 】
+            ══════════════════════════════════════════
+            Narrator speaks DIRECTLY to the viewer. Use "you" throughout.
+
+            STEP 1 — Set a vivid, ultra-specific scene:
+            "Picture this. You're [EXACT AGE] years old. You live in [SPECIFIC CITY]. You work as a [SPECIFIC JOB TITLE] making $[EXACT SALARY]/year — which works out to about $[EXACT MONTHLY TAKE-HOME] per month after taxes."
+
+            STEP 2 — State a sharply RELATABLE problem tied to this exact topic:
+            — Compounding: "You've got $[EXACT AMOUNT] sitting in a savings account earning 0.05% interest. Someone keeps telling you to invest it. But invest where? And what does compounding actually do for someone in your situation over [X] years?"
+            — Stock: "A coworker won't stop talking about [SPECIFIC STOCK]. The YouTube comments are wild — half saying it's the next big thing, half saying it's a trap. You've got $[AMOUNT] you could put in. What should you actually know before you touch it?"
+            — Car: "Your [YEAR] [BRAND MODEL] just hit [MILEAGE] miles. The dealership is showing you a new [MODEL] at $[PRICE]. Monthly payment? $[PAYMENT]. Seems manageable on your salary. But is it really?"
+            — Home loan: "You found a $[PRICE] house in [SPECIFIC NEIGHBORHOOD, CITY]. 20% down is $[AMOUNT]. At today's rates, a 30-year mortgage payment would be $[MONTHLY PAYMENT]/month. You're making $[SALARY]. Does this math actually work for you?"
+
+            OPENING STRUCTURE — rotate based on seed (pick ONE):
+            A: Direct scenario → alarming number → sharp question to Expert
+            B: Open with a surprising stat → connect it to the viewer's exact profile → question
+            C: Start with the most common mistake people in this situation make → tie to viewer → question
+            D: "Most people in [CITY] earning $[SALARY] have no idea that..." → scenario → question
+
+            End with Narrator asking the Expert ONE sharp, specific question.
+
+            ══════════════════════════════════════════
+            【 FINANCE EXPERT — DEEP DIVE】
+            ══════════════════════════════════════════
+            Expert gives real, specific, calculation-backed answers. No vague advice.
+
+            For EACH key point, follow this structure:
+
+            POINT [X]: [Clear name]
+            → What it actually is — explain from absolute zero, assume the viewer knows nothing
+            → SHOW THE MATH explicitly:
+               "If you invest $[AMOUNT] at [X]% annual return:
+                Year 1: $[CALCULATED AMOUNT]
+                Year 5: $[CALCULATED AMOUNT]
+                Year 10: $[CALCULATED AMOUNT]
+                Formula: A = P(1 + r)^n → plugging in your numbers: [SHOW THE CALCULATION]"
+            → Real example with SPECIFIC names (company, person, or real event — never generic)
+            → Pros — when it works, with numbers
+            → Cons — when it fails, with real examples
+            → Bottom line for THIS viewer: "At [AGE] earning $[SALARY] in [CITY] — this is [RECOMMENDED / NOT RECOMMENDED / CONDITIONAL] because [SPECIFIC REASON WITH NUMBERS]"
+
+            FOR STOCK TOPICS specifically:
+            → Company 5-year history: key highs, lows, major events (product launches, earnings misses, scandals)
+            → Current P/E ratio, market cap — explain what these mean in plain English
+            → 3 clear Pros with supporting data
+            → 3 clear Cons with real risk factors
+            → Historical returns vs S&P 500 — actual numbers, actual comparison
+            → Verdict: "For someone at [AGE] with $[INVESTABLE AMOUNT] — here's exactly what I'd do and why"
+
+            FOR HOME LOAN TOPICS:
+            → Full PITI breakdown: Principal + Interest + Property Tax + Insurance = true monthly cost
+            → 30-year vs 15-year: real number comparison for this salary
+            → Rent vs Buy: opportunity cost, break-even timeline, specific to this city
+            → "The 28% rule: your housing cost shouldn't exceed 28% of gross monthly income. For $[SALARY], that cap is $[MAX PAYMENT]/month. Here's how your numbers stack up."
+
+            FOR CAR TOPICS:
+            → True cost of ownership per year: EMI + Insurance + Gas + Maintenance + Depreciation
+            → Loan vs cash calculation with this profile's numbers
+            → "On $[SALARY], a healthy car budget is no more than $[AMOUNT]/month — here's why and how this specific car compares"
+
+            FOR COMPOUNDING TOPICS:
+            → Show the power of starting at [AGE] vs waiting 10 years — real dollar difference
+            → Compare: savings account, bonds, index funds, individual stocks — expected returns for each
+            → The specific vehicle that makes most sense for this viewer's tax situation and timeline
+
+            ══════════════════════════════════════════
+            【 NARRATOR — FOLLOW-UP QUESTIONS 】
+            ══════════════════════════════════════════
+            Narrator voices the questions the viewer is actually thinking:
+            "But what if [specific edge case]?"
+            "Okay but what about [common objection]?"
+            "What if I already made the wrong choice — is it too late?"
+
+            Expert gives DIRECT answers — "it depends" is BANNED. "Consult a professional" is BANNED.
+
+            ══════════════════════════════════════════
+            【 CLOSING — SPECIFIC ACTION PLAN 】
+            ══════════════════════════════════════════
+            Expert gives a NUMBERED action plan tailored to this viewer's profile:
+            "For someone who is [AGE], earning $[SALARY], living in [CITY] — here are your exact next steps:
+            1. [Specific action with exact dollar amount and timeline]
+            2. [Specific action with exact dollar amount and timeline]
+            3. [Specific action with exact dollar amount and timeline]"
+
+            Narrator closes with ONE memorable line the viewer will remember.
+
+            ══════════════════════════════════════════
+            NON-NEGOTIABLE RULES:
+            ══════════════════════════════════════════
+            ✗ NEVER say "consult a professional" — you ARE the professional
+            ✗ NEVER give generic advice — everything must be tied to this viewer's specific numbers
+            ✗ NEVER reuse the same opening scenario structure two times in a row
+            ✗ NEVER leave jargon unexplained — define every term the moment you use it
+            ✓ Show every calculation explicitly — step by step
+            ✓ Every point gets one specific real company/person/event example
+            ✓ Plain English — expert-level thinking, friend-level language
+            ✓ Viewer should feel: "Wait — this is exactly my situation"
             ${durFillEn}
           `;
         } else if (style === 'podcast_panel') {
