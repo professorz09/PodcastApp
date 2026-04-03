@@ -16,6 +16,7 @@ export const arenaTheme: Theme = {
       options: ['rect', 'circle', 'triangle'] },
     { id: 'focusActiveSpeaker', label: 'Focus Active Speaker',     type: 'boolean', defaultValue: false,      group: 'Speaker' },
     // ── Elements ──────────────────────────────────────────────────
+    { id: 'showTimerNames',     label: 'Speaker Names by Timer',   type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showVsBadge',        label: 'Show VS Badge',            type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showSegmentCount',   label: 'Show Segment Count Dots',  type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showVuMeter',        label: 'Show VU Meter',            type: 'boolean', defaultValue: false,      group: 'Elements' },
@@ -40,6 +41,7 @@ export const arenaTheme: Theme = {
 
     const showSpeakers     = config.showSpeakers;
     const speakerShape: 'rect' | 'circle' | 'triangle' = themeConfig?.speakerShape || 'rect';
+    const showTimerNames   = themeConfig?.showTimerNames ?? false;
     const showVsBadge      = themeConfig?.showVsBadge ?? false;
     const showSegmentCount = themeConfig?.showSegmentCount ?? false;
     const detachVuMeter    = themeConfig?.detachVuMeter ?? false;
@@ -73,6 +75,40 @@ export const arenaTheme: Theme = {
         ctx.textBaseline = 'middle';
         ctx.fillText(`${m}:${s}`, timerX + timerW / 2, topY);
         ctx.restore();
+    }
+
+    // ── Speaker names beside timer ─────────────────────────────────
+    if (showTimerNames && speakerIds.length >= 2 && config.showTimer) {
+        const timerW   = 100;
+        const timerCY  = 50; // topY
+        const GAP      = 18;
+        const leftEdge = canvasWidth / 2 - timerW / 2 - GAP;
+        const rightEdge = canvasWidth / 2 + timerW / 2 + GAP;
+
+        speakerIds.slice(0, 2).forEach((id, index) => {
+            const isLeft    = index === 0;
+            const label     = speakerLabels[index] || id;
+            const color     = colors[index];
+            const isSpeaking = currentSegment.speaker === id;
+
+            ctx.save();
+            ctx.font = `${isSpeaking ? 'bold' : ''} 16px sans-serif`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign    = isLeft ? 'right' : 'left';
+            ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.45)';
+            ctx.shadowColor  = isSpeaking ? color : 'transparent';
+            ctx.shadowBlur   = isSpeaking ? 14 : 0;
+            ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
+
+            // Small color dot indicator
+            const dotX = isLeft ? leftEdge - ctx.measureText(label.toUpperCase()).width - 8 : rightEdge + ctx.measureText(label.toUpperCase()).width + 8;
+            ctx.beginPath();
+            ctx.arc(dotX, timerCY, 4, 0, Math.PI * 2);
+            ctx.fillStyle = isSpeaking ? color : 'rgba(255,255,255,0.2)';
+            ctx.shadowBlur = isSpeaking ? 10 : 0;
+            ctx.fill();
+            ctx.restore();
+        });
     }
 
     // ── VS badge ───────────────────────────────────────────────────

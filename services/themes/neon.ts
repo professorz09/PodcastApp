@@ -19,6 +19,7 @@ export const neonTheme: Theme = {
       options: ['bottom-sides', 'top-sides', 'mid-sides'] },
     // ── Elements ──────────────────────────────────────────────────
     { id: 'showBar',           label: 'Show Top Bar',             type: 'boolean', defaultValue: false,              group: 'Elements' },
+    { id: 'showTimerNames',    label: 'Speaker Names by Timer',   type: 'boolean', defaultValue: true,               group: 'Elements' },
     // ── Scores ────────────────────────────────────────────────────
     { id: 'scoreStyle',        label: 'Score Style',              type: 'select',  defaultValue: 'neon-badge',       group: 'Scores',
       options: ['neon-badge', 'glitch', 'dots', 'bar'] },
@@ -36,6 +37,7 @@ export const neonTheme: Theme = {
 
     const showSpeakers      = config.showSpeakers;
     const showBar           = themeConfig?.showBar ?? false;
+    const showTimerNames    = themeConfig?.showTimerNames ?? true;
     const speakerShape      = themeConfig?.speakerShape || 'circle';
     const showSpeakerLabel  = themeConfig?.showSpeakerLabel ?? false;
     const detachNamePos     = themeConfig?.detachNamePos ?? false;
@@ -136,6 +138,58 @@ export const neonTheme: Theme = {
         }
         ctx.shadowBlur = 0;
         ctx.restore();
+    }
+
+    // ── Speaker names beside timer ─────────────────────────────────
+    if (showTimerNames && config.showTimer && speakerIds.length >= 2) {
+        // Y and pill half-width depend on bar state
+        const timerCY   = showBar ? BAR_H / 2 : 38;
+        const pillHW    = showBar ? 56 : 70;   // half-width of timer box
+        const GAP       = 16;
+        const leftEdge  = canvasWidth / 2 - pillHW - GAP;
+        const rightEdge = canvasWidth / 2 + pillHW + GAP;
+
+        speakerIds.slice(0, 2).forEach((id, index) => {
+            const isLeft     = index === 0;
+            const label      = speakerLabels[index] || id;
+            const color      = colors[index];
+            const isSpeaking = currentSegment.speaker === id;
+
+            ctx.save();
+            ctx.font = `bold 15px monospace`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign    = isLeft ? 'right' : 'left';
+
+            // Pill background for active speaker
+            if (isSpeaking) {
+                const tw = ctx.measureText(label.toUpperCase()).width;
+                const pillX = isLeft ? leftEdge - tw - 14 : rightEdge;
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.15;
+                ctx.beginPath();
+                ctx.roundRect(pillX, timerCY - 13, tw + 28, 26, 13);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+
+            ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
+            ctx.shadowColor = isSpeaking ? color : 'transparent';
+            ctx.shadowBlur  = isSpeaking ? 16 : 0;
+            ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
+
+            // Color dot
+            const tw2    = ctx.measureText(label.toUpperCase()).width;
+            const dotOff = 6;
+            const dotX   = isLeft ? leftEdge - tw2 - dotOff : rightEdge + tw2 + dotOff;
+            ctx.beginPath();
+            ctx.arc(dotX, timerCY, 4, 0, Math.PI * 2);
+            ctx.fillStyle   = color;
+            ctx.globalAlpha = isSpeaking ? 1 : 0.3;
+            ctx.shadowColor = color;
+            ctx.shadowBlur  = isSpeaking ? 12 : 0;
+            ctx.fill();
+            ctx.restore();
+        });
     }
 
     // ── Speaker draw (circle / square / hexagon) ───────────────────
