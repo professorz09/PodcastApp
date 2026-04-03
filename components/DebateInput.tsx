@@ -449,7 +449,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'podcast_breakdown') { setSpeakerCount(2); }
                       if (newStyle === 'documentary') { setSpeakerCount(2); }
                       if (newStyle === 'joe_rogan') { setSpeakerCount(2); }
-                      if (newStyle === 'finance_deep_dive') { setSpeakerCount(2); }
+                      if (newStyle === 'finance_deep_dive') { setSpeakerCount(3); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
