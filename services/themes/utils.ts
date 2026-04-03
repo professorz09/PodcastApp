@@ -661,3 +661,58 @@ export const drawScores = (ctx: CanvasRenderingContext2D | OffscreenCanvasRender
     drawScoreBox(true, scores.scoreA, colorA);
     drawScoreBox(false, scores.scoreB, colorB);
 };
+
+export const drawDebatePointCounter = (
+    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    context: DrawContext
+) => {
+    const { config, scores, themeConfig } = context;
+    const { width: canvasWidth, height: canvasHeight } = ctx.canvas;
+
+    if (!themeConfig?.showPointCounter || !scores) return;
+    if (config.speakerIds.length < 2) return;
+
+    const colorA = themeConfig?.speakerColorA || '#3b82f6';
+    const colorB = themeConfig?.speakerColorB || '#ef4444';
+
+    const drawCounter = (score: string, isLeft: boolean, color: string) => {
+        const count = parseInt(score) || 0;
+        const MAX = 6;
+        const showCount = Math.min(count, MAX);
+        const hasMore = count > MAX;
+
+        const barW = 28;
+        const barH = 5;
+        const gap = 10;
+        const dotsH = hasMore ? 22 : 0;
+        const totalH = showCount * (barH + gap) - (showCount > 0 ? gap : 0) + dotsH;
+        const startY = (canvasHeight - totalH) / 2;
+        const marginX = 14;
+        const x = isLeft ? marginX : canvasWidth - marginX - barW;
+
+        ctx.save();
+        for (let i = 0; i < showCount; i++) {
+            const y = startY + i * (barH + gap);
+            ctx.fillStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.roundRect(x, y, barW, barH, 3);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+
+        if (hasMore) {
+            ctx.fillStyle = color;
+            ctx.font = 'bold 13px sans-serif';
+            ctx.textAlign = isLeft ? 'left' : 'right';
+            ctx.textBaseline = 'middle';
+            const dotsY = startY + showCount * (barH + gap) + 6;
+            ctx.fillText('•••', isLeft ? x : x + barW, dotsY);
+        }
+        ctx.restore();
+    };
+
+    drawCounter(scores.scoreA, true, colorA);
+    drawCounter(scores.scoreB, false, colorB);
+};

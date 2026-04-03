@@ -1,5 +1,5 @@
 import { Theme, DrawContext } from './types';
-import { drawBackground, drawSubtitles, drawScores } from './utils';
+import { drawBackground, drawSubtitles, drawScores, drawDebatePointCounter } from './utils';
 
 export const splitTheme: Theme = {
   id: 'split',
@@ -9,6 +9,7 @@ export const splitTheme: Theme = {
     { id: 'timerColor', label: 'Timer Color', type: 'color', defaultValue: '#eab308' },
     { id: 'speakerColorA', label: 'Speaker A Color', type: 'color', defaultValue: '#3b82f6' },
     { id: 'speakerColorB', label: 'Speaker B Color', type: 'color', defaultValue: '#ef4444' },
+    { id: 'showPointCounter',   label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -174,6 +175,9 @@ export const splitTheme: Theme = {
             );
         });
     }
+
+    // Debate Point Counter
+    drawDebatePointCounter(ctx, context);
 
     // Subtitles
     drawSubtitles(ctx, context);
