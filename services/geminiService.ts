@@ -1094,7 +1094,7 @@ export const generateDebateScript = async (
 
                 पात्र:
                 - Narrator: एक (हमेशा "Narrator" label से)
-                - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से सही नाम या persona चुनो — अगर real लोग हैं (Joe Rogan, Trump, Marx) तो उनकी real style में, अगर concept है (Veg vs Non-Veg, Socialism vs Capitalism) तो उस side के strong representative persona बनाओ`}
+                - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से fresh नाम खुद choose करो — हर बार नए, topic-relevant नाम। अगर topic specific public figure के बारे में है तो उनका नाम use करो, अगर concept debate है तो उस side को represent करने वाले believable Indian names बनाओ। Generic या repeated नाम मत use करो।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 OPENING — NARRATOR (exact format, word for word):
@@ -1150,7 +1150,7 @@ export const generateDebateScript = async (
                 भाषा: हिंदी / Hinglish।
 
                 पात्र — ठीक ${speakerCount} वक्ता (कोई Narrator नहीं):
-                ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `Topic के हिसाब से सही opposing personas चुनो — real लोग हों तो उनकी real style, concept debate हो तो strong representative बनाओ।`}
+                ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `हर बार topic के हिसाब से fresh नाम खुद generate करो — एक ही नाम बार-बार मत use करो। नाम meaningful और believable हों — जो उस side को naturally represent करें।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 OPENING — Speaker A:
@@ -1838,7 +1838,7 @@ export const generateDebateScript = async (
 
               Characters:
               - Narrator: one (always labeled "Narrator")
-              - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Pick the right names or personas for this topic — if real people are involved (Joe Rogan, Elon Musk, Karl Marx, Trump) use their actual names and mirror their real speaking style and known views; if it's a concept debate (Veg vs Non-Veg, Socialism vs Capitalism, Believer vs Atheist) create strong representative personas for each side`}
+              - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Choose fresh, topic-appropriate names — never reuse the same names across topics. If the topic is about a specific public figure, use their name; if it's a concept debate, create believable names that fit the side they represent. Avoid generic or repetitive names.`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               OPENING — NARRATOR (exact wording, no variation):
@@ -1894,7 +1894,7 @@ export const generateDebateScript = async (
               Language: ${language}.
 
               Characters — exactly ${speakerCount} speakers (no Narrator):
-              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Pick appropriate opposing personas for this topic — if real people are involved use their actual names and real style; if it's a concept debate create strong representative personas.`}
+              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Choose fresh names relevant to this specific topic — never repeat the same names. No generic placeholder names. Each name should feel like it belongs to someone who would genuinely hold that side's position.`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               OPENING — Speaker A:
