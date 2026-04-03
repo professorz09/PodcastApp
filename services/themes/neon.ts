@@ -7,19 +7,22 @@ export const neonTheme: Theme = {
   description: 'Cyberpunk style with glowing text and borders.',
   properties: [
     // ── Colors ────────────────────────────────────────────────────
-    { id: 'glowColorA',       label: 'Glow Color A',              type: 'color',   defaultValue: '#00ff00',       group: 'Colors' },
-    { id: 'glowColorB',       label: 'Glow Color B',              type: 'color',   defaultValue: '#ff0000',       group: 'Colors' },
-    { id: 'barColor',         label: 'Top Bar Color',             type: 'color',   defaultValue: 'rgba(0,0,0,0.88)', group: 'Colors' },
+    { id: 'glowColorA',        label: 'Glow Color A',             type: 'color',   defaultValue: '#00ff00',          group: 'Colors' },
+    { id: 'glowColorB',        label: 'Glow Color B',             type: 'color',   defaultValue: '#ff0000',          group: 'Colors' },
+    { id: 'barColor',          label: 'Top Bar Color',            type: 'color',   defaultValue: 'rgba(0,0,0,0.88)', group: 'Colors' },
     // ── Speaker ───────────────────────────────────────────────────
-    { id: 'speakerShape',     label: 'Speaker Shape',             type: 'select',  defaultValue: 'circle',        group: 'Speaker',
+    { id: 'speakerShape',      label: 'Speaker Shape',            type: 'select',  defaultValue: 'circle',           group: 'Speaker',
       options: ['circle', 'square', 'hexagon'] },
-    { id: 'showSpeakerLabel', label: 'Speaker Name Below Shape',  type: 'boolean', defaultValue: false,           group: 'Speaker' },
+    { id: 'showSpeakerLabel',  label: 'Show Speaker Name',        type: 'boolean', defaultValue: false,              group: 'Speaker' },
+    { id: 'detachNamePos',     label: 'Detach Name from Shape',   type: 'boolean', defaultValue: false,              group: 'Speaker' },
+    { id: 'nameAlign',         label: 'Name Position',            type: 'select',  defaultValue: 'bottom-sides',     group: 'Speaker',
+      options: ['bottom-sides', 'top-sides', 'mid-sides'] },
     // ── Elements ──────────────────────────────────────────────────
-    { id: 'showBar',          label: 'Show Top Bar',              type: 'boolean', defaultValue: true,            group: 'Elements' },
+    { id: 'showBar',           label: 'Show Top Bar',             type: 'boolean', defaultValue: false,              group: 'Elements' },
     // ── Scores ────────────────────────────────────────────────────
-    { id: 'scoreStyle',       label: 'Score Style',               type: 'select',  defaultValue: 'neon-badge',    group: 'Scores',
+    { id: 'scoreStyle',        label: 'Score Style',              type: 'select',  defaultValue: 'neon-badge',       group: 'Scores',
       options: ['neon-badge', 'glitch', 'dots', 'bar'] },
-    { id: 'scorePosition',    label: 'Score Position',            type: 'select',  defaultValue: 'bottom',        group: 'Scores',
+    { id: 'scorePosition',     label: 'Score Position',           type: 'select',  defaultValue: 'bottom',           group: 'Scores',
       options: ['top-bar', 'bottom'] },
   ],
   draw: (context: DrawContext) => {
@@ -32,9 +35,11 @@ export const neonTheme: Theme = {
     const { speakerIds, speakerLabels, speakerPositions } = config;
 
     const showSpeakers      = config.showSpeakers;
-    const showBar           = themeConfig?.showBar !== undefined ? themeConfig.showBar : true;
+    const showBar           = themeConfig?.showBar ?? false;
     const speakerShape      = themeConfig?.speakerShape || 'circle';
-    const showSpeakerLabel  = themeConfig?.showSpeakerLabel !== undefined ? themeConfig.showSpeakerLabel : true;
+    const showSpeakerLabel  = themeConfig?.showSpeakerLabel ?? false;
+    const detachNamePos     = themeConfig?.detachNamePos ?? false;
+    const nameAlign         = themeConfig?.nameAlign || 'bottom-sides';
     const scoreStyle        = themeConfig?.scoreStyle || 'neon-badge';
     const scorePosition     = themeConfig?.scorePosition || 'bottom';
     const BAR_H             = 80;
@@ -65,45 +70,73 @@ export const neonTheme: Theme = {
         ctx.moveTo(0, BAR_H); ctx.lineTo(canvasWidth, BAR_H);
         ctx.stroke();
         ctx.restore();
+
+        // Timer (center of bar)
+        if (config.showTimer) {
+            ctx.save();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 32px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = '#0ff';
+            ctx.shadowBlur = 12;
+            if (currentSegment.speaker === 'Narrator') {
+                if (!(config.showSubtitles && config.subtitleBackground)) {
+                    ctx.fillText('NARRATOR', canvasWidth / 2, BAR_H / 2);
+                }
+            } else {
+                const segEnd = context.segmentOffsets[currentSegmentIndex + 1] || context.totalDuration;
+                const timeLeft = Math.max(0, Math.ceil(segEnd - time));
+                ctx.fillText(`${timeLeft}s`, canvasWidth / 2, BAR_H / 2);
+            }
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+
+        // Speaker names inside bar (left / right halves, based on speaker positions)
+        speakerIds.forEach((id, index) => {
+            const isSpeaking = isPlaying && currentSegment.speaker === id;
+            const label = speakerLabels[index] || id;
+            const color = colors[index % colors.length];
+            const pos = speakerPositions[index] || { x: index === 0 ? 0.25 : 0.75, y: 0.5 };
+            ctx.save();
+            ctx.font = 'bold 22px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
+            ctx.shadowColor = isSpeaking ? color : 'transparent';
+            ctx.shadowBlur = isSpeaking ? 18 : 0;
+            ctx.fillText(label.toUpperCase(), pos.x * canvasWidth, BAR_H / 2);
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        });
     }
 
-    // ── Timer (center of top bar) ───────────────────────────────────
-    if (config.showTimer) {
+    // ── Timer outside bar (when bar is off) ────────────────────────
+    if (!showBar && config.showTimer) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.beginPath();
+        ctx.roundRect(canvasWidth / 2 - 70, 14, 140, 48, 24);
+        ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 32px sans-serif';
+        ctx.font = 'bold 28px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowColor = '#0ff';
-        ctx.shadowBlur = 12;
-
+        ctx.shadowBlur = 10;
         if (currentSegment.speaker === 'Narrator') {
             if (!(config.showSubtitles && config.subtitleBackground)) {
-                ctx.fillText('NARRATOR', canvasWidth / 2, BAR_H / 2);
+                ctx.fillText('NARRATOR', canvasWidth / 2, 38);
             }
         } else {
             const segEnd = context.segmentOffsets[currentSegmentIndex + 1] || context.totalDuration;
             const timeLeft = Math.max(0, Math.ceil(segEnd - time));
-            ctx.fillText(`${timeLeft}s`, canvasWidth / 2, BAR_H / 2);
+            ctx.fillText(`${timeLeft}s`, canvasWidth / 2, 38);
         }
         ctx.shadowBlur = 0;
+        ctx.restore();
     }
-
-    // ── Speaker names in top-bar (left / right halves) ─────────────
-    speakerIds.forEach((id, index) => {
-        const isSpeaking = isPlaying && currentSegment.speaker === id;
-        const label = speakerLabels[index] || id;
-        const color = colors[index % colors.length];
-        const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
-
-        ctx.font = 'bold 22px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
-        ctx.shadowColor = isSpeaking ? color : 'transparent';
-        ctx.shadowBlur = isSpeaking ? 18 : 0;
-        ctx.fillText(label.toUpperCase(), pos.x * canvasWidth, BAR_H / 2);
-        ctx.shadowBlur = 0;
-    });
 
     // ── Speaker draw (circle / square / hexagon) ───────────────────
     const baseRadius = 80 * config.speakerScale;
@@ -157,7 +190,7 @@ export const neonTheme: Theme = {
             ctx.stroke();
             ctx.restore();
 
-            if (showSpeakerLabel) {
+            if (showSpeakerLabel && !detachNamePos) {
                 ctx.save();
                 ctx.fillStyle = color;
                 ctx.font = 'bold 18px monospace';
@@ -208,7 +241,7 @@ export const neonTheme: Theme = {
                 ctx.restore();
             }
 
-            if (showSpeakerLabel) {
+            if (showSpeakerLabel && !detachNamePos) {
                 ctx.save();
                 ctx.fillStyle = color;
                 ctx.font = 'bold 18px monospace';
@@ -280,7 +313,7 @@ export const neonTheme: Theme = {
                 ctx.restore();
             }
 
-            if (showSpeakerLabel) {
+            if (showSpeakerLabel && !detachNamePos) {
                 ctx.save();
                 ctx.fillStyle = color;
                 ctx.font = 'bold 18px monospace';
@@ -301,6 +334,60 @@ export const neonTheme: Theme = {
             drawSpeaker(pos.x, pos.y, isSpeaking, color,
                 config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null, label);
         });
+
+        // ── Detached Speaker Names ────────────────────────────────
+        if (showSpeakerLabel && detachNamePos) {
+            // Fixed Y position based on nameAlign setting
+            const nameY = nameAlign === 'top-sides'
+                ? canvasHeight * 0.12
+                : nameAlign === 'mid-sides'
+                ? canvasHeight * 0.50
+                : canvasHeight * 0.88; // bottom-sides (default)
+
+            speakerIds.slice(0, 2).forEach((id, index) => {
+                const isSpeaking = isPlaying && currentSegment.speaker === id;
+                const label = speakerLabels[index] || id;
+                const color = colors[index % colors.length];
+                const isLeft = index === 0;
+
+                // Fixed x: speaker A → left quarter, speaker B → right quarter
+                const nameX = isLeft ? canvasWidth * 0.22 : canvasWidth * 0.78;
+
+                ctx.save();
+                ctx.font = `bold 20px monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
+                ctx.shadowColor = isSpeaking ? color : 'transparent';
+                ctx.shadowBlur = isSpeaking ? 20 : 0;
+
+                // Neon underline bar
+                const tw = ctx.measureText(label.toUpperCase()).width;
+                if (isSpeaking) {
+                    ctx.fillStyle = color;
+                    ctx.globalAlpha = 0.18;
+                    ctx.beginPath();
+                    ctx.roundRect(nameX - tw / 2 - 12, nameY - 16, tw + 24, 32, 6);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+
+                ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
+                ctx.fillText(label.toUpperCase(), nameX, nameY);
+
+                // Thin colored underline
+                ctx.beginPath();
+                ctx.moveTo(nameX - tw / 2, nameY + 14);
+                ctx.lineTo(nameX + tw / 2, nameY + 14);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = isSpeaking ? 2 : 1;
+                ctx.globalAlpha = isSpeaking ? 1 : 0.3;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = isSpeaking ? 10 : 0;
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
     }
 
     // Side Stats

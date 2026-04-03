@@ -19,7 +19,9 @@ export const arenaTheme: Theme = {
     { id: 'showVsBadge',        label: 'Show VS Badge',            type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showSegmentCount',   label: 'Show Segment Count Dots',  type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showVuMeter',        label: 'Show VU Meter',            type: 'boolean', defaultValue: false,      group: 'Elements' },
-    { id: 'detachVuMeter',      label: 'Detach VU to Side Dots',   type: 'boolean', defaultValue: false,      group: 'Elements' },
+    { id: 'detachVuMeter',      label: 'Detach VU to Side',        type: 'boolean', defaultValue: false,      group: 'Elements' },
+    { id: 'vuDetachStyle',      label: 'Side VU Style',            type: 'select',  defaultValue: 'dots',     group: 'Elements',
+      options: ['dots', 'bars', 'arc'] },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -41,8 +43,9 @@ export const arenaTheme: Theme = {
     const showVsBadge      = themeConfig?.showVsBadge ?? false;
     const showSegmentCount = themeConfig?.showSegmentCount ?? false;
     const detachVuMeter    = themeConfig?.detachVuMeter ?? false;
+    const vuDetachStyle    = themeConfig?.vuDetachStyle || 'dots';
     // VU meter: arena theme has its own default (off); respects global toggle too
-    // When detachVuMeter is true, we suppress the ring-on-speaker VU and instead draw side dots
+    // When detachVuMeter is true, we suppress the ring-on-speaker VU and instead draw on sides
     const vuEnabled        = config.showVuMeter && (themeConfig?.showVuMeter ?? false) && !detachVuMeter;
     const vuDetachEnabled  = config.showVuMeter && (themeConfig?.showVuMeter ?? false) && detachVuMeter;
 
@@ -292,67 +295,99 @@ export const arenaTheme: Theme = {
         drawSideDots(false, speakerSegCounts[1], speakerSegTotals[1], colors[1]);
     }
 
-    // ── Detached VU Meter — side dots next to segment count ───────
+    // ── Detached VU Meter — side panel, active speaker's side ─────
     if (vuDetachEnabled && speakerIds.length >= 2) {
         const activeSpeakerId = currentSegment.speaker;
         const activeIdx = speakerIds.indexOf(activeSpeakerId);
         if (activeIdx === 0 || activeIdx === 1) {
-            const isLeft = activeIdx === 0;
-            const color  = colors[activeIdx];
-
-            // Geometry matching segment count dots
+            const isLeft  = activeIdx === 0;
+            const color   = colors[activeIdx];
             const DOT_R   = 6;
             const DOT_GAP = 7;
-            const VU_DOTS = 10;
+            const VU_SLOTS = 10;
 
-            // Base x: same as segment count column
-            const baseX = isLeft
-                ? 14 + DOT_R          // left edge (speaker A)
-                : canvasWidth - 14 - DOT_R; // right edge (speaker B)
+            // Base edge x (same column as segment count dots)
+            const baseX   = isLeft ? 14 + DOT_R : canvasWidth - 14 - DOT_R;
+            // Offset to sit beside segment count dots if both are visible
+            const segOff  = showSegmentCount ? DOT_R * 2 + 5 : 0;
+            const vuCX    = isLeft ? baseX + segOff : baseX - segOff;
 
-            // VU column is placed next to the segment dots
-            // If segment count is also showing, offset outward by one dot-column width
-            const vuOffset = showSegmentCount ? (DOT_R * 2 + 5) : 0;
-            const vuCX = isLeft ? baseX + vuOffset : baseX - vuOffset;
+            // Vertical centering
+            const colH    = VU_SLOTS * (DOT_R * 2) + (VU_SLOTS - 1) * DOT_GAP;
+            const startY  = (canvasHeight - colH) / 2;
+            const litCount = Math.max(1, Math.round(audioLevel * VU_SLOTS));
 
-            // Vertical center
-            const colH   = VU_DOTS * (DOT_R * 2) + (VU_DOTS - 1) * DOT_GAP;
-            const startY = (canvasHeight - colH) / 2;
+            // Helper: color ramp per slot (0=bottom)
+            const slotColor = (slotIdx: number, lit: boolean) => {
+                if (!lit) return 'rgba(255,255,255,0.08)';
+                const pct = slotIdx / (VU_SLOTS - 1);
+                return pct < 0.55 ? color : pct < 0.80 ? '#facc15' : '#ef4444';
+            };
 
-            // How many dots are lit (at least 1 when active, max all)
-            const litCount = Math.max(1, Math.round(audioLevel * VU_DOTS));
-
-            for (let i = 0; i < VU_DOTS; i++) {
-                // i=0 is top, fill from BOTTOM (high index = bottom = louder end)
-                const dotIdx = VU_DOTS - 1 - i;   // 0 = bottom
-                const isLit  = dotIdx < litCount;
-                const dotY   = startY + i * (DOT_R * 2 + DOT_GAP) + DOT_R;
-
-                // Color ramp: speaker color → yellow → red (bottom to top)
-                const pct = dotIdx / (VU_DOTS - 1);
-                let dotColor: string;
-                if (!isLit) {
-                    dotColor = 'rgba(255,255,255,0.08)';
-                } else if (pct < 0.55) {
-                    dotColor = color;
-                } else if (pct < 0.80) {
-                    dotColor = '#facc15';
-                } else {
-                    dotColor = '#ef4444';
+            if (vuDetachStyle === 'dots') {
+                // ── Round dots ────────────────────────────────────
+                for (let i = 0; i < VU_SLOTS; i++) {
+                    const slotIdx = VU_SLOTS - 1 - i;  // 0 = bottom
+                    const isLit   = slotIdx < litCount;
+                    const dotY    = startY + i * (DOT_R * 2 + DOT_GAP) + DOT_R;
+                    const dc      = slotColor(slotIdx, isLit);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(vuCX, dotY, DOT_R, 0, Math.PI * 2);
+                    ctx.fillStyle = dc;
+                    if (isLit) { ctx.shadowColor = dc; ctx.shadowBlur = 8 + audioLevel * 12; }
+                    ctx.fill();
+                    ctx.restore();
                 }
 
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(vuCX, dotY, DOT_R, 0, Math.PI * 2);
-                ctx.fillStyle = dotColor;
-                if (isLit) {
-                    ctx.shadowColor = dotColor;
-                    ctx.shadowBlur  = 8 + audioLevel * 12;
-                } else {
-                    ctx.shadowBlur = 0;
+            } else if (vuDetachStyle === 'bars') {
+                // ── Thin rectangle bars ───────────────────────────
+                const BAR_W = 14, BAR_H_UNIT = DOT_R * 2;
+                for (let i = 0; i < VU_SLOTS; i++) {
+                    const slotIdx = VU_SLOTS - 1 - i;
+                    const isLit   = slotIdx < litCount;
+                    const barY    = startY + i * (BAR_H_UNIT + DOT_GAP);
+                    const barX    = isLeft ? vuCX - BAR_W / 2 : vuCX - BAR_W / 2;
+                    const dc      = slotColor(slotIdx, isLit);
+                    ctx.save();
+                    ctx.fillStyle = dc;
+                    if (isLit) { ctx.shadowColor = dc; ctx.shadowBlur = 6 + audioLevel * 10; }
+                    ctx.beginPath();
+                    ctx.roundRect(barX, barY, BAR_W, BAR_H_UNIT, 3);
+                    ctx.fill();
+                    ctx.restore();
                 }
-                ctx.fill();
-                ctx.restore();
+
+            } else {
+                // ── Arc (curved meter) ────────────────────────────
+                // Draw a partial arc on the near edge of the canvas
+                const arcCX  = isLeft ? 0 : canvasWidth;
+                const arcCY  = canvasHeight / 2;
+                const R_NEAR = 60 + segOff;
+                const R_FAR  = R_NEAR + 26;
+                const SEGS   = 16;
+                const SWEEP  = Math.PI * 0.9; // total arc sweep (radians)
+                const startA = -SWEEP / 2 - Math.PI / 2;
+                const litSegs = Math.max(1, Math.round(audioLevel * SEGS));
+
+                for (let s = 0; s < SEGS; s++) {
+                    const a0   = startA + (s / SEGS) * SWEEP;
+                    const a1   = startA + ((s + 1) / SEGS) * SWEEP - 0.04;
+                    const isLit = s < litSegs;
+                    const pct  = s / (SEGS - 1);
+                    const dc   = !isLit ? 'rgba(255,255,255,0.07)'
+                                 : pct < 0.55 ? color
+                                 : pct < 0.80 ? '#facc15' : '#ef4444';
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(arcCX, arcCY, R_NEAR, a0, a1);
+                    ctx.arc(arcCX, arcCY, R_FAR,  a1, a0, true);
+                    ctx.closePath();
+                    ctx.fillStyle = dc;
+                    if (isLit) { ctx.shadowColor = dc; ctx.shadowBlur = 8 + audioLevel * 14; }
+                    ctx.fill();
+                    ctx.restore();
+                }
             }
         }
     }
