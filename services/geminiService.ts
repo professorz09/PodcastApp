@@ -566,7 +566,7 @@ export const generateDebateScript = async (
                 CHARACTERS:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 - Narrator: crisp, engaging — सिर्फ opening hook, major transitions, और closing के लिए
-                - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "topic के हिसाब से 2 natural Indian names"} — दोनों की अलग personality:
+                - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "topic के हिसाब से 2 fresh, topic-relevant नाम choose करो"} — दोनों की अलग personality:
                   Speaker A: curious, "yaar yeh toh mujhe pata nahi tha", सवाल पूछता है
                   Speaker B: analytical, clearly explain करता है, examples देता है — बात की तरह, lecture की तरह नहीं
 
@@ -638,7 +638,7 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 CHARACTERS — ठीक 2 speakers (Narrator नहीं):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `Topic के हिसाब से 2 natural Indian names चुनो।`}
+                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `Topic के हिसाब से 2 fresh नाम choose करो — हर topic के लिए अलग।`}
                 दोनों की personality अलग हो:
                 - Speaker A: ज़्यादा curious — "yaar seriously?", "matlab?", "lekin phir kya hua?" जैसे natural reactions
                 - Speaker B: ज़्यादा knowledgeable — clearly explain करता है, examples देता है — लेकिन lecture नहीं, baat करता है
@@ -1094,14 +1094,14 @@ export const generateDebateScript = async (
 
                 पात्र:
                 - Narrator: एक (हमेशा "Narrator" label से)
-                - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से fresh नाम खुद choose करो — हर बार नए, topic-relevant नाम। अगर topic specific public figure के बारे में है तो उनका नाम use करो, अगर concept debate है तो उस side को represent करने वाले believable Indian names बनाओ। Generic या repeated नाम मत use करो।`}
+                - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से fresh नाम choose करो — हर बार अलग, topic-relevant। अगर topic किसी specific public figure पर है तो उनका नाम use करो, concept debate है तो उस side को represent करने वाला believable नाम बनाओ। Generic या repeated नाम मत use करो।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 OPENING — NARRATOR (exact format, word for word):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 Narrator की पहली line EXACTLY इस structure में होगी — कोई बदलाव नहीं:
 
-                "हमने सबसे advanced AI models को configure किया है ताकि [Speaker A का नाम] और [Speaker B का नाम] को represent करने वाले दो characters बना सकें। [Speaker A का नाम] [उनकी side/position एक line में], जबकि [Speaker B का नाम] [उनकी opposing side/position एक line में]। इनकी debate इस सवाल से शुरू होती है:"
+                "हमने सबसे advanced AI models को configure किया है ताकि [Speaker A का नाम] और [Speaker B का नाम] को represent करने वाले दो characters बना सकें। इनकी debate इस सवाल से शुरू होती है:"
 
                 फिर अगली line में — एक sharp, provocative debate question:
                 "[Topic का core tension — एक sentence में, सवाल के रूप में]"
@@ -1150,7 +1150,7 @@ export const generateDebateScript = async (
                 भाषा: हिंदी / Hinglish।
 
                 पात्र — ठीक ${speakerCount} वक्ता (कोई Narrator नहीं):
-                ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `हर बार topic के हिसाब से fresh नाम खुद generate करो — एक ही नाम बार-बार मत use करो। नाम meaningful और believable हों — जो उस side को naturally represent करें।`}
+                ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `Topic के हिसाब से fresh नाम choose करो — हर बार अलग। Generic या repeated नाम मत use करो।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 OPENING — Speaker A:
@@ -1845,7 +1845,7 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               The Narrator's FIRST LINE must be EXACTLY this structure — word for word:
 
-              "We configured the most advanced AI models to create two characters representing [Speaker A name] and [Speaker B name]. [Speaker A name] [their position/side in one line], while [Speaker B name] [their opposing position/side in one line]. Their debate starts with this question:"
+              "We configured the most advanced AI models to create two characters representing [Speaker A name] and [Speaker B name]. Their debate starts with this question:"
 
               Then on the very next line — one sharp, provocative debate question:
               "[The core tension of this topic as a single question]"
