@@ -550,83 +550,135 @@ export const generateDebateScript = async (
         if (style === 'explained') {
             if (includeNarrator) {
               prompt = `
-                विषय: "${topic}" पर एक गहरी "Explained" शैली की वीडियो स्क्रिप्ट तैयार करें।
-                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                विषय: "${topic}"
+                ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
                 ${durLineHi}
-                भाषा: हिंदी (Hinglish ठीक है)।
+                भाषा: Hinglish — natural educated Indian speech।
 
-                पात्र:
-                - Narrator: एक (हमेशा "Narrator" नाम से)
-                - ${speakerCount} वक्ता: ${speakers.length > 0 ? speakers.join(", ") : `विषय के अनुरूप उचित नाम ऑटो-डिटेक्ट करें`}
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                STEP 1 — पहले यह ANALYZE करो:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ✦ इस topic की सबसे gripping, surprising, या important बात क्या है? → यही opening hook बनेगी।
+                ✦ इस topic को cover करने के लिए 4-5 most important concepts कौन से हैं?
+                ✦ इनके बीच logical flow कैसा होगा?
 
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                संरचना (Narrator ON मोड):
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                CHARACTERS:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                - Narrator: crisp, engaging — सिर्फ opening hook, major transitions, और closing के लिए
+                - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "topic के हिसाब से 2 natural Indian names"} — दोनों की अलग personality:
+                  Speaker A: curious, "yaar yeh toh mujhe pata nahi tha", सवाल पूछता है
+                  Speaker B: analytical, clearly explain करता है, examples देता है — बात की तरह, lecture की तरह नहीं
 
-                【 शुरुआत — Narrator का परिचय 】
-                - एक strong hook से शुरू करें (चौंकाने वाला fact, सवाल, या real situation)
-                - यह topic क्या है — सीधे और interesting तरीके से
-                - क्यों जानना ज़रूरी है, इस video में क्या-क्या समझेंगे (clear roadmap)
-                - Audience को engage करें, boring intro नहीं
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                STRUCTURE:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 मुख्य चर्चा — दोनों वक्ता (topic की depth में) 】
-                - दोनों speakers मिलकर step-by-step topic explain करें
-                - हर concept: पहले simple भाषा में, फिर real-life example (middle class Indian context से)
-                - एक speaker explain करे, दूसरा question पूछे, add करे, या counter-example दे
-                - बीच में Narrator 1-2 बार short transitions दे सकता है ("अब देखते हैं...", "यहाँ एक interesting twist है...")
-                - Deep जाएं — surface level नहीं, असली insight दें
-                - Avoid: "इसलिए यह महत्वपूर्ण है", "आइए विचार करें" जैसे robotic phrases
+                【 Narrator — Opening Hook (30-45 seconds का) 】
+                Topic का सबसे shocking, counterintuitive, या fascinating angle से शुरू।
+                एक line में audience को बाँध लो — question, fact, या provocative statement।
+                फिर 2-3 lines में बताओ: आज क्या समझेंगे और क्यों यह matter करता है।
+                Boring roadmap नहीं — एक interesting promise।
 
-                【 अंत — Narrator का निष्कर्ष 】
-                - Key takeaways summarize करें (3-4 sharp points)
-                - एक actionable insight या thought-provoking question दें
-                - Memorable ending line — audience के दिमाग में रह जाए
+                【 Main Conversation — दोनों Speakers 】
+                Narrator हर major concept को 1-2 crisp lines में introduce करे → फिर दोनों speakers उस पर बात करें।
+                हर concept:
+                → Core idea simply explain (technical language नहीं)
+                → एक SPECIFIC example — इस exact topic के लिए:
+                  • किताब का chapter → real teaching को story form में
+                  • Biology/science → body/nature mechanism को analogy से
+                  • Social topic → real situation जो लोग face करते हैं
+                  • Finance → specific numbers और relatable comparison
+                  • Philosophy/politics → historical या current event
+                → Speaker A का natural reaction/follow-up
+                → Speaker B का deeper angle या clarification
+                Narrator transitions: maximum 2-3 बार — हर concept के पहले नहीं, सिर्फ जब genuinely needed हो।
 
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                स्वर और भाषा:
-                - बिल्कुल natural, दो पढ़े-लिखे दोस्तों की conversation जैसी
-                - Colloquial Hindi/Hinglish — robotic या किताबी भाषा नहीं
-                - AI phrases ban: "इस प्रकार", "निष्कर्ष के रूप में", "यह ध्यान देने योग्य है"
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                【 Narrator — Closing 】
+                Robotic bullet-point summary नहीं।
+                2-3 sharp lines जो:
+                → Topic का real essence capture करें
+                → एक thought-provoking question या insight दें
+                → Audience के दिमाग में रह जाएं
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                RULES:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ✓ Natural Hinglish throughout — conversational, real
+                ✓ Specific examples — topic-relevant, generic नहीं
+                ✓ दोनों speakers की अलग voice — एक जैसे मत लगें
+                ✗ BANNED: "यह महत्वपूर्ण है", "निष्कर्ष में", "आइए समझते हैं", "इस प्रकार", "यह ध्यान देने योग्य है"
+                ✗ BANNED: Narrator unnecessarily बीच में आए — only for opening, closing, और major transitions
+                ✗ BANNED: Generic filler — हर line meaningful होनी चाहिए
                 ${durFillHi}
               `;
             } else {
               prompt = `
-                विषय: "${topic}" पर एक गहरी "Explained" शैली की वीडियो स्क्रिप्ट तैयार करें।
-                ${specificDetails ? `विशिष्ट विवरण: ${specificDetails}` : ''}
+                विषय: "${topic}"
+                ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
                 ${durLineHi}
-                भाषा: हिंदी (Hinglish ठीक है)।
+                भाषा: Hinglish — जैसे दो पढ़े-लिखे भारतीय दोस्त आपस में बात करते हैं।
 
-                पात्र — ठीक ${speakerCount} वक्ता (कोई Narrator नहीं):
-                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `विषय के अनुरूप उचित नाम ऑटो-डिटेक्ट करें।`}
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                STEP 1 — पहले यह ANALYZE करो:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                इस topic में:
+                ✦ सबसे surprising, counterintuitive, या shocking बात क्या है?
+                ✦ लोग इसके बारे में क्या गलत सोचते हैं?
+                ✦ Real life से इसका सबसे direct connection कहाँ है?
+                इन्हीं से opening hook और angle तय करो।
 
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                संरचना (Narrator OFF — सिर्फ दो दोस्त explain कर रहे हैं):
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                CHARACTERS — ठीक 2 speakers (Narrator नहीं):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `Topic के हिसाब से 2 natural Indian names चुनो।`}
+                दोनों की personality अलग हो:
+                - Speaker A: ज़्यादा curious — "yaar seriously?", "matlab?", "lekin phir kya hua?" जैसे natural reactions
+                - Speaker B: ज़्यादा knowledgeable — clearly explain करता है, examples देता है — लेकिन lecture नहीं, baat करता है
 
-                【 शुरुआत 】
-                - एक speaker सीधे topic introduce करता है — interesting hook (चौंकाने वाला fact या सवाल)
-                - दूसरा speaker react करता है, curiosity दिखाता है
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                STRUCTURE:
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 पूरी चर्चा — दोनों मिलकर deep explain करते हैं 】
-                - जैसे दो पढ़े-लिखे दोस्त बैठकर किसी topic को जड़ से explain कर रहे हों
-                - हर concept: पहले simple भाषा में explain, फिर real-life example (middle class Indian situations से)
-                - दोनों naturally आगे-पीछे बात करें — एक explain करे, दूसरा question पूछे, add करे
-                - Avoid: Narrator, "अब हम देखेंगे" जैसे transition announcements
-                - Examples: जो middle class Indian audience को directly relatable हों
-                - Deep जाएं — surface level नहीं, असली insight दें
-                - हर बड़े point के बाद कोई relatable analogy या case study ज़रूर दें
+                【 Opening 】
+                Topic के सबसे interesting या unexpected angle से शुरू करो।
+                Best approach topic के हिसाब से खुद choose करो — इनमें से एक:
+                → ऐसा fact या statistic जो लोग expect नहीं करते
+                → एक specific relatable scenario जो audience खुद face करती है
+                → एक popular belief जो गलत साबित होने वाली है
+                → एक सवाल जो audience के मन में पहले से है
+                Speaker A hook से शुरू करे → Speaker B deepen करे → curiosity बने।
 
-                【 अंत 】
-                - दोनों मिलकर naturally conversation में key points conclude करें
-                - एक memorable line या thought से end करें — artificial नहीं
+                【 Main Explanation 】
+                Topic को 3-5 points/concepts में break करो (topic के हिसाब से — forcefully equal मत करो)।
+                हर point के लिए:
+                → Core idea: 1-2 simple lines में — technical language नहीं
+                → एक SPECIFIC example जो इस exact topic के लिए relevant हो:
+                  • किताब का chapter है → उस chapter की real teaching को story form में
+                  • Biology/science है → body या nature की real mechanism को analogy से
+                  • Social topic है → real-world situation जो लोग face करते हैं
+                  • Finance है → specific numbers और relatable comparisons
+                  • Philosophy/politics है → historical या current event
+                → Speaker A का natural reaction या follow-up question
+                → Speaker B का deeper angle या clarification
 
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                स्वर और भाषा:
-                - बिल्कुल natural, conversational Hinglish
-                - Robotic या किताबी phrases बिल्कुल नहीं
-                - AI clichés ban: "इस प्रकार", "निष्कर्ष के रूप में", "यह ध्यान देने योग्य है"
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                【 Unexpected Angle — "wait, really?" moment 】
+                Topic से related कोई ऐसी बात जो audience expect नहीं करती।
+                Organic feel हो — forced नहीं।
+
+                【 Closing 】
+                Forced summary नहीं। दोनों naturally conversation में main insight पर आएं।
+                एक memorable line जो topic का essence capture करे।
+
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                TONE RULES (strictly follow):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ✓ Natural reactions: "Yaar sach mein?", "Accha phir?", "Woh toh mujhe pata hi nahi tha"
+                ✓ Specific examples — "Jaise Dhoni ne..." नहीं "Jaise ek cricketer ne..."
+                ✓ दोनों speakers की अलग-अलग voice — एक जैसे मत लगें
+                ✗ BANNED: "यह महत्वपूर्ण है", "इस प्रकार", "आइए समझते हैं", "निष्कर्ष में", "यह ध्यान देने योग्य है"
+                ✗ BANNED: Generic filler — हर line में real information या real reaction
+                ✗ BANNED: दोनों speakers एक जैसी बात अलग-अलग words में बोलें
                 ${durFillHi}
               `;
             }
@@ -1205,83 +1257,135 @@ export const generateDebateScript = async (
         if (style === 'explained') {
           if (includeNarrator) {
             prompt = `
-              Generate a deep "Explained" style video script on the topic: "${topic}".
-              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              Topic: "${topic}"
+              ${specificDetails ? `Additional context: ${specificDetails}` : ''}
               ${durLineEn}
               Language: ${language}.
 
-              Characters:
-              - Narrator: one (always named "Narrator")
-              - ${speakerCount} speakers: ${speakers.length > 0 ? speakers.join(", ") : `Auto-detect names appropriate for the topic`}
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STEP 1 — ANALYZE THE TOPIC FIRST:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✦ What is the most fascinating, surprising, or counterintuitive thing about this topic?
+              ✦ What are the 4-5 most important concepts that must be covered?
+              ✦ What is the most logical, engaging order to cover them?
+              These answers drive the entire structure — don't skip this step.
 
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Structure (Narrator ON mode):
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              CHARACTERS:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Narrator: crisp, punchy — used ONLY for the opening hook, closing, and major transitions
+              - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "names appropriate for the topic"} — distinct personalities:
+                Speaker A: more curious — asks the questions the audience would ask, "wait seriously?", "so what you're saying is..."
+                Speaker B: more analytical — explains clearly with specific examples, conversational not lecture-mode
 
-              【 Opening — Narrator's Introduction 】
-              - Start with a strong hook (shocking fact, question, or real situation that grabs attention)
-              - What this topic is — explained simply and interestingly
-              - Why it matters and a clear roadmap of what will be covered
-              - Make the audience want to keep watching — no boring intros
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Main Discussion — Both Speakers (deep into the topic) 】
-              - Both speakers explain the topic step-by-step together
-              - Each concept: first in simple language, then with a real-life relatable example (middle-class / everyday context)
-              - One speaker explains, the other asks, adds, or gives a counter-example
-              - Narrator may give 1-2 short transitions in the middle ("Now let's look at...", "Here's where it gets interesting...")
-              - Go deep — no surface-level takes, give real insight
-              - Banned phrases: "It's important to note", "Let's delve into", "In conclusion", "This is significant"
+              【 Narrator — Opening Hook 】
+              Lead with the most gripping angle of this specific topic.
+              ONE powerful sentence that stops the audience cold.
+              Then 2-3 lines: what are we covering and why does it genuinely matter.
+              Not a boring list — an interesting promise.
 
-              【 Closing — Narrator's Conclusion 】
-              - Summarize 3-4 sharp key takeaways
-              - Give one actionable insight or thought-provoking question
-              - End with a memorable line the audience will remember
+              【 Main Conversation — Speakers 】
+              Narrator introduces each major concept (1-2 crisp lines) → Speakers discuss it naturally.
+              For each concept:
+              → State the core idea in 1-2 simple sentences — no jargon
+              → Give ONE specific, concrete example tailored to THIS exact topic:
+                • Book chapter/law → the real principle illustrated with a specific scenario
+                • Science/biology → a body or nature analogy that makes it click instantly
+                • Social/psychology topic → a real situation people actually face
+                • Finance → real numbers and relatable comparisons
+                • Philosophy/politics → a historical or current event as the anchor
+              → Speaker A's natural reaction or follow-up question
+              → Speaker B's deeper explanation or nuanced angle
+              Narrator transitions: maximum 2-3 times total — only for genuinely major topic shifts, not after every concept.
 
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Tone & Language:
-              - Highly natural — like two knowledgeable friends talking
-              - Conversational, use contractions, natural pauses, personality
-              - No robotic or formal AI phrases
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              【 Narrator — Closing 】
+              NOT a bullet-point summary.
+              2-3 sharp sentences that:
+              → Capture the real essence of what was discussed
+              → Leave the audience with a thought-provoking question or insight
+              → Sound like something they'll actually remember
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Natural conversational language throughout
+              ✓ Specific examples only — tailored to this topic, never generic
+              ✓ Speaker A and B must sound noticeably different from each other
+              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", "This is significant", "Furthermore"
+              ✗ BANNED: Narrator appearing unnecessarily — only opening, closing, and major shifts
+              ✗ BANNED: Any filler line that adds no real information or authentic reaction
               ${durFillEn}
             `;
           } else {
             prompt = `
-              Generate a deep "Explained" style video script on the topic: "${topic}".
-              ${specificDetails ? `Specific Details: ${specificDetails}` : ''}
+              Topic: "${topic}"
+              ${specificDetails ? `Additional context: ${specificDetails}` : ''}
               ${durLineEn}
               Language: ${language}.
 
-              Characters — exactly ${speakerCount} speakers (no Narrator):
-              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Auto-detect names appropriate for the topic.`}
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STEP 1 — ANALYZE THE TOPIC FIRST:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Before writing, identify:
+              ✦ The most surprising or counterintuitive angle of this topic
+              ✦ The biggest misconception people have about it
+              ✦ The most relatable real-world connection
+              ✦ The "wait, really?" moment hidden in this topic
+              Use these to build the opening hook and choose what angle to take.
 
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Structure (Narrator OFF — just two friends explaining):
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              CHARACTERS — exactly 2 speakers (no Narrator):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Pick 2 names fitting for the topic.`}
+              Give them distinct personalities:
+              - Speaker A: more curious — "wait seriously?", "so what you're saying is...", asks the questions the audience has
+              - Speaker B: more knowledgeable — explains clearly with specific examples — like a friend, not a professor
 
-              【 Opening 】
-              - One speaker introduces the topic with a strong hook (shocking fact or question)
-              - The other speaker reacts, shows curiosity, pulls the conversation forward
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Full Discussion — Both Explain Together (deep) 】
-              - Like two well-read friends sitting down to explain a topic from the ground up
-              - Every concept: explain simply first, then give a real-life relatable example (everyday / middle-class context)
-              - Natural back-and-forth — one explains, the other asks, adds, or challenges
-              - Avoid: Narrator role, announcement transitions ("Now we will look at...")
-              - Examples must feel directly relatable to a general everyday audience
-              - Go deep — real insight, not surface-level takes
-              - After every major point, give a relatable analogy or mini case study
+              【 Opening — Hook first 】
+              Lead with the most interesting angle of THIS specific topic. Choose ONE approach that fits best:
+              → A shocking or counterintuitive fact ("Most people think X, but the reality is Y")
+              → A relatable scenario the audience has actually lived through
+              → A question they've definitely wondered about
+              → A popular belief that's about to be turned upside down
+              Speaker A hooks → Speaker B deepens → curiosity builds naturally.
+
+              【 Main Explanation — cover the real content 】
+              Break the topic into 3-5 natural sections based on what THIS topic actually needs.
+              For each section:
+              → State the core idea in 1-2 simple sentences — no jargon
+              → Give ONE specific, concrete example tailored to THIS exact topic:
+                • Book chapter/law → the real principle illustrated with a specific scenario
+                • Science/biology → a body or nature analogy that makes it click instantly
+                • Social/psychology topic → a real situation people actually face
+                • Finance → real numbers and relatable comparisons
+                • Philosophy/politics → a historical or current event as the anchor
+              → Speaker A reacts or asks a question the audience would also ask
+              → Speaker B explains further or adds a nuanced angle
+
+              【 One unexpected turn — the "wait, really?" moment 】
+              An angle, implication, or connection the audience didn't see coming. Feels organic, not forced.
 
               【 Closing 】
-              - Both naturally conclude in conversation — no forced summary
-              - End with a memorable line or thought — not artificial
+              Both speakers land naturally on the key takeaway through conversation — no forced "in conclusion."
+              End with one memorable line that captures the essence of the topic.
 
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Tone & Language:
-              - Highly natural, conversational — like real knowledgeable people talking
-              - No robotic or formal AI phrases
-              - Banned: "It's important to note", "Let's delve into", "In conclusion", "This is significant"
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              TONE & LANGUAGE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Natural conversation — like two people who've genuinely thought about this topic
+              ✓ Specific examples only — never "imagine a company that..." or generic placeholders
+              ✓ Speaker A and B must sound noticeably different from each other
+              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", "This is significant", "Furthermore", "It is worth mentioning"
+              ✗ BANNED: Both speakers echoing the same point in different words
+              ✗ BANNED: Any filler — every line must add real information or authentic human reaction
               ${durFillEn}
             `;
           }
