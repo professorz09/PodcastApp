@@ -608,8 +608,11 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 RULES:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ✓ जब भी कोई बात बोले — उसे ठीक से समझाए: पहले basics बताओ, फिर example दो, फिर deeper point
+                ✓ Expert की तरह सोचो लेकिन बोलो simple भाषा में — जैसे कोई जानकार दोस्त समझा रहा हो
+                ✓ हर concept को zero से build करो — assume मत करो कि audience पहले से जानती है
+                ✓ हर बड़े point के साथ एक real, relatable example या analogy ज़रूर दो
                 ✓ Natural Hinglish throughout — conversational, real
-                ✓ Specific examples — topic-relevant, generic नहीं
                 ✓ दोनों speakers की अलग voice — एक जैसे मत लगें
                 ✗ BANNED: "यह महत्वपूर्ण है", "निष्कर्ष में", "आइए समझते हैं", "इस प्रकार", "यह ध्यान देने योग्य है"
                 ✗ BANNED: Narrator unnecessarily बीच में आए — only for opening, closing, और major transitions
@@ -677,7 +680,11 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 TONE RULES (strictly follow):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                ✓ Seedha explain karo — jaise koi cheez samjha raha ho, apni baat par nahi
+                ✓ जब भी कोई बात बोले — उसे ठीक से समझाए: पहले basics बताओ, फिर example दो, फिर deeper point
+                ✓ Expert की तरह सोचो लेकिन बोलो simple भाषा में — जैसे कोई जानकार दोस्त समझा रहा हो
+                ✓ हर concept को zero से build करो — assume मत करो कि audience पहले से जानती है
+                ✓ हर बड़े point के साथ एक real, relatable example या analogy ज़रूर दो
+                ✓ Seedha explain karo — seedha topic pe, apni baat par nahi
                 ✓ Specific examples — "Jaise Dhoni ne 2011 mein..." nahi "jaise ek cricketer ne..."
                 ✓ दोनों speakers की अलग-अलग voice — एक जैसे मत लगें
                 ✗ BANNED: "Jaise tune abhi bola", "Maine ye kaha tha", "Tu sahi keh raha hai isliye" — speakers refer to each other's words nahi karenge
@@ -1320,8 +1327,11 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               RULES:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Whenever a point is made — explain it properly: start with the basics, then give an example, then go deeper
+              ✓ Think like an expert, speak like a knowledgeable friend — simple language, zero jargon
+              ✓ Build every concept from zero — never assume the audience already knows
+              ✓ Every major point must have a real, relatable example or analogy
               ✓ Natural conversational language throughout
-              ✓ Specific examples only — tailored to this topic, never generic
               ✓ Speaker A and B must sound noticeably different from each other
               ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", "This is significant", "Furthermore"
               ✗ BANNED: Narrator appearing unnecessarily — only opening, closing, and major shifts
@@ -1390,7 +1400,11 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               TONE & LANGUAGE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              ✓ Direct explanation — like explaining the thing itself, not talking about the conversation
+              ✓ Whenever a point is made — explain it properly: start with the basics, then give an example, then go deeper
+              ✓ Think like an expert, speak like a knowledgeable friend — simple language, zero jargon
+              ✓ Build every concept from zero — never assume the audience already knows
+              ✓ Every major point must have a real, relatable example or analogy
+              ✓ Direct explanation — about the topic itself, not about the conversation
               ✓ Specific examples only — never "imagine a company that..." or generic placeholders
               ✓ Speaker A and B must sound noticeably different from each other
               ✗ BANNED: "Like you said", "As I mentioned", "You make a good point" — no self-referencing
