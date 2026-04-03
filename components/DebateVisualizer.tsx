@@ -109,6 +109,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [nameBadgeStyle, setNameBadgeStyle] = useState<'classic' | 'comic' | 'pill' | 'minimal'>('comic');
   const [nameBadgeColorA, setNameBadgeColorA] = useState('#3b82f6');
   const [nameBadgeColorB, setNameBadgeColorB] = useState('#ef4444');
+  const [nameBadgeColorC, setNameBadgeColorC] = useState('#eab308');
   const [segmentScores, setSegmentScores] = useState<number[]>([]);
   const [showScorecard, setShowScorecard] = useState(false);
   const [scorecardData, setScorecardData] = useState<{ scores: { model: string, score: number }[], average: number } | null>(null);
@@ -675,6 +676,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
         nameBadgeStyle,
         nameBadgeColorA,
         nameBadgeColorB,
+        nameBadgeColorC,
     };
 
     const assets: RenderAssets = {
@@ -713,7 +715,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
       speakerScale, showTimer, showSideStats, showVuMeter, vuMeterStyle, showSpeakerImages, showSpeakers, showScores, backgroundDim, speakerPositions, showNameLabels,
       background, speakerImages, currentSegmentBackground, segmentOffsets, currentSegmentIndex, segmentScores, activeSpeakers, showSettings, globalBackgroundColor, questionMode,
       globalThemeConfig, narratorTextColor, showMinimalSpeakerName, showMinimalSideVU,
-      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB
+      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB, nameBadgeColorC
   ]);
 
   /* OLD RENDER
@@ -2509,6 +2511,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             nameBadgeStyle,
             nameBadgeColorA,
             nameBadgeColorB,
+            nameBadgeColorC,
         };
 
         const videoBlob = await renderVideoOffline({
@@ -3192,26 +3195,36 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                           {/* Badge Colors */}
                           <div className="space-y-2 pt-1 border-t border-white/5">
                             <p className="text-[10px] text-gray-500">Badge Colors</p>
-                            <div className="flex gap-3">
-                              <div className="flex-1 flex items-center gap-2 bg-black/30 rounded-lg p-2">
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ background: nameBadgeColorA }} />
-                                <span className="text-[10px] text-gray-400 flex-1">Speaker 1</span>
+                            <div className="flex gap-2 flex-wrap">
+                              <div className="flex-1 min-w-[80px] flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nameBadgeColorA }} />
+                                <span className="text-[10px] text-gray-400 flex-1">{speakerLabels[0] || 'Speaker 1'}</span>
                                 <input type="color" value={nameBadgeColorA}
                                   onChange={(e) => setNameBadgeColorA(e.target.value)}
                                   className="w-7 h-7 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0"
                                 />
                               </div>
-                              <div className="flex-1 flex items-center gap-2 bg-black/30 rounded-lg p-2">
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ background: nameBadgeColorB }} />
-                                <span className="text-[10px] text-gray-400 flex-1">Speaker 2</span>
+                              <div className="flex-1 min-w-[80px] flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nameBadgeColorB }} />
+                                <span className="text-[10px] text-gray-400 flex-1">{speakerLabels[1] || 'Speaker 2'}</span>
                                 <input type="color" value={nameBadgeColorB}
                                   onChange={(e) => setNameBadgeColorB(e.target.value)}
                                   className="w-7 h-7 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0"
                                 />
                               </div>
+                              {activeSpeakers.length >= 3 && (
+                                <div className="flex-1 min-w-[80px] flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nameBadgeColorC }} />
+                                  <span className="text-[10px] text-gray-400 flex-1">{speakerLabels[2] || 'Speaker 3'}</span>
+                                  <input type="color" value={nameBadgeColorC}
+                                    onChange={(e) => setNameBadgeColorC(e.target.value)}
+                                    className="w-7 h-7 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0"
+                                  />
+                                </div>
+                              )}
                             </div>
                             <button
-                              onClick={() => { setNameBadgeColorA('#3b82f6'); setNameBadgeColorB('#ef4444'); }}
+                              onClick={() => { setNameBadgeColorA('#3b82f6'); setNameBadgeColorB('#ef4444'); setNameBadgeColorC('#eab308'); }}
                               className="text-[10px] text-gray-600 hover:text-gray-300 font-semibold uppercase tracking-wide"
                             >Reset to defaults</button>
                           </div>

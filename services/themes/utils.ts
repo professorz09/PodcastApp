@@ -266,7 +266,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   const badgeCustomColors = [
     config.nameBadgeColorA || themeColors[0],
     config.nameBadgeColorB || themeColors[1],
-    themeColors[2],
+    config.nameBadgeColorC || themeColors[2],
     themeColors[3],
   ];
 

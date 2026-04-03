@@ -28,6 +28,7 @@ export interface VisualConfig {
   nameBadgeStyle?: 'classic' | 'comic' | 'pill' | 'minimal';
   nameBadgeColorA?: string;
   nameBadgeColorB?: string;
+  nameBadgeColorC?: string;
 }
 
 export interface RenderAssets {
