@@ -645,45 +645,45 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Opening 】
-                Topic के सबसे interesting या unexpected angle से शुरू करो।
-                Best approach topic के हिसाब से खुद choose करो — इनमें से एक:
-                → ऐसा fact या statistic जो लोग expect नहीं करते
-                → एक specific relatable scenario जो audience खुद face करती है
-                → एक popular belief जो गलत साबित होने वाली है
-                → एक सवाल जो audience के मन में पहले से है
-                Speaker A hook से शुरू करे → Speaker B deepen करे → curiosity बने।
+                【 Opening — Narrator जैसा intro, Speaker A बोलेगा 】
+                Step 1 — Speaker A एक direct सवाल से शुरू करे जो इस topic से तुरंत जुड़े और audience के मन में उठे।
+                  (जैसे topic "Why women live longer" → "Yaar, kya tune kabhi socha hai ki aurtein aadmiyon se zyada kyu jeeti hain?")
+                  सवाल sharp और topic-specific हो — "Kya tune kabhi socha hai..." generic नहीं।
+                Step 2 — Speaker B topic को briefly introduce करे: 2-3 simple lines में बताए यह topic है क्या।
+                  Clear, no jargon — जैसे किसी को पहली बार बता रहे हो।
+                Step 3 — Speaker A central question पूछे जो पूरी discussion का anchor बनेगा:
+                  Topic के हिसाब से decide करो — "Toh sawaal yeh hai ki [kya yeh sach hai? kyun aisa hota hai? sahi hai ya galat?]"
+                  Har topic का question alag hoga — same pattern नहीं।
 
-                【 Main Explanation 】
-                Topic को जितने concepts में naturally break हो, उतने करो — topic के हिसाब से decide करो।
-                हर point के लिए:
-                → Core idea: 1-2 simple lines में — technical language नहीं
-                → एक SPECIFIC example जो इस exact topic के लिए relevant हो:
-                  • किताब का chapter है → उस chapter की real teaching को story form में
-                  • Biology/science है → body या nature की real mechanism को analogy से
-                  • Social topic है → real-world situation जो लोग face करते हैं
-                  • Finance है → specific numbers और relatable comparisons
-                  • Philosophy/politics है → historical या current event
-                → Speaker A का natural reaction या follow-up question
-                → Speaker B का deeper angle या clarification
+                【 Main Discussion — Direct Perspective Style 】
+                Speakers सीधे topic explain करें — ek ek cheez par।
+                Flow ऐसे हो:
+                → Speaker A एक angle या point directly explain करे — as if woh khud samjha raha ho audience ko
+                → Speaker B उसी baat mein kuch aur add kare, deeper jae, ya ek alag perspective de — directly
+                → Dono seedha topic pe baat karein — "tu yeh bol raha tha" ya "maine ye bola" style bilkul nahi
+                → Har concept ke baad ek specific real example zaroor ho — topic ke hisaab se:
+                  • किताब का chapter → उस chapter की real teaching story form में
+                  • Biology/science → body/nature mechanism analogy से
+                  • Social topic → real situation जो log face karte hain
+                  • Finance → specific numbers और relatable comparisons
+                  • Philosophy/politics → historical या current event
 
-                【 Unexpected Angle — "wait, really?" moment 】
-                Topic से related कोई ऐसी बात जो audience expect नहीं करती।
-                Organic feel हो — forced नहीं।
+                【 Unexpected Angle 】
+                Topic से related कोई ऐसी बात जो audience expect नहीं करती — organic, forced नहीं।
 
                 【 Closing 】
-                Forced summary नहीं। दोनों naturally conversation में main insight पर आएं।
+                Forced summary नहीं। दोनों naturally main insight पर land करें।
                 एक memorable line जो topic का essence capture करे।
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 TONE RULES (strictly follow):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                ✓ Natural reactions: "Yaar sach mein?", "Accha phir?", "Woh toh mujhe pata hi nahi tha"
-                ✓ Specific examples — "Jaise Dhoni ne..." नहीं "Jaise ek cricketer ne..."
+                ✓ Seedha explain karo — jaise koi cheez samjha raha ho, apni baat par nahi
+                ✓ Specific examples — "Jaise Dhoni ne 2011 mein..." nahi "jaise ek cricketer ne..."
                 ✓ दोनों speakers की अलग-अलग voice — एक जैसे मत लगें
-                ✗ BANNED: "यह महत्वपूर्ण है", "इस प्रकार", "आइए समझते हैं", "निष्कर्ष में", "यह ध्यान देने योग्य है"
+                ✗ BANNED: "Jaise tune abhi bola", "Maine ye kaha tha", "Tu sahi keh raha hai isliye" — speakers refer to each other's words nahi karenge
+                ✗ BANNED: "यह महत्वपूर्ण है", "इस प्रकार", "आइए समझते हैं", "निष्कर्ष में"
                 ✗ BANNED: Generic filler — हर line में real information या real reaction
-                ✗ BANNED: दोनों speakers एक जैसी बात अलग-अलग words में बोलें
                 ${durFillHi}
               `;
             }
@@ -1359,43 +1359,45 @@ export const generateDebateScript = async (
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Opening — Hook first 】
-              Lead with the most interesting angle of THIS specific topic. Choose ONE approach that fits best:
-              → A shocking or counterintuitive fact ("Most people think X, but the reality is Y")
-              → A relatable scenario the audience has actually lived through
-              → A question they've definitely wondered about
-              → A popular belief that's about to be turned upside down
-              Speaker A hooks → Speaker B deepens → curiosity builds naturally.
+              【 Opening — Same structure as Narrator intro, but Speaker A delivers it 】
+              Step 1 — Speaker A opens with a direct question tied to THIS specific topic — one the audience immediately wants answered.
+                (e.g. topic "Why women live longer" → "Hey, have you ever actually looked at why women outlive men by almost a decade?")
+                Sharp and topic-specific — not a generic "Have you ever wondered..."
+              Step 2 — Speaker B briefly introduces the topic: 2-3 simple sentences on what it actually is.
+                Clear, no jargon — like explaining to someone who's hearing about it for the first time.
+              Step 3 — Speaker A poses the central question that anchors the whole discussion:
+                Based on what THIS topic calls for — "So the real question is: [Is this actually true? Why does this happen? Is it right or wrong? How do we make sense of this?]"
+                The question type should match the topic — don't force the same pattern every time.
 
-              【 Main Explanation — cover the real content 】
-              Break the topic into as many sections as it naturally needs — let the topic decide, not a fixed number.
-              For each section:
-              → State the core idea in 1-2 simple sentences — no jargon
-              → Give ONE specific, concrete example tailored to THIS exact topic:
+              【 Main Discussion — Direct Perspective Style 】
+              Both speakers explain the topic directly — point by point, perspective by perspective.
+              Flow like this:
+              → Speaker A explains one angle or point directly — as if explaining it to the audience themselves
+              → Speaker B adds to it, goes deeper, or brings a different angle — also directly
+              → Both stay focused on the topic itself — never say "like you just said" or "as I mentioned" — no self-referencing
+              → After each concept, include one specific real example tailored to this exact topic:
                 • Book chapter/law → the real principle illustrated with a specific scenario
                 • Science/biology → a body or nature analogy that makes it click instantly
-                • Social/psychology topic → a real situation people actually face
+                • Social/psychology → a real situation people actually face
                 • Finance → real numbers and relatable comparisons
                 • Philosophy/politics → a historical or current event as the anchor
-              → Speaker A reacts or asks a question the audience would also ask
-              → Speaker B explains further or adds a nuanced angle
 
-              【 One unexpected turn — the "wait, really?" moment 】
-              An angle, implication, or connection the audience didn't see coming. Feels organic, not forced.
+              【 Unexpected Angle 】
+              Something about the topic the audience didn't see coming — organic, not forced.
 
               【 Closing 】
-              Both speakers land naturally on the key takeaway through conversation — no forced "in conclusion."
-              End with one memorable line that captures the essence of the topic.
+              No forced summary. Both speakers land naturally on the key insight through conversation.
+              End with one memorable line that captures the real essence of the topic.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               TONE & LANGUAGE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              ✓ Natural conversation — like two people who've genuinely thought about this topic
+              ✓ Direct explanation — like explaining the thing itself, not talking about the conversation
               ✓ Specific examples only — never "imagine a company that..." or generic placeholders
               ✓ Speaker A and B must sound noticeably different from each other
-              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", "This is significant", "Furthermore", "It is worth mentioning"
-              ✗ BANNED: Both speakers echoing the same point in different words
-              ✗ BANNED: Any filler — every line must add real information or authentic human reaction
+              ✗ BANNED: "Like you said", "As I mentioned", "You make a good point" — no self-referencing
+              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", "This is significant", "Furthermore"
+              ✗ BANNED: Any filler — every line must add real information or an authentic human reaction
               ${durFillEn}
             `;
           }
