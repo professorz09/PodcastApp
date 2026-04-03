@@ -6,14 +6,17 @@ export const neonTheme: Theme = {
   name: 'Neon',
   description: 'Cyberpunk style with glowing text and borders.',
   properties: [
-    { id: 'glowColorA',      label: 'Glow Color A',          type: 'color',   defaultValue: '#00ff00' },
-    { id: 'glowColorB',      label: 'Glow Color B',          type: 'color',   defaultValue: '#ff0000' },
-    { id: 'showBar',         label: 'Show Top Bar',           type: 'boolean', defaultValue: true },
-    { id: 'barColor',        label: 'Bar Color',              type: 'color',   defaultValue: 'rgba(0,0,0,0.8)' },
-    { id: 'scoreStyle',      label: 'Score Style',            type: 'select',  defaultValue: 'neon-badge',
+    { id: 'glowColorA',       label: 'Glow Color A',               type: 'color',   defaultValue: '#00ff00' },
+    { id: 'glowColorB',       label: 'Glow Color B',               type: 'color',   defaultValue: '#ff0000' },
+    { id: 'showBar',          label: 'Show Top Bar',                type: 'boolean', defaultValue: true },
+    { id: 'barColor',         label: 'Bar Color',                   type: 'color',   defaultValue: 'rgba(0,0,0,0.88)' },
+    { id: 'speakerShape',     label: 'Speaker Shape',               type: 'select',  defaultValue: 'circle',
+      options: ['circle', 'rect', 'hexagon'] },
+    { id: 'showSpeakerLabel', label: 'Speaker Name Below Circle',   type: 'boolean', defaultValue: true },
+    { id: 'scoreStyle',       label: 'Score Style',                 type: 'select',  defaultValue: 'neon-badge',
       options: ['neon-badge', 'glitch', 'dots', 'bar'] },
-    { id: 'scorePosition',   label: 'Score Position',         type: 'select',  defaultValue: 'top',
-      options: ['top', 'bottom'] },
+    { id: 'scorePosition',    label: 'Score Position',              type: 'select',  defaultValue: 'bottom',
+      options: ['top-bar', 'bottom'] },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -23,355 +26,462 @@ export const neonTheme: Theme = {
 
     const isPlaying = true;
     const { speakerIds, speakerLabels, speakerPositions } = config;
-    
-    const showSpeakers = config.showSpeakers;
-    const showBar = themeConfig?.showBar !== undefined ? themeConfig.showBar : true;
-    const scoreStyle: string = themeConfig?.scoreStyle || 'neon-badge';
-    const scorePosition: string = themeConfig?.scorePosition || 'top';
 
-    // Background
-    drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
-
-    // Top Bar
-    if (showBar) {
-        ctx.fillStyle = themeConfig?.barColor || 'rgba(0,0,0,0.8)';
-        ctx.fillRect(0, 0, canvasWidth, 80);
-    }
-
-    // Timer
-    if (config.showTimer) {
-         ctx.fillStyle = '#fff';
-         ctx.font = 'bold 32px sans-serif';
-         ctx.textAlign = 'center';
-         ctx.textBaseline = 'middle';
-         ctx.shadowColor = '#0ff';
-         ctx.shadowBlur = 10;
-
-         if (currentSegment.speaker === 'Narrator') {
-             if (!(config.showSubtitles && config.subtitleBackground)) {
-                 ctx.fillText('NARRATOR', canvasWidth / 2, 40);
-             }
-         } else {
-             const segmentStartTime = context.segmentOffsets[currentSegmentIndex] || 0;
-             const segmentEndTime = context.segmentOffsets[currentSegmentIndex + 1] || context.totalDuration;
-             const segmentDuration = Math.max(0, segmentEndTime - segmentStartTime);
-             const segmentElapsed = Math.max(0, time - segmentStartTime);
-             const timeLeft = Math.max(0, Math.ceil(segmentDuration - segmentElapsed));
-             ctx.fillText(`${timeLeft}s`, canvasWidth / 2, 40);
-         }
-         ctx.shadowBlur = 0;
-    }
-
-    const drawNeonText = (text: string, x: number, color: string, active: boolean) => {
-        ctx.font = 'bold 48px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = active ? '#fff' : '#333';
-        if (active) {
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 20;
-            ctx.fillText(text, x, 40);
-        } else {
-            ctx.shadowBlur = 0;
-            ctx.fillText(text, x, 40);
-        }
-        ctx.shadowBlur = 0;
-    };
-
-    // Speakers (Circles)
-    const baseRadius = 80 * config.speakerScale;
-    const pulseIntensity = 10;
-
-    const drawSpeaker = (xPct: number, yPct: number, isActive: boolean, color: string, image: HTMLImageElement | null, label: string) => {
-      const x = xPct * canvasWidth;
-      const y = yPct * canvasHeight;
-      const pulse = isActive ? pulseIntensity * audioLevel : 0;
-      
-      if (isActive) {
-          ctx.beginPath();
-          ctx.arc(x, y, baseRadius + pulse + 10, 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.globalAlpha = 0.3;
-          ctx.fill();
-          ctx.globalAlpha = 1.0;
-          
-          ctx.beginPath();
-          ctx.arc(x, y, baseRadius + pulse, 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.fill();
-      }
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
-      ctx.clip();
-      
-      if (image) {
-          const scale = Math.max((baseRadius * 2) / image.width, (baseRadius * 2) / image.height);
-          const imgW = image.width * scale;
-          const imgH = image.height * scale;
-          ctx.drawImage(image, x - imgW/2, y - imgH/2, imgW, imgH);
-      } else {
-          ctx.fillStyle = '#1e293b';
-          ctx.fill();
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 64px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(label.charAt(0).toUpperCase(), x, y);
-      }
-      ctx.restore();
-      
-      ctx.beginPath();
-      ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = isActive ? color : '#1a2a1a';
-      ctx.shadowColor = isActive ? color : 'transparent';
-      ctx.shadowBlur = isActive ? 15 + audioLevel * 20 : 0;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // VU Meter Ring
-      if (config.showVuMeter && isActive && config.vuMeterStyle === 'ring') {
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(x, y, baseRadius + 15 + (audioLevel * 40), 0, Math.PI * 2);
-          ctx.shadowBlur = 10 + (audioLevel * 40);
-          ctx.shadowColor = color;
-          ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + (audioLevel * 0.7)})`;
-          ctx.lineWidth = 4 + (audioLevel * 16);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(x, y, baseRadius + 25 + (audioLevel * 60), 0, Math.PI * 2);
-          ctx.strokeStyle = color;
-          ctx.globalAlpha = 0.2 * audioLevel;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          ctx.restore();
-      }
-    };
+    const showSpeakers      = config.showSpeakers;
+    const showBar           = themeConfig?.showBar !== undefined ? themeConfig.showBar : true;
+    const speakerShape      = themeConfig?.speakerShape || 'circle';
+    const showSpeakerLabel  = themeConfig?.showSpeakerLabel !== undefined ? themeConfig.showSpeakerLabel : true;
+    const scoreStyle        = themeConfig?.scoreStyle || 'neon-badge';
+    const scorePosition     = themeConfig?.scorePosition || 'bottom';
+    const BAR_H             = 80;
 
     const colors = [
         themeConfig?.glowColorA || '#00ff00',
         themeConfig?.glowColorB || '#ff0000',
         '#3b82f6',
-        '#eab308'
+        '#eab308',
     ];
 
+    // ── Background ─────────────────────────────────────────────────
+    drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
+
+    // ── Top Bar ────────────────────────────────────────────────────
+    if (showBar) {
+        ctx.fillStyle = themeConfig?.barColor || 'rgba(0,0,0,0.88)';
+        ctx.fillRect(0, 0, canvasWidth, BAR_H);
+
+        // Thin neon bottom border on bar
+        const barBorderColor = themeConfig?.glowColorA || '#00ff00';
+        ctx.save();
+        ctx.strokeStyle = barBorderColor;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = barBorderColor;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(0, BAR_H); ctx.lineTo(canvasWidth, BAR_H);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // ── Timer (center of top bar) ───────────────────────────────────
+    if (config.showTimer) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = '#0ff';
+        ctx.shadowBlur = 12;
+
+        if (currentSegment.speaker === 'Narrator') {
+            if (!(config.showSubtitles && config.subtitleBackground)) {
+                ctx.fillText('NARRATOR', canvasWidth / 2, BAR_H / 2);
+            }
+        } else {
+            const segEnd = context.segmentOffsets[currentSegmentIndex + 1] || context.totalDuration;
+            const timeLeft = Math.max(0, Math.ceil(segEnd - time));
+            ctx.fillText(`${timeLeft}s`, canvasWidth / 2, BAR_H / 2);
+        }
+        ctx.shadowBlur = 0;
+    }
+
+    // ── Speaker names in top-bar (left / right halves) ─────────────
     speakerIds.forEach((id, index) => {
         const isSpeaking = isPlaying && currentSegment.speaker === id;
         const label = speakerLabels[index] || id;
-        const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
         const color = colors[index % colors.length];
-        
-        drawNeonText(label, pos.x * canvasWidth, color, isSpeaking);
+        const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
 
-        if (showSpeakers) {
-            drawSpeaker(pos.x, pos.y, isSpeaking, color, config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null, label);
-        }
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
+        ctx.shadowColor = isSpeaking ? color : 'transparent';
+        ctx.shadowBlur = isSpeaking ? 18 : 0;
+        ctx.fillText(label.toUpperCase(), pos.x * canvasWidth, BAR_H / 2);
+        ctx.shadowBlur = 0;
     });
+
+    // ── Speaker draw (circle / rect / hexagon) ─────────────────────
+    const baseRadius = 80 * config.speakerScale;
+
+    const drawHexPath = (x: number, y: number, r: number) => {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 180) * (60 * i - 30);
+            const px = x + r * Math.cos(angle);
+            const py = y + r * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+    };
+
+    const drawSpeaker = (xPct: number, yPct: number, isActive: boolean, color: string, image: HTMLImageElement | null, label: string) => {
+        const x = xPct * canvasWidth;
+        const y = yPct * canvasHeight;
+        const pulse = isActive ? 10 * audioLevel : 0;
+
+        if (speakerShape === 'rect') {
+            // ── Rect ──────────────────────────────────────
+            const w = (baseRadius * 2.2) + pulse;
+            const h = (baseRadius * 2.8) + pulse;
+            const rx = x - w / 2, ry = y - h / 2;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(rx, ry, w, h, 16);
+            ctx.clip();
+            if (image) {
+                const s = Math.max(w / image.width, h / image.height);
+                ctx.drawImage(image, x - image.width * s / 2, y - image.height * s / 2, image.width * s, image.height * s);
+            } else {
+                ctx.fillStyle = '#0a0f0a';
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = `bold ${baseRadius * 0.7}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label.charAt(0).toUpperCase(), x, y);
+            }
+            ctx.restore();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(rx, ry, w, h, 16);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = isActive ? 3 : 1.5;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = isActive ? 20 + audioLevel * 25 : 6;
+            ctx.stroke();
+            ctx.restore();
+
+            if (showSpeakerLabel) {
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 18px monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.shadowColor = color; ctx.shadowBlur = 10;
+                ctx.fillText(label.toUpperCase(), x, ry + h + 10);
+                ctx.restore();
+            }
+
+        } else if (speakerShape === 'hexagon') {
+            // ── Hexagon ───────────────────────────────────
+            const r = baseRadius + pulse * 0.6;
+
+            ctx.save();
+            drawHexPath(x, y, r);
+            ctx.clip();
+            if (image) {
+                const s = Math.max((r * 2) / image.width, (r * 2) / image.height);
+                ctx.drawImage(image, x - image.width * s / 2, y - image.height * s / 2, image.width * s, image.height * s);
+            } else {
+                ctx.fillStyle = '#0a0f0a';
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = `bold ${r * 0.65}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label.charAt(0).toUpperCase(), x, y);
+            }
+            ctx.restore();
+
+            ctx.save();
+            drawHexPath(x, y, r);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = isActive ? 3 : 1.5;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = isActive ? 22 + audioLevel * 28 : 6;
+            ctx.stroke();
+            ctx.restore();
+
+            // Outer ring VU
+            if (isActive && config.showVuMeter) {
+                ctx.save();
+                drawHexPath(x, y, r + 14 + audioLevel * 24);
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = 0.3 + audioLevel * 0.5;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = color; ctx.shadowBlur = 14;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            if (showSpeakerLabel) {
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 18px monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.shadowColor = color; ctx.shadowBlur = 10;
+                ctx.fillText(label.toUpperCase(), x, y + r + 12);
+                ctx.restore();
+            }
+
+        } else {
+            // ── Circle (default) ───────────────────────────
+            if (isActive) {
+                ctx.beginPath();
+                ctx.arc(x, y, baseRadius + pulse + 10, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.25;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                ctx.beginPath();
+                ctx.arc(x, y, baseRadius + pulse, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.15;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
+            ctx.clip();
+            if (image) {
+                const scale = Math.max((baseRadius * 2) / image.width, (baseRadius * 2) / image.height);
+                ctx.drawImage(image, x - image.width * scale / 2, y - image.height * scale / 2, image.width * scale, image.height * scale);
+            } else {
+                ctx.fillStyle = '#0a0f0a';
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 64px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label.charAt(0).toUpperCase(), x, y);
+            }
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
+            ctx.lineWidth = isActive ? 4 : 1.5;
+            ctx.strokeStyle = color;
+            ctx.shadowColor = isActive ? color : 'transparent';
+            ctx.shadowBlur = isActive ? 20 + audioLevel * 25 : 0;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            if (config.showVuMeter && isActive && config.vuMeterStyle === 'ring') {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x, y, baseRadius + 15 + audioLevel * 40, 0, Math.PI * 2);
+                ctx.shadowBlur = 10 + audioLevel * 40;
+                ctx.shadowColor = color;
+                ctx.strokeStyle = `rgba(255,255,255,${0.3 + audioLevel * 0.7})`;
+                ctx.lineWidth = 4 + audioLevel * 16;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(x, y, baseRadius + 25 + audioLevel * 60, 0, Math.PI * 2);
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = 0.2 * audioLevel;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            if (showSpeakerLabel) {
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 18px monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.shadowColor = color; ctx.shadowBlur = 10;
+                ctx.fillText(label.toUpperCase(), x, y + baseRadius + 12);
+                ctx.restore();
+            }
+        }
+    };
+
+    if (showSpeakers) {
+        speakerIds.forEach((id, index) => {
+            const isSpeaking = isPlaying && currentSegment.speaker === id;
+            const label = speakerLabels[index] || id;
+            const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
+            const color = colors[index % colors.length];
+            drawSpeaker(pos.x, pos.y, isSpeaking, color,
+                config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null, label);
+        });
+    }
 
     // Side Stats
     drawSideStats(ctx, context);
 
-    // ── Neon Score Boxes (custom, theme-matched) ────────────────────
+    // ── Neon Score Display ─────────────────────────────────────────
     if (config.showScores && context.scores && speakerIds.length >= 2) {
         const scoreA = context.scores.scoreA;
         const scoreB = context.scores.scoreB;
-        const colorA = themeConfig?.glowColorA || '#00ff00';
-        const colorB = themeConfig?.glowColorB || '#ff0000';
+        const colorA = colors[0];
+        const colorB = colors[1];
         const labelA = speakerLabels?.[0] || speakerIds[0] || 'A';
         const labelB = speakerLabels?.[1] || speakerIds[1] || 'B';
 
-        const isBottom = scorePosition === 'bottom';
-        const posY = isBottom ? canvasHeight - 100 : 18;
+        if (scorePosition === 'top-bar') {
+            // ── Integrated into top bar ──────────────────
+            // Already positioned: speaker names are in bar; add score as small badge next to name
+            const drawBarScore = (isLeft: boolean, score: string, color: string, label: string) => {
+                const spkIdx = isLeft ? 0 : 1;
+                const pos = speakerPositions[spkIdx] || { x: isLeft ? 0.25 : 0.75, y: 0.5 };
+                const cx = pos.x * canvasWidth;
+                const badgeW = 52, badgeH = 28;
+                const bx = isLeft ? cx + 60 : cx - 60 - badgeW;
+                const by = (BAR_H - badgeH) / 2;
 
-        const drawNeonScoreBox = (isLeft: boolean, score: string, color: string, label: string) => {
-            const margin = 18;
-
-            if (scoreStyle === 'neon-badge') {
-                // ── Neon Badge style ─────────────────────────
-                const boxW = 150, boxH = 68;
-                const x = isLeft ? margin : canvasWidth - margin - boxW;
-                const y = posY;
-
-                // Outer neon glow
                 ctx.save();
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 28;
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
                 ctx.beginPath();
-                ctx.roundRect(x, y, boxW, boxH, 6);
-                ctx.stroke();
-                ctx.restore();
-
-                // Dark fill
-                ctx.fillStyle = 'rgba(0,0,0,0.88)';
-                ctx.beginPath();
-                ctx.roundRect(x, y, boxW, boxH, 6);
+                ctx.roundRect(bx, by, badgeW, badgeH, 6);
                 ctx.fill();
 
-                // Corner accent lines
-                ctx.save();
                 ctx.strokeStyle = color;
-                ctx.lineWidth = 3;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 15;
-                const corner = 14;
-                // top-left
-                ctx.beginPath(); ctx.moveTo(x + corner, y); ctx.lineTo(x, y); ctx.lineTo(x, y + corner); ctx.stroke();
-                // top-right
-                ctx.beginPath(); ctx.moveTo(x + boxW - corner, y); ctx.lineTo(x + boxW, y); ctx.lineTo(x + boxW, y + corner); ctx.stroke();
-                // bottom-left
-                ctx.beginPath(); ctx.moveTo(x + corner, y + boxH); ctx.lineTo(x, y + boxH); ctx.lineTo(x, y + boxH - corner); ctx.stroke();
-                // bottom-right
-                ctx.beginPath(); ctx.moveTo(x + boxW - corner, y + boxH); ctx.lineTo(x + boxW, y + boxH); ctx.lineTo(x + boxW, y + boxH - corner); ctx.stroke();
-                ctx.restore();
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = color; ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.roundRect(bx, by, badgeW, badgeH, 6);
+                ctx.stroke();
 
-                // Label
-                ctx.fillStyle = color;
-                ctx.font = 'bold 11px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 8;
-                ctx.fillText(label.toUpperCase(), x + boxW / 2, y + 8);
-                ctx.shadowBlur = 0;
-
-                // Score
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 30px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 20;
-                ctx.fillText(score, x + boxW / 2, y + boxH / 2 + 8);
-                ctx.shadowBlur = 0;
-
-            } else if (scoreStyle === 'glitch') {
-                // ── Glitch style ──────────────────────────────
-                const boxW = 130, boxH = 56;
-                const x = isLeft ? margin : canvasWidth - margin - boxW;
-                const y = posY;
-
-                // Glitch offset layers
-                const glitchOffset = Math.sin(time * 12) * 2;
-                ctx.save();
-                ctx.globalAlpha = 0.4;
-                ctx.fillStyle = color;
-                ctx.font = 'bold 34px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(score, x + boxW / 2 + glitchOffset, y + boxH / 2);
-                ctx.fillStyle = '#ff00ff';
-                ctx.fillText(score, x + boxW / 2 - glitchOffset, y + boxH / 2);
-                ctx.globalAlpha = 1;
-                ctx.restore();
-
-                // Dark bg
-                ctx.fillStyle = 'rgba(0,0,0,0.75)';
-                ctx.fillRect(x, y, boxW, boxH);
-
-                // Scanline effect
-                for (let sy = y; sy < y + boxH; sy += 4) {
-                    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-                    ctx.fillRect(x, sy, boxW, 2);
-                }
-
-                // Score
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 30px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 18;
-                ctx.fillText(score, x + boxW / 2, y + boxH / 2);
-                ctx.shadowBlur = 0;
+                ctx.font = 'bold 16px monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.shadowColor = color; ctx.shadowBlur = 12;
+                ctx.fillText(score, bx + badgeW / 2, by + badgeH / 2);
+                ctx.restore();
+            };
 
-                // Label
-                ctx.fillStyle = color;
-                ctx.font = 'bold 10px monospace';
-                ctx.textAlign = isLeft ? 'left' : 'right';
-                ctx.textBaseline = 'top';
-                ctx.fillText(label.toUpperCase(), isLeft ? x + 4 : x + boxW - 4, y + 4);
+            drawBarScore(true,  scoreA, colorA, labelA);
+            drawBarScore(false, scoreB, colorB, labelB);
 
-            } else if (scoreStyle === 'dots') {
-                // ── Dots style (segment tracker) ─────────────
-                const maxDots = 10;
-                const scoreNum = parseFloat(score) || 0;
-                const filledDots = Math.round((scoreNum / 10) * maxDots);
-                const dotR = 9;
-                const dotGap = 6;
-                const totalW = maxDots * (dotR * 2) + (maxDots - 1) * dotGap;
-                const startX = isLeft ? margin : canvasWidth - margin - totalW;
-                const centerY = posY + dotR;
+        } else {
+            // ── Bottom corners ────────────────────────────
+            const posY = canvasHeight - 110;
+            const margin = 20;
 
-                // Label
-                ctx.fillStyle = color;
-                ctx.font = 'bold 11px monospace';
-                ctx.textAlign = isLeft ? 'left' : 'right';
-                ctx.textBaseline = 'bottom';
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 8;
-                ctx.fillText(`${label.toUpperCase()} · ${score}`, isLeft ? startX : startX + totalW, centerY - dotR - 4);
-                ctx.shadowBlur = 0;
+            const drawBottomScore = (isLeft: boolean, score: string, color: string, label: string) => {
 
-                for (let d = 0; d < maxDots; d++) {
-                    const dotX = startX + d * (dotR * 2 + dotGap) + dotR;
-                    const isFilled = d < filledDots;
-                    ctx.beginPath();
-                    ctx.arc(dotX, centerY, dotR, 0, Math.PI * 2);
-                    ctx.fillStyle = isFilled ? color : 'rgba(255,255,255,0.08)';
-                    ctx.shadowColor = isFilled ? color : 'transparent';
-                    ctx.shadowBlur = isFilled ? 12 : 0;
-                    ctx.fill();
+                if (scoreStyle === 'neon-badge') {
+                    const boxW = 150, boxH = 68;
+                    const x = isLeft ? margin : canvasWidth - margin - boxW;
+                    const y = posY;
+
+                    ctx.save();
+                    ctx.shadowColor = color; ctx.shadowBlur = 28;
+                    ctx.strokeStyle = color; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.roundRect(x, y, boxW, boxH, 6); ctx.stroke();
+                    ctx.restore();
+
+                    ctx.fillStyle = 'rgba(0,0,0,0.88)';
+                    ctx.beginPath(); ctx.roundRect(x, y, boxW, boxH, 6); ctx.fill();
+
+                    // Corner brackets
+                    ctx.save();
+                    ctx.strokeStyle = color; ctx.lineWidth = 3;
+                    ctx.shadowColor = color; ctx.shadowBlur = 15;
+                    const c = 14;
+                    ctx.beginPath(); ctx.moveTo(x+c,y); ctx.lineTo(x,y); ctx.lineTo(x,y+c); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x+boxW-c,y); ctx.lineTo(x+boxW,y); ctx.lineTo(x+boxW,y+c); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x+c,y+boxH); ctx.lineTo(x,y+boxH); ctx.lineTo(x,y+boxH-c); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x+boxW-c,y+boxH); ctx.lineTo(x+boxW,y+boxH); ctx.lineTo(x+boxW,y+boxH-c); ctx.stroke();
+                    ctx.restore();
+
+                    ctx.fillStyle = color;
+                    ctx.font = 'bold 11px monospace';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                    ctx.shadowColor = color; ctx.shadowBlur = 8;
+                    ctx.fillText(label.toUpperCase(), x + boxW/2, y + 8);
+                    ctx.shadowBlur = 0;
+
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 30px monospace';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.shadowColor = color; ctx.shadowBlur = 20;
+                    ctx.fillText(score, x + boxW/2, y + boxH/2 + 8);
+                    ctx.shadowBlur = 0;
+
+                } else if (scoreStyle === 'glitch') {
+                    const boxW = 140, boxH = 58;
+                    const x = isLeft ? margin : canvasWidth - margin - boxW;
+                    const y = posY;
+                    const g = Math.sin(time * 14) * 2.5;
+
+                    ctx.fillStyle = 'rgba(0,0,0,0.78)';
+                    ctx.fillRect(x, y, boxW, boxH);
+                    for (let sy = y; sy < y + boxH; sy += 4) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                        ctx.fillRect(x, sy, boxW, 2);
+                    }
+
+                    ctx.save();
+                    ctx.globalAlpha = 0.35;
+                    ctx.font = 'bold 32px monospace';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillStyle = colorA; ctx.fillText(score, x+boxW/2+g, y+boxH/2);
+                    ctx.fillStyle = colorB; ctx.fillText(score, x+boxW/2-g, y+boxH/2);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 30px monospace';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.shadowColor = color; ctx.shadowBlur = 16;
+                    ctx.fillText(score, x + boxW/2, y + boxH/2);
+                    ctx.shadowBlur = 0;
+
+                    ctx.fillStyle = color; ctx.font = 'bold 10px monospace';
+                    ctx.textAlign = isLeft ? 'left' : 'right'; ctx.textBaseline = 'top';
+                    ctx.fillText(label.toUpperCase(), isLeft ? x+4 : x+boxW-4, y+4);
+
+                } else if (scoreStyle === 'dots') {
+                    const maxDots = 10;
+                    const scoreNum = parseFloat(score) || 0;
+                    const filled = Math.round((scoreNum / 10) * maxDots);
+                    const dotR = 10, dotGap = 7;
+                    const totalW = maxDots*(dotR*2) + (maxDots-1)*dotGap;
+                    const startX = isLeft ? margin : canvasWidth - margin - totalW;
+                    const cy = posY + dotR;
+
+                    ctx.fillStyle = color; ctx.font = 'bold 12px monospace';
+                    ctx.textAlign = isLeft ? 'left' : 'right'; ctx.textBaseline = 'bottom';
+                    ctx.shadowColor = color; ctx.shadowBlur = 8;
+                    ctx.fillText(`${label.toUpperCase()} · ${score}`, isLeft ? startX : startX+totalW, cy - dotR - 6);
+                    ctx.shadowBlur = 0;
+
+                    for (let d = 0; d < maxDots; d++) {
+                        const dx = startX + d*(dotR*2+dotGap) + dotR;
+                        const lit = d < filled;
+                        ctx.beginPath();
+                        ctx.arc(dx, cy, dotR, 0, Math.PI*2);
+                        ctx.fillStyle = lit ? color : 'rgba(255,255,255,0.07)';
+                        ctx.shadowColor = lit ? color : 'transparent';
+                        ctx.shadowBlur = lit ? 14 : 0;
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+
+                } else if (scoreStyle === 'bar') {
+                    const barW = 20, barMaxH = 90;
+                    const scoreNum = parseFloat(score) || 0;
+                    const fillH = (scoreNum / 10) * barMaxH;
+                    const x = isLeft ? margin : canvasWidth - margin - barW;
+                    const barTop = posY;
+                    const barBottom = posY + barMaxH;
+
+                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                    ctx.beginPath(); ctx.roundRect(x, barTop, barW, barMaxH, 4); ctx.fill();
+
+                    ctx.save();
+                    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 16;
+                    ctx.beginPath(); ctx.roundRect(x, barBottom-fillH, barW, fillH, 4); ctx.fill();
+                    ctx.restore();
+
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px monospace';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                    ctx.fillText(score, x+barW/2, barBottom+6);
+
+                    ctx.fillStyle = color; ctx.font = 'bold 10px monospace';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                    ctx.shadowColor = color; ctx.shadowBlur = 8;
+                    ctx.fillText(label.slice(0,4).toUpperCase(), x+barW/2, barTop-4);
                     ctx.shadowBlur = 0;
                 }
+            };
 
-            } else if (scoreStyle === 'bar') {
-                // ── Bar style ─────────────────────────────────
-                const barW = 18;
-                const barMaxH = 100;
-                const scoreNum = parseFloat(score) || 0;
-                const fillH = (scoreNum / 10) * barMaxH;
-                const x = isLeft ? margin : canvasWidth - margin - barW;
-                const barBottom = posY + barMaxH;
-
-                // Track
-                ctx.fillStyle = 'rgba(255,255,255,0.07)';
-                ctx.beginPath();
-                ctx.roundRect(x, posY, barW, barMaxH, 4);
-                ctx.fill();
-
-                // Fill
-                ctx.save();
-                ctx.fillStyle = color;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.roundRect(x, barBottom - fillH, barW, fillH, 4);
-                ctx.fill();
-                ctx.restore();
-
-                // Score text
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 14px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                ctx.fillText(score, x + barW / 2, barBottom + 6);
-
-                // Label
-                ctx.fillStyle = color;
-                ctx.font = 'bold 10px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText(label.slice(0, 3).toUpperCase(), x + barW / 2, posY - 4);
-            }
-        };
-
-        drawNeonScoreBox(true,  scoreA, colorA, labelA);
-        drawNeonScoreBox(false, scoreB, colorB, labelB);
+            drawBottomScore(true,  scoreA, colorA, labelA);
+            drawBottomScore(false, scoreB, colorB, labelB);
+        }
     }
 
     // Subtitles
