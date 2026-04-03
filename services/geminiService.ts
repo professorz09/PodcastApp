@@ -1324,11 +1324,22 @@ export const generateDebateScript = async (
               }
 
               ══════════════════════════════════════════
-              【 NARRATOR — OPENING 】
+              【 NARRATOR — OPENING (SHOW FORMAT) 】
               ══════════════════════════════════════════
-              Narrator ek vivid, relatable USA-based scenario paint karta hai — seedha audience se ("aap")।
-              Age, salary, city, job — sab khud pick karo jo topic ke liye realistic lage।
-              Ek sharp specific question se Experts ko hand over karo। Bas — koi lecture nahi।
+              Narrator EXACTLY is structure mein shuru kare:
+
+              Line 1 — seedha topic introduce karo:
+              "Aaj hum baat karenge [TOPIC] ke baare mein।"
+              (topic ka naam clearly pehli line mein — koi buildup nahi)
+
+              Line 2-3 — us specific person ko introduce karo jisne yeh question poochha hai:
+              "Yeh sawaal hai [NAME] ka। Wo [CITY] mein rehte hain, ek [JOB] hain, aur unka sawaal hai — [SPECIFIC QUESTION RELATED TO TOPIC]।"
+              Person ki identity topic ke hisaab se realistic choose karo — age, job, city, family situation।
+
+              Line 4 — Experts ko hand over karo:
+              "Aaj hamare paas hain [Expert 1 naam] aur [Expert 2 naam] — aao dekhte hain kya kehna hai inhe।"
+
+              Bas — Narrator ka kaam yahan khatam। Beech mein nahi aayega।
 
               ══════════════════════════════════════════
               【 MAIN DISCUSSION — Dono Experts 】
@@ -1864,12 +1875,22 @@ export const generateDebateScript = async (
             }
 
             ══════════════════════════════════════════
-            【 NARRATOR — OPENING 】
+            【 NARRATOR — OPENING (SHOW FORMAT) 】
             ══════════════════════════════════════════
-            Narrator paints a vivid, relatable USA-based scenario — speak directly to the viewer ("you").
-            Age, salary, city, job, family situation — pick whatever fits this topic most realistically.
-            Raise one sharp specific financial problem tied to the topic.
-            Hand off to the Experts with one focused question. That's it — no lecture.
+            Narrator opens EXACTLY in this structure:
+
+            Line 1 — name the topic directly:
+            "Today we're talking about [TOPIC]."
+            (topic first — no warmup, no buildup)
+
+            Line 2-3 — introduce the specific person who asked this question:
+            "This question comes from [NAME]. [He/She] lives in [CITY], works as a [JOB], and wants to know — [SPECIFIC QUESTION TIED TO TOPIC]."
+            Pick a realistic person — age, job, city, family situation that fits this topic.
+
+            Line 4 — hand off to experts:
+            "Joining us today are [Expert 1 name] and [Expert 2 name] — let's hear what they have to say."
+
+            That's it — Narrator does NOT come back in the middle.
 
             ══════════════════════════════════════════
             【 MAIN DISCUSSION — Both Experts 】
