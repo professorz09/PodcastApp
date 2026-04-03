@@ -9,7 +9,7 @@ export interface DrawContext {
   segmentOffsets: number[];
   currentSegmentIndex: number;
   totalDuration: number;
-  scores: { scoreA: string; scoreB: string; scoreC?: string };
+  scores: { scoreA: string; scoreB: string };
   config: VisualConfig;
   assets: RenderAssets;
   themeConfig: any; // Theme-specific config

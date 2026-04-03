@@ -1,5 +1,5 @@
 import { Theme, DrawContext } from './types';
-import { drawBackground, drawSubtitles, drawSideStats, drawScores, drawDebatePointCounter } from './utils';
+import { drawBackground, drawSubtitles, drawSideStats, drawScores } from './utils';
 
 export const neonTheme: Theme = {
   id: 'neon',
@@ -10,10 +10,6 @@ export const neonTheme: Theme = {
     { id: 'glowColorB', label: 'Glow Color B', type: 'color', defaultValue: '#ff0000' },
     { id: 'showBar', label: 'Show Top Bar', type: 'boolean', defaultValue: true },
     { id: 'barColor', label: 'Bar Color', type: 'color', defaultValue: 'rgba(0,0,0,0.8)' },
-    { id: 'showPointCounter', label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
-    { id: 'counterPosition',  label: 'Counter Position', type: 'select', defaultValue: 'side', options: ['side', 'bottom'] },
-    { id: 'counterStyle',     label: 'Counter Style', type: 'select', defaultValue: 'bars', options: ['bars', 'dots', 'numbers'] },
-    { id: 'counterMax',       label: 'Max Dots/Bars', type: 'number', defaultValue: 6, min: 1, max: 20 },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -187,7 +183,6 @@ export const neonTheme: Theme = {
     // Scores
     drawScores(ctx, context);
 
-    drawDebatePointCounter(ctx, context);
     // Subtitles
     drawSubtitles(ctx, context);
   }

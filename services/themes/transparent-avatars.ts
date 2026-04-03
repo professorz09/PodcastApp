@@ -1,5 +1,5 @@
 import { Theme, DrawContext } from './types';
-import { drawBackground, drawSubtitles, drawDebatePointCounter } from './utils';
+import { drawBackground, drawSubtitles } from './utils';
 
 export const transparentAvatarsTheme: Theme = {
   id: 'transparent-avatars',
@@ -16,10 +16,6 @@ export const transparentAvatarsTheme: Theme = {
     { id: 'showSpeakerNames', label: 'Show Speaker Names', type: 'boolean', defaultValue: true },
     { id: 'showScores', label: 'Show Scores', type: 'boolean', defaultValue: false },
     { id: 'subtitleBoxStyle', label: 'Subtitle Box Style', type: 'select', defaultValue: 'comic', options: ['comic', 'classic', 'minimal'] },
-    { id: 'showPointCounter', label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
-    { id: 'counterPosition',  label: 'Counter Position', type: 'select', defaultValue: 'side', options: ['side', 'bottom'] },
-    { id: 'counterStyle',     label: 'Counter Style', type: 'select', defaultValue: 'bars', options: ['bars', 'dots', 'numbers'] },
-    { id: 'counterMax',       label: 'Max Dots/Bars', type: 'number', defaultValue: 6, min: 1, max: 20 },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -398,7 +394,6 @@ export const transparentAvatarsTheme: Theme = {
         drawSpeakerNames();
     }
 
-    drawDebatePointCounter(ctx, context);
     // Subtitles
     drawSubtitles(ctx, context);
   }

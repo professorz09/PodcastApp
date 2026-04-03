@@ -1,5 +1,5 @@
 import { Theme, DrawContext } from './types';
-import { drawBackground, drawSubtitles, drawDebatePointCounter } from './utils';
+import { drawBackground, drawSubtitles } from './utils';
 
 export const arenaTheme: Theme = {
   id: 'arena',
@@ -13,10 +13,6 @@ export const arenaTheme: Theme = {
     { id: 'focusActiveSpeaker', label: '🎙 Sirf Bolne Wala Dikhao (Narrator pe dono hide)', type: 'boolean', defaultValue: false },
     { id: 'speakerShape',       label: 'Speaker Image Shape', type: 'select', defaultValue: 'rect',
       options: ['rect', 'circle', 'triangle'] },
-    { id: 'showPointCounter',   label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
-    { id: 'counterPosition',    label: 'Counter Position', type: 'select', defaultValue: 'side', options: ['side', 'bottom'] },
-    { id: 'counterStyle',       label: 'Counter Style', type: 'select', defaultValue: 'bars', options: ['bars', 'dots', 'numbers'] },
-    { id: 'counterMax',         label: 'Max Dots/Bars', type: 'number', defaultValue: 6, min: 1, max: 20 },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -312,9 +308,6 @@ export const arenaTheme: Theme = {
                 config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null);
         });
     }
-
-    // Debate Point Counter
-    drawDebatePointCounter(ctx, context);
 
     // Subtitles
     drawSubtitles(ctx, context);
