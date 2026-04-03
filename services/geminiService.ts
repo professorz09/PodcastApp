@@ -553,70 +553,67 @@ export const generateDebateScript = async (
                 विषय: "${topic}"
                 ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
                 ${durLineHi}
-                भाषा: Hinglish — natural educated Indian speech।
+                भाषा: Hinglish — natural, conversational।
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                STEP 1 — पहले यह ANALYZE करो:
+                STEP 1 — पहले PLAN करो (script लिखने से पहले):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                ✦ इस topic की सबसे gripping, surprising, या important बात क्या है? → यही opening hook बनेगी।
-                ✦ इस topic को cover करने के लिए 4-5 most important concepts कौन से हैं?
-                ✦ इनके बीच logical flow कैसा होगा?
+                इस topic के 4-6 सबसे important aspects/points identify करो।
+                हर point के लिए सोचो:
+                  → यह point है क्या? (definition / meaning)
+                  → इसका positive/benefit side क्या है?
+                  → इसका negative/drawback/दूसरा side क्या है?
+                  → Real life example क्या होगा?
+                यही structure script में आएगा।
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 CHARACTERS:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                - Narrator: crisp, engaging — सिर्फ opening hook, major transitions, और closing के लिए
-                - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "topic के हिसाब से 2 fresh, topic-relevant नाम choose करो"} — दोनों की अलग personality:
-                  Speaker A: curious, "yaar yeh toh mujhe pata nahi tha", सवाल पूछता है
-                  Speaker B: analytical, clearly explain करता है, examples देता है — बात की तरह, lecture की तरह नहीं
+                - Narrator: सिर्फ opening intro और closing के लिए — बीच में नहीं आएगा
+                - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "topic के हिसाब से 2 fresh नाम choose करो — हर बार अलग"} — दोनों की अलग personality:
+                  Speaker A: curious, questions पूछता है, कभी-कभी devil's advocate बनता है
+                  Speaker B: well-informed, clearly explain करता है, दोनों sides देखता है
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Narrator — Opening 】
-                Step 1 — एक सवाल से शुरू करो जो topic से directly जुड़ा हो और audience के मन में तुरंत उठे।
-                  (जैसे topic "Why women live longer" है → "क्या सच में औरतें मर्दों से ज़्यादा जीती हैं? और अगर हाँ, तो क्यों?")
-                  (जैसे topic "48 Laws Law 1" है → "क्या आपने कभी सोचा है कि power में रहने वाले लोग हमेशा किसी की तारीफ क्यों नहीं करते?")
-                  सवाल direct, sharp, और topic-specific हो — generic नहीं।
-                Step 2 — Topic को briefly introduce करो: 2-3 simple lines में बताओ यह topic है क्या।
-                  Simple, clear, no jargon — जैसे किसी को पहली बार बता रहे हो।
-                Step 3 — फिर central question पूछो जो पूरी video का anchor बनेगा:
-                  "तो सवाल यह है — [topic के हिसाब से: क्या यह सच है? क्यों ऐसा होता है? यह सही है या गलत? इसे कैसे समझें?]"
-                  यह question topic के nature के हिसाब से decide करो — एक ही pattern से मत पूछो हर बार।
+                【 Narrator — Opening (SHORT — 3-4 lines max) 】
+                बस इतना बताओ:
+                → यह topic क्या है — एक-दो simple lines में
+                → इसके बारे में क्यों जानना ज़रूरी है — एक line
+                → Debate/discussion शुरू। बस।
+                कोई long hook नहीं, कोई dramatic build-up नहीं।
 
-                【 Main Conversation — दोनों Speakers (Direct Perspective Style) 】
-                Narrator सिर्फ genuinely major topic shift पर 1-2 lines दे — हर concept के पहले नहीं (maximum 2-3 बार total)।
-                बाकी सब speakers करें — इस flow में:
-                → Speaker A एक angle या point directly explain करे — जैसे audience को खुद समझा रहा हो
-                → Speaker B उसी point में kuch aur add करे, deeper जाए, या alag perspective दे — directly
-                → दोनों seedha topic पर बोलें — "tune ye bola", "jaise maine kaha" style बिल्कुल नहीं
-                → Har concept ke baad ek specific real example zaroor:
-                  • किताब का chapter → real teaching को story form में
-                  • Biology/science → body/nature mechanism को analogy से
-                  • Social topic → real situation जो लोग face करते हैं
-                  • Finance → specific numbers और relatable comparison
-                  • Philosophy/politics → historical या current event
+                【 Point-by-Point Discussion (यही main content है) 】
+                हर important aspect/point के लिए यह structure follow करो:
 
-                【 Narrator — Closing 】
-                Robotic bullet-point summary नहीं।
-                2-3 sharp lines जो:
-                → Topic का real essence capture करें
-                → एक thought-provoking question या insight दें
-                → Audience के दिमाग में रह जाएं
+                POINT X: [Point का नाम]
+                → Speaker A: यह point है क्या — basics से explain करो, zero assume करो
+                → Speaker B: इसका एक side/angle बताओ (benefit / how it works / positive view)
+                → Speaker A: इसका दूसरा side बताओ (drawback / limitation / counter view / darker side)
+                → Speaker B: Real example दो जो दोनों sides को clearly show करे
+                → दोनों मिलकर: इस point का conclusion — यह कब काम करता है, कब नहीं
+
+                यही pattern हर point पर repeat करो।
+                Points के बीच naturally transition करो — "Ab baat karte hain..." जैसे phrases से।
+
+                【 Narrator — Closing (SHORT — 2-3 lines) 】
+                → Topic का core essence एक line में
+                → एक thought-provoking question या insight जो याद रहे
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 RULES:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                ✓ जब भी कोई बात बोले — उसे ठीक से समझाए: पहले basics बताओ, फिर example दो, फिर deeper point
-                ✓ Expert की तरह सोचो लेकिन बोलो simple भाषा में — जैसे कोई जानकार दोस्त समझा रहा हो
-                ✓ हर concept को zero से build करो — assume मत करो कि audience पहले से जानती है
-                ✓ हर बड़े point के साथ एक real, relatable example या analogy ज़रूर दो
-                ✓ Natural Hinglish throughout — conversational, real
+                ✓ हर point के दोनों sides ज़रूर दिखाओ — सिर्फ positive या सिर्फ negative नहीं
+                ✓ हर point zero से explain करो — audience को पहले से कुछ पता नहीं है
+                ✓ हर point के साथ एक specific, real example — generic नहीं
+                ✓ Simple Hinglish — expert की सोच, दोस्त की भाषा
                 ✓ दोनों speakers की अलग voice — एक जैसे मत लगें
-                ✗ BANNED: "यह महत्वपूर्ण है", "निष्कर्ष में", "आइए समझते हैं", "इस प्रकार", "यह ध्यान देने योग्य है"
-                ✗ BANNED: Narrator unnecessarily बीच में आए — only for opening, closing, और major transitions
-                ✗ BANNED: Generic filler — हर line meaningful होनी चाहिए
+                ✗ BANNED: Long dramatic intro — opening 4 lines से ज़्यादा नहीं
+                ✗ BANNED: Narrator बीच में आए — सिर्फ opening और closing
+                ✗ BANNED: "यह महत्वपूर्ण है", "निष्कर्ष में", "आइए समझते हैं", generic filler
+                ✗ BANNED: Speakers एक-दूसरे के words refer करें — seedha topic पर बात करो
                 ${durFillHi}
               `;
             } else {
@@ -624,72 +621,62 @@ export const generateDebateScript = async (
                 विषय: "${topic}"
                 ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
                 ${durLineHi}
-                भाषा: Hinglish — जैसे दो पढ़े-लिखे भारतीय दोस्त आपस में बात करते हैं।
+                भाषा: Hinglish — जैसे दो जानकार दोस्त आपस में बात कर रहे हों।
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                STEP 1 — पहले यह ANALYZE करो:
+                STEP 1 — पहले PLAN करो:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                इस topic में:
-                ✦ सबसे surprising, counterintuitive, या shocking बात क्या है?
-                ✦ लोग इसके बारे में क्या गलत सोचते हैं?
-                ✦ Real life से इसका सबसे direct connection कहाँ है?
-                इन्हीं से opening hook और angle तय करो।
+                इस topic के 4-6 सबसे important aspects/points identify करो।
+                हर point के लिए तय करो:
+                  → यह क्या है (definition)
+                  → इसका positive/benefit side
+                  → इसका negative/drawback/दूसरा side
+                  → Best real example
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 CHARACTERS — ठीक 2 speakers (Narrator नहीं):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                ${speakers.length > 0 ? `इन नामों का उपयोग करें: ${speakers.join(", ")}.` : `Topic के हिसाब से 2 fresh नाम choose करो — हर topic के लिए अलग।`}
-                दोनों की personality अलग हो:
-                - Speaker A: ज़्यादा curious — "yaar seriously?", "matlab?", "lekin phir kya hua?" जैसे natural reactions
-                - Speaker B: ज़्यादा knowledgeable — clearly explain करता है, examples देता है — लेकिन lecture नहीं, baat करता है
+                ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `Topic के हिसाब से fresh नाम choose करो — हर बार अलग।`}
+                दोनों की personality अलग:
+                - Speaker A: curious, devil's advocate, dono sides explore karta hai
+                - Speaker B: well-informed, clearly explain karta hai, examples deta hai
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Opening — Narrator जैसा intro, Speaker A बोलेगा 】
-                Step 1 — Speaker A एक direct सवाल से शुरू करे जो इस topic से तुरंत जुड़े और audience के मन में उठे।
-                  (जैसे topic "Why women live longer" → "Yaar, kya tune kabhi socha hai ki aurtein aadmiyon se zyada kyu jeeti hain?")
-                  सवाल sharp और topic-specific हो — "Kya tune kabhi socha hai..." generic नहीं।
-                Step 2 — Speaker B topic को briefly introduce करे: 2-3 simple lines में बताए यह topic है क्या।
-                  Clear, no jargon — जैसे किसी को पहली बार बता रहे हो।
-                Step 3 — Speaker A central question पूछे जो पूरी discussion का anchor बनेगा:
-                  Topic के हिसाब से decide करो — "Toh sawaal yeh hai ki [kya yeh sach hai? kyun aisa hota hai? sahi hai ya galat?]"
-                  Har topic का question alag hoga — same pattern नहीं।
+                【 Opening — Speaker A (SHORT — 3-4 lines max) 】
+                → Topic kya hai — ek-do simple lines mein
+                → Kyun important hai — ek line
+                → Discussion shuru। Bas।
 
-                【 Main Discussion — Direct Perspective Style 】
-                Speakers सीधे topic explain करें — ek ek cheez par।
-                Flow ऐसे हो:
-                → Speaker A एक angle या point directly explain करे — as if woh khud samjha raha ho audience ko
-                → Speaker B उसी baat mein kuch aur add kare, deeper jae, ya ek alag perspective de — directly
-                → Dono seedha topic pe baat karein — "tu yeh bol raha tha" ya "maine ye bola" style bilkul nahi
-                → Har concept ke baad ek specific real example zaroor ho — topic ke hisaab se:
-                  • किताब का chapter → उस chapter की real teaching story form में
-                  • Biology/science → body/nature mechanism analogy से
-                  • Social topic → real situation जो log face karte hain
-                  • Finance → specific numbers और relatable comparisons
-                  • Philosophy/politics → historical या current event
+                【 Point-by-Point Discussion (यही main content है) 】
+                हर important aspect/point के लिए:
 
-                【 Unexpected Angle 】
-                Topic से related कोई ऐसी बात जो audience expect नहीं करती — organic, forced नहीं।
+                POINT X: [Point का नाम]
+                → Speaker A: यह point क्या है — basics से, zero assume karo
+                → Speaker B: इसका एक side (benefit / how it works / positive view)
+                → Speaker A: इसका दूसरा side (drawback / limitation / counter / darker side)
+                → Speaker B: Real example जो दोनों sides show करे
+                → दोनों: इस point का conclusion — kab kaam karta hai, kab nahi
 
-                【 Closing 】
-                Forced summary नहीं। दोनों naturally main insight पर land करें।
-                एक memorable line जो topic का essence capture करे।
+                Natural transition: "Ab ek aur cheez..." / "Yaar ek important angle reh gaya..."
+
+                【 Closing — Speaker B (SHORT — 2-3 lines) 】
+                → Topic ka core essence ek line mein
+                → Ek memorable thought ya question
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                TONE RULES (strictly follow):
+                RULES:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                ✓ जब भी कोई बात बोले — उसे ठीक से समझाए: पहले basics बताओ, फिर example दो, फिर deeper point
-                ✓ Expert की तरह सोचो लेकिन बोलो simple भाषा में — जैसे कोई जानकार दोस्त समझा रहा हो
-                ✓ हर concept को zero से build करो — assume मत करो कि audience पहले से जानती है
-                ✓ हर बड़े point के साथ एक real, relatable example या analogy ज़रूर दो
-                ✓ Seedha explain karo — seedha topic pe, apni baat par nahi
-                ✓ Specific examples — "Jaise Dhoni ne 2011 mein..." nahi "jaise ek cricketer ne..."
-                ✓ दोनों speakers की अलग-अलग voice — एक जैसे मत लगें
-                ✗ BANNED: "Jaise tune abhi bola", "Maine ye kaha tha", "Tu sahi keh raha hai isliye" — speakers refer to each other's words nahi karenge
-                ✗ BANNED: "यह महत्वपूर्ण है", "इस प्रकार", "आइए समझते हैं", "निष्कर्ष में"
-                ✗ BANNED: Generic filler — हर line में real information या real reaction
+                ✓ हर point के DONO sides dikhao — sirf positive ya sirf negative nahi
+                ✓ हर point zero से explain करो
+                ✓ हर point ke saath specific real example
+                ✓ Simple Hinglish — expert ki soch, dost ki bhaasha
+                ✓ Dono speakers ki alag voice
+                ✗ BANNED: Long dramatic opening — 4 lines se zyada nahi
+                ✗ BANNED: "yeh zaroori hai", "nirhskarsh mein", generic filler
+                ✗ BANNED: Speakers ek-dusre ke words refer karein
                 ${durFillHi}
               `;
             }
@@ -1302,68 +1289,62 @@ export const generateDebateScript = async (
               Language: ${language}.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              STEP 1 — ANALYZE THE TOPIC FIRST:
+              STEP 1 — PLAN BEFORE WRITING:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              ✦ What is the most fascinating, surprising, or counterintuitive thing about this topic?
-              ✦ What are the 4-5 most important concepts that must be covered?
-              ✦ What is the most logical, engaging order to cover them?
-              These answers drive the entire structure — don't skip this step.
+              Identify 4-6 key aspects/points of this topic.
+              For each point, determine:
+                → What it is (definition / how it works)
+                → Its positive / benefit / upside
+                → Its negative / drawback / other side
+                → The best real-world example that shows both sides
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               CHARACTERS:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              - Narrator: crisp, punchy — used ONLY for the opening hook, closing, and major transitions
-              - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "names appropriate for the topic"} — distinct personalities:
-                Speaker A: more curious — asks the questions the audience would ask, "wait seriously?", "so what you're saying is..."
-                Speaker B: more analytical — explains clearly with specific examples, conversational not lecture-mode
+              - Narrator: ONLY for opening and closing — never in between
+              - 2 Speakers: ${speakers.length > 0 ? speakers.join(", ") : "choose 2 fresh names fitting the topic — different each time"} — distinct personalities:
+                Speaker A: curious, sometimes plays devil's advocate, asks what the audience is thinking
+                Speaker B: well-informed, explains both sides clearly, uses real examples
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Narrator — Opening 】
-              Step 1 — Start with a direct question tied to the topic — one that the audience immediately wants answered.
-                (e.g. topic "Why women live longer" → "Do women actually live longer than men — and if so, why?")
-                (e.g. topic "48 Laws Law 1" → "Have you ever noticed that the most powerful people in the room rarely compliment anyone?")
-                The question must be sharp, specific to THIS topic — not a generic "Have you ever wondered..."
-              Step 2 — Briefly introduce the topic: 2-3 simple sentences explaining what it is.
-                Clear, no jargon — like you're telling someone who's hearing about it for the first time.
-              Step 3 — Then ask the central question that will anchor the whole video:
-                "So the real question is — [topic-appropriate: Is this actually true? Why does this happen? Is it right or wrong? How do we make sense of this?]"
-                Choose the question type based on what THIS topic actually calls for — don't force the same pattern every time.
+              【 Narrator — Opening (SHORT — 3-4 lines MAX) 】
+              Only say:
+              → What this topic is — 1-2 simple sentences
+              → Why it matters — 1 sentence
+              → Then hand off to speakers immediately.
+              No long hooks, no dramatic build-up.
 
-              【 Main Conversation — Speakers (Direct Perspective Style) 】
-              Narrator only steps in for genuinely major topic shifts — maximum 2-3 times total, not before every concept.
-              Speakers carry the rest — in this flow:
-              → Speaker A explains one angle or point directly — as if talking straight to the audience
-              → Speaker B adds to it, goes deeper, or brings a different angle — also directly
-              → Both stay focused on the topic itself — never "like you just said", "as I mentioned", "you make a good point" — no self-referencing
-              → After each concept, one specific real example tailored to this exact topic:
-                • Book chapter/law → the real principle illustrated with a specific scenario
-                • Science/biology → a body or nature analogy that makes it click instantly
-                • Social/psychology topic → a real situation people actually face
-                • Finance → real numbers and relatable comparisons
-                • Philosophy/politics → a historical or current event as the anchor
+              【 Point-by-Point Discussion (this is the entire main content) 】
+              For each key aspect/point, follow this exact pattern:
 
-              【 Narrator — Closing 】
-              NOT a bullet-point summary.
-              2-3 sharp sentences that:
-              → Capture the real essence of what was discussed
-              → Leave the audience with a thought-provoking question or insight
-              → Sound like something they'll actually remember
+              POINT [X]: [Name of the point]
+              → Speaker A: What this point is — explain from zero, assume audience knows nothing
+              → Speaker B: The positive/benefit/upside side — how it works, why it matters
+              → Speaker A: The negative/drawback/counter side — limitations, risks, darker angle
+              → Speaker B: A specific real example that shows BOTH sides clearly
+              → Together: Brief conclusion on this point — when it works, when it doesn't
+
+              Transition naturally to the next point — "Now let's talk about...", "There's another angle here..."
+
+              【 Narrator — Closing (SHORT — 2-3 lines) 】
+              → The core essence of the topic in one line
+              → One thought-provoking question or insight to leave with
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               RULES:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              ✓ Whenever a point is made — explain it properly: start with the basics, then give an example, then go deeper
-              ✓ Think like an expert, speak like a knowledgeable friend — simple language, zero jargon
-              ✓ Build every concept from zero — never assume the audience already knows
-              ✓ Every major point must have a real, relatable example or analogy
-              ✓ Natural conversational language throughout
-              ✓ Speaker A and B must sound noticeably different from each other
-              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", "This is significant", "Furthermore"
-              ✗ BANNED: Narrator appearing unnecessarily — only opening, closing, and major shifts
-              ✗ BANNED: Any filler line that adds no real information or authentic reaction
+              ✓ Show BOTH sides of every point — never only positive or only negative
+              ✓ Build every concept from zero — never assume prior knowledge
+              ✓ Every point must have a specific, real example — no vague placeholders
+              ✓ Simple language, expert thinking — like a knowledgeable friend
+              ✓ Speaker A and B must sound clearly different
+              ✗ BANNED: Long dramatic opening — 4 lines max
+              ✗ BANNED: Narrator appearing mid-discussion — only opening and closing
+              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", generic filler
+              ✗ BANNED: Speakers referencing each other's words — stay focused on the topic
               ${durFillEn}
             `;
           } else {
@@ -1374,70 +1355,59 @@ export const generateDebateScript = async (
               Language: ${language}.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              STEP 1 — ANALYZE THE TOPIC FIRST:
+              STEP 1 — PLAN BEFORE WRITING:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Before writing, identify:
-              ✦ The most surprising or counterintuitive angle of this topic
-              ✦ The biggest misconception people have about it
-              ✦ The most relatable real-world connection
-              ✦ The "wait, really?" moment hidden in this topic
-              Use these to build the opening hook and choose what angle to take.
+              Identify 4-6 key aspects/points of this topic.
+              For each point:
+                → What it is (definition)
+                → Positive / benefit side
+                → Negative / drawback / other side
+                → Best real example showing both sides
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               CHARACTERS — exactly 2 speakers (no Narrator):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Pick 2 names fitting for the topic.`}
-              Give them distinct personalities:
-              - Speaker A: more curious — "wait seriously?", "so what you're saying is...", asks the questions the audience has
-              - Speaker B: more knowledgeable — explains clearly with specific examples — like a friend, not a professor
+              ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Choose fresh names fitting the topic — different every time.`}
+              Distinct personalities:
+              - Speaker A: curious, devil's advocate, explores both sides
+              - Speaker B: well-informed, explains clearly with specific examples
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Opening — Same structure as Narrator intro, but Speaker A delivers it 】
-              Step 1 — Speaker A opens with a direct question tied to THIS specific topic — one the audience immediately wants answered.
-                (e.g. topic "Why women live longer" → "Hey, have you ever actually looked at why women outlive men by almost a decade?")
-                Sharp and topic-specific — not a generic "Have you ever wondered..."
-              Step 2 — Speaker B briefly introduces the topic: 2-3 simple sentences on what it actually is.
-                Clear, no jargon — like explaining to someone who's hearing about it for the first time.
-              Step 3 — Speaker A poses the central question that anchors the whole discussion:
-                Based on what THIS topic calls for — "So the real question is: [Is this actually true? Why does this happen? Is it right or wrong? How do we make sense of this?]"
-                The question type should match the topic — don't force the same pattern every time.
+              【 Opening — Speaker A (SHORT — 3-4 lines MAX) 】
+              → What this topic is — 1-2 simple sentences
+              → Why it matters — 1 sentence
+              → Jump straight into the discussion.
 
-              【 Main Discussion — Direct Perspective Style 】
-              Both speakers explain the topic directly — point by point, perspective by perspective.
-              Flow like this:
-              → Speaker A explains one angle or point directly — as if explaining it to the audience themselves
-              → Speaker B adds to it, goes deeper, or brings a different angle — also directly
-              → Both stay focused on the topic itself — never say "like you just said" or "as I mentioned" — no self-referencing
-              → After each concept, include one specific real example tailored to this exact topic:
-                • Book chapter/law → the real principle illustrated with a specific scenario
-                • Science/biology → a body or nature analogy that makes it click instantly
-                • Social/psychology → a real situation people actually face
-                • Finance → real numbers and relatable comparisons
-                • Philosophy/politics → a historical or current event as the anchor
+              【 Point-by-Point Discussion (this is the entire main content) 】
+              For each key aspect/point:
 
-              【 Unexpected Angle 】
-              Something about the topic the audience didn't see coming — organic, not forced.
+              POINT [X]: [Name of the point]
+              → Speaker A: What this point is — from zero, no prior knowledge assumed
+              → Speaker B: The positive/benefit/upside side
+              → Speaker A: The negative/drawback/counter side
+              → Speaker B: Specific real example showing both sides
+              → Both: Quick conclusion — when does this work, when doesn't it
 
-              【 Closing 】
-              No forced summary. Both speakers land naturally on the key insight through conversation.
-              End with one memorable line that captures the real essence of the topic.
+              Natural transitions between points.
+
+              【 Closing — Speaker B (SHORT — 2-3 lines) 】
+              → Core essence of the topic in one line
+              → One memorable thought or question
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              TONE & LANGUAGE:
+              RULES:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              ✓ Whenever a point is made — explain it properly: start with the basics, then give an example, then go deeper
-              ✓ Think like an expert, speak like a knowledgeable friend — simple language, zero jargon
-              ✓ Build every concept from zero — never assume the audience already knows
-              ✓ Every major point must have a real, relatable example or analogy
-              ✓ Direct explanation — about the topic itself, not about the conversation
-              ✓ Specific examples only — never "imagine a company that..." or generic placeholders
-              ✓ Speaker A and B must sound noticeably different from each other
-              ✗ BANNED: "Like you said", "As I mentioned", "You make a good point" — no self-referencing
-              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", "This is significant", "Furthermore"
-              ✗ BANNED: Any filler — every line must add real information or an authentic human reaction
+              ✓ Both sides of every point — never one-sided
+              ✓ Build from zero — no assumed knowledge
+              ✓ Specific real examples — no vague "imagine a company..." placeholders
+              ✓ Simple language, expert thinking
+              ✓ Speaker A and B must sound clearly different
+              ✗ BANNED: Long opening — 4 lines max
+              ✗ BANNED: "It's important to note", "Let's delve into", "In conclusion", generic filler
+              ✗ BANNED: Speakers referencing each other's words
               ${durFillEn}
             `;
           }
