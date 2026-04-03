@@ -574,9 +574,19 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   // Manual: regenerate all segment scores at once
   const handleRegenerateAllScores = useCallback(() => {
+      if (script.length === 0) return;
       const newScores = script.map(() => Math.floor((Math.random() * 3.9 + 6) * 10) / 10);
       setSegmentScores(newScores);
-  }, [script]);
+      // Auto-enable score display so user sees the result immediately
+      setShowScores(true);
+      // For Arena theme: also enable corner scores
+      if (theme === 'arena') {
+          setGlobalThemeConfig(prev => ({
+              ...prev,
+              arena: { ...(prev['arena'] || {}), showArenaScore: true }
+          }));
+      }
+  }, [script, theme]);
 
   // Canvas Rendering Loop
   const render = useCallback(() => {
