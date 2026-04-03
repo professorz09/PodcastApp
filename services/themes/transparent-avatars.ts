@@ -19,6 +19,7 @@ export const transparentAvatarsTheme: Theme = {
     { id: 'showPointCounter', label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
     { id: 'counterPosition',  label: 'Counter Position', type: 'select', defaultValue: 'side', options: ['side', 'bottom'] },
     { id: 'counterStyle',     label: 'Counter Style', type: 'select', defaultValue: 'bars', options: ['bars', 'dots', 'numbers'] },
+    { id: 'counterMax',       label: 'Max Dots/Bars', type: 'number', defaultValue: 6, min: 1, max: 20 },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;

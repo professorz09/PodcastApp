@@ -676,7 +676,7 @@ export const drawDebatePointCounter = (
     const colorB = themeConfig?.speakerColorB || themeConfig?.glowColorB || '#ef4444';
     const position: 'side' | 'bottom' = themeConfig?.counterPosition || 'side';
     const style: 'bars' | 'dots' | 'numbers' = themeConfig?.counterStyle || 'bars';
-    const MAX = 6;
+    const MAX = Math.max(1, Math.min(20, parseInt(themeConfig?.counterMax) || 6));
 
     // ── helpers ──────────────────────────────────────────────────────
     const glow = (color: string) => { ctx.shadowColor = color; ctx.shadowBlur = 10; };
