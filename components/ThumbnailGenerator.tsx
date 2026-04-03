@@ -77,53 +77,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     const effectiveSource: TitleSource = hasScript ? 'script' : 'transcript';
     setTitleSource(effectiveSource);
 
-    // Auto-load Situational default style image
-    if (videoStyle === 'situational' && !referenceImage) {
-      fetch('/default-style-situational.jpg')
-        .then(r => r.blob())
-        .then(blob => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const result = ev.target?.result as string;
-            const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-            if (match) {
-              onUpdateThumbnailState({
-                ...thumbnailState,
-                ...( changed ? updates : {}),
-                referenceImage: { mimeType: match[1], data: match[2], url: result },
-              });
-            }
-          };
-          reader.readAsDataURL(blob);
-        })
-        .catch(() => { if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates }); });
-      return;
-    }
-
     if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates });
   }, []);
-
-  // Auto-load Situational style image whenever videoStyle becomes 'situational' and no image set
-  useEffect(() => {
-    if (videoStyle !== 'situational' || referenceImage) return;
-    fetch('/default-style-situational.jpg')
-      .then(r => r.blob())
-      .then(blob => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const result = ev.target?.result as string;
-          const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-          if (match) {
-            onUpdateThumbnailState({
-              ...thumbnailState,
-              referenceImage: { mimeType: match[1], data: match[2], url: result },
-            });
-          }
-        };
-        reader.readAsDataURL(blob);
-      })
-      .catch(() => {});
-  }, [videoStyle]);
 
   const getSourceText = (source: TitleSource): string => {
     if (source === 'transcript' && hasTranscript) return youtubeData!.fullText;
