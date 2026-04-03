@@ -1111,7 +1111,18 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 DEBATE BODY:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                - दोनों sides genuinely strong हों — कोई side obviously weak नहीं
+                दोनों speakers expert की तरह argue करें — लेकिन simple, clear भाषा में।
+
+                हर argument इस तरह build होगा:
+                → पहले अपनी position का core reason basics से explain करो — assume मत करो audience सब जानती है
+                → फिर एक logical reasoning दो — facts, real examples, या analogies से support करो
+                → दूसरी side के argument को directly counter करो — logical basis पर, emotional नहीं
+                → Arguments deep और well-reasoned हों — surface-level assertions नहीं
+
+                Narrator की flexibility:
+                → Narrator सिर्फ opening और closing तक सीमित नहीं है
+                → जब कोई important context, fact, या clarification debate को और strong बनाए, तब Narrator बीच में आ सकता है
+                → लेकिन बहुत ज़्यादा नहीं — speakers की debate flow interrupt न हो
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 CLOSING — NARRATOR:
@@ -1121,8 +1132,13 @@ export const generateDebateScript = async (
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 RULES:
-                - भाषा bilkul natural, human — जैसे real लोग बात करते हैं
-                - AI clichés बिल्कुल नहीं: "यह ध्यान देने योग्य है", "निष्कर्ष में", "इस प्रकार"
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ✓ दोनों sides genuinely strong — कोई side strawman नहीं
+                ✓ Expert-level thinking, simple भाषा — जैसे कोई जानकार इंसान real debate में बोलता हो
+                ✓ हर point basics से build होकर logical conclusion तक जाए
+                ✓ Real examples, analogies, या facts से arguments support हों
+                ✗ BANNED: "यह ध्यान देने योग्य है", "निष्कर्ष में", "इस प्रकार", generic filler
+                ✗ BANNED: एक side का argument दूसरे से obviously कमज़ोर हो
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ${durFillHi}
               `;
@@ -1140,23 +1156,35 @@ export const generateDebateScript = async (
                 OPENING — Speaker A:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 - एक provocative question या bold statement से शुरू करे जो topic को instantly set करे
-                - अपनी side briefly बताए — 2-3 sentences, punchy
-                - Speaker B तुरंत respond करे — अपनी opposing side clear करे
+                - अपनी side की core position basics से briefly बताए — 2-3 sentences, punchy
+                - Speaker B तुरंत respond करे — अपनी opposing position clearly रखे
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 DEBATE BODY:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                - दोनों sides equally strong हों
+                दोनों speakers expert की तरह argue करें — लेकिन simple, clear भाषा में।
+
+                हर argument इस तरह build होगा:
+                → पहले अपनी position का core reason basics से explain करो — assume मत करो audience सब जानती है
+                → फिर एक logical reasoning दो — facts, real examples, या analogies से support करो
+                → दूसरी side के argument को directly counter करो — logical basis पर, emotional नहीं
+                → Arguments deep और well-reasoned हों — surface-level assertions नहीं
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 CLOSING:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                - दोनों अपना final position बोलें — confident, brief
-                - कोई resolution नहीं — audience को choose करना है
+                - दोनों अपना final position confidently रखें — brief, sharp
+                - कोई resolution नहीं — audience को decide करना है
 
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 RULES:
-                - Natural, human भाषा — robotic phrases बिल्कुल नहीं
-                - AI clichés ban: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में"
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                ✓ दोनों sides equally strong — कोई side strawman नहीं
+                ✓ Expert-level thinking, simple भाषा — जैसे कोई जानकार इंसान real debate में बोलता हो
+                ✓ हर point basics से build होकर logical conclusion तक जाए
+                ✓ Real examples, analogies, या facts से arguments support हों
+                ✗ BANNED: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में", generic filler
+                ✗ BANNED: एक side का argument दूसरे से obviously कमज़ोर हो
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ${durFillHi}
               `;
@@ -1827,7 +1855,18 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               DEBATE BODY:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              - Both sides are genuinely strong — neither is obviously weak or a strawman
+              Both speakers argue like genuine experts — but in simple, clear language anyone can follow.
+
+              Every argument must be built like this:
+              → Start from the basics of their position — don't assume the audience already knows the context
+              → Add logical reasoning — support with real facts, examples, or analogies
+              → Directly counter the other side's argument — on logical grounds, not emotional
+              → Arguments must be deep and well-reasoned — not surface-level assertions
+
+              Narrator's flexibility:
+              → Narrator is NOT limited to only the opening and closing
+              → When important context, a key fact, or a clarification would genuinely strengthen the debate, Narrator can step in
+              → But sparingly — don't interrupt the natural flow of the argument
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               CLOSING — NARRATOR:
@@ -1835,9 +1874,15 @@ export const generateDebateScript = async (
               - Capture each side's core argument in one line
               - Leave the audience to decide — a thought-provoking final question or statement
 
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               RULES:
-              - Completely natural, human language — no AI-speak
-              - Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "This is significant"
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Both sides genuinely strong — no strawmanning either side
+              ✓ Expert-level thinking, simple language — like a knowledgeable person arguing in real life
+              ✓ Every point builds from basics to a logical conclusion
+              ✓ Support arguments with real examples, analogies, or facts
+              ✗ BANNED: "It's important to note", "In conclusion", "Let's delve into", "This is significant"
+              ✗ BANNED: One side being obviously weaker than the other
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
             `;
@@ -1854,24 +1899,36 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               OPENING — Speaker A:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              - Open with a bold question or provocative statement that immediately frames the debate
-              - State their side briefly — 2-3 sentences, punchy
-              - Speaker B responds immediately — states their opposing position
+              - Open with a bold question or provocative statement that instantly frames the debate
+              - Briefly state their core position from basics — 2-3 sentences, punchy
+              - Speaker B responds immediately — clearly states their opposing position
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               DEBATE BODY:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              - Both sides equally strong — no strawmanning
+              Both speakers argue like genuine experts — but in simple, clear language anyone can follow.
+
+              Every argument must be built like this:
+              → Start from the basics of their position — don't assume the audience already knows the context
+              → Add logical reasoning — support with real facts, examples, or analogies
+              → Directly counter the other side's argument — on logical grounds, not emotional
+              → Arguments must be deep and well-reasoned — not surface-level assertions
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               CLOSING:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              - Each speaker briefly restates their core position — confident, not repetitive
+              - Each speaker states their final position — confident, sharp, no new arguments
               - No resolution — audience decides
 
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               RULES:
-              - Natural, human language — the way real people actually argue
-              - Banned: "It's important to note", "In conclusion", "Let's delve into"
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Both sides equally strong — no strawmanning either side
+              ✓ Expert-level thinking, simple language — like a knowledgeable person arguing in real life
+              ✓ Every point builds from basics to a logical conclusion
+              ✓ Support arguments with real examples, analogies, or facts
+              ✗ BANNED: "It's important to note", "In conclusion", "Let's delve into"
+              ✗ BANNED: One side being obviously weaker than the other
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
             `;
