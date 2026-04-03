@@ -35,7 +35,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview'>('gemini-3-flash-preview');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'explained' | 'explained_solo' | 'republic' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan'>(
+  const [style, setStyle] = useState<'debate' | 'explained' | 'explained_solo' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
