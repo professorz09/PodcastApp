@@ -19,6 +19,7 @@ export const arenaTheme: Theme = {
     { id: 'showVsBadge',        label: 'Show VS Badge',            type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showSegmentCount',   label: 'Show Segment Count Dots',  type: 'boolean', defaultValue: false,      group: 'Elements' },
     { id: 'showVuMeter',        label: 'Show VU Meter',            type: 'boolean', defaultValue: false,      group: 'Elements' },
+    { id: 'detachVuMeter',      label: 'Detach VU to Side Dots',   type: 'boolean', defaultValue: false,      group: 'Elements' },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -39,8 +40,11 @@ export const arenaTheme: Theme = {
     const speakerShape: 'rect' | 'circle' | 'triangle' = themeConfig?.speakerShape || 'rect';
     const showVsBadge      = themeConfig?.showVsBadge ?? false;
     const showSegmentCount = themeConfig?.showSegmentCount ?? false;
+    const detachVuMeter    = themeConfig?.detachVuMeter ?? false;
     // VU meter: arena theme has its own default (off); respects global toggle too
-    const vuEnabled        = config.showVuMeter && (themeConfig?.showVuMeter ?? false);
+    // When detachVuMeter is true, we suppress the ring-on-speaker VU and instead draw side dots
+    const vuEnabled        = config.showVuMeter && (themeConfig?.showVuMeter ?? false) && !detachVuMeter;
+    const vuDetachEnabled  = config.showVuMeter && (themeConfig?.showVuMeter ?? false) && detachVuMeter;
 
     // Background
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
@@ -286,6 +290,71 @@ export const arenaTheme: Theme = {
 
         drawSideDots(true,  speakerSegCounts[0], speakerSegTotals[0], colors[0]);
         drawSideDots(false, speakerSegCounts[1], speakerSegTotals[1], colors[1]);
+    }
+
+    // ── Detached VU Meter — side dots next to segment count ───────
+    if (vuDetachEnabled && speakerIds.length >= 2) {
+        const activeSpeakerId = currentSegment.speaker;
+        const activeIdx = speakerIds.indexOf(activeSpeakerId);
+        if (activeIdx === 0 || activeIdx === 1) {
+            const isLeft = activeIdx === 0;
+            const color  = colors[activeIdx];
+
+            // Geometry matching segment count dots
+            const DOT_R   = 6;
+            const DOT_GAP = 7;
+            const VU_DOTS = 10;
+
+            // Base x: same as segment count column
+            const baseX = isLeft
+                ? 14 + DOT_R          // left edge (speaker A)
+                : canvasWidth - 14 - DOT_R; // right edge (speaker B)
+
+            // VU column is placed next to the segment dots
+            // If segment count is also showing, offset outward by one dot-column width
+            const vuOffset = showSegmentCount ? (DOT_R * 2 + 5) : 0;
+            const vuCX = isLeft ? baseX + vuOffset : baseX - vuOffset;
+
+            // Vertical center
+            const colH   = VU_DOTS * (DOT_R * 2) + (VU_DOTS - 1) * DOT_GAP;
+            const startY = (canvasHeight - colH) / 2;
+
+            // How many dots are lit (at least 1 when active, max all)
+            const litCount = Math.max(1, Math.round(audioLevel * VU_DOTS));
+
+            for (let i = 0; i < VU_DOTS; i++) {
+                // i=0 is top, fill from BOTTOM (high index = bottom = louder end)
+                const dotIdx = VU_DOTS - 1 - i;   // 0 = bottom
+                const isLit  = dotIdx < litCount;
+                const dotY   = startY + i * (DOT_R * 2 + DOT_GAP) + DOT_R;
+
+                // Color ramp: speaker color → yellow → red (bottom to top)
+                const pct = dotIdx / (VU_DOTS - 1);
+                let dotColor: string;
+                if (!isLit) {
+                    dotColor = 'rgba(255,255,255,0.08)';
+                } else if (pct < 0.55) {
+                    dotColor = color;
+                } else if (pct < 0.80) {
+                    dotColor = '#facc15';
+                } else {
+                    dotColor = '#ef4444';
+                }
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(vuCX, dotY, DOT_R, 0, Math.PI * 2);
+                ctx.fillStyle = dotColor;
+                if (isLit) {
+                    ctx.shadowColor = dotColor;
+                    ctx.shadowBlur  = 8 + audioLevel * 12;
+                } else {
+                    ctx.shadowBlur = 0;
+                }
+                ctx.fill();
+                ctx.restore();
+            }
+        }
     }
 
     // Subtitles
