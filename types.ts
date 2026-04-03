@@ -130,7 +130,7 @@ export interface DebateConfig {
   commentsFileContent?: string;
   model: 'gemini-3-flash-preview' | 'gemini-3.1-pro-preview';
   language: string;
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational';
+  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'republic' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational';
   speakerCount: number;
   speakerNames?: string[]; // Optional, if user provides them. Otherwise auto-detected.
   specificDetails?: string;
