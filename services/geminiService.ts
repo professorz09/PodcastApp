@@ -453,7 +453,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' = 'debate',
+  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -680,6 +680,70 @@ export const generateDebateScript = async (
                 ${durFillHi}
               `;
             }
+        } else if (style === 'explained_solo') {
+          prompt = `
+            विषय: "${topic}"
+            ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: Hinglish — natural, conversational YouTube voiceover style।
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STEP 1 — PLAN FIRST:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            इस topic के 4-7 key points identify करो जो एक proper YouTube video में cover होने चाहिए।
+            Order: basics → depth → application → conclusion
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            CHARACTER — केवल 1 speaker (Voiceover):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Voiceover"`}
+            Tone: confident, clear, friendly — जैसे एक knowledgeable YouTuber बोलता है।
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE (इसी order में):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 HOOK (2-3 lines) 】
+            एक interesting fact, question, या shocking statement से शुरू करो जो audience को रोके।
+            Topic-specific — generic "kya aapne kabhi socha hai" नहीं।
+
+            【 INTRO 】
+            "Is video mein hum cover karenge:" — फिर 3-5 bullet points में briefly बताओ kya-kya cover होगा।
+            Short aur crisp।
+
+            【 BASICS — यह topic है क्या? 】
+            2-4 lines में: यह topic zero से explain करो।
+            Assume करो audience को कुछ भी नहीं पता।
+            Simple language — jargon नहीं।
+
+            【 MAIN POINTS — ek ek karke 】
+            हर point के लिए:
+            → Point ka naam clearly bolo
+            → Explain karo yeh point kya hai
+            → Real example ya analogy do
+            → Practical implication bolo — isse kya farak padta hai?
+
+            【 KEY TAKEAWAY 】
+            2-3 lines mein: is topic ka sabse important message kya hai।
+            Simple, memorable।
+
+            【 OUTRO 】
+            "Agar yeh video helpful lagi toh like karo, aur subscribe karo aur se cheezein seekhne ke liye।"
+            Ya similar natural CTA — robotic nahi।
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Sirf 1 speaker — "Voiceover" (ya provided name)
+            ✓ Har point zero se explain karo — prior knowledge assume mat karo
+            ✓ Har point ke saath specific real example
+            ✓ Conversational Hinglish — jaise koi dost samjha raha ho
+            ✓ YouTube script feel — scripted nahi, natural
+            ✗ BANNED: Multiple speakers ya dialogue format
+            ✗ BANNED: "Yeh zaroori hai", "Is prakar", "Ant mein", generic filler
+            ✗ BANNED: Long boring intro — hook direct aur sharp ho
+            ${durFillHi}
+          `;
         } else if (style === 'situational') {
           if (!includeNarrator) {
             prompt = `
@@ -1411,6 +1475,70 @@ export const generateDebateScript = async (
               ${durFillEn}
             `;
           }
+        } else if (style === 'explained_solo') {
+          prompt = `
+            Topic: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STEP 1 — PLAN FIRST:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Identify 4-7 key points that a proper YouTube video on this topic should cover.
+            Logical order: basics → depth → application → conclusion
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            CHARACTER — exactly 1 speaker (Voiceover):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Voiceover"`}
+            Tone: confident, clear, friendly — like a knowledgeable YouTuber talking directly to camera.
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE (in this exact order):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 HOOK (2-3 lines) 】
+            Start with an interesting fact, question, or shocking statement that stops the viewer.
+            Topic-specific — never generic "Have you ever wondered..."
+
+            【 INTRO 】
+            "In this video, we're going to cover:" — then 3-5 bullet points briefly listing what will be covered.
+            Short and crisp.
+
+            【 BASICS — What is this topic? 】
+            2-4 lines: explain this topic from absolute zero.
+            Assume the audience knows nothing about it.
+            Simple language — zero jargon.
+
+            【 MAIN POINTS — one by one 】
+            For each point:
+            → State the point name clearly
+            → Explain what this point is
+            → Give a real example or analogy
+            → Practical implication — why does this matter?
+
+            【 KEY TAKEAWAY 】
+            2-3 lines: what is the single most important message from this topic.
+            Simple and memorable.
+
+            【 OUTRO 】
+            "If you found this video helpful, give it a like and subscribe for more content like this."
+            Or similar natural CTA — not robotic.
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Only 1 speaker — "Voiceover" (or provided name)
+            ✓ Explain every point from zero — never assume prior knowledge
+            ✓ Every point must have a specific real example
+            ✓ Conversational tone — like a friend explaining, not a lecture
+            ✓ Proper YouTube script feel — natural, not stilted
+            ✗ BANNED: Multiple speakers or dialogue format
+            ✗ BANNED: "It's important to note", "In conclusion", "Furthermore", generic filler
+            ✗ BANNED: Long boring intro — hook must be direct and sharp
+            ${durFillEn}
+          `;
         } else if (style === 'situational') {
           if (!includeNarrator) {
           prompt = `
