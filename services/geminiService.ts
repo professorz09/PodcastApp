@@ -585,19 +585,18 @@ export const generateDebateScript = async (
                   "तो सवाल यह है — [topic के हिसाब से: क्या यह सच है? क्यों ऐसा होता है? यह सही है या गलत? इसे कैसे समझें?]"
                   यह question topic के nature के हिसाब से decide करो — एक ही pattern से मत पूछो हर बार।
 
-                【 Main Conversation — दोनों Speakers 】
-                Narrator हर major concept को 1-2 crisp lines में introduce करे → फिर दोनों speakers उस पर बात करें।
-                हर concept:
-                → Core idea simply explain (technical language नहीं)
-                → एक SPECIFIC example — इस exact topic के लिए:
+                【 Main Conversation — दोनों Speakers (Direct Perspective Style) 】
+                Narrator सिर्फ genuinely major topic shift पर 1-2 lines दे — हर concept के पहले नहीं (maximum 2-3 बार total)।
+                बाकी सब speakers करें — इस flow में:
+                → Speaker A एक angle या point directly explain करे — जैसे audience को खुद समझा रहा हो
+                → Speaker B उसी point में kuch aur add करे, deeper जाए, या alag perspective दे — directly
+                → दोनों seedha topic पर बोलें — "tune ye bola", "jaise maine kaha" style बिल्कुल नहीं
+                → Har concept ke baad ek specific real example zaroor:
                   • किताब का chapter → real teaching को story form में
                   • Biology/science → body/nature mechanism को analogy से
                   • Social topic → real situation जो लोग face करते हैं
                   • Finance → specific numbers और relatable comparison
                   • Philosophy/politics → historical या current event
-                → Speaker A का natural reaction/follow-up
-                → Speaker B का deeper angle या clarification
-                Narrator transitions: maximum 2-3 बार — हर concept के पहले नहीं, सिर्फ जब genuinely needed हो।
 
                 【 Narrator — Closing 】
                 Robotic bullet-point summary नहीं।
@@ -1298,19 +1297,18 @@ export const generateDebateScript = async (
                 "So the real question is — [topic-appropriate: Is this actually true? Why does this happen? Is it right or wrong? How do we make sense of this?]"
                 Choose the question type based on what THIS topic actually calls for — don't force the same pattern every time.
 
-              【 Main Conversation — Speakers 】
-              Narrator introduces each major concept (1-2 crisp lines) → Speakers discuss it naturally.
-              For each concept:
-              → State the core idea in 1-2 simple sentences — no jargon
-              → Give ONE specific, concrete example tailored to THIS exact topic:
+              【 Main Conversation — Speakers (Direct Perspective Style) 】
+              Narrator only steps in for genuinely major topic shifts — maximum 2-3 times total, not before every concept.
+              Speakers carry the rest — in this flow:
+              → Speaker A explains one angle or point directly — as if talking straight to the audience
+              → Speaker B adds to it, goes deeper, or brings a different angle — also directly
+              → Both stay focused on the topic itself — never "like you just said", "as I mentioned", "you make a good point" — no self-referencing
+              → After each concept, one specific real example tailored to this exact topic:
                 • Book chapter/law → the real principle illustrated with a specific scenario
                 • Science/biology → a body or nature analogy that makes it click instantly
                 • Social/psychology topic → a real situation people actually face
                 • Finance → real numbers and relatable comparisons
                 • Philosophy/politics → a historical or current event as the anchor
-              → Speaker A's natural reaction or follow-up question
-              → Speaker B's deeper explanation or nuanced angle
-              Narrator transitions: maximum 2-3 times total — only for genuinely major topic shifts, not after every concept.
 
               【 Narrator — Closing 】
               NOT a bullet-point summary.
