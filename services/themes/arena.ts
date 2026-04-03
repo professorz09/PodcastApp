@@ -14,6 +14,8 @@ export const arenaTheme: Theme = {
     { id: 'speakerShape',       label: 'Speaker Image Shape', type: 'select', defaultValue: 'rect',
       options: ['rect', 'circle', 'triangle'] },
     { id: 'showPointCounter',   label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
+    { id: 'counterPosition',    label: 'Counter Position', type: 'select', defaultValue: 'side', options: ['side', 'bottom'] },
+    { id: 'counterStyle',       label: 'Counter Style', type: 'select', defaultValue: 'bars', options: ['bars', 'dots', 'numbers'] },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;

@@ -10,6 +10,8 @@ export const splitTheme: Theme = {
     { id: 'speakerColorA', label: 'Speaker A Color', type: 'color', defaultValue: '#3b82f6' },
     { id: 'speakerColorB', label: 'Speaker B Color', type: 'color', defaultValue: '#ef4444' },
     { id: 'showPointCounter',   label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
+    { id: 'counterPosition',    label: 'Counter Position', type: 'select', defaultValue: 'side', options: ['side', 'bottom'] },
+    { id: 'counterStyle',       label: 'Counter Style', type: 'select', defaultValue: 'bars', options: ['bars', 'dots', 'numbers'] },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;

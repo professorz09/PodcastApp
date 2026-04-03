@@ -667,52 +667,132 @@ export const drawDebatePointCounter = (
     context: DrawContext
 ) => {
     const { config, scores, themeConfig } = context;
-    const { width: canvasWidth, height: canvasHeight } = ctx.canvas;
+    const { width: W, height: H } = ctx.canvas;
 
     if (!themeConfig?.showPointCounter || !scores) return;
     if (config.speakerIds.length < 2) return;
 
-    const colorA = themeConfig?.speakerColorA || '#3b82f6';
-    const colorB = themeConfig?.speakerColorB || '#ef4444';
+    const colorA = themeConfig?.speakerColorA || themeConfig?.glowColorA || '#3b82f6';
+    const colorB = themeConfig?.speakerColorB || themeConfig?.glowColorB || '#ef4444';
+    const position: 'side' | 'bottom' = themeConfig?.counterPosition || 'side';
+    const style: 'bars' | 'dots' | 'numbers' = themeConfig?.counterStyle || 'bars';
+    const MAX = 6;
 
-    const drawCounter = (score: string, isLeft: boolean, color: string) => {
-        const count = parseInt(score) || 0;
-        const MAX = 6;
-        const showCount = Math.min(count, MAX);
-        const hasMore = count > MAX;
+    // ── helpers ──────────────────────────────────────────────────────
+    const glow = (color: string) => { ctx.shadowColor = color; ctx.shadowBlur = 10; };
+    const noGlow = () => { ctx.shadowBlur = 0; };
 
-        const barW = 28;
-        const barH = 5;
-        const gap = 10;
-        const dotsH = hasMore ? 22 : 0;
-        const totalH = showCount * (barH + gap) - (showCount > 0 ? gap : 0) + dotsH;
-        const startY = (canvasHeight - totalH) / 2;
-        const marginX = 14;
-        const x = isLeft ? marginX : canvasWidth - marginX - barW;
+    const drawDots = (count: string, isLeft: boolean, color: string) => {
+        const n = parseInt(count) || 0;
+        const show = Math.min(n, MAX);
+        const more = n > MAX;
+        if (position === 'side') {
+            const r = 8, gap = 9;
+            const totalH = show * (r * 2 + gap) - (show > 0 ? gap : 0) + (more ? 20 : 0);
+            const sy = (H - totalH) / 2;
+            const mx = 15;
+            const cx = isLeft ? mx + r : W - mx - r;
+            ctx.save();
+            for (let i = 0; i < show; i++) {
+                const cy = sy + i * (r * 2 + gap) + r;
+                ctx.fillStyle = color; glow(color);
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+            }
+            noGlow();
+            if (more) {
+                ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = isLeft ? 'left' : 'right'; ctx.textBaseline = 'middle';
+                ctx.fillText('•••', isLeft ? cx - r : cx + r, sy + show * (r * 2 + gap) + 6);
+            }
+            ctx.restore();
+        } else {
+            const r = 7, gap = 8;
+            const totalW = show * (r * 2 + gap) - (show > 0 ? gap : 0) + (more ? 22 : 0);
+            const baseY = H - 80;
+            const sx = isLeft ? 30 : W - 30 - totalW;
+            ctx.save();
+            for (let i = 0; i < show; i++) {
+                const cx = sx + i * (r * 2 + gap) + r;
+                ctx.fillStyle = color; glow(color);
+                ctx.beginPath(); ctx.arc(cx, baseY, r, 0, Math.PI * 2); ctx.fill();
+            }
+            noGlow();
+            if (more) {
+                ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = isLeft ? 'left' : 'right'; ctx.textBaseline = 'middle';
+                ctx.fillText('•••', sx + show * (r * 2 + gap) + (isLeft ? 2 : -2), baseY);
+            }
+            ctx.restore();
+        }
+    };
 
+    const drawBars = (count: string, isLeft: boolean, color: string) => {
+        const n = parseInt(count) || 0;
+        const show = Math.min(n, MAX);
+        const more = n > MAX;
+        if (position === 'side') {
+            const bW = 28, bH = 5, gap = 10;
+            const totalH = show * (bH + gap) - (show > 0 ? gap : 0) + (more ? 22 : 0);
+            const sy = (H - totalH) / 2;
+            const mx = 14;
+            const x = isLeft ? mx : W - mx - bW;
+            ctx.save();
+            for (let i = 0; i < show; i++) {
+                const y = sy + i * (bH + gap);
+                ctx.fillStyle = color; glow(color);
+                ctx.beginPath(); ctx.roundRect(x, y, bW, bH, 3); ctx.fill();
+            }
+            noGlow();
+            if (more) {
+                ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = isLeft ? 'left' : 'right'; ctx.textBaseline = 'middle';
+                ctx.fillText('•••', isLeft ? x : x + bW, sy + show * (bH + gap) + 6);
+            }
+            ctx.restore();
+        } else {
+            const bW = 5, bH = 28, gap = 10;
+            const totalW = show * (bW + gap) - (show > 0 ? gap : 0) + (more ? 22 : 0);
+            const baseY = H - 80;
+            const sx = isLeft ? 30 : W - 30 - totalW;
+            ctx.save();
+            for (let i = 0; i < show; i++) {
+                const x = sx + i * (bW + gap);
+                ctx.fillStyle = color; glow(color);
+                ctx.beginPath(); ctx.roundRect(x, baseY - bH / 2, bW, bH, 3); ctx.fill();
+            }
+            noGlow();
+            if (more) {
+                ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = isLeft ? 'left' : 'right'; ctx.textBaseline = 'middle';
+                ctx.fillText('•••', sx + show * (bW + gap) + 2, baseY);
+            }
+            ctx.restore();
+        }
+    };
+
+    const drawNumbers = (count: string, isLeft: boolean, color: string) => {
+        const bW = 52, bH = 52, mx = 12;
+        let x: number, y: number;
+        if (position === 'side') {
+            x = isLeft ? mx : W - mx - bW;
+            y = H / 2 - bH / 2;
+        } else {
+            x = isLeft ? 24 : W - 24 - bW;
+            y = H - 80 - bH / 2;
+        }
         ctx.save();
-        for (let i = 0; i < showCount; i++) {
-            const y = startY + i * (barH + gap);
-            ctx.fillStyle = color;
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.roundRect(x, y, barW, barH, 3);
-            ctx.fill();
-        }
-        ctx.shadowBlur = 0;
-
-        if (hasMore) {
-            ctx.fillStyle = color;
-            ctx.font = 'bold 13px sans-serif';
-            ctx.textAlign = isLeft ? 'left' : 'right';
-            ctx.textBaseline = 'middle';
-            const dotsY = startY + showCount * (barH + gap) + 6;
-            ctx.fillText('•••', isLeft ? x : x + barW, dotsY);
-        }
+        ctx.fillStyle = color; glow(color);
+        ctx.beginPath(); ctx.roundRect(x, y, bW, bH, 12); ctx.fill();
+        noGlow();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 26px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(count, x + bW / 2, y + bH / 2);
         ctx.restore();
     };
 
-    drawCounter(scores.scoreA, true, colorA);
-    drawCounter(scores.scoreB, false, colorB);
+    // ── dispatch ─────────────────────────────────────────────────────
+    const draw = style === 'dots' ? drawDots : style === 'numbers' ? drawNumbers : drawBars;
+    draw(scores.scoreA, true,  colorA);
+    draw(scores.scoreB, false, colorB);
 };

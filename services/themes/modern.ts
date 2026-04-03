@@ -1,5 +1,5 @@
 import { Theme, DrawContext } from './types';
-import { drawBackground, drawSubtitles, drawSideStats, drawScores } from './utils';
+import { drawBackground, drawSubtitles, drawSideStats, drawScores, drawDebatePointCounter } from './utils';
 
 export const modernTheme: Theme = {
   id: 'modern',
@@ -10,6 +10,9 @@ export const modernTheme: Theme = {
     { id: 'speakerColorB', label: 'Speaker B Color', type: 'color', defaultValue: '#ef4444' },
     { id: 'baseRadius', label: 'Circle Radius', type: 'number', defaultValue: 80, min: 40, max: 150 },
     { id: 'pulseIntensity', label: 'Pulse Intensity', type: 'number', defaultValue: 10, min: 0, max: 50 },
+    { id: 'showPointCounter', label: '🏆 Debate Point Counter', type: 'boolean', defaultValue: false },
+    { id: 'counterPosition',  label: 'Counter Position', type: 'select', defaultValue: 'side', options: ['side', 'bottom'] },
+    { id: 'counterStyle',     label: 'Counter Style', type: 'select', defaultValue: 'bars', options: ['bars', 'dots', 'numbers'] },
   ],
   draw: (context: DrawContext) => {
     const { ctx, time, audioLevel, script, currentSegmentIndex, config, assets, themeConfig } = context;
@@ -148,6 +151,7 @@ export const modernTheme: Theme = {
     // Scores
     drawScores(ctx, context);
 
+    drawDebatePointCounter(ctx, context);
     // Subtitles
     drawSubtitles(ctx, context);
   }
