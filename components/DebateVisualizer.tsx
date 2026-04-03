@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
@@ -567,11 +567,16 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   // Generate scores when script changes
   useEffect(() => {
       const newScores = script.map(() => {
-          // Random score between 6.0 and 9.9
           return Math.floor((Math.random() * 3.9 + 6) * 10) / 10;
       });
       setSegmentScores(newScores);
   }, [script.length]);
+
+  // Manual: regenerate all segment scores at once
+  const handleRegenerateAllScores = useCallback(() => {
+      const newScores = script.map(() => Math.floor((Math.random() * 3.9 + 6) * 10) / 10);
+      setSegmentScores(newScores);
+  }, [script]);
 
   // Canvas Rendering Loop
   const render = useCallback(() => {
@@ -3479,6 +3484,21 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                         </>
                       )}
                     </div>
+
+                    {/* Score Generator */}
+                    <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-2">
+                      <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Score Generator</label>
+                      <p className="text-[10px] text-gray-600 leading-relaxed">Sabke segments ke liye naye random scores generate karo (6.0 – 9.9 range)</p>
+                      <button
+                        onClick={handleRegenerateAllScores}
+                        disabled={script.length === 0}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-bold bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/25 text-yellow-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw size={12} />
+                        Generate All Scores ({script.length} segments)
+                      </button>
+                    </div>
+
                     <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
                       <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Export</label>
                       <div className="space-y-2">

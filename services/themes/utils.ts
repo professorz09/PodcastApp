@@ -621,43 +621,85 @@ export const drawSideStats = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
 export const drawScores = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, context: DrawContext) => {
     const { config, scores, themeConfig } = context;
     const { width: canvasWidth } = ctx.canvas;
-    const { speakerIds } = config;
+    const { speakerIds, speakerLabels } = config;
 
     if (!config.showScores || !scores) return;
-    
-    // Only support scores for first 2 speakers for now
     if (speakerIds.length < 2) return;
-
-    const drawScoreBox = (isLeft: boolean, score: string, color: string) => {
-        const boxW = 140;
-        const boxH = 60;
-        const margin = 20;
-        const x = isLeft ? margin : canvasWidth - margin - boxW;
-        const y = 20;
-
-        // Background
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.roundRect(x, y, boxW, boxH, 12);
-        ctx.fill();
-
-        // Shadow/Glow
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 15;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Text
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(score, x + boxW / 2, y + boxH / 2 + 2);
-    };
 
     const colorA = themeConfig?.speakerColorA || (config.theme === 'neon' ? '#00ff00' : '#3b82f6');
     const colorB = themeConfig?.speakerColorB || (config.theme === 'neon' ? '#ff0000' : '#ef4444');
 
-    drawScoreBox(true, scores.scoreA, colorA);
-    drawScoreBox(false, scores.scoreB, colorB);
+    const drawScoreBox = (isLeft: boolean, score: string, color: string, label: string) => {
+        const boxW = 160;
+        const boxH = 72;
+        const margin = 18;
+        const radius = 14;
+        const x = isLeft ? margin : canvasWidth - margin - boxW;
+        const y = 18;
+
+        // Outer glow
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.roundRect(x, y, boxW, boxH, radius);
+        ctx.fill();
+        ctx.restore();
+
+        // Dark glass background
+        ctx.fillStyle = 'rgba(8, 8, 18, 0.82)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, boxW, boxH, radius);
+        ctx.fill();
+
+        // Colored top accent bar
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x, y, boxW, 4, [radius, radius, 0, 0]);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.restore();
+
+        // Left colored dot
+        const dotR = 7;
+        const dotX = x + 18;
+        const dotY = y + boxH / 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.restore();
+
+        // Speaker name (small, above score)
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = isLeft ? 'left' : 'right';
+        ctx.textBaseline = 'top';
+        const nameX = isLeft ? dotX + dotR + 8 : x + boxW - 14;
+        ctx.fillText(label.toUpperCase(), nameX, y + 10);
+
+        // Score value (large)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = isLeft ? 'left' : 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(score, nameX, y + boxH - 8);
+
+        // "SCORE" label (tiny)
+        ctx.fillStyle = color;
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = isLeft ? 'left' : 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('SCORE', nameX, y + boxH - 40);
+    };
+
+    const labelA = speakerLabels?.[0] || speakerIds[0] || 'A';
+    const labelB = speakerLabels?.[1] || speakerIds[1] || 'B';
+
+    drawScoreBox(true,  scores.scoreA, colorA, labelA);
+    drawScoreBox(false, scores.scoreB, colorB, labelB);
 };
