@@ -750,71 +750,62 @@ export const generateDebateScript = async (
               विषय: "${topic}" पर एक "Situational" style की video script बनाओ।
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
               ${durLineHi}
-              भाषा: हिंदी + Hinglish (जैसे real लोग बात करते हैं — natural, simple, human)।
-              Target Audience: USA में रहने वाले mature adults — इनकी ज़िंदगी के issues इस topic से जुड़ते हैं।
+              भाषा: हिंदी + Hinglish (real लोग जैसे बात करते हैं — natural, short, human)।
+              Target Audience: USA में रहने वाले mature adults।
 
-              पात्र — ठीक 3 वक्ता (fixed):
+              पात्र — ठीक 3 वक्ता:
               ${speakers.length >= 3
                 ? `इन नामों का उपयोग करें: ${speakers[0]} (situation में फंसा इंसान), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
-                : `Topic के हिसाब से नाम और experts चुनो — Speaker 1 वो इंसान जो situation में फंसा है, Speaker 2 और 3 उस topic के दो अलग-अलग domain experts (topic देखकर decide करो कि कौन से experts सबसे relevant हैं)।`
+                : `Topic के हिसाब से नाम और experts चुनो — Speaker 1 वो इंसान जो situation में फंसा है, Speaker 2 और 3 उस topic के दो अलग-अलग relevant domain experts।`
               }
 
               ══════════════════════════════════════════
-              【 SPEAKER 1 — INTRO + STORY (situation में फंसा इंसान) 】
+              【 SPEAKER 1 — DIRECT INTRO (कोई buildup नहीं) 】
               ══════════════════════════════════════════
-
-              Speaker 1 की opening EXACTLY इस structure में होगी:
-
-              Line 1 — अपना नाम और identity:
-              "मेरा नाम [नाम] है। मैं एक [middle class आदमी / engineer / artist / student / single mom / introvert / ...] हूँ।"
-              (topic के हिसाब से सबसे relevant identity चुनो — 1-2 words में)
-
-              Line 2 — triggering moment:
-              Topic और situation के हिसाब से एक natural time reference से शुरू करो — जो सबसे believable लगे।
-              (जैसे: "पिछले महीने...", "तीन हफ्ते पहले...", "उस रात जब...", "जब से यह हुआ...", "कुछ दिनों से..." — topic fit करे वो चुनो, "कल रात" default नहीं है)
-
-              फिर story naturally build हो:
-              → क्या हुआ — specific details के साथ, summary नहीं
-              → कैसे complicated होता गया — step by step
-              → आज कहाँ हूँ — emotionally और practically
-              → अपने सवालों से end करे — वो specific questions जो सोने नहीं देते, topic-relevant
+              पहली line EXACTLY यह होगी:
+              "मेरा नाम [नाम] है। मैं [identity] हूँ।"
+              फिर सीधे situation में — क्या हुआ, कैसे उलझा, अभी कहाँ हूँ।
+              2-3 short paragraphs MAX — long monologue नहीं।
+              अंत में एक burning question।
 
               ══════════════════════════════════════════
-              【 SPEAKER 2 — EXPERT 1 (पहला angle) 】
+              【 CONVERSATION STRUCTURE — यह MOST IMPORTANT है 】
               ══════════════════════════════════════════
-              ★ पहले story को genuinely feel करो — "यार, यह सुनकर समझ आता है कितना tough होगा" — फिर शुरू करो
-              ★ हर point simple और clear रखो — जैसे किसी दोस्त को समझा रहे हो, lecture नहीं
-              ★ कोई भी term जो आम आदमी न जाने — उसी line में simple भाषा में explain करो
-              ★ हर advice के साथ एक real example — कोई नाम, situation, result — abstract नहीं
-              ★ Pros और cons दोनों बताओ — false hope मत दो, real picture दो
 
-              ══════════════════════════════════════════
-              【 SPEAKER 3 — EXPERT 2 (दूसरा angle) 】
-              ══════════════════════════════════════════
-              ★ Speaker 2 की बात repeat मत करो — बिल्कुल नया angle लाओ
-              ★ वो चीज़ बताओ जो लोग usually miss करते हैं — hidden costs, emotional toll, long-term consequences
-              ★ एक ऐसी analogy दो जो instantly समझ आए — रोज़ की ज़िंदगी से
-              ★ कोई भी term — immediately explain करो, bare term कभी मत छोड़ो
-              ★ Politely disagree करो जहाँ ज़रूरी हो — real conversation होनी चाहिए
+              ★★★ PING-PONG FORMAT — हर response SHORT रखो ★★★
+              एक speaker 3-5 lines से ज़्यादा नहीं बोलेगा एक turn में।
+              फिर दूसरा react करेगा, या Speaker 1 एक follow-up सवाल पूछेगा।
+
+              Speaker 1 पूरी conversation में ACTIVE रहेगा — बीच-बीच में realistic follow-up सवाल पूछता रहेगा जैसे:
+              "ठीक है, लेकिन अगर [scenario X] हो जाए तो?"
+              "मतलब अगर मैं [action Y] करूँ तो क्या होगा?"
+              "यह तो हो गया — लेकिन इससे बचा जा सकता था?"
+              "अभी जो हो गया उसे कैसे fix करूँ?"
+              "मुझे honestly बताओ — अब कितना नुकसान हो सकता है?"
+
+              Expert 1 — पहला angle, short और clear।
+              Expert 2 — बिल्कुल अलग angle, Expert 1 से politely argue करे जहाँ ज़रूरी हो।
+              दोनों एक-दूसरे को challenge करें — real conversation।
 
               ══════════════════════════════════════════
               FLOW:
               ══════════════════════════════════════════
-              ACT 1 — Speaker 1 की story: Hook → journey → ONE burning question
-              ACT 2 — Experts react genuinely → clarify → advice शुरू करें
-              ACT 3 — Back-and-forth: Experts एक-दूसरे को challenge करें, Speaker 1 बीच में सवाल पूछे
-              ENDING — दोनों experts मिलकर (एक साथ, दोनों की आवाज़ में) Speaker को SPECIFIC numbered actionable steps दें — vague नहीं, actual step-by-step instructions। यहीं script खत्म होती है — इसके बाद कुछ नहीं।
+              → Speaker 1: direct intro + situation (short)
+              → Experts react genuinely — NOT एक साथ lecture, बल्कि short turns
+              → Speaker 1 follow-up सवाल पूछता रहे पूरी बात में
+              → Experts जवाब दें, आपस में disagree करें, Speaker 1 फिर पूछे
+              → ENDING: दोनों experts मिलकर NUMBERED action steps दें — specific, not vague। यहीं खत्म।
 
               ══════════════════════════════════════════
               HARD RULES:
               ══════════════════════════════════════════
-              ✗ Jargon बिना explanation — NEVER
-              ✗ "consult a professional" — professionals पहले से बैठे हैं, actual advice दो
-              ✗ "ध्यान देने योग्य है", "निष्कर्ष में", "सुनिश्चित करें" — banned
-              ✗ Surface-level generic advice — deeper जाओ
-              ✗ Lecture mode — conversation होनी चाहिए
-              ✓ हर major point = एक real, named example
-              ✓ Emotional truth — audience को लगे "यार यह तो मेरी ही story है"
+              ✗ किसी का भी एक turn 5 lines से ज़्यादा नहीं — EVER
+              ✗ Jargon बिना explanation — कभी नहीं
+              ✗ "consult a professional" — BANNED, actual advice दो
+              ✗ Generic surface-level advice — deeper जाओ
+              ✗ Long monologue — यह conversation है, speech नहीं
+              ✓ हर major point के साथ real, named example
+              ✓ Audience को लगे "यार यह तो मेरी ही situation है"
               ══════════════════════════════════════════
               ${durFillHi}
             `;
@@ -1662,68 +1653,61 @@ export const generateDebateScript = async (
             Language: ${language}.
             Target Audience: USA mature audience — people dealing with real-life issues related to this topic.
 
-            Characters — exactly 3 speakers (fixed):
+            Characters — exactly 3 speakers:
             ${speakers.length >= 3
               ? `Use these names: ${speakers[0]} (the person in the situation), ${speakers[1]} (Expert 1), ${speakers[2]} (Expert 2).`
-              : `Choose names and experts appropriate for THIS topic — Speaker 1 is the person stuck in the situation, Speakers 2 & 3 are two different domain experts relevant to the topic (decide which type of experts make the most sense based on what the topic is about).`
+              : `Choose names and experts for THIS topic — Speaker 1 is the person stuck in the situation, Speakers 2 & 3 are two different domain experts most relevant to this topic.`
             }
 
             ══════════════════════════════════════════
-            【 SPEAKER 1 — INTRO + STORY (the person in the situation) 】
+            【 SPEAKER 1 — DIRECT INTRO (no buildup) 】
             ══════════════════════════════════════════
-
-            Speaker 1 opens EXACTLY in this structure:
-
-            Line 1 — name and identity:
-            "My name is [name]. I'm a [middle class guy / engineer / artist / student / single mom / introvert / ...]."
-            (Pick the most relevant identity for this topic — keep it to 1–2 words)
-
-            Line 2 — the triggering moment:
-            Pick a natural time reference that fits the topic and feels believable — not a default phrase.
-            (e.g. "Three weeks ago...", "Ever since that day...", "A month back...", "When it first started..." — choose what fits, do NOT default to "last night")
-
-            Then the story builds naturally:
-            → What happened — specific details, not a summary
-            → How it got complicated — step by step
-            → Where they are now — emotionally and practically
-            → Ends with their own questions — specific things they can't figure out, relevant to this topic
+            First line MUST be exactly:
+            "My name is [name]. I'm a [identity]."
+            Then straight into the situation — what happened, how it got complicated, where they are now.
+            Keep it to 2-3 short paragraphs MAX. No long monologue.
+            End with one burning question.
 
             ══════════════════════════════════════════
-            【 SPEAKER 2 — EXPERT 1 (first angle) 】
+            【 CONVERSATION STRUCTURE — THIS IS THE MOST IMPORTANT PART 】
             ══════════════════════════════════════════
-            ★ First, genuinely feel the story — "Man, hearing that… I can understand how overwhelming that must feel." Then dig in.
-            ★ Explain everything in simple, plain language — like talking to a smart friend, not a client
-            ★ Any term the average person might not know — explain it immediately in the same sentence
-            ★ Every piece of advice needs a real example — give it a name, a situation, a result — not abstract
-            ★ Give both the upside AND the downside — no false hope, real picture
+
+            ★★★ PING-PONG FORMAT — keep every response SHORT ★★★
+            No speaker talks for more than 3-5 lines in one turn.
+            Then another speaker reacts, or Speaker 1 jumps in with a follow-up question.
+
+            Speaker 1 stays ACTIVE throughout — keeps asking realistic follow-up questions like:
+            "Okay but what if [scenario X] happens?"
+            "So if I do [action Y] — what happens then?"
+            "This already happened — could it have been avoided?"
+            "How do I fix what already went wrong?"
+            "Be honest with me — how bad can this actually get?"
+            "And what about [edge case]?"
+
+            Expert 1 — first angle, short and clear.
+            Expert 2 — completely different angle, respectfully disagrees with Expert 1 where needed.
+            Both experts challenge each other — real conversation, not a rehearsed presentation.
 
             ══════════════════════════════════════════
-            【 SPEAKER 3 — EXPERT 2 (second angle) 】
+            FLOW:
             ══════════════════════════════════════════
-            ★ Bring a completely different angle — do NOT repeat what Expert 1 said
-            ★ Surface what people usually miss — hidden costs, emotional toll, long-term consequences
-            ★ Use one analogy from everyday life that instantly clicks
-            ★ Any term you use — explain it immediately. No bare jargon ever.
-            ★ Respectfully push back on Expert 1 where needed — real conversation, not a tag team
-
-            ══════════════════════════════════════════
-            STORY ARC:
-            ══════════════════════════════════════════
-            ACT 1 — Speaker 1's story: Hook → full journey → ONE burning question
-            ACT 2 — Experts genuinely react → clarify → start going deep
-            ACT 3 — Real back-and-forth: experts challenge each other, Speaker 1 asks follow-up questions
-            ENDING — Both experts together (both voices, one combined segment) give Speaker 1 SPECIFIC numbered actionable steps — actual instructions, not vague suggestions. Script ends here. Nothing after this.
+            → Speaker 1: direct intro + situation (short)
+            → Experts react — short turns, NOT one long lecture each
+            → Speaker 1 keeps asking follow-up questions throughout
+            → Experts answer, disagree with each other, Speaker 1 asks again
+            → ENDING: both experts together give NUMBERED action steps — specific, not vague. Script ends here.
 
             ══════════════════════════════════════════
             NON-NEGOTIABLE RULES:
             ══════════════════════════════════════════
-            ✗ NEVER use any term without immediately explaining it
-            ✗ NEVER say "consult a professional" — you ARE the professionals, give actual advice
-            ✗ NO surface-level generic advice — go deeper than what anyone already knows
-            ✗ NO lecture mode — this is a real conversation
-            ✗ Banned phrases: "It's important to note", "In conclusion", "Let's delve into", "I want to emphasize"
-            ✓ Every major point = one real example with specific detail
-            ✓ Audience should think: "Wait — this is literally my situation"
+            ✗ No single turn longer than 5 lines — EVER
+            ✗ Never use jargon without immediately explaining it
+            ✗ "Consult a professional" — BANNED, give actual advice
+            ✗ No surface-level generic advice — go deeper
+            ✗ No long monologues — this is a conversation, not a speech
+            ✗ Banned phrases: "It's important to note", "In conclusion", "Let's delve into"
+            ✓ Every major point = one real, named example
+            ✓ Audience should feel: "This is literally my situation"
             ══════════════════════════════════════════
             ${durFillEn}
           `;
