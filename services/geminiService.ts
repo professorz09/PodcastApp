@@ -574,11 +574,16 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Narrator — Opening Hook (30-45 seconds का) 】
-                Topic का सबसे shocking, counterintuitive, या fascinating angle से शुरू।
-                एक line में audience को बाँध लो — question, fact, या provocative statement।
-                फिर 2-3 lines में बताओ: आज क्या समझेंगे और क्यों यह matter करता है।
-                Boring roadmap नहीं — एक interesting promise।
+                【 Narrator — Opening 】
+                Step 1 — एक सवाल से शुरू करो जो topic से directly जुड़ा हो और audience के मन में तुरंत उठे।
+                  (जैसे topic "Why women live longer" है → "क्या सच में औरतें मर्दों से ज़्यादा जीती हैं? और अगर हाँ, तो क्यों?")
+                  (जैसे topic "48 Laws Law 1" है → "क्या आपने कभी सोचा है कि power में रहने वाले लोग हमेशा किसी की तारीफ क्यों नहीं करते?")
+                  सवाल direct, sharp, और topic-specific हो — generic नहीं।
+                Step 2 — Topic को briefly introduce करो: 2-3 simple lines में बताओ यह topic है क्या।
+                  Simple, clear, no jargon — जैसे किसी को पहली बार बता रहे हो।
+                Step 3 — फिर central question पूछो जो पूरी video का anchor बनेगा:
+                  "तो सवाल यह है — [topic के हिसाब से: क्या यह सच है? क्यों ऐसा होता है? यह सही है या गलत? इसे कैसे समझें?]"
+                  यह question topic के nature के हिसाब से decide करो — एक ही pattern से मत पूछो हर बार।
 
                 【 Main Conversation — दोनों Speakers 】
                 Narrator हर major concept को 1-2 crisp lines में introduce करे → फिर दोनों speakers उस पर बात करें।
@@ -1282,11 +1287,16 @@ export const generateDebateScript = async (
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Narrator — Opening Hook 】
-              Lead with the most gripping angle of this specific topic.
-              ONE powerful sentence that stops the audience cold.
-              Then 2-3 lines: what are we covering and why does it genuinely matter.
-              Not a boring list — an interesting promise.
+              【 Narrator — Opening 】
+              Step 1 — Start with a direct question tied to the topic — one that the audience immediately wants answered.
+                (e.g. topic "Why women live longer" → "Do women actually live longer than men — and if so, why?")
+                (e.g. topic "48 Laws Law 1" → "Have you ever noticed that the most powerful people in the room rarely compliment anyone?")
+                The question must be sharp, specific to THIS topic — not a generic "Have you ever wondered..."
+              Step 2 — Briefly introduce the topic: 2-3 simple sentences explaining what it is.
+                Clear, no jargon — like you're telling someone who's hearing about it for the first time.
+              Step 3 — Then ask the central question that will anchor the whole video:
+                "So the real question is — [topic-appropriate: Is this actually true? Why does this happen? Is it right or wrong? How do we make sense of this?]"
+                Choose the question type based on what THIS topic actually calls for — don't force the same pattern every time.
 
               【 Main Conversation — Speakers 】
               Narrator introduces each major concept (1-2 crisp lines) → Speakers discuss it naturally.
