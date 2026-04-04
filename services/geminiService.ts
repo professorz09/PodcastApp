@@ -1160,15 +1160,11 @@ export const generateDebateScript = async (
                 - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से fresh नाम choose करो — हर बार अलग, topic-relevant। अगर topic किसी specific public figure पर है तो उनका नाम use करो, concept debate है तो उस side को represent करने वाला believable नाम बनाओ। Generic या repeated नाम मत use करो।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                OPENING — NARRATOR (EXACTLY 3 lines — kuch zyada nahi):
+                OPENING — NARRATOR (sirf 2 lines):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Narrator ka opening EXACTLY is format mein hoga:
-
-                Line 1: "Aaj debate hogi — [TOPIC NAME seedha, ek line mein]."
-                Line 2: "Ek taraf hain [Speaker A naam] jo support karte hain [Speaker A ki position/ideology ek short phrase mein], aur doosri taraf hain [Speaker B naam] jo believe karte hain [Speaker B ki position/ideology]."
-                Line 3: "[Topic ka core tension — ek sharp, direct DEBATE QUESTION] — yahi aaj decide hoga."
-
-                Bas. Teen lines. Opening yahan khatam. Debate shuru.
+                Line 1: "Aaj do debaters — [Speaker A naam] aur [Speaker B naam] — [TOPIC] par discuss karne wale hain."
+                Line 2: "[Topic ka core tension — ek sharp debate question]?"
+                Bas. Debate shuru.
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 DEBATE BODY:
@@ -1197,12 +1193,8 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ✓ दोनों sides genuinely strong — कोई side strawman नहीं
                 ✓ Expert-level thinking, simple भाषा — जैसे कोई जानकार इंसान real debate में बोलता हो
-                ✓ हर point basics से build होकर logical conclusion तक जाए
                 ✓ Real examples, analogies, या facts से arguments support हों
-                ✗ BANNED: Opening mein 3 lines se zyada — bilkul nahi
-                ✗ BANNED: "हमने AI models configure किया है" ya koi bhi AI/meta reference opening mein
-                ✗ BANNED: Speaker ka position opening mein mat chhupao — LINE 2 mein clearly bolna hai
-                ✗ BANNED: "यह ध्यान देने योग्य है", "निष्कर्ष में", "इस प्रकार", generic filler
+                ✗ BANNED: Generic filler — "यह ध्यान देने योग्य है", "निष्कर्ष में", "इस प्रकार"
                 ✗ BANNED: एक side का argument दूसरे से obviously कमज़ोर हो
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ${durFillHi}
@@ -1218,13 +1210,11 @@ export const generateDebateScript = async (
                 ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `Topic के हिसाब से fresh नाम choose करो — हर बार अलग। Generic या repeated नाम मत use करो।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                OPENING — Speaker A (EXACTLY 3 lines — kuch zyada nahi):
+                OPENING — Speaker A (sirf 2 lines):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Speaker A seedha is format mein shuru karega:
-                Line 1: "[TOPIC NAME directly bolo — ek line mein]."
-                Line 2: "Main hun [Speaker A naam] — main support karta hun [Speaker A ki position/ideology short mein]. Aur [Speaker B naam], jo believe karte hain [Speaker B ki position/ideology], unse poochta hun —"
-                Line 3: "[Topic ka core tension — ek sharp, direct DEBATE QUESTION]?"
-                Bas. Teen lines. Koi build-up nahi, koi 4th line nahi.
+                Line 1: "Aaj debate hai [TOPIC] par — main hun [Speaker A naam], aur mere saath hain [Speaker B naam]."
+                Line 2: "[Topic ka core tension — ek sharp debate question]?"
+                Bas. Speaker B turant respond karega.
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 DEBATE BODY:
@@ -1248,11 +1238,8 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ✓ दोनों sides equally strong — कोई side strawman नहीं
                 ✓ Expert-level thinking, simple भाषा — जैसे कोई जानकार इंसान real debate में बोलता हो
-                ✓ हर point basics से build होकर logical conclusion तक जाए
                 ✓ Real examples, analogies, या facts से arguments support हों
-                ✗ BANNED: Opening mein 3 lines se zyada — bilkul nahi
-                ✗ BANNED: Speaker ka position opening mein mat chhupao — LINE 2 mein clearly bolna hai
-                ✗ BANNED: "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में", generic filler
+                ✗ BANNED: Generic filler — "यह ध्यान देने योग्य है", "निष्कर्ष के रूप में"
                 ✗ BANNED: एक side का argument दूसरे से obviously कमज़ोर हो
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 ${durFillHi}
@@ -2243,15 +2230,11 @@ export const generateDebateScript = async (
               - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Choose fresh, topic-appropriate names — never reuse the same names across topics. If the topic is about a specific public figure, use their name; if it's a concept debate, create believable names that fit the side they represent. Avoid generic or repetitive names.`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              OPENING — NARRATOR (EXACTLY 3 lines — nothing more):
+              OPENING — NARRATOR (2 lines only):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              The Narrator's opening must follow this EXACT format:
-
-              Line 1: "Today's debate — [TOPIC NAME directly, one line]."
-              Line 2: "On one side is [Speaker A name] who supports [Speaker A's position/ideology in a short phrase], and on the other is [Speaker B name] who believes in [Speaker B's position/ideology]."
-              Line 3: "[The core tension of this topic — one sharp, direct DEBATE QUESTION] — that's what we'll settle today."
-
-              That's it. Three lines. Opening ends here. Debate begins immediately.
+              Line 1: "Today, two debaters — [Speaker A name] and [Speaker B name] — discuss [TOPIC]."
+              Line 2: "[The core tension of this topic as one sharp debate question]?"
+              That's it. Debate begins.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               DEBATE BODY:
@@ -2280,12 +2263,8 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ✓ Both sides genuinely strong — no strawmanning either side
               ✓ Expert-level thinking, simple language — like a knowledgeable person arguing in real life
-              ✓ Every point builds from basics to a logical conclusion
               ✓ Support arguments with real examples, analogies, or facts
-              ✗ BANNED: Opening more than 3 lines — strictly enforced
-              ✗ BANNED: "We configured the most advanced AI models" or any AI/meta reference in the opening
-              ✗ BANNED: Hiding who supports what — Line 2 must clearly state each speaker's position
-              ✗ BANNED: "It's important to note", "In conclusion", "Let's delve into", "This is significant"
+              ✗ BANNED: Generic filler — "It's important to note", "In conclusion", "Let's delve into"
               ✗ BANNED: One side being obviously weaker than the other
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
@@ -2301,13 +2280,11 @@ export const generateDebateScript = async (
               ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Choose fresh names relevant to this specific topic — never repeat the same names. No generic placeholder names. Each name should feel like it belongs to someone who would genuinely hold that side's position.`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              OPENING — Speaker A (EXACTLY 3 lines — nothing more):
+              OPENING — Speaker A (2 lines only):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Speaker A opens in this EXACT format:
-              Line 1: "[TOPIC NAME directly — one line]."
-              Line 2: "I'm [Speaker A name] — I support [Speaker A's position/ideology in a short phrase]. And [Speaker B name], who believes in [Speaker B's position/ideology], let me ask you —"
-              Line 3: "[The core tension of this topic — one sharp, direct DEBATE QUESTION]?"
-              That's it. Three lines. No build-up, no 4th line.
+              Line 1: "Today's debate is on [TOPIC] — I'm [Speaker A name] and my opponent is [Speaker B name]."
+              Line 2: "[The core tension of this topic as one sharp debate question]?"
+              That's it. Speaker B responds immediately.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               DEBATE BODY:
@@ -2331,11 +2308,8 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ✓ Both sides equally strong — no strawmanning either side
               ✓ Expert-level thinking, simple language — like a knowledgeable person arguing in real life
-              ✓ Every point builds from basics to a logical conclusion
               ✓ Support arguments with real examples, analogies, or facts
-              ✗ BANNED: Opening more than 3 lines — strictly enforced
-              ✗ BANNED: Hiding who supports what — Line 2 must clearly state each speaker's position
-              ✗ BANNED: "It's important to note", "In conclusion", "Let's delve into"
+              ✗ BANNED: Generic filler — "It's important to note", "In conclusion", "Let's delve into"
               ✗ BANNED: One side being obviously weaker than the other
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               ${durFillEn}
