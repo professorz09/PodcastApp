@@ -1160,11 +1160,13 @@ export const generateDebateScript = async (
                 - ${speakerCount} वक्ता (दो opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Topic के हिसाब से fresh नाम choose करो — हर बार अलग, topic-relevant। अगर topic किसी specific public figure पर है तो उनका नाम use करो, concept debate है तो उस side को represent करने वाला believable नाम बनाओ। Generic या repeated नाम मत use करो।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                OPENING — NARRATOR (sirf 2 lines):
+                OPENING — NARRATOR (3 lines max):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Line 1: Dono debaters ke naam + topic — ek line mein introduce karo. Wording apni taraf se choose karo.
-                Line 2: Topic ka core tension — ek sharp debate question.
-                Bas. Debate shuru.
+                Yeh 3 cheezein clearly cover karo — apni wording mein:
+                1. Topic ka naam directly batao.
+                2. Dono debaters ke naam + unki exact position/side — "X, jo [position] support karta hai, aur Y, jo [position] ka paksha leta hai."
+                3. Ek sharp, direct debate question jisse debate shuru ho.
+                Bas. Koi extra build-up nahi.
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 DEBATE BODY:
@@ -1210,11 +1212,13 @@ export const generateDebateScript = async (
                 ${speakers.length > 0 ? `इन नामों का उपयोग करो: ${speakers.join(", ")}.` : `Topic के हिसाब से fresh नाम choose करो — हर बार अलग। Generic या repeated नाम मत use करो।`}
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                OPENING — Speaker A (sirf 2 lines):
+                OPENING — Speaker A (3 lines max):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Line 1: Topic + apna naam + opponent ka naam — ek line mein introduce karo. Wording apni taraf se choose karo.
-                Line 2: Topic ka core tension — ek sharp debate question.
-                Bas. Speaker B turant respond karega.
+                Yeh 3 cheezein clearly cover karo — apni wording mein:
+                1. Topic ka naam directly batao.
+                2. Apna naam + apni position, aur opponent ka naam + uski position — clearly.
+                3. Ek sharp debate question opponent ko throw karo.
+                Bas. Speaker B turant jawab dega.
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 DEBATE BODY:
@@ -2230,11 +2234,13 @@ export const generateDebateScript = async (
               - ${speakerCount} speakers (two opposing sides): ${speakers.length > 0 ? speakers.join(", ") : `Choose fresh, topic-appropriate names — never reuse the same names across topics. If the topic is about a specific public figure, use their name; if it's a concept debate, create believable names that fit the side they represent. Avoid generic or repetitive names.`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              OPENING — NARRATOR (2 lines only):
+              OPENING — NARRATOR (3 lines max):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Line 1: Introduce both debaters and the topic in one line. Choose your own wording — don't repeat a fixed phrase.
-              Line 2: The core tension of the topic — one sharp debate question.
-              That's it. Debate begins.
+              Cover these 3 things clearly — in your own wording:
+              1. State the topic directly by name.
+              2. Introduce both debaters with their name AND their exact position/side — e.g. "X, who supports [position], and Y, who argues for [position]."
+              3. One sharp, direct debate question to kick things off.
+              That's it. No extra build-up. Debate begins.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               DEBATE BODY:
@@ -2280,10 +2286,12 @@ export const generateDebateScript = async (
               ${speakers.length > 0 ? `Use these names: ${speakers.join(", ")}.` : `Choose fresh names relevant to this specific topic — never repeat the same names. No generic placeholder names. Each name should feel like it belongs to someone who would genuinely hold that side's position.`}
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              OPENING — Speaker A (2 lines only):
+              OPENING — Speaker A (3 lines max):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Line 1: Introduce the topic, yourself, and your opponent in one line. Choose your own wording — don't repeat a fixed phrase.
-              Line 2: The core tension of the topic — one sharp debate question.
+              Cover these 3 things clearly — in your own wording:
+              1. State the topic directly by name.
+              2. Introduce yourself with your position/side, and your opponent with their position/side — clearly stated.
+              3. Throw one sharp debate question at your opponent.
               That's it. Speaker B responds immediately.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
