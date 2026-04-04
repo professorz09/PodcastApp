@@ -31,6 +31,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     selectedTitle = '',
     thumbnailTexts = [],
     selectedThumbnailText = '',
+    comboPairs = [],
     hostName = '',
     guestName = '',
     thumbnailUrl,
@@ -44,7 +45,6 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [isGeneratingThumbnailText, setIsGeneratingThumbnailText] = useState(false);
   const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
   const [inspirationError, setInspirationError] = useState<string | null>(null);
-  const [pairs, setPairs] = useState<{ title: string; thumbnailText: string }[]>([]);
   const [isGeneratingPair, setIsGeneratingPair] = useState(false);
   const [pairError, setPairError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -102,7 +102,6 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       onUpdateThumbnailState({
         ...thumbnailState,
         titles: generatedTitles,
-        selectedTitle: generatedTitles[0] || '',
       });
     } catch (e: any) {
       setGenerateError(e?.message || 'Title generation failed. Please try again.');
@@ -121,7 +120,6 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       onUpdateThumbnailState({
         ...thumbnailState,
         thumbnailTexts: generatedTexts,
-        selectedThumbnailText: generatedTexts[0] || '',
       });
     } catch (e: any) {
       setGenerateError(e?.message || 'Thumbnail text generation failed. Please try again.');
@@ -187,7 +185,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       if (result.length === 0) {
         setPairError('Koi pair nahi aaya — dobara try karo.');
       } else {
-        setPairs(result);
+        onUpdateThumbnailState({ ...thumbnailState, comboPairs: result });
       }
     } catch (err: any) {
       setPairError(err?.message || 'Generation fail hui. Dobara try karo.');
@@ -349,7 +347,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                       ? <Loader2 size={12} className="animate-spin" />
                       : <Zap size={12} />
                     }
-                    {pairs.length > 0 ? 'Regenerate' : 'Generate Both'}
+                    {comboPairs.length > 0 ? 'Regenerate' : 'Generate Both'}
                   </button>
                 </div>
 
@@ -358,9 +356,9 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                     <Loader2 className="animate-spin" size={14} />
                     <span className="text-sm">Matched pairs ban rahe hain...</span>
                   </div>
-                ) : pairs.length > 0 ? (
+                ) : comboPairs.length > 0 ? (
                   <div className="space-y-2">
-                    {pairs.map((pair, idx) => {
+                    {comboPairs.map((pair, idx) => {
                       const isSelected = selectedTitle === pair.title && selectedThumbnailText === pair.thumbnailText;
                       return (
                         <div

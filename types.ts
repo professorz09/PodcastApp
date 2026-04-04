@@ -114,6 +114,7 @@ export interface ThumbnailState {
   selectedTitle: string;
   thumbnailTexts: string[];
   selectedThumbnailText: string;
+  comboPairs?: { title: string; thumbnailText: string }[];
   hostName: string;
   guestName: string;
   thumbnailUrl: string | null;

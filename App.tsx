@@ -31,6 +31,7 @@ const App: React.FC = () => {
     selectedTitle: '',
     thumbnailTexts: [],
     selectedThumbnailText: '',
+    comboPairs: [],
     hostName: 'Joe Rogan',
     guestName: '',
     thumbnailUrl: null,
@@ -103,6 +104,7 @@ const App: React.FC = () => {
             setThumbnailState({
               thumbnailTexts: [],
               selectedThumbnailText: '',
+              comboPairs: [],
               extraInstructions: '',
               ...stored.thumbnailState,
             });
@@ -200,6 +202,7 @@ const App: React.FC = () => {
       selectedTitle: '',
       thumbnailTexts: [],
       selectedThumbnailText: '',
+      comboPairs: [],
       hostName: 'Joe Rogan',
       guestName: '',
       thumbnailUrl: null,
