@@ -392,15 +392,131 @@ export const arenaTheme: Theme = {
     if (showSpeakers) {
         const focusMode = themeConfig?.focusActiveSpeaker === true;
         const isNarratorTurn = currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator';
+        const activeIdx = speakerIds.findIndex(id => id === currentSegment.speaker);
+        const doFocus = focusMode && !isNarratorTurn && activeIdx !== -1;
+
+        // ── Phase 1: Inactive speakers (dimmed) ───────────────────
         speakerIds.forEach((id, index) => {
-            const isSpeaking = isPlaying && currentSegment.speaker === id;
-            if (focusMode) { if (isNarratorTurn || !isSpeaking) return; }
+            const isSpeaking = currentSegment.speaker === id;
+            if (isSpeaking) return;
             const label = speakerLabels[index] || id;
-            const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
+            const pos   = speakerPositions[index] || { x: 0.5, y: 0.5 };
             const color = colors[index % colors.length];
-            drawSpeaker(label, pos.x, pos.y, isSpeaking, color,
+            ctx.save();
+            if (doFocus) ctx.globalAlpha = 0.18;
+            drawSpeaker(label, pos.x, pos.y, false, color,
+                config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null);
+            ctx.restore();
+        });
+
+        // ── Phase 2: Neon spotlight cone behind active speaker ────
+        if (doFocus) {
+            const aPos  = speakerPositions[activeIdx] || { x: 0.5, y: 0.5 };
+            const ax    = aPos.x * canvasWidth;
+            const ay    = aPos.y * canvasHeight + 50;
+            const aColor = colors[activeIdx % colors.length];
+            const pulse  = 1 + audioLevel * 0.3;
+
+            // Cone beam from top-center
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const halfW = canvasWidth * 0.18 * pulse;
+            const coneGrad = ctx.createRadialGradient(ax, -60, 0, ax, ay + 80, canvasHeight * 0.8);
+            coneGrad.addColorStop(0, `${aColor}44`);
+            coneGrad.addColorStop(0.55, `${aColor}18`);
+            coneGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = coneGrad;
+            ctx.beginPath();
+            ctx.moveTo(ax, -60);
+            ctx.lineTo(ax + halfW, ay + 120);
+            ctx.lineTo(ax - halfW, ay + 120);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            // Floor light pool ellipse
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const poolGrad = ctx.createRadialGradient(ax, ay + 90, 0, ax, ay + 90, 180 + audioLevel * 60);
+            poolGrad.addColorStop(0, `${aColor}55`);
+            poolGrad.addColorStop(0.5, `${aColor}22`);
+            poolGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = poolGrad;
+            ctx.beginPath();
+            ctx.ellipse(ax, ay + 90, 180 + audioLevel * 60, 38 + audioLevel * 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // ── Phase 3: Active speaker (full brightness) ─────────────
+        speakerIds.forEach((id, index) => {
+            const isSpeaking = currentSegment.speaker === id;
+            if (!isSpeaking) return;
+            const label = speakerLabels[index] || id;
+            const pos   = speakerPositions[index] || { x: 0.5, y: 0.5 };
+            const color = colors[index % colors.length];
+            drawSpeaker(label, pos.x, pos.y, true, color,
                 config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null);
         });
+
+        // ── Phase 4: Neon focus rings around active speaker ───────
+        if (doFocus) {
+            const aPos   = speakerPositions[activeIdx] || { x: 0.5, y: 0.5 };
+            const ax     = aPos.x * canvasWidth;
+            const ay     = aPos.y * canvasHeight + 50;
+            const aColor = colors[activeIdx % colors.length];
+            const sc     = config.speakerScale * (1 + audioLevel * 0.07);
+
+            // Determine reference radius based on shape
+            const refR = speakerShape === 'circle'   ? 120 * sc
+                       : speakerShape === 'triangle' ? 140 * sc
+                       : Math.max(240 * sc, 320 * sc) * 0.55; // rect approx
+
+            const RINGS = 3;
+            for (let r = 0; r < RINGS; r++) {
+                const expand  = refR + 18 * (r + 1) + audioLevel * 30 * (r + 1);
+                const alpha   = Math.max(0, (0.7 - r * 0.22)) * (0.35 + audioLevel * 0.65);
+                const lw      = Math.max(1, 3 - r);
+                const glow    = 16 + audioLevel * 24;
+                const flicker = 1 + Math.sin(time * 9 + r * 2.1) * 0.08 * audioLevel;
+
+                ctx.save();
+                ctx.globalAlpha  = alpha * flicker;
+                ctx.strokeStyle  = aColor;
+                ctx.lineWidth    = lw * flicker;
+                ctx.shadowColor  = aColor;
+                ctx.shadowBlur   = glow;
+
+                if (speakerShape === 'circle') {
+                    ctx.beginPath();
+                    ctx.arc(ax, ay, expand, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (speakerShape === 'triangle') {
+                    clipTriangle(ax, ay, expand);
+                    ctx.stroke();
+                } else {
+                    const rw = 240 * sc + 18 * (r + 1) * 1.4 + audioLevel * 20 * (r + 1);
+                    const rh = 320 * sc + 18 * (r + 1) * 1.4 + audioLevel * 20 * (r + 1);
+                    ctx.beginPath();
+                    ctx.roundRect(ax - rw / 2, ay - rh / 2, rw, rh, 34);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // Neon halo shimmer (outer radial glow)
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            const haloR = refR * 1.7 + audioLevel * 50;
+            const halo  = ctx.createRadialGradient(ax, ay, refR * 0.6, ax, ay, haloR);
+            halo.addColorStop(0, `${aColor}${Math.round((0.28 + audioLevel * 0.35) * 255).toString(16).padStart(2, '0')}`);
+            halo.addColorStop(1, 'transparent');
+            ctx.fillStyle = halo;
+            ctx.beginPath();
+            ctx.ellipse(ax, ay, haloR, haloR * 0.88, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
     }
 
     // ── Segment Count Dots — side-centered, no names ──────────────
