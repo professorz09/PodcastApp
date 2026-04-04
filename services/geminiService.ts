@@ -1162,8 +1162,8 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 OPENING — NARRATOR (sirf 2 lines):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Line 1: "Aaj do debaters — [Speaker A naam] aur [Speaker B naam] — [TOPIC] par discuss karne wale hain."
-                Line 2: "[Topic ka core tension — ek sharp debate question]?"
+                Line 1: Dono debaters ke naam + topic — ek line mein introduce karo. Wording apni taraf se choose karo.
+                Line 2: Topic ka core tension — ek sharp debate question.
                 Bas. Debate shuru.
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1212,8 +1212,8 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 OPENING — Speaker A (sirf 2 lines):
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                Line 1: "Aaj debate hai [TOPIC] par — main hun [Speaker A naam], aur mere saath hain [Speaker B naam]."
-                Line 2: "[Topic ka core tension — ek sharp debate question]?"
+                Line 1: Topic + apna naam + opponent ka naam — ek line mein introduce karo. Wording apni taraf se choose karo.
+                Line 2: Topic ka core tension — ek sharp debate question.
                 Bas. Speaker B turant respond karega.
 
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2232,8 +2232,8 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               OPENING — NARRATOR (2 lines only):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Line 1: "Today, two debaters — [Speaker A name] and [Speaker B name] — discuss [TOPIC]."
-              Line 2: "[The core tension of this topic as one sharp debate question]?"
+              Line 1: Introduce both debaters and the topic in one line. Choose your own wording — don't repeat a fixed phrase.
+              Line 2: The core tension of the topic — one sharp debate question.
               That's it. Debate begins.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2282,8 +2282,8 @@ export const generateDebateScript = async (
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               OPENING — Speaker A (2 lines only):
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              Line 1: "Today's debate is on [TOPIC] — I'm [Speaker A name] and my opponent is [Speaker B name]."
-              Line 2: "[The core tension of this topic as one sharp debate question]?"
+              Line 1: Introduce the topic, yourself, and your opponent in one line. Choose your own wording — don't repeat a fixed phrase.
+              Line 2: The core tension of the topic — one sharp debate question.
               That's it. Speaker B responds immediately.
 
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
