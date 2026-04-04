@@ -396,7 +396,7 @@ export const arenaTheme: Theme = {
         const doFocus = focusMode && !isNarratorTurn && activeIdx !== -1;
 
         // ── Phase 1: Inactive speakers (hidden in focus mode) ────
-        if (!doFocus) {
+        if (!focusMode) {
             speakerIds.forEach((id, index) => {
                 const isSpeaking = currentSegment.speaker === id;
                 if (isSpeaking) return;
