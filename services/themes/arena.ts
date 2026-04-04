@@ -395,19 +395,18 @@ export const arenaTheme: Theme = {
         const activeIdx = speakerIds.findIndex(id => id === currentSegment.speaker);
         const doFocus = focusMode && !isNarratorTurn && activeIdx !== -1;
 
-        // ── Phase 1: Inactive speakers (dimmed) ───────────────────
-        speakerIds.forEach((id, index) => {
-            const isSpeaking = currentSegment.speaker === id;
-            if (isSpeaking) return;
-            const label = speakerLabels[index] || id;
-            const pos   = speakerPositions[index] || { x: 0.5, y: 0.5 };
-            const color = colors[index % colors.length];
-            ctx.save();
-            if (doFocus) ctx.globalAlpha = 0.18;
-            drawSpeaker(label, pos.x, pos.y, false, color,
-                config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null);
-            ctx.restore();
-        });
+        // ── Phase 1: Inactive speakers (hidden in focus mode) ────
+        if (!doFocus) {
+            speakerIds.forEach((id, index) => {
+                const isSpeaking = currentSegment.speaker === id;
+                if (isSpeaking) return;
+                const label = speakerLabels[index] || id;
+                const pos   = speakerPositions[index] || { x: 0.5, y: 0.5 };
+                const color = colors[index % colors.length];
+                drawSpeaker(label, pos.x, pos.y, false, color,
+                    config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null);
+            });
+        }
 
         // ── Phase 2: Neon spotlight cone behind active speaker ────
         if (doFocus) {
