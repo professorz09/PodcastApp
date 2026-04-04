@@ -13,6 +13,7 @@ export const neonTheme: Theme = {
     // ── Speaker ───────────────────────────────────────────────────
     { id: 'speakerShape',      label: 'Speaker Shape',            type: 'select',  defaultValue: 'circle',           group: 'Speaker',
       options: ['circle', 'square', 'hexagon'] },
+    { id: 'focusActiveSpeaker', label: 'Focus Active Speaker',    type: 'boolean', defaultValue: false,              group: 'Speaker' },
     { id: 'showSpeakerLabel',  label: 'Show Speaker Name',        type: 'boolean', defaultValue: false,              group: 'Speaker' },
     { id: 'detachNamePos',     label: 'Detach Name from Shape',   type: 'boolean', defaultValue: false,              group: 'Speaker' },
     { id: 'nameAlign',         label: 'Name Position',            type: 'select',  defaultValue: 'bottom-sides',     group: 'Speaker',
@@ -39,6 +40,7 @@ export const neonTheme: Theme = {
     const showBar           = themeConfig?.showBar ?? false;
     const showTimerNames    = themeConfig?.showTimerNames ?? true;
     const speakerShape      = themeConfig?.speakerShape || 'circle';
+    const focusActiveSpeaker = themeConfig?.focusActiveSpeaker ?? false;
     const showSpeakerLabel  = themeConfig?.showSpeakerLabel ?? false;
     const detachNamePos     = themeConfig?.detachNamePos ?? false;
     const nameAlign         = themeConfig?.nameAlign || 'bottom-sides';
@@ -356,13 +358,40 @@ export const neonTheme: Theme = {
     };
 
     if (showSpeakers) {
+        const isNarratorTurn = currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator';
+
+        // ── Neon Spotlight vignette (focus mode) ─────────────────
+        if (focusActiveSpeaker && !isNarratorTurn) {
+            const activeIdx = speakerIds.indexOf(currentSegment.speaker);
+            if (activeIdx !== -1) {
+                const activePos = speakerPositions[activeIdx] || { x: 0.5, y: 0.5 };
+                const cx = activePos.x * canvasWidth;
+                const cy = activePos.y * canvasHeight;
+                const spotR = Math.max(canvasWidth, canvasHeight) * 0.48;
+                const grad = ctx.createRadialGradient(cx, cy, spotR * 0.08, cx, cy, spotR);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(0.55, 'rgba(0,0,0,0.35)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.78)');
+                ctx.save();
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                ctx.restore();
+            }
+        }
+
         speakerIds.forEach((id, index) => {
             const isSpeaking = isPlaying && currentSegment.speaker === id;
+            // Narrator turn → hide all speakers in focus mode
+            if (focusActiveSpeaker && isNarratorTurn) return;
             const label = speakerLabels[index] || id;
             const pos = speakerPositions[index] || { x: 0.5, y: 0.5 };
             const color = colors[index % colors.length];
+            // Inactive speaker → render faint (neon ghost) instead of completely hiding
+            const isDimmed = focusActiveSpeaker && !isSpeaking;
+            if (isDimmed) { ctx.save(); ctx.globalAlpha = 0.18; }
             drawSpeaker(pos.x, pos.y, isSpeaking, color,
                 config.showSpeakerImages[index] !== false ? assets.speakerImages[index] : null, label);
+            if (isDimmed) ctx.restore();
         });
 
         // ── Detached Speaker Names ────────────────────────────────
@@ -376,14 +405,17 @@ export const neonTheme: Theme = {
 
             speakerIds.slice(0, 2).forEach((id, index) => {
                 const isSpeaking = isPlaying && currentSegment.speaker === id;
+                if (focusActiveSpeaker && isNarratorTurn) return;
                 const label = speakerLabels[index] || id;
                 const color = colors[index % colors.length];
                 const isLeft = index === 0;
+                const isDimmedName = focusActiveSpeaker && !isSpeaking;
 
                 // Fixed x: speaker A → left quarter, speaker B → right quarter
                 const nameX = isLeft ? canvasWidth * 0.22 : canvasWidth * 0.78;
 
                 ctx.save();
+                if (isDimmedName) ctx.globalAlpha = 0.18;
                 ctx.font = `bold 20px monospace`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
