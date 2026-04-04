@@ -20,6 +20,9 @@ export const neonTheme: Theme = {
     // ── Elements ──────────────────────────────────────────────────
     { id: 'showBar',           label: 'Show Top Bar',             type: 'boolean', defaultValue: false,              group: 'Elements' },
     { id: 'showTimerNames',    label: 'Speaker Names by Timer',   type: 'boolean', defaultValue: true,               group: 'Elements' },
+    { id: 'timerStyle',        label: 'Timer Style',              type: 'select',  defaultValue: 'pill',             group: 'Elements',
+      options: ['pill', 'bare', 'neon-box', 'arc', 'glitch'] },
+    { id: 'timerColor',        label: 'Timer Color',              type: 'color',   defaultValue: '#00ffff',          group: 'Elements' },
     // ── Scores ────────────────────────────────────────────────────
     { id: 'scoreStyle',        label: 'Score Style',              type: 'select',  defaultValue: 'neon-badge',       group: 'Scores',
       options: ['neon-badge', 'glitch', 'dots', 'bar'] },
@@ -44,6 +47,8 @@ export const neonTheme: Theme = {
     const nameAlign         = themeConfig?.nameAlign || 'bottom-sides';
     const scoreStyle        = themeConfig?.scoreStyle || 'neon-badge';
     const scorePosition     = themeConfig?.scorePosition || 'bottom';
+    const timerStyle        = themeConfig?.timerStyle || 'pill';
+    const timerColor        = themeConfig?.timerColor || '#00ffff';
     const BAR_H             = 80;
 
     const colors = [
@@ -116,28 +121,155 @@ export const neonTheme: Theme = {
 
     // ── Timer outside bar (when bar is off) ────────────────────────
     if (!showBar && config.showTimer) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.beginPath();
-        ctx.roundRect(canvasWidth / 2 - 70, 14, 140, 48, 24);
-        ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 28px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.shadowColor = '#0ff';
-        ctx.shadowBlur = 10;
-        if (currentSegment.speaker === 'Narrator') {
-            if (!(config.showSubtitles && config.subtitleBackground)) {
-                ctx.fillText('NARRATOR', canvasWidth / 2, 38);
+        const isNarrator = currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator';
+        const segEnd   = context.segmentOffsets[currentSegmentIndex + 1] || context.totalDuration;
+        const segStart = context.segmentOffsets[currentSegmentIndex] || 0;
+        const segDur   = Math.max(1, segEnd - segStart);
+        const timeLeft = Math.max(0, Math.ceil(segEnd - time));
+        const timeFrac = Math.max(0, Math.min(1, (segEnd - time) / segDur)); // 1→0 as time runs out
+        const timerText = isNarrator ? (config.showSubtitles && config.subtitleBackground ? '' : 'NARRATOR') : `${timeLeft}s`;
+        if (!timerText) { /* skip */ } else
+        if (timerStyle === 'bare') {
+            // ── Bare: text-only neon glow ──────────────────────────
+            ctx.save();
+            ctx.font = 'bold 36px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 22 + audioLevel * 14;
+            ctx.fillText(timerText, canvasWidth / 2, 44);
+            // thin neon underline
+            const tw = ctx.measureText(timerText).width;
+            ctx.beginPath();
+            ctx.moveTo(canvasWidth / 2 - tw / 2, 60);
+            ctx.lineTo(canvasWidth / 2 + tw / 2, 60);
+            ctx.strokeStyle = timerColor;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 10;
+            ctx.stroke();
+            ctx.restore();
+
+        } else if (timerStyle === 'neon-box') {
+            // ── Neon Box: cyberpunk HUD bracket ───────────────────
+            const bw = 130, bh = 54;
+            const bx = canvasWidth / 2 - bw / 2;
+            const by = 14;
+            ctx.save();
+            // Dark glass fill
+            ctx.fillStyle = 'rgba(0,0,0,0.78)';
+            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill();
+            // Neon border
+            ctx.strokeStyle = timerColor;
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 18;
+            ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.stroke();
+            // Corner brackets
+            const c = 12;
+            ctx.lineWidth = 3; ctx.shadowBlur = 10;
+            [[bx, by, 1, 1], [bx+bw, by, -1, 1], [bx, by+bh, 1, -1], [bx+bw, by+bh, -1, -1]].forEach(([px, py, dx, dy]) => {
+                ctx.beginPath();
+                ctx.moveTo(px as number + (dx as number) * c, py as number);
+                ctx.lineTo(px as number, py as number);
+                ctx.lineTo(px as number, py as number + (dy as number) * c);
+                ctx.stroke();
+            });
+            // Progress bar at bottom
+            ctx.fillStyle = 'rgba(255,255,255,0.07)';
+            ctx.fillRect(bx + 8, by + bh - 6, bw - 16, 3);
+            ctx.fillStyle = timerColor;
+            ctx.shadowBlur = 8;
+            ctx.fillRect(bx + 8, by + bh - 6, (bw - 16) * timeFrac, 3);
+            // Text
+            ctx.font = 'bold 26px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = timerColor;
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 14;
+            ctx.fillText(timerText, canvasWidth / 2, by + bh / 2 - 3);
+            ctx.restore();
+
+        } else if (timerStyle === 'arc') {
+            // ── Arc: circular ring that depletes ──────────────────
+            const cx = canvasWidth / 2, cy = 56;
+            const R = 38, lw = 5;
+            ctx.save();
+            // Track ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, -Math.PI / 2, Math.PI * 3 / 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+            ctx.lineWidth = lw;
+            ctx.stroke();
+            // Filled arc (depleting clockwise)
+            const endAngle = -Math.PI / 2 + timeFrac * Math.PI * 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, -Math.PI / 2, endAngle);
+            ctx.strokeStyle = timerColor;
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 16 + audioLevel * 12;
+            ctx.lineWidth = lw;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            // Center dot
+            ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = timerColor; ctx.shadowBlur = 10; ctx.fill();
+            // Text inside
+            ctx.font = `bold ${isNarrator ? '13px' : '22px'} monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 12;
+            ctx.fillText(timerText, cx, cy);
+            ctx.restore();
+
+        } else if (timerStyle === 'glitch') {
+            // ── Glitch: RGB-split flicker ──────────────────────────
+            const cx = canvasWidth / 2, cy = 44;
+            const glitchAmt = 2 + Math.sin(time * 14) * 3 + audioLevel * 5;
+            ctx.save();
+            ctx.font = 'bold 34px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Red ghost
+            ctx.globalAlpha = 0.55;
+            ctx.fillStyle = '#ff0040';
+            ctx.fillText(timerText, cx + glitchAmt, cy - 1);
+            // Cyan ghost
+            ctx.fillStyle = '#00ffff';
+            ctx.fillText(timerText, cx - glitchAmt, cy + 1);
+            ctx.globalAlpha = 1;
+            // Main text
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 18;
+            ctx.fillText(timerText, cx, cy);
+            // Scanline flicker bar (random)
+            if (Math.sin(time * 31) > 0.7) {
+                ctx.fillStyle = 'rgba(0,255,255,0.08)';
+                ctx.fillRect(0, cy - 18, canvasWidth, 8);
             }
+            ctx.restore();
+
         } else {
-            const segEnd = context.segmentOffsets[currentSegmentIndex + 1] || context.totalDuration;
-            const timeLeft = Math.max(0, Math.ceil(segEnd - time));
-            ctx.fillText(`${timeLeft}s`, canvasWidth / 2, 38);
+            // ── Pill (default) ─────────────────────────────────────
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.55)';
+            ctx.beginPath();
+            ctx.roundRect(canvasWidth / 2 - 70, 14, 140, 48, 24);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 28px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 10;
+            ctx.fillText(timerText, canvasWidth / 2, 38);
+            ctx.shadowBlur = 0;
+            ctx.restore();
         }
-        ctx.shadowBlur = 0;
-        ctx.restore();
     }
 
     // ── Speaker names beside/below timer ──────────────────────────
