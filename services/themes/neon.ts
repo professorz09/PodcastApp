@@ -12,7 +12,7 @@ export const neonTheme: Theme = {
     { id: 'barColor',          label: 'Top Bar Color',            type: 'color',   defaultValue: 'rgba(0,0,0,0.88)', group: 'Colors' },
     // ── Speaker ───────────────────────────────────────────────────
     { id: 'speakerShape',      label: 'Speaker Shape',            type: 'select',  defaultValue: 'circle',           group: 'Speaker',
-      options: ['circle', 'square', 'hexagon'] },
+      options: ['circle', 'square', 'hexagon', 'rect', 'transparent', 'comic'] },
     { id: 'showSpeakerLabel',  label: 'Show Speaker Name',        type: 'boolean', defaultValue: false,              group: 'Speaker' },
     { id: 'detachNamePos',     label: 'Detach Name from Shape',   type: 'boolean', defaultValue: false,              group: 'Speaker' },
     { id: 'nameAlign',         label: 'Name Position',            type: 'select',  defaultValue: 'bottom-sides',     group: 'Speaker',
@@ -129,6 +129,18 @@ export const neonTheme: Theme = {
         const timeFrac = Math.max(0, Math.min(1, (segEnd - time) / segDur)); // 1→0 as time runs out
         const timerText = isNarrator ? (config.showSubtitles && config.subtitleBackground ? '' : 'NARRATOR') : `${timeLeft}s`;
         if (!timerText) { /* skip */ } else
+        if (isNarrator) {
+            // ── Narrator: always bare (no box behind NARRATOR text) ──
+            ctx.save();
+            ctx.font = 'bold 26px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.shadowColor = timerColor;
+            ctx.shadowBlur = 14;
+            ctx.fillText('NARRATOR', canvasWidth / 2, 38);
+            ctx.restore();
+        } else
         if (timerStyle === 'bare') {
             // ── Bare: text-only neon glow ──────────────────────────
             ctx.save();
@@ -467,6 +479,196 @@ export const neonTheme: Theme = {
                 ctx.textAlign = 'center'; ctx.textBaseline = 'top';
                 ctx.shadowColor = color; ctx.shadowBlur = 10;
                 ctx.fillText(label.toUpperCase(), x, y + r + 12);
+                ctx.restore();
+            }
+
+        } else if (speakerShape === 'rect') {
+            // ── Rect: tall portrait crop (arena-style) ────
+            const rw = (baseRadius * 1.8) + pulse * 0.5;
+            const rh = (baseRadius * 2.6) + pulse * 0.5;
+            const rx = x - rw / 2, ry = y - rh / 2;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(rx, ry, rw, rh, 18);
+            ctx.clip();
+            if (image) {
+                const s = Math.max(rw / image.width, rh / image.height);
+                ctx.drawImage(image, x - image.width * s / 2, y - image.height * s / 2, image.width * s, image.height * s);
+            } else {
+                ctx.fillStyle = '#0a0f0a'; ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = `bold ${baseRadius * 0.65}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label.charAt(0).toUpperCase(), x, y);
+            }
+            ctx.restore();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(rx, ry, rw, rh, 18);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = isActive ? 3 : 1.5;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = isActive ? 20 + audioLevel * 25 : 6;
+            ctx.stroke();
+            ctx.restore();
+
+            if (isActive && config.showVuMeter) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.roundRect(rx - 8 - audioLevel * 10, ry - 8 - audioLevel * 10,
+                    rw + 16 + audioLevel * 20, rh + 16 + audioLevel * 20, 24);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = 0.35 + audioLevel * 0.45;
+                ctx.shadowColor = color; ctx.shadowBlur = 14;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            if (showSpeakerLabel && !detachNamePos) {
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 18px monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.shadowColor = color; ctx.shadowBlur = 10;
+                ctx.fillText(label.toUpperCase(), x, ry + rh + 10);
+                ctx.restore();
+            }
+
+        } else if (speakerShape === 'transparent') {
+            // ── Transparent PNG: no clip, full image as-is ──
+            if (image) {
+                const th = (baseRadius * 2.8) + pulse;
+                const tw = th * (image.width / image.height);
+                ctx.save();
+                ctx.shadowColor = isActive ? color : 'transparent';
+                ctx.shadowBlur = isActive ? 22 + audioLevel * 28 : 0;
+                ctx.drawImage(image, x - tw / 2, y - th / 2, tw, th);
+                if (isActive) {
+                    // neon floor glow under image
+                    const glowGrad = ctx.createRadialGradient(x, y + th / 2, 0, x, y + th / 2, tw * 0.55);
+                    glowGrad.addColorStop(0, `${color}55`);
+                    glowGrad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = glowGrad;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y + th / 2, tw * 0.45, 20, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            } else {
+                // fallback placeholder
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.fillStyle = '#0a0f0a'; ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 64px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label.charAt(0).toUpperCase(), x, y);
+                ctx.restore();
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = color; ctx.lineWidth = 2;
+                ctx.shadowColor = color; ctx.shadowBlur = 12;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            if (showSpeakerLabel && !detachNamePos) {
+                const th = image ? (baseRadius * 2.8 + pulse) : baseRadius * 2;
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.font = 'bold 18px monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.shadowColor = color; ctx.shadowBlur = 10;
+                ctx.fillText(label.toUpperCase(), x, y + th / 2 + 10);
+                ctx.restore();
+            }
+
+        } else if (speakerShape === 'comic') {
+            // ── Comic: circle + thick outlines + halftone dots ──
+            const r = baseRadius + pulse * 0.5;
+            const outlineW = isActive ? 7 : 5;
+
+            // Outer thick black outline
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, r + outlineW, 0, Math.PI * 2);
+            ctx.fillStyle = '#000';
+            ctx.fill();
+            ctx.restore();
+
+            // Colored thick ring
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, r + outlineW / 2, 0, Math.PI * 2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = outlineW;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = isActive ? 18 + audioLevel * 22 : 6;
+            ctx.stroke();
+            ctx.restore();
+
+            // Image clip
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.clip();
+            if (image) {
+                const scale = Math.max((r * 2) / image.width, (r * 2) / image.height);
+                ctx.drawImage(image, x - image.width * scale / 2, y - image.height * scale / 2, image.width * scale, image.height * scale);
+            } else {
+                ctx.fillStyle = '#0a0f0a'; ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 64px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label.charAt(0).toUpperCase(), x, y);
+            }
+            // Halftone dot overlay
+            const dotSpacing = 14;
+            for (let dy = -r; dy <= r; dy += dotSpacing) {
+                for (let dx = -r; dx <= r; dx += dotSpacing) {
+                    if (dx * dx + dy * dy <= r * r) {
+                        ctx.beginPath();
+                        ctx.arc(x + dx + dotSpacing / 2, y + dy + dotSpacing / 2, 2, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+                        ctx.fill();
+                    }
+                }
+            }
+            ctx.restore();
+
+            // Active burst lines
+            if (isActive && audioLevel > 0.3) {
+                const lines = 8;
+                ctx.save();
+                for (let i = 0; i < lines; i++) {
+                    const angle = (i / lines) * Math.PI * 2;
+                    const startR = r + outlineW + 6;
+                    const endR   = startR + 12 + audioLevel * 18;
+                    ctx.beginPath();
+                    ctx.moveTo(x + Math.cos(angle) * startR, y + Math.sin(angle) * startR);
+                    ctx.lineTo(x + Math.cos(angle) * endR,   y + Math.sin(angle) * endR);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = color; ctx.shadowBlur = 8;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            if (showSpeakerLabel && !detachNamePos) {
+                ctx.save();
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 19px "Comic Sans MS", cursive, monospace';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+                ctx.strokeText(label.toUpperCase(), x, y + r + outlineW + 8);
+                ctx.fillText(label.toUpperCase(), x, y + r + outlineW + 8);
                 ctx.restore();
             }
 
