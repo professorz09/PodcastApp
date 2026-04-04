@@ -578,12 +578,12 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Narrator — Opening (EXACTLY 3 lines — kuch zyada nahi) 】
-                Teen lines — is structure mein:
-                Line 1: Topic ka naam seedha bolo — ek chhoti line.
-                Line 2: Speaker A ka naam + is topic par unka viewpoint/stance (topic ke hisaab se jo naturally fit kare). Aur Speaker B ka naam + unka opposite viewpoint/stance.
-                Line 3: Is topic se related ek sharp, direct question — yahi discussion ka core hai.
-                Bas. Teeno lines bilkul short. Koi extra line nahi, koi build-up nahi.
+                【 Narrator — Opening (SHORT — 3-4 lines max) 】
+                बस इतना बताओ:
+                → यह topic क्या है — एक-दो simple lines में
+                → इसके बारे में क्यों जानना ज़रूरी है — एक line
+                → Debate/discussion शुरू। बस।
+                कोई long hook नहीं, कोई dramatic build-up नहीं।
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए यह structure follow करो:
@@ -610,9 +610,7 @@ export const generateDebateScript = async (
                 ✓ हर point के साथ एक specific, real example — generic नहीं
                 ✓ Simple Hinglish — expert की सोच, दोस्त की भाषा
                 ✓ दोनों speakers की अलग voice — एक जैसे मत लगें
-                ✗ BANNED: Intro mein "yeh topic zaroori hai", "aaj hum samjhenge", generic warmup — seedha LINE 1-2-3 format
-                ✗ BANNED: Intro mein 3 se zyada lines — bilkul nahi
-                ✗ BANNED: Speakers ka position/ideology intro mein chhupao — clearly bolna hai kaun kya support karta hai
+                ✗ BANNED: Long dramatic intro — opening 4 lines से ज़्यादा नहीं
                 ✗ BANNED: Narrator बीच में आए — सिर्फ opening और closing
                 ✗ BANNED: "यह महत्वपूर्ण है", "निष्कर्ष में", "आइए समझते हैं", generic filler
                 ✗ BANNED: Speakers एक-दूसरे के words refer करें — seedha topic पर बात करो
@@ -647,12 +645,10 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Opening — Speaker A (EXACTLY 3 lines — kuch zyada nahi) 】
-                Teen lines — is structure mein:
-                Line 1: Topic ka naam seedha bolo — ek chhoti line.
-                Line 2: Speaker A apna naam bole + is topic par apna viewpoint/stance (topic ke hisaab se jo naturally fit kare). Phir Speaker B ka naam + unka opposite viewpoint/stance mention kare.
-                Line 3: Is topic se related ek sharp, direct question — yahi discussion ka core hai.
-                Bas. Teen lines. Koi 4th line nahi, koi build-up nahi.
+                【 Opening — Speaker A (SHORT — 3-4 lines max) 】
+                → Topic kya hai — ek-do simple lines mein
+                → Kyun important hai — ek line
+                → Discussion shuru। Bas।
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए:
@@ -678,9 +674,7 @@ export const generateDebateScript = async (
                 ✓ हर point ke saath specific real example
                 ✓ Simple Hinglish — expert ki soch, dost ki bhaasha
                 ✓ Dono speakers ki alag voice
-                ✗ BANNED: Intro mein 3 se zyada lines — bilkul nahi
-                ✗ BANNED: Generic warmup — "yeh topic bahut important hai", "aaj hum dekhenge" type openers
-                ✗ BANNED: Speakers ka position intro mein mat chhupao — LINE 2 mein clearly bolna hai kaun kya support karta hai
+                ✗ BANNED: Long dramatic opening — 4 lines se zyada nahi
                 ✗ BANNED: "yeh zaroori hai", "nirhskarsh mein", generic filler
                 ✗ BANNED: Speakers ek-dusre ke words refer karein
                 ${durFillHi}
