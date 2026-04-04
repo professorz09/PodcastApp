@@ -140,32 +140,89 @@ export const neonTheme: Theme = {
         ctx.restore();
     }
 
-    // ── Speaker names beside timer ─────────────────────────────────
+    // ── Speaker names beside/below timer ──────────────────────────
     if (showTimerNames && config.showTimer && speakerIds.length >= 2) {
-        // Y and gap depend on bar state
-        const timerCY   = showBar ? BAR_H / 2 : 38;
-        // Bar-off: pill is 140px wide (±70 from center). Bar-on: timer is just text, use ~48px estimate
-        const timerHW   = showBar ? 48 : 70;
-        const GAP       = 20;
-        const leftEdge  = canvasWidth / 2 - timerHW - GAP;
-        const rightEdge = canvasWidth / 2 + timerHW + GAP;
+        const timerCY = showBar ? BAR_H / 2 : 38;
 
-        speakerIds.slice(0, 2).forEach((id, index) => {
-            const isLeft     = index === 0;
-            const label      = speakerLabels[index] || id;
-            const color      = colors[index];
-            const isSpeaking = currentSegment.speaker === id;
+        if (speakerIds.length === 2) {
+            // ── 2 speakers: left / right of timer ─────────────────
+            const timerHW  = showBar ? 48 : 70;
+            const GAP      = 20;
+            const leftEdge  = canvasWidth / 2 - timerHW - GAP;
+            const rightEdge = canvasWidth / 2 + timerHW + GAP;
 
-            ctx.save();
-            ctx.font        = `bold 22px sans-serif`;
-            ctx.textBaseline = 'middle';
-            ctx.textAlign    = isLeft ? 'right' : 'left';
-            ctx.fillStyle   = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
-            ctx.shadowColor = isSpeaking ? color : 'transparent';
-            ctx.shadowBlur  = isSpeaking ? 18 : 0;
-            ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
-            ctx.restore();
-        });
+            speakerIds.forEach((id, index) => {
+                const isLeft     = index === 0;
+                const label      = speakerLabels[index] || id;
+                const color      = colors[index];
+                const isSpeaking = currentSegment.speaker === id;
+                ctx.save();
+                ctx.font         = `bold 22px sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.textAlign    = isLeft ? 'right' : 'left';
+                ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
+                ctx.shadowColor  = isSpeaking ? color : 'transparent';
+                ctx.shadowBlur   = isSpeaking ? 18 : 0;
+                ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
+                ctx.restore();
+            });
+
+        } else {
+            // ── 3+ speakers: pill row below the timer ─────────────
+            const rowY   = timerCY + (showBar ? 0 : 54);
+            const PILL_H = 30;
+            const PILL_PAD_X = 16;
+            const GAP    = 10;
+            const FONT   = 'bold 15px monospace';
+
+            ctx.font = FONT;
+            // Measure each label
+            const pillWidths = speakerIds.map((id, i) => {
+                const label = speakerLabels[i] || id;
+                return ctx.measureText(label.toUpperCase()).width + PILL_PAD_X * 2;
+            });
+            const totalW = pillWidths.reduce((a, b) => a + b, 0) + GAP * (speakerIds.length - 1);
+            let px = canvasWidth / 2 - totalW / 2;
+
+            speakerIds.forEach((id, index) => {
+                const label      = speakerLabels[index] || id;
+                const color      = colors[index % colors.length];
+                const isSpeaking = currentSegment.speaker === id;
+                const pw         = pillWidths[index];
+                const py         = rowY - PILL_H / 2;
+
+                ctx.save();
+                // Pill background
+                ctx.fillStyle = isSpeaking ? `${color}33` : 'rgba(255,255,255,0.06)';
+                ctx.beginPath();
+                ctx.roundRect(px, py, pw, PILL_H, PILL_H / 2);
+                ctx.fill();
+
+                // Pill border
+                ctx.strokeStyle = color;
+                ctx.lineWidth   = isSpeaking ? 1.5 : 0.8;
+                ctx.globalAlpha = isSpeaking ? 1 : 0.3;
+                ctx.shadowColor = color;
+                ctx.shadowBlur  = isSpeaking ? 14 : 0;
+                ctx.beginPath();
+                ctx.roundRect(px, py, pw, PILL_H, PILL_H / 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.shadowBlur  = 0;
+
+                // Label text
+                ctx.font         = FONT;
+                ctx.textAlign    = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
+                ctx.shadowColor  = isSpeaking ? color : 'transparent';
+                ctx.shadowBlur   = isSpeaking ? 12 : 0;
+                ctx.fillText(label.toUpperCase(), px + pw / 2, rowY);
+                ctx.restore();
+
+                px += pw + GAP;
+            });
+        }
     }
 
     // ── Speaker draw (circle / square / hexagon) ───────────────────
@@ -367,56 +424,100 @@ export const neonTheme: Theme = {
 
         // ── Detached Speaker Names ────────────────────────────────
         if (showSpeakerLabel && detachNamePos) {
-            // Fixed Y position based on nameAlign setting
             const nameY = nameAlign === 'top-sides'
                 ? canvasHeight * 0.12
                 : nameAlign === 'mid-sides'
                 ? canvasHeight * 0.50
-                : canvasHeight * 0.88; // bottom-sides (default)
+                : canvasHeight * 0.88;
 
-            speakerIds.slice(0, 2).forEach((id, index) => {
-                const isSpeaking = isPlaying && currentSegment.speaker === id;
-                const label = speakerLabels[index] || id;
-                const color = colors[index % colors.length];
-                const isLeft = index === 0;
+            if (speakerIds.length === 2) {
+                // ── 2 speakers: left + right fixed positions ───────
+                speakerIds.forEach((id, index) => {
+                    const isSpeaking = isPlaying && currentSegment.speaker === id;
+                    const label      = speakerLabels[index] || id;
+                    const color      = colors[index % colors.length];
+                    const nameX      = index === 0 ? canvasWidth * 0.22 : canvasWidth * 0.78;
 
-                // Fixed x: speaker A → left quarter, speaker B → right quarter
-                const nameX = isLeft ? canvasWidth * 0.22 : canvasWidth * 0.78;
-
-                ctx.save();
-                ctx.font = `bold 20px monospace`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
-                ctx.shadowColor = isSpeaking ? color : 'transparent';
-                ctx.shadowBlur = isSpeaking ? 20 : 0;
-
-                // Neon underline bar
-                const tw = ctx.measureText(label.toUpperCase()).width;
-                if (isSpeaking) {
-                    ctx.fillStyle = color;
-                    ctx.globalAlpha = 0.18;
+                    ctx.save();
+                    ctx.font          = `bold 20px monospace`;
+                    ctx.textAlign     = 'center';
+                    ctx.textBaseline  = 'middle';
+                    ctx.shadowColor   = isSpeaking ? color : 'transparent';
+                    ctx.shadowBlur    = isSpeaking ? 20 : 0;
+                    const tw = ctx.measureText(label.toUpperCase()).width;
+                    if (isSpeaking) {
+                        ctx.fillStyle   = color;
+                        ctx.globalAlpha = 0.18;
+                        ctx.beginPath();
+                        ctx.roundRect(nameX - tw / 2 - 12, nameY - 16, tw + 24, 32, 6);
+                        ctx.fill();
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
+                    ctx.fillText(label.toUpperCase(), nameX, nameY);
                     ctx.beginPath();
-                    ctx.roundRect(nameX - tw / 2 - 12, nameY - 16, tw + 24, 32, 6);
+                    ctx.moveTo(nameX - tw / 2, nameY + 14);
+                    ctx.lineTo(nameX + tw / 2, nameY + 14);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth   = isSpeaking ? 2 : 1;
+                    ctx.globalAlpha = isSpeaking ? 1 : 0.3;
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur  = isSpeaking ? 10 : 0;
+                    ctx.stroke();
+                    ctx.restore();
+                });
+
+            } else {
+                // ── 3+ speakers: horizontal pill row at nameY ──────
+                const PILL_H    = 32;
+                const PILL_PAD  = 18;
+                const GAP       = 10;
+                const FONT      = 'bold 15px monospace';
+                ctx.font = FONT;
+
+                const pillWidths = speakerIds.map((id, i) => {
+                    const label = speakerLabels[i] || id;
+                    return ctx.measureText(label.toUpperCase()).width + PILL_PAD * 2;
+                });
+                const totalW = pillWidths.reduce((a, b) => a + b, 0) + GAP * (speakerIds.length - 1);
+                let px = canvasWidth / 2 - totalW / 2;
+
+                speakerIds.forEach((id, index) => {
+                    const isSpeaking = isPlaying && currentSegment.speaker === id;
+                    const label      = speakerLabels[index] || id;
+                    const color      = colors[index % colors.length];
+                    const pw         = pillWidths[index];
+                    const py         = nameY - PILL_H / 2;
+
+                    ctx.save();
+                    ctx.fillStyle = isSpeaking ? `${color}33` : 'rgba(255,255,255,0.06)';
+                    ctx.beginPath();
+                    ctx.roundRect(px, py, pw, PILL_H, PILL_H / 2);
                     ctx.fill();
+
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth   = isSpeaking ? 1.5 : 0.7;
+                    ctx.globalAlpha = isSpeaking ? 1 : 0.28;
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur  = isSpeaking ? 16 : 0;
+                    ctx.beginPath();
+                    ctx.roundRect(px, py, pw, PILL_H, PILL_H / 2);
+                    ctx.stroke();
                     ctx.globalAlpha = 1;
-                }
+                    ctx.shadowBlur  = 0;
 
-                ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
-                ctx.fillText(label.toUpperCase(), nameX, nameY);
+                    ctx.font          = FONT;
+                    ctx.textAlign     = 'center';
+                    ctx.textBaseline  = 'middle';
+                    ctx.fillStyle     = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
+                    ctx.shadowColor   = isSpeaking ? color : 'transparent';
+                    ctx.shadowBlur    = isSpeaking ? 14 : 0;
+                    ctx.fillText(label.toUpperCase(), px + pw / 2, nameY);
+                    ctx.restore();
 
-                // Thin colored underline
-                ctx.beginPath();
-                ctx.moveTo(nameX - tw / 2, nameY + 14);
-                ctx.lineTo(nameX + tw / 2, nameY + 14);
-                ctx.strokeStyle = color;
-                ctx.lineWidth = isSpeaking ? 2 : 1;
-                ctx.globalAlpha = isSpeaking ? 1 : 0.3;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = isSpeaking ? 10 : 0;
-                ctx.stroke();
-                ctx.restore();
-            });
+                    px += pw + GAP;
+                });
+            }
         }
     }
 
