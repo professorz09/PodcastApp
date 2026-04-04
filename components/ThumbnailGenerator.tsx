@@ -57,6 +57,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'situational', label: 'Situational', desc: 'Emotional & personal story', color: 'rose' },
     { value: 'debate', label: 'Debate', desc: 'Confrontational & bold', color: 'amber' },
     { value: 'podcast', label: 'Podcast', desc: 'Shocking clickbait', color: 'purple' },
+    { value: 'explained', label: 'Explained', desc: 'Big face + topic visual', color: 'emerald' },
   ];
 
   const hasScript = script.length > 0;

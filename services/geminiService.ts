@@ -24,9 +24,25 @@ const getApiKey = () => {
   return apiKey;
 };
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
+  if (style === 'explained') {
+    return `
+You are a YouTube copywriter for top-tier Explained / Documentary channels (like Kurzgesagt, Wendover, MKBHD, Veritasium).
+Read the script and generate 4 highly clickable YouTube titles in the "Explained" style — concise, factual-curiosity-driven, slightly dramatic but credible.
+
+Requirements:
+1. Clear subject: "Why [X] Is Changing Everything", "The Real Reason [X]", "How [X] Actually Works"
+2. Curiosity gap: the title reveals the topic but withholds the answer
+3. Scope signal: words like "Actually", "Really", "Finally", "Nobody Talks About", "The Truth About"
+4. 55-70 characters max. Readable at a glance. No fluff, no filler.
+5. Mix English + Hindi/Hinglish options if script is Hindi.
+Examples: "Why India's Economy Is Quietly Collapsing", "The Real Reason GPT-4 Feels Different", "Nobody Tells You This About Crypto"
+
+Return ONLY a valid JSON array of 4 strings. No markdown.
+    `;
+  }
   if (style === 'situational') {
     return `
     You are a YouTube copywriter specializing in personal story and emotional content.
@@ -109,6 +125,31 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
 };
 
 const getThumbnailTextStylePrompt = (style: ThumbnailVideoStyle): string => {
+  if (style === 'explained') {
+    return `
+You are a YouTube thumbnail copywriter for "Explained" style channels. Write SHORT, PUNCHY text that appears ON the thumbnail — not the title.
+
+STYLE: Factual-dramatic. Clean. Bold. Like a headline from a newspaper or documentary.
+
+CRITICAL RULE — TOPIC SPECIFICITY:
+The text must reference THIS topic. Generic "THE TRUTH" or "EXPLAINED" alone are weak.
+BAD: "THE TRUTH" (meaningless alone)
+GOOD: "STILL ALIVE?" / "THEY LIED" / "IT'S REAL" (topic-specific short punch)
+
+Generate exactly 5 options:
+- Option 1: A short factual-shock phrase about THIS topic (3-4 words, CAPS power words)
+- Option 2: A "nobody told you" punch (e.g. "NOBODY SAW THIS")
+- Option 3: A Hindi/Hinglish punchy phrase (if topic allows)
+- Option 4: A 2-word maximum ultra-short bomb (e.g. "GAME OVER" / "IT'S REAL")
+- Option 5: A question that makes you click (e.g. "HOW?!" / "WHY NOW?")
+
+RULES:
+- Max 4 words each (2-word options preferred)
+- ALL CAPS for punch words
+- Must feel like it belongs on a clean documentary thumbnail
+- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+    `;
+  }
   if (style === 'situational') {
     return `
 You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT that appears on a thumbnail image.
@@ -248,6 +289,11 @@ export const generateTitleTextPair = async (scriptText: string, videoStyle: Thum
 - Title: Clear two-sides framing. Who's right, who's wrong, big clash. 55-70 chars.
 - Thumbnail text: 2-5 word confrontational CAPS question or claim. Complements title — adds heat.
 - E.g. Title: "Is Hustle Culture Destroying Your Life?" → Thumbnail: "STOP GRINDING"`
+    : videoStyle === 'explained'
+    ? `STYLE — Explained / Documentary:
+- Title: Factual curiosity-gap title. Clear subject, withheld answer. 55-70 chars. E.g. "Why India's Economy Is Quietly Collapsing", "Nobody Tells You This About AI"
+- Thumbnail text: 2-4 word clean bold punch. CAPS for power. Complements without repeating the title.
+- E.g. Title: "The Real Reason EV Cars Are Failing" → Thumbnail: "THEY LIED"`
     : `STYLE — Podcast / High Energy:
 - Title: Shocking revelation or curiosity bait. Drop a bombshell. 55-65 chars.
 - Thumbnail text: 2-5 word explosive CAPS hook. Amplifies what the title hints at.
@@ -2806,7 +2852,31 @@ export const generateThumbnail = async (title: string, hostName: string, guestNa
     // Step 2: Generate using extracted style, creative content based on topic
     onStep?.('generating');
 
-    if (videoStyle === 'situational') {
+    if (videoStyle === 'explained') {
+      const scriptSnippet = scriptText?.slice(0, 1500) || '';
+      prompt = `You are a world-class YouTube thumbnail designer specializing in "Explained" / documentary-style content.
+
+VISUAL STYLE GUIDE (extracted from reference — follow this for colors, mood, font style, layout energy):
+${styleAnalysis}
+
+YOUR TASK:
+Create a brand-new "Explained" style YouTube thumbnail for the topic below. Use the style guide above for color palette, mood, and typography feel. Content and composition are yours to design.
+
+TOPIC: "${title}"
+${scriptSnippet ? `SCRIPT CONTEXT:\n${scriptSnippet}` : ''}
+${hostName ? `PRESENTER: ${hostName}` : 'PRESENTER: Confident, photorealistic presenter fitting this topic'}
+
+LAYOUT (Explained signature look):
+1. LEFT 40%: Large face close-up — intrigued, confident, or slightly shocked expression matching topic. Photorealistic, cinematic.
+2. RIGHT 55%: A bold PROP, SCENE, or CONCEPT visual that represents this specific topic. NOT a second person. Make it dramatic and topic-specific.
+3. BOTTOM: Full title text "${title}" — small but COMPLETELY READABLE, thin dark bar or clean white text at very bottom edge.
+4. BACKGROUND: Solid dark saturated color that unifies both halves (deep green, navy, or dark red).
+
+STYLE RULES:
+- Match color grading and mood from the style guide
+- High contrast, cinematic quality, sharply focused subjects
+- Do NOT copy any people, text, or logos from the reference${extraNote}`;
+    } else if (videoStyle === 'situational') {
       const scriptSnippet = scriptText?.slice(0, 2000) || '';
       prompt = `You are a world-class YouTube thumbnail designer specializing in personal story / situational content.
 
@@ -2872,6 +2942,33 @@ STYLE RULES (non-negotiable):
 - Photorealistic, high quality, 16:9 YouTube thumbnail
 - Do NOT copy any people, text, or logos from the reference${extraNote}`;
     }
+
+  } else if (videoStyle === 'explained') {
+    // ── EXPLAINED style: big face left + bold visual right + small full title bottom ──
+    const scriptSnippet = scriptText?.slice(0, 1500) || '';
+    prompt = `You are a world-class YouTube thumbnail designer specializing in "Explained" and documentary-style content (like Kurzgesagt, Wendover Productions, Veritasium, MKBHD).
+
+YOUR TASK:
+Create a powerful, cinematic "Explained" style YouTube thumbnail — 16:9, photorealistic, ultra-high detail.
+
+TOPIC / HOOK TEXT: "${title}"
+${scriptSnippet ? `SCRIPT CONTEXT (use to pick the right visual):\n${scriptSnippet}` : ''}
+${hostName ? `HOST / PRESENTER: ${hostName} — show this person as the main face` : 'PRESENTER: Generate a photorealistic confident presenter person fitting this topic'}
+
+LAYOUT (follow STRICTLY — this is the signature "Explained" look):
+1. LEFT 40% — Large face close-up of the presenter/character. Face takes up most of this zone. Expression: intrigued, slightly shocked, or confidently serious — matches the topic energy. Slight angle toward center. Photorealistic skin, hair, and lighting.
+2. RIGHT 55% — A bold, dramatic visual that represents the topic. This is NOT another person — it is a PROP, SCENE, CONCEPT, or VISUAL METAPHOR. Examples: a burning object, a massive machine, a city skyline, a chart, a news clipping, a product, a creature — whatever BEST represents this specific topic visually. Make it dramatic and impactful.
+3. TITLE TEXT — Positioned at the BOTTOM of the frame in a thin dark semi-transparent bar OR as small clean white bold sans-serif text at the very bottom. The full title "${title}" must be COMPLETELY READABLE — no cropping. Font size: small but sharp. This is the YouTube title displayed ON the thumbnail for context — do not make it the dominant element.
+4. BACKGROUND — Solid dark color (deep green #1a3a1a, dark navy, dark grey, or deep red) that unifies both halves. Slight vignette at edges.
+
+KEY VISUAL RULES:
+- The face and the topic visual must look like they belong together — same lighting direction, same color grading
+- High contrast, saturated colors, sharp focus on both elements
+- The VISUAL on the right must be topic-specific — if topic is about AI, show a dramatic AI visualization; if about economy, show money/charts/graphs burning or collapsing; if about a movie, show a dramatic movie scene prop
+- NO text overlays except the title line at the bottom
+- NO generic stock photo look — cinematic, dramatic, editorial quality
+- 16:9 aspect ratio, 1920×1080 quality feel
+- Photorealistic — NOT illustrated or cartoon${extraNote}`;
 
   } else {
     prompt = `
