@@ -579,11 +579,11 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
                 【 Narrator — Opening (EXACTLY 3 lines — kuch zyada nahi) 】
-                इस EXACT format mein likho:
-                Line 1: "Aaj baat karenge — [TOPIC NAME seedha, ek line mein]."
-                Line 2: "Ek taraf hain [Speaker A naam] jo maante hain [Speaker A ki position/ideology ek word ya short phrase mein], aur doosri taraf hain [Speaker B naam] jo support karte hain [Speaker B ki position/ideology]."
-                Line 3: "[Topic se related ek sharp, direct QUESTION] — yahi aaj samjhenge."
-                Bas. Teeno lines short hongi. Koi build-up nahi, koi filler nahi, koi 4th line nahi.
+                Teen lines — is structure mein:
+                Line 1: Topic ka naam seedha bolo — ek chhoti line.
+                Line 2: Speaker A ka naam + is topic par unka viewpoint/stance (topic ke hisaab se jo naturally fit kare). Aur Speaker B ka naam + unka opposite viewpoint/stance.
+                Line 3: Is topic se related ek sharp, direct question — yahi discussion ka core hai.
+                Bas. Teeno lines bilkul short. Koi extra line nahi, koi build-up nahi.
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए यह structure follow करो:
@@ -648,10 +648,10 @@ export const generateDebateScript = async (
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
                 【 Opening — Speaker A (EXACTLY 3 lines — kuch zyada nahi) 】
-                Seedha is format mein shuru karo:
-                Line 1: "[TOPIC NAME directly bolo — ek line mein]."
-                Line 2: "Main hun [Speaker A naam] — main believe karta hun [Speaker A ki position/ideology short mein]. Aur mere saath hain [Speaker B naam] jo support karte hain [Speaker B ki position/ideology]."
-                Line 3: "[Topic se related ek sharp, direct QUESTION jo discussion kickstart kare]?"
+                Teen lines — is structure mein:
+                Line 1: Topic ka naam seedha bolo — ek chhoti line.
+                Line 2: Speaker A apna naam bole + is topic par apna viewpoint/stance (topic ke hisaab se jo naturally fit kare). Phir Speaker B ka naam + unka opposite viewpoint/stance mention kare.
+                Line 3: Is topic se related ek sharp, direct question — yahi discussion ka core hai.
                 Bas. Teen lines. Koi 4th line nahi, koi build-up nahi.
 
                 【 Point-by-Point Discussion (यही main content है) 】
