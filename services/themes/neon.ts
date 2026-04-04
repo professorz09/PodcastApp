@@ -142,32 +142,64 @@ export const neonTheme: Theme = {
         ctx.restore();
     }
 
-    // ── Speaker names beside timer ─────────────────────────────────
+    // ── Speaker names beside / around timer ───────────────────────
     if (showTimerNames && config.showTimer && speakerIds.length >= 2) {
-        // Y and gap depend on bar state
-        const timerCY   = showBar ? BAR_H / 2 : 38;
-        // Bar-off: pill is 140px wide (±70 from center). Bar-on: timer is just text, use ~48px estimate
-        const timerHW   = showBar ? 48 : 70;
-        const GAP       = 20;
-        const leftEdge  = canvasWidth / 2 - timerHW - GAP;
-        const rightEdge = canvasWidth / 2 + timerHW + GAP;
+        const timerCY = showBar ? BAR_H / 2 : 38;
+        const count   = speakerIds.length;
 
-        speakerIds.slice(0, 2).forEach((id, index) => {
-            const isLeft     = index === 0;
-            const label      = speakerLabels[index] || id;
-            const color      = colors[index];
-            const isSpeaking = currentSegment.speaker === id;
+        if (count === 2) {
+            // Original 2-speaker layout: left & right of timer
+            const timerHW  = showBar ? 48 : 70;
+            const GAP      = 20;
+            const leftEdge  = canvasWidth / 2 - timerHW - GAP;
+            const rightEdge = canvasWidth / 2 + timerHW + GAP;
 
-            ctx.save();
-            ctx.font        = `bold 22px sans-serif`;
-            ctx.textBaseline = 'middle';
-            ctx.textAlign    = isLeft ? 'right' : 'left';
-            ctx.fillStyle   = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
-            ctx.shadowColor = isSpeaking ? color : 'transparent';
-            ctx.shadowBlur  = isSpeaking ? 18 : 0;
-            ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
-            ctx.restore();
-        });
+            speakerIds.forEach((id, index) => {
+                const isLeft     = index === 0;
+                const label      = speakerLabels[index] || id;
+                const color      = colors[index % colors.length];
+                const isSpeaking = currentSegment.speaker === id;
+                ctx.save();
+                ctx.font         = `bold 22px sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.textAlign    = isLeft ? 'right' : 'left';
+                ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
+                ctx.shadowColor  = isSpeaking ? color : 'transparent';
+                ctx.shadowBlur   = isSpeaking ? 18 : 0;
+                ctx.fillText(label.toUpperCase(), isLeft ? leftEdge : rightEdge, timerCY);
+                ctx.restore();
+            });
+        } else {
+            // 3+ speakers: evenly spread across top — active one glows
+            const SIDE_PAD = 60;
+            const fontSize = count > 4 ? 15 : 18;
+            speakerIds.forEach((id, index) => {
+                const label      = speakerLabels[index] || id;
+                const color      = colors[index % colors.length];
+                const isSpeaking = currentSegment.speaker === id;
+                const x = SIDE_PAD + (canvasWidth - SIDE_PAD * 2) * (index / (count - 1));
+
+                ctx.save();
+                ctx.font         = `bold ${fontSize}px sans-serif`;
+                ctx.textAlign    = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.28)';
+                ctx.shadowColor  = isSpeaking ? color : 'transparent';
+                ctx.shadowBlur   = isSpeaking ? 18 : 0;
+                ctx.fillText(label.toUpperCase(), x, timerCY - 6);
+
+                // Active indicator dot below name
+                if (isSpeaking) {
+                    ctx.beginPath();
+                    ctx.arc(x, timerCY + 10, 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle   = color;
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur  = 8;
+                    ctx.fill();
+                }
+                ctx.restore();
+            });
+        }
     }
 
     // ── Speaker draw (circle / square / hexagon) ───────────────────
@@ -396,38 +428,44 @@ export const neonTheme: Theme = {
 
         // ── Detached Speaker Names ────────────────────────────────
         if (showSpeakerLabel && detachNamePos) {
-            // Fixed Y position based on nameAlign setting
             const nameY = nameAlign === 'top-sides'
                 ? canvasHeight * 0.12
                 : nameAlign === 'mid-sides'
                 ? canvasHeight * 0.50
-                : canvasHeight * 0.88; // bottom-sides (default)
+                : canvasHeight * 0.88;
 
-            speakerIds.slice(0, 2).forEach((id, index) => {
+            const count    = speakerIds.length;
+            const SIDE_PAD = 80;
+            const fontSize = count > 4 ? 15 : count > 2 ? 17 : 20;
+
+            // X position: 2 speakers → fixed quarters; 3+ → evenly distributed
+            const getNameX = (index: number) => {
+                if (count === 2) return index === 0 ? canvasWidth * 0.22 : canvasWidth * 0.78;
+                return SIDE_PAD + (canvasWidth - SIDE_PAD * 2) * (index / (count - 1));
+            };
+
+            speakerIds.forEach((id, index) => {
                 const isSpeaking = isPlaying && currentSegment.speaker === id;
                 if (focusActiveSpeaker && isNarratorTurn) return;
-                const label = speakerLabels[index] || id;
-                const color = colors[index % colors.length];
-                const isLeft = index === 0;
+                const label       = speakerLabels[index] || id;
+                const color       = colors[index % colors.length];
                 const isDimmedName = focusActiveSpeaker && !isSpeaking;
-
-                // Fixed x: speaker A → left quarter, speaker B → right quarter
-                const nameX = isLeft ? canvasWidth * 0.22 : canvasWidth * 0.78;
+                const nameX       = getNameX(index);
 
                 ctx.save();
                 if (isDimmedName) ctx.globalAlpha = 0.18;
-                ctx.font = `bold 20px monospace`;
-                ctx.textAlign = 'center';
+                ctx.font         = `bold ${fontSize}px monospace`;
+                ctx.textAlign    = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillStyle = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
-                ctx.shadowColor = isSpeaking ? color : 'transparent';
-                ctx.shadowBlur = isSpeaking ? 20 : 0;
+                ctx.fillStyle    = isSpeaking ? '#fff' : 'rgba(255,255,255,0.35)';
+                ctx.shadowColor  = isSpeaking ? color : 'transparent';
+                ctx.shadowBlur   = isSpeaking ? 20 : 0;
 
-                // Neon underline bar
+                // Neon highlight pill behind active name
                 const tw = ctx.measureText(label.toUpperCase()).width;
-                if (isSpeaking) {
-                    ctx.fillStyle = color;
-                    ctx.globalAlpha = 0.18;
+                if (isSpeaking && !isDimmedName) {
+                    ctx.fillStyle    = color;
+                    ctx.globalAlpha  = 0.18;
                     ctx.beginPath();
                     ctx.roundRect(nameX - tw / 2 - 12, nameY - 16, tw + 24, 32, 6);
                     ctx.fill();
@@ -439,13 +477,13 @@ export const neonTheme: Theme = {
 
                 // Thin colored underline
                 ctx.beginPath();
-                ctx.moveTo(nameX - tw / 2, nameY + 14);
-                ctx.lineTo(nameX + tw / 2, nameY + 14);
-                ctx.strokeStyle = color;
-                ctx.lineWidth = isSpeaking ? 2 : 1;
-                ctx.globalAlpha = isSpeaking ? 1 : 0.3;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = isSpeaking ? 10 : 0;
+                ctx.moveTo(nameX - tw / 2, nameY + fontSize * 0.75);
+                ctx.lineTo(nameX + tw / 2, nameY + fontSize * 0.75);
+                ctx.strokeStyle  = color;
+                ctx.lineWidth    = isSpeaking ? 2 : 1;
+                ctx.globalAlpha  = isSpeaking ? (isDimmedName ? 0.18 : 1) : 0.3;
+                ctx.shadowColor  = color;
+                ctx.shadowBlur   = isSpeaking ? 10 : 0;
                 ctx.stroke();
                 ctx.restore();
             });
