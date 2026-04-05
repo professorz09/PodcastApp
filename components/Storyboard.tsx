@@ -239,23 +239,23 @@ function sceneTimingsByWordCoverage(
 function buildSceneTimings(
   scenes: StoryboardScene[],
   script: DebateSegment[],
-  audioSegs: DebateSegment[],
-  actualOffsets: number[],
-  actualDurs: number[],
+  audioSegScriptIndices: number[],   // script index of each audio segment (in playback order)
+  actualOffsets: number[],           // cumulative start time of each audio segment
+  _actualDurs: number[],
   totalDuration: number,
 ): number[] {
   if (scenes.length === 0) return [];
 
-  if (audioSegs.length === 1) {
+  if (audioSegScriptIndices.length === 1) {
     // Single-audio: each scene gets time ∝ its segment word count
     return sceneTimingsByWordCoverage(scenes, script, totalDuration);
   }
 
-  // Multi-audio: map audioSeg index → actual decoded start time
+  // Multi-audio: direct index lookup — no object references, no stale-closure bugs
+  // scriptIdx → actual start time in merged audio
   const scriptIdxToStart = new Map<number, number>();
-  audioSegs.forEach((seg, i) => {
-    const scriptIdx = script.indexOf(seg);
-    if (scriptIdx >= 0) scriptIdxToStart.set(scriptIdx, actualOffsets[i]);
+  audioSegScriptIndices.forEach((scriptIdx, audioIdx) => {
+    scriptIdxToStart.set(scriptIdx, actualOffsets[audioIdx]);
   });
 
   return scenes.map(sc => {
@@ -263,7 +263,8 @@ function buildSceneTimings(
       const t = scriptIdxToStart.get(idx);
       if (t !== undefined) return t;
     }
-    return totalDuration; // uncovered scene → place at end
+    // Scene has no matching audio segment — place it after the previous scene
+    return totalDuration;
   });
 }
 
@@ -403,8 +404,9 @@ async function createStoryboardVideo(
     off += buf.length;
   }
 
-  // ── Build scene timings (unified: works for single & multi audio) ──
-  const sceneTimings = buildSceneTimings(scenes, script, audioSegs, actualOffsets, actualDurs, totalDuration);
+  // ── Build scene timings — index-based, no stale object refs ──
+  const audioSegScriptIndices = audioSegs.map(seg => script.indexOf(seg));
+  const sceneTimings = buildSceneTimings(scenes, script, audioSegScriptIndices, actualOffsets, actualDurs, totalDuration);
   // For single-audio subtitle: word-proportional segment offsets
   const propTimings = audioSegs.length === 1
     ? buildProportionalTimings(scenes, script, totalDuration)
@@ -466,7 +468,9 @@ async function createStoryboardVideo(
       const audioIdx = getAudioSegIdx(elapsed, actualOffsets);
       const segStart = actualOffsets[audioIdx] ?? 0;
       const segEnd = actualOffsets[audioIdx + 1] ?? totalDuration;
-      visibleText = subtitleForSeg(audioSegs[audioIdx], elapsed - segStart, segEnd - segStart);
+      // Use index lookup — no stale object references
+      const scriptIdx = audioSegScriptIndices[audioIdx];
+      visibleText = subtitleForSeg(script[scriptIdx], elapsed - segStart, segEnd - segStart);
     }
 
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
@@ -607,7 +611,8 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const actualTotalRef = useRef<number>(0);
   // Actual per-audioSeg offsets (decoded durations) — same as video export uses
   const actualSegOffsetsRef = useRef<number[]>([]);
-  const actualAudioSegsRef = useRef<DebateSegment[]>([]);
+  // For each audio segment (by audio index), its SCRIPT index — avoids stale object-reference bugs
+  const audioSegScriptIdxRef = useRef<number[]>([]);
   // Proportional timings for single-audio mode
   const propTimingsRef = useRef<ProportionalTimings | null>(null);
   const singleAudioModeRef = useRef(false);
@@ -706,13 +711,14 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       const segEnd = segOffsets[currentSegIdx + 1] ?? actualTotalRef.current;
       return textForSeg(script[currentSegIdx], playTime - segStart, segEnd - segStart);
     }
-    // Multi-audio mode
+    // Multi-audio mode — use script indices so we always read fresh segment data
     const actualOffsets = actualSegOffsetsRef.current;
-    const audioSegs = actualAudioSegsRef.current;
-    if (actualOffsets.length > 0 && audioSegs.length > 0) {
+    const scriptIndices = audioSegScriptIdxRef.current;
+    if (actualOffsets.length > 0 && scriptIndices.length > 0) {
       const segStart = actualOffsets[currentSegIdx] ?? 0;
       const segEnd = actualOffsets[currentSegIdx + 1] ?? actualTotalRef.current;
-      return textForSeg(audioSegs[currentSegIdx], playTime - segStart, segEnd - segStart);
+      const scriptIdx = scriptIndices[currentSegIdx];
+      return textForSeg(script[scriptIdx], playTime - segStart, segEnd - segStart);
     }
     // Fallback (before audio loaded)
     const segStart = offsets[currentSegIdx] ?? 0;
@@ -823,17 +829,19 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
         for (let c = 0; c < ch; c++) merged.getChannelData(c).set(buf.getChannelData(c), off);
         off += buf.length;
       }
+      // Store script-level indices (safe across re-renders — no object references)
+      const scriptIndices = audioSegs.map(seg => script.indexOf(seg));
       mergedBufRef.current = merged;
       actualTotalRef.current = total;
       actualSegOffsetsRef.current = actualOffsets;
-      actualAudioSegsRef.current = audioSegs;
+      audioSegScriptIdxRef.current = scriptIndices;
       singleAudioModeRef.current = audioSegs.length === 1;
       // Proportional timings (for single-audio subtitle sync)
       propTimingsRef.current = singleAudioModeRef.current
         ? buildProportionalTimings(scenes, script, total)
         : null;
-      // Scene start times — used by activeScene and video export
-      const timings = buildSceneTimings(scenes, script, audioSegs, actualOffsets, actualDurs, total);
+      // Scene start times — index-based, no object refs
+      const timings = buildSceneTimings(scenes, script, scriptIndices, actualOffsets, actualDurs, total);
       sceneTimingsRef.current = timings;
       // Update display timing (startTime/endTime) with actual decoded values
       setScenes(prev => applyDecodedTimings(prev, timings, total));
@@ -845,16 +853,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   // When scenes change and audio is already loaded, recompute scene timings
   useEffect(() => {
     if (!mergedBufRef.current || scenes.length === 0) return;
-    const audioSegs = actualAudioSegsRef.current;
+    const scriptIndices = audioSegScriptIdxRef.current;
     const offsets = actualSegOffsetsRef.current;
     const total = actualTotalRef.current;
-    if (!offsets.length) return;
-    // Recompute durations from stored offsets + total
+    if (!offsets.length || !scriptIndices.length) return;
     const durs = offsets.map((t, i) => (offsets[i + 1] ?? total) - t);
     if (singleAudioModeRef.current) {
       propTimingsRef.current = buildProportionalTimings(scenes, script, total);
     }
-    sceneTimingsRef.current = buildSceneTimings(scenes, script, audioSegs, offsets, durs, total);
+    sceneTimingsRef.current = buildSceneTimings(scenes, script, scriptIndices, offsets, durs, total);
   }, [scenes, script]);
 
   const seekTo = useCallback((time: number) => {
