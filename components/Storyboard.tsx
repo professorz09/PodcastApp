@@ -356,9 +356,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const allImagesReady = scenes.length > 0 && scenes.every(sc => sc.imageUrl && !sc.isGenerating);
   const anyImageReady = scenes.some(sc => sc.imageUrl);
 
-  // Recalculate scene count max
-  const segmentCount = script.length;
-  const maxScenes = Math.min(200, segmentCount * 3);
+  const maxScenes = 200;
 
   // ── Generate scenes list ──
   const handleGenerateScenes = useCallback(async () => {
@@ -530,22 +528,31 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
               />
             </div>
 
-            {/* Model */}
+            {/* Model Toggle */}
             <div>
               <label className="block text-xs text-gray-500 mb-2">Script Analysis Model</label>
-              <div className="relative">
-                <select
-                  value={model}
-                  onChange={e => setModel(e.target.value)}
-                  className="w-full bg-[#080808] border border-white/5 rounded-lg px-3 py-2 text-xs text-white appearance-none cursor-pointer outline-none focus:border-purple-500/40"
-                >
-                  {MODEL_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <div className="flex bg-[#080808] border border-white/5 rounded-xl p-1 gap-1">
+                {MODEL_OPTIONS.map(o => {
+                  const isActive = model === o.value;
+                  return (
+                    <button
+                      key={o.value}
+                      onClick={() => setModel(o.value)}
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                        isActive
+                          ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                          : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                      }`}
+                    >
+                      {o.value.includes('flash') ? '⚡ Flash' : '✦ Pro'}
+                    </button>
+                  );
+                })}
               </div>
-              <p className="text-[10px] text-gray-600 mt-1.5 flex items-center gap-1">
+              <p className="text-[10px] text-gray-600 mt-2">
+                {model.includes('flash') ? 'Fast · lower cost' : 'Best quality · slower'}
+              </p>
+              <p className="text-[10px] text-gray-600 mt-1 flex items-center gap-1">
                 <ImagePlus size={9} />
                 Images: MS Paint style (auto)
               </p>
