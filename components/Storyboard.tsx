@@ -185,17 +185,52 @@ function buildSceneTimings(
 function buildScenesFromRaw(
   rawScenes: { sceneNumber: number; prompt: string; segmentIndices: number[] }[],
   segments: DebateSegment[],
+  knownTotal?: number,
 ): StoryboardScene[] {
-  const { offsets, total } = buildOffsets(segments);
-  return rawScenes.map((raw) => {
+  // Use word-proportional timing — robust when s.duration = 0 (ElevenLabs)
+  const durBased = segments.reduce((s, seg) => s + (seg.duration ?? 0), 0);
+  const total = knownTotal ?? (durBased > 0 ? durBased : 0);
+
+  const segWords = segments.map(s => Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length));
+  const totalWords = segWords.reduce((a, b) => a + b, 0);
+
+  // Cumulative word offset per segment
+  const segWordStart: number[] = [];
+  let cum = 0;
+  for (const w of segWords) { segWordStart.push(cum); cum += w; }
+
+  const builtScenes = rawScenes.map((raw) => {
     const indices = raw.segmentIndices.filter(i => i >= 0 && i < segments.length);
-    const start = indices.length > 0 ? offsets[indices[0]] : 0;
-    const lastIdx = indices.length > 0 ? indices[indices.length - 1] : 0;
-    const end = (lastIdx < segments.length - 1)
-      ? offsets[lastIdx] + (segments[lastIdx].duration ?? 0)
-      : total;
-    return { id: `scene-${raw.sceneNumber}`, sceneNumber: raw.sceneNumber, prompt: raw.prompt, startTime: Math.max(0, start), endTime: Math.max(start + 0.5, end), segmentIndices: indices };
+    let startTime = 0, endTime = total;
+    if (indices.length > 0 && totalWords > 0 && total > 0) {
+      startTime = (segWordStart[indices[0]] / totalWords) * total;
+      const lastIdx = indices[indices.length - 1];
+      const endWords = segWordStart[lastIdx] + segWords[lastIdx];
+      endTime = (Math.min(endWords, totalWords) / totalWords) * total;
+    }
+    return {
+      id: `scene-${raw.sceneNumber}`,
+      sceneNumber: raw.sceneNumber,
+      prompt: raw.prompt,
+      startTime: Math.max(0, startTime),
+      endTime: Math.max(startTime + 0.5, endTime),
+      segmentIndices: indices,
+    };
   });
+  return builtScenes;
+}
+
+// Apply actual decoded timings to scenes (call after audio is decoded)
+function applyDecodedTimings(
+  scenes: StoryboardScene[],
+  sceneTimings: number[],
+  total: number,
+): StoryboardScene[] {
+  return scenes.map((sc, i) => ({
+    ...sc,
+    startTime: sceneTimings[i] ?? sc.startTime,
+    endTime: i + 1 < sceneTimings.length ? sceneTimings[i + 1] : total,
+  }));
 }
 
 
@@ -688,7 +723,10 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
         ? buildProportionalTimings(scenes, script, total)
         : null;
       // Scene start times — used by activeScene and video export
-      sceneTimingsRef.current = buildSceneTimings(scenes, script, audioSegs, actualOffsets, actualDurs, total);
+      const timings = buildSceneTimings(scenes, script, audioSegs, actualOffsets, actualDurs, total);
+      sceneTimingsRef.current = timings;
+      // Update display timing (startTime/endTime) with actual decoded values
+      setScenes(prev => applyDecodedTimings(prev, timings, total));
     } finally {
       setIsLoadingAudio(false);
     }
@@ -754,7 +792,8 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     setIsGeneratingScenes(true); setVideoBlob(null); setCharacterGuide('');
     try {
       const result = await generateStoryboardScenes(script.map(s => ({ speaker: s.speaker, text: s.text, duration: s.duration })), sceneCount, model);
-      const built = buildScenesFromRaw(result.scenes, script);
+      const knownTotal = actualTotalRef.current || undefined;
+      const built = buildScenesFromRaw(result.scenes, script, knownTotal);
       setScenes(built); setCharacterGuide(result.characterGuide || '');
       setShowSettings(false); setPlayTime(0);
       toast.success(`${built.length} scenes created`);
