@@ -77,13 +77,30 @@ function getVisibleText(text: string, timeInSeg: number, segDuration: number): s
   if (segDuration <= 0) return words.slice(0, WORDS_PER_PHRASE).join(' ');
 
   const totalPhrases = Math.ceil(words.length / WORDS_PER_PHRASE);
-  // Which phrase chunk are we in?
   const phraseIdx = Math.min(
     totalPhrases - 1,
     Math.floor((Math.max(0, timeInSeg) / segDuration) * totalPhrases),
   );
   const start = phraseIdx * WORDS_PER_PHRASE;
   return words.slice(start, start + WORDS_PER_PHRASE).join(' ');
+}
+
+// Exact subtitle from wordTimings: show the phrase window for the current spoken word
+function getVisibleTextFromWordTimings(
+  wordTimings: { word: string; start: number; end: number }[],
+  timeInSeg: number,
+): string {
+  if (!wordTimings.length) return '';
+  // Find last word that has started playing
+  let spokenIdx = 0;
+  for (let i = 0; i < wordTimings.length; i++) {
+    if (wordTimings[i].start <= timeInSeg) spokenIdx = i;
+    else break;
+  }
+  // Show the WORDS_PER_PHRASE chunk that contains the current spoken word
+  const chunkIdx = Math.floor(spokenIdx / WORDS_PER_PHRASE);
+  const start = chunkIdx * WORDS_PER_PHRASE;
+  return wordTimings.slice(start, start + WORDS_PER_PHRASE).map(w => w.word).join(' ');
 }
 
 // ── Proportional timing for single-audio mode ─────────────────────────────────
@@ -160,31 +177,58 @@ function sceneTimingsByWordCoverage(
 ): number[] {
   if (scenes.length === 0) return [];
 
+  // ── Method 1: wordTimings (exact spoken durations from Google TTS / STT) ──
+  // If any segment has wordTimings, compute per-segment offsets from actual
+  // spoken durations → exact scene boundary times, not estimates.
+  const hasWordTimings = script.some(s => s.wordTimings && s.wordTimings.length > 0);
+
+  if (hasWordTimings) {
+    // Per-segment actual spoken duration: last word's end time
+    const segSpokenDurs = script.map(s => {
+      if (s.wordTimings && s.wordTimings.length > 0) {
+        return s.wordTimings[s.wordTimings.length - 1].end;
+      }
+      // Segment has no wordTimings → estimate from word count relative to neighbours
+      return null;
+    });
+
+    // Fill nulls with proportional estimate from total
+    const knownTotal = segSpokenDurs.reduce((sum, d) => sum + (d ?? 0), 0);
+    const unknownCount = segSpokenDurs.filter(d => d === null).length;
+    const unknownEach = unknownCount > 0 ? Math.max(0, totalDuration - knownTotal) / unknownCount : 0;
+    const segDurs = segSpokenDurs.map(d => d ?? unknownEach);
+
+    // Cumulative per-segment start times within merged audio
+    const segStart: number[] = [];
+    let cum = 0;
+    for (const d of segDurs) { segStart.push(cum); cum += d; }
+
+    // Each scene starts at its first valid segment's start time
+    return scenes.map(sc => {
+      for (const idx of sc.segmentIndices) {
+        if (idx >= 0 && idx < segStart.length) return segStart[idx];
+      }
+      return totalDuration; // no valid indices
+    });
+  }
+
+  // ── Method 2: word-count proportional (fallback when no wordTimings) ──
   const segWords = script.map(s =>
     Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length)
   );
-
-  // Total words covered by each scene
   const sceneWordCounts = scenes.map(sc =>
     sc.segmentIndices.reduce(
-      (sum, idx) => sum + (idx >= 0 && idx < segWords.length ? segWords[idx] : 0),
-      0,
+      (sum, idx) => sum + (idx >= 0 && idx < segWords.length ? segWords[idx] : 0), 0,
     )
   );
-
   const totalCovered = sceneWordCounts.reduce((a, b) => a + b, 0);
+  if (totalCovered === 0) return scenes.map((_, i) => (i / scenes.length) * totalDuration);
 
-  // Fallback: equal distribution if no segmentIndices are valid
-  if (totalCovered === 0) {
-    return scenes.map((_, i) => (i / scenes.length) * totalDuration);
-  }
-
-  // Cumulative: scene[i] starts where scene[i-1] ends
   const timings: number[] = [];
   let cum = 0;
-  for (const words of sceneWordCounts) {
+  for (const w of sceneWordCounts) {
     timings.push((cum / totalCovered) * totalDuration);
-    cum += words;
+    cum += w;
   }
   return timings;
 }
@@ -405,20 +449,24 @@ async function createStoryboardVideo(
     const sceneIdx = getActiveSceneIdx(elapsed, sceneTimings);
     const imgUrl = scenes[sceneIdx]?.imageUrl;
 
-    // ── Subtitle: per-audioSeg text with word-by-word reveal ──
+    // ── Subtitle: wordTimings (exact) or phrase-chunk (fallback) ──
     let visibleText = '';
+    const subtitleForSeg = (seg: DebateSegment | undefined, timeInSeg: number, segDur: number) => {
+      if (!seg) return '';
+      if (seg.wordTimings && seg.wordTimings.length > 0)
+        return getVisibleTextFromWordTimings(seg.wordTimings, timeInSeg);
+      return getVisibleText(seg.text ?? '', timeInSeg, segDur);
+    };
     if (propTimings) {
-      // Single-audio: word-proportional
       const segIdx = getAudioSegIdx(elapsed, propTimings.segOffsets);
       const segStart = propTimings.segOffsets[segIdx] ?? 0;
       const segEnd = propTimings.segOffsets[segIdx + 1] ?? totalDuration;
-      visibleText = getVisibleText(script[segIdx]?.text ?? '', elapsed - segStart, segEnd - segStart);
+      visibleText = subtitleForSeg(script[segIdx], elapsed - segStart, segEnd - segStart);
     } else {
-      // Multi-audio: actual decoded offsets
       const audioIdx = getAudioSegIdx(elapsed, actualOffsets);
       const segStart = actualOffsets[audioIdx] ?? 0;
       const segEnd = actualOffsets[audioIdx + 1] ?? totalDuration;
-      visibleText = getVisibleText(audioSegs[audioIdx]?.text ?? '', elapsed - segStart, segEnd - segStart);
+      visibleText = subtitleForSeg(audioSegs[audioIdx], elapsed - segStart, segEnd - segStart);
     }
 
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
@@ -638,30 +686,38 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     return scenes.find(sc => sc.segmentIndices.includes(currentSegIdx)) ?? scenes[0] ?? null;
   }, [scenes, playTime, currentSegIdx]);
 
-  // ── Word-by-word subtitle ──
+  // ── Subtitle text — uses wordTimings if available (exact), else phrase chunks ──
   const activeSubtitleText = useMemo(() => {
-    // In single-audio: use proportional word offsets for smooth subtitle progression
+    // Helper: get text for a segment at given timeInSeg
+    const textForSeg = (seg: typeof script[0] | undefined, timeInSeg: number, segDur: number) => {
+      if (!seg) return '';
+      // Exact: wordTimings from Google TTS / STT sync
+      if (seg.wordTimings && seg.wordTimings.length > 0) {
+        return getVisibleTextFromWordTimings(seg.wordTimings, timeInSeg);
+      }
+      // Fallback: phrase-chunk proportional
+      return getVisibleText(seg.text ?? '', timeInSeg, segDur);
+    };
+
+    // Single-audio mode
     if (singleAudioModeRef.current && propTimingsRef.current) {
-      const rawText = script[currentSegIdx]?.text ?? '';
       const segOffsets = propTimingsRef.current.segOffsets;
       const segStart = segOffsets[currentSegIdx] ?? 0;
       const segEnd = segOffsets[currentSegIdx + 1] ?? actualTotalRef.current;
-      return getVisibleText(rawText, playTime - segStart, segEnd - segStart);
+      return textForSeg(script[currentSegIdx], playTime - segStart, segEnd - segStart);
     }
-    // In multi-audio: use actual decoded offset for the current audioSeg
+    // Multi-audio mode
     const actualOffsets = actualSegOffsetsRef.current;
     const audioSegs = actualAudioSegsRef.current;
     if (actualOffsets.length > 0 && audioSegs.length > 0) {
-      const rawText = audioSegs[currentSegIdx]?.text ?? '';
       const segStart = actualOffsets[currentSegIdx] ?? 0;
       const segEnd = actualOffsets[currentSegIdx + 1] ?? actualTotalRef.current;
-      return getVisibleText(rawText, playTime - segStart, segEnd - segStart);
+      return textForSeg(audioSegs[currentSegIdx], playTime - segStart, segEnd - segStart);
     }
     // Fallback (before audio loaded)
-    const rawText = script[currentSegIdx]?.text ?? '';
     const segStart = offsets[currentSegIdx] ?? 0;
     const segEnd = offsets[currentSegIdx + 1] ?? totalDuration;
-    return getVisibleText(rawText, playTime - segStart, segEnd - segStart);
+    return textForSeg(script[currentSegIdx], playTime - segStart, segEnd - segStart);
   }, [currentSegIdx, playTime, offsets, totalDuration, script]);
 
   // Active image URL — from activeScene directly (works for both modes)
