@@ -905,6 +905,18 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     sceneTimingsRef.current = buildSceneTimings(scenes, script, scriptIndices, offsets, durs, total);
   }, [scenes, script]);
 
+  // ── Initial display timings (before audio loads) ──────────────────────────
+  // Compute estimated startTime/endTime from word coverage so the timeline
+  // never shows "0:00 → 0:00" when scenes are loaded from storage or generated.
+  useEffect(() => {
+    if (scenes.length === 0 || mergedBufRef.current) return; // skip if audio already loaded
+    const allZero = scenes.every(sc => sc.startTime === 0 && sc.endTime === 0);
+    if (!allZero) return; // already have some timing data
+    const estimatedTotal = totalDuration > 0 ? totalDuration : scenes.length * 5;
+    const timings = sceneTimingsByWordCoverage(scenes, script, estimatedTotal);
+    setScenes(prev => applyDecodedTimings(prev, timings, estimatedTotal));
+  }, [scenes, script, totalDuration]);
+
   const seekTo = useCallback((time: number) => {
     const t = Math.max(0, Math.min(time, actualTotalRef.current || totalDuration));
     pauseAtRef.current = t;
