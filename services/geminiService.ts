@@ -514,7 +514,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' = 'debate',
+  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -740,6 +740,64 @@ export const generateDebateScript = async (
                 ${durFillHi}
               `;
             }
+        } else if (style === 'image') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: IMAGE STYLE — SINGLE VOICE, RELATABLE HOOK, USA AUDIENCE
+            एक ही speaker। कोई narrator नहीं, कोई दूसरा speaker नहीं।
+            यह psychology / finance / self-improvement topic पर एक voiceover script है।
+            Audience: USA-based adults। Language: English।
+            Hook format: एक specific, relatable scenario/character से शुरू — जो सीधे audience की life को reflect करे।
+            ═══════════════════════════════════════
+
+            Topic: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineHi}
+            Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 HOOK (first 3-5 lines — this is everything) 】
+            Start with a specific, vivid character scenario — a real-feeling person in a real-feeling situation.
+            Then flip it to the audience with "Have you ever...?" or "Sound familiar?" or "That's most of us."
+            Examples of good hooks:
+            • "A man who never misses a gym session, eats clean, sleeps 8 hours — but still feels completely empty inside. Have you ever met someone like that? Or maybe... that's you."
+            • "There's a woman who checks her bank account every morning, not out of habit — out of fear. She earns decent money. It still never feels like enough."
+            • "A 29-year-old who looks successful on paper — good job, decent apartment, nice clothes — but spends every Sunday night dreading Monday. Not because the job is hard. Because it doesn't mean anything."
+            The hook MUST feel like it could describe someone the audience actually knows — or themselves.
+
+            【 THE CORE INSIGHT 】
+            After the hook, explain the real psychology or financial principle behind it.
+            — What is actually happening (the mechanism, the pattern)
+            — Why most people don't see it clearly
+            — What it costs them (emotionally, financially, time-wise)
+
+            【 THE SHIFT 】
+            Now give the audience a reframe — a new way to see this.
+            — A simple, concrete principle or action
+            — A real example of someone who understood this and what changed
+            — Make it feel achievable, not preachy
+
+            【 CLOSING LINE (1-2 lines max) 】
+            End with one line that stays in the head. A question, a truth, or a challenge.
+            Example: "The goal was never the money. The goal was the feeling you thought money would give you."
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Single speaker — no dialogue, no back-and-forth
+            ✓ English — USA audience, conversational but smart
+            ✓ Hook must be a specific scenario, not a generic statement
+            ✓ Every insight must have a real, grounded example
+            ✓ Tone: calm, direct, intelligent — like someone who actually knows this
+            ✗ BANNED: "In today's video we will..." — start with the hook directly
+            ✗ BANNED: Preachy advice, motivational poster lines, hollow positivity
+            ✗ BANNED: "As we know", "It is important to", generic filler
+            ✗ BANNED: Multiple speakers or dialogue format
+            ${durFillHi}
+          `;
         } else if (style === 'explained_solo') {
           prompt = `
             ═══════════════════════════════════════
@@ -1684,6 +1742,64 @@ export const generateDebateScript = async (
               ${durFillEn}
             `;
           }
+        } else if (style === 'image') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: IMAGE STYLE — SINGLE VOICE, RELATABLE HOOK, USA AUDIENCE
+            One speaker. No narrator. No second speaker. No dialogue.
+            Psychology / finance / self-improvement topic.
+            Audience: USA-based adults. Language: English.
+            Hook: A specific, relatable character scenario that mirrors the audience's real life.
+            ═══════════════════════════════════════
+
+            Topic: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 HOOK (3-5 lines — this determines everything) 】
+            Open with a specific, vivid character in a specific, real-feeling situation.
+            Then turn it toward the audience — "Have you ever...?" / "Sound familiar?" / "That's most of us."
+            The character is not famous. They are ordinary. The situation is specific, not abstract.
+            Examples:
+            • "A man who never misses a gym session, eats clean, sleeps 8 hours — but still feels completely empty inside. Have you ever met someone like that? Or maybe... that's you."
+            • "There's a woman who checks her bank account every morning — not out of habit. Out of fear. She earns good money. It still never feels like enough."
+            • "A 29-year-old who looks successful on paper — good job, decent apartment, nice clothes — but spends every Sunday night dreading Monday. Not because the job is hard. Because it doesn't mean anything."
+
+            【 THE CORE INSIGHT 】
+            Now explain the real psychology or financial principle at play.
+            — What is actually happening beneath the surface (the mechanism, the pattern)
+            — Why most people don't see it or name it
+            — What it costs them — emotionally, financially, in time or energy
+
+            【 THE SHIFT 】
+            Give the audience a reframe. A concrete new way to see this situation.
+            — One principle or shift in thinking, specific to this topic
+            — A real-world example of someone who applied this and what actually changed
+            — Keep it grounded. Not motivational. Practical.
+
+            【 CLOSING (1-2 lines only) 】
+            One line that stays. A truth, a question, or a quiet challenge.
+            Example: "The goal was never the money. The goal was the feeling you thought money would give you."
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Single speaker only — no back-and-forth, no names exchanged
+            ✓ English — USA audience, conversational but intelligent
+            ✓ Hook must open with a specific human scenario, not a general statement
+            ✓ Every insight must have a grounded, real example
+            ✓ Tone: calm, direct, unhurried — like someone who has actually lived this
+            ✗ BANNED: "In today's video..." — start with the hook directly, no intro
+            ✗ BANNED: Hollow motivational lines, generic life advice
+            ✗ BANNED: "As we know", "It is important to note", any filler
+            ✗ BANNED: Multiple speakers or any dialogue
+            ${durFillEn}
+          `;
         } else if (style === 'explained_solo') {
           prompt = `
             ═══════════════════════════════════════
