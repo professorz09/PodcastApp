@@ -902,7 +902,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     if (singleAudioModeRef.current) {
       propTimingsRef.current = buildProportionalTimings(scenes, script, total);
     }
-    sceneTimingsRef.current = buildSceneTimings(scenes, script, scriptIndices, offsets, durs, total);
+    const newTimings = buildSceneTimings(scenes, script, scriptIndices, offsets, durs, total);
+    sceneTimingsRef.current = newTimings;
+    // Update display timestamps if any scene still has stale/zero timings
+    const needsUpdate = scenes.some((sc, i) => Math.abs((newTimings[i] ?? 0) - sc.startTime) > 0.1);
+    if (needsUpdate) {
+      setScenes(prev => applyDecodedTimings(prev, newTimings, total));
+    }
   }, [scenes, script]);
 
   // ── Initial display timings (before audio loads) ──────────────────────────
