@@ -11,6 +11,7 @@ import {
   FolderDown,
   Music2,
   RotateCcw,
+  Film,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -31,6 +32,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
     { id: AppState.THUMBNAIL, label: 'Thumb', icon: Image },
     { id: AppState.AUDIO, label: 'Voice', icon: Wand2 },
     { id: AppState.VISUALIZER, label: 'Video', icon: Video },
+    { id: AppState.STORYBOARD, label: 'Storyboard', icon: Film },
     { id: AppState.LYRICS, label: 'Lyrics', icon: Music2, optional: true },
   ];
 
@@ -102,7 +104,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
                    step.id === AppState.INPUT ? 'Generate' :
                    step.id === AppState.SCRIPT ? 'Script Editor' :
                    step.id === AppState.THUMBNAIL ? 'Thumbnail' :
-                   step.id === AppState.AUDIO ? 'Voice Gen' : 'Video Maker'}
+                   step.id === AppState.AUDIO ? 'Voice Gen' :
+                   step.id === AppState.STORYBOARD ? 'Storyboard' : 'Video Maker'}
                 </span>
                 {(step as any).optional && !isActive && (
                   <span className="ml-auto text-[9px] font-semibold uppercase tracking-widest text-gray-700 border border-gray-700 rounded px-1 py-0.5">skip</span>

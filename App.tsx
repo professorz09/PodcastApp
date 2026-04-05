@@ -7,6 +7,7 @@ import ThumbnailGenerator from './components/ThumbnailGenerator';
 import DebateVisualizer from './components/DebateVisualizer';
 import ContentImporter from './components/ContentImporter';
 import LyricsGenerator from './components/LyricsGenerator';
+import Storyboard from './components/Storyboard';
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
@@ -433,6 +434,13 @@ const App: React.FC = () => {
           script={script}
           onBack={() => setAppState(AppState.AUDIO)}
           youtubeData={youtubeData}
+        />
+      )}
+
+      {appState === AppState.STORYBOARD && (
+        <Storyboard
+          script={script}
+          onBack={() => setAppState(AppState.VISUALIZER)}
         />
       )}
     </Layout>

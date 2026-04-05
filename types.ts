@@ -31,6 +31,7 @@ export enum AppState {
   AUDIO = 'AUDIO',
   THUMBNAIL = 'THUMBNAIL',
   VISUALIZER = 'VISUALIZER',
+  STORYBOARD = 'STORYBOARD',
   // Deprecated but kept for compatibility if needed during migration
   UPLOAD = 'UPLOAD',
   PROCESSING = 'PROCESSING',
@@ -120,6 +121,18 @@ export interface ThumbnailState {
   thumbnailUrl: string | null;
   referenceImage: { data: string, mimeType: string, url: string } | null;
   videoStyle?: 'situational' | 'debate' | 'podcast';
+}
+
+export interface StoryboardScene {
+  id: string;
+  sceneNumber: number;
+  prompt: string;
+  startTime: number;   // seconds into full audio
+  endTime: number;     // seconds into full audio
+  segmentIndices: number[];
+  imageUrl?: string;   // base64 data URL once generated
+  isGenerating?: boolean;
+  error?: string;
 }
 
 export interface DebateConfig {

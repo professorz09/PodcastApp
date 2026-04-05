@@ -3872,3 +3872,100 @@ export const generateSongAudio = async (
   for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
   return new Blob([buf], { type: audioPart.inlineData.mimeType || 'audio/wav' });
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STORYBOARD SCENE GENERATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface StoryboardSceneRaw {
+  sceneNumber: number;
+  prompt: string;
+  segmentIndices: number[];
+}
+
+export const generateStoryboardScenes = async (
+  segments: { speaker: string; text: string; duration?: number }[],
+  sceneCount: number,
+  model: string = 'gemini-3-flash-preview',
+): Promise<StoryboardSceneRaw[]> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const scriptText = segments.map((s, i) => `[${i}] ${s.speaker}: ${s.text}`).join('\n');
+  const durInfo = segments.map((s, i) => `[${i}] ${(s.duration ?? 0).toFixed(1)}s`).join(', ');
+
+  const prompt = `
+You are a professional video director and storyboard artist.
+
+Below is a voiceover/podcast script split into segments with durations:
+
+SCRIPT:
+${scriptText}
+
+SEGMENT DURATIONS: ${durInfo}
+
+TASK:
+Create exactly ${sceneCount} cinematic storyboard scenes that visually represent this script.
+Each scene must cover one or more consecutive script segments.
+Every segment must be covered by exactly one scene (no gaps, no overlaps).
+
+For each scene, provide:
+1. A detailed, vivid IMAGE GENERATION PROMPT suitable for AI image generation (Stable Diffusion / DALL-E / Imagen style).
+   - Be specific: lighting, camera angle, mood, style, subject, background.
+   - Style: cinematic, photorealistic, 16:9 composition.
+   - NO text, NO subtitles in the image.
+2. Which segment indices ([0], [1], ...) this scene covers.
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "prompt": "Detailed image generation prompt here...",
+      "segmentIndices": [0, 1]
+    },
+    ...
+  ]
+}
+Do not add any explanation outside the JSON.
+`;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      responseMimeType: 'application/json',
+      temperature: 0.7,
+    },
+  });
+
+  const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const parsed = JSON.parse(cleaned);
+  return (parsed.scenes || []) as StoryboardSceneRaw[];
+};
+
+export const generateStoryboardImage = async (
+  prompt: string,
+  style: string = 'cinematic',
+): Promise<string> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const fullPrompt = `${prompt}\n\nStyle: ${style}, cinematic photography, 16:9, high quality, no text, no watermarks, photorealistic.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: { parts: [{ text: fullPrompt }] },
+    config: {
+      imageConfig: { aspectRatio: '16:9' },
+    },
+  });
+
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if (part.inlineData) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+  throw new Error('No image generated');
+};
