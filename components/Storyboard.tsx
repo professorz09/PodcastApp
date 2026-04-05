@@ -233,89 +233,53 @@ function sceneTimingsByWordCoverage(
   return timings;
 }
 
-// ── Build scene start times from actual decoded audio ─────────────────────────
-// Multi-audio: map each scene's segmentIndices → actual decoded offsets
-// Single-audio: word-coverage proportional (per scene's narration word count)
+// ── Build scene start times ────────────────────────────────────────────────────
+// Treats the entire audio as ONE continuous timeline and spreads N scenes evenly
+// across it. Priority: wordTimings (exact word timestamps) → equal time split.
 function buildSceneTimings(
   scenes: StoryboardScene[],
   script: DebateSegment[],
-  audioSegScriptIndices: number[],   // script index of each audio segment (in playback order)
-  actualOffsets: number[],           // cumulative start time of each audio segment
-  actualDurs: number[],
+  audioSegScriptIndices: number[],
+  actualOffsets: number[],
+  _actualDurs: number[],
   totalDuration: number,
 ): number[] {
   if (scenes.length === 0) return [];
+  const N = scenes.length;
 
-  if (audioSegScriptIndices.length === 1) {
-    // Single-audio: each scene gets time ∝ its segment word count
-    return sceneTimingsByWordCoverage(scenes, script, totalDuration);
+  // ── Treat the whole audio as one continuous timeline ──
+  // Build a single flat list of word timestamps across ALL segments (in order)
+  const allWords: { absoluteStart: number }[] = [];
+  audioSegScriptIndices.forEach((scriptIdx, audioIdx) => {
+    const seg = script[scriptIdx];
+    const segOffset = actualOffsets[audioIdx] ?? 0;
+    if (seg?.wordTimings?.length) {
+      for (const wt of seg.wordTimings) {
+        allWords.push({ absoluteStart: segOffset + wt.start });
+      }
+    }
+  });
+
+  if (allWords.length >= N) {
+    // Exact: each scene gets an equal slice of spoken words → use the first
+    // word of that slice's real timestamp as the scene switch point
+    return scenes.map((_, i) => {
+      if (i === 0) return 0;
+      const wordIdx = Math.round((i / N) * allWords.length);
+      return allWords[Math.min(wordIdx, allWords.length - 1)].absoluteStart;
+    });
   }
 
-  // Build lookup: scriptIdx → { start, duration } of its audio
-  const segInfo = new Map<number, { start: number; dur: number }>();
-  audioSegScriptIndices.forEach((scriptIdx, audioIdx) => {
-    segInfo.set(scriptIdx, {
-      start: actualOffsets[audioIdx],
-      dur: actualDurs[audioIdx] ?? (totalDuration - actualOffsets[audioIdx]),
-    });
+  // Fallback: count total words across all script text, spread scenes proportionally
+  const scriptText = audioSegScriptIndices
+    .map(idx => script[idx]?.text ?? '')
+    .join(' ');
+  const totalWords = scriptText.split(/\s+/).filter(Boolean).length || N;
+
+  return scenes.map((_, i) => {
+    if (i === 0) return 0;
+    return (i / N) * totalDuration;
   });
-
-  // For each scene, its "anchor" = first segmentIndex that has audio
-  const sceneAnchor = scenes.map(sc => {
-    for (const idx of sc.segmentIndices) {
-      if (segInfo.has(idx)) return idx;
-    }
-    return -1; // no audio for this scene
-  });
-
-  // Group scene indices by anchor — detect multiple scenes per segment
-  const anchorToSceneIdxs = new Map<number, number[]>();
-  sceneAnchor.forEach((anchor, sceneIdx) => {
-    if (anchor === -1) return;
-    if (!anchorToSceneIdxs.has(anchor)) anchorToSceneIdxs.set(anchor, []);
-    anchorToSceneIdxs.get(anchor)!.push(sceneIdx);
-  });
-
-  // Build result
-  const result = new Array(scenes.length).fill(totalDuration);
-  anchorToSceneIdxs.forEach((sceneIdxs, anchor) => {
-    const { start, dur } = segInfo.get(anchor)!;
-    const seg = script[anchor];
-
-    if (sceneIdxs.length === 1) {
-      // One scene per segment — switch exactly when segment starts (perfect sync)
-      result[sceneIdxs[0]] = start;
-      return;
-    }
-
-    // Multiple scenes in one segment — split its text into equal word-chunks
-    // and use wordTimings for exact timestamps when available
-    const N = sceneIdxs.length;
-    const words = (seg?.text ?? '').split(/\s+/).filter(Boolean);
-    const totalWords = words.length || N;
-    const wt = seg?.wordTimings; // { word, start, end }[] — from Google TTS / Sync
-
-    sceneIdxs.forEach((si, i) => {
-      if (i === 0) {
-        // First scene always starts at segment start
-        result[si] = start;
-        return;
-      }
-
-      // Which word marks the start of this scene's chunk?
-      const wordIdx = Math.round((i / N) * totalWords);
-
-      if (wt && wt.length > wordIdx) {
-        // Exact: use the actual spoken timestamp of that word
-        result[si] = start + wt[wordIdx].start;
-      } else {
-        // Proportional fallback: word fraction × segment duration
-        result[si] = start + (i / N) * dur;
-      }
-    });
-  });
-
-  return result;
 }
 
 function buildScenesFromRaw(
