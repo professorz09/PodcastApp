@@ -733,7 +733,12 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       const idx = getActiveSceneIdx(safeTime, timings);
       return scenes[idx] ?? scenes[0] ?? null;
     }
-    // Before audio loads: fallback to segmentIndices lookup
+    // Before audio loads: use scenes' own startTime values if available
+    if (scenes.some(sc => sc.startTime > 0)) {
+      const idx = getActiveSceneIdx(playTime, scenes.map(sc => sc.startTime));
+      return scenes[idx] ?? scenes[0] ?? null;
+    }
+    // Last resort: segmentIndices lookup
     return scenes.find(sc => sc.segmentIndices.includes(currentSegIdx)) ?? scenes[0] ?? null;
   }, [scenes, playTime, currentSegIdx]);
 
@@ -750,12 +755,19 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       return getVisibleText(seg.text ?? '', timeInSeg, segDur);
     };
 
-    // Single-audio mode
+    // Single-audio mode: find current script segment by playTime, not by currentSegIdx
+    // (currentSegIdx is always 0 in single-audio mode — only 1 merged buffer)
     if (singleAudioModeRef.current && propTimingsRef.current) {
       const segOffsets = propTimingsRef.current.segOffsets;
-      const segStart = segOffsets[currentSegIdx] ?? 0;
-      const segEnd = segOffsets[currentSegIdx + 1] ?? actualTotalRef.current;
-      return textForSeg(script[currentSegIdx], playTime - segStart, segEnd - segStart);
+      // Find which script segment we're currently in based on playTime
+      let scriptIdx = 0;
+      for (let i = 0; i < segOffsets.length; i++) {
+        if (segOffsets[i] <= playTime) scriptIdx = i;
+        else break;
+      }
+      const segStart = segOffsets[scriptIdx] ?? 0;
+      const segEnd = segOffsets[scriptIdx + 1] ?? actualTotalRef.current;
+      return textForSeg(script[scriptIdx], playTime - segStart, segEnd - segStart);
     }
     // Multi-audio mode — use script indices so we always read fresh segment data
     const actualOffsets = actualSegOffsetsRef.current;
