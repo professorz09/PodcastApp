@@ -531,13 +531,46 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     });
   }, [totalDuration]);
 
-  // ── Auto-set durations ──
-  const handleAutoSet = () => {
+  // ── Auto-set durations (from actual audio segment durations) ──
+  const handleAutoSet = useCallback(async () => {
     if (!scenes.length) return;
-    const rebuilt = buildScenesFromRaw(scenes.map(sc => ({ sceneNumber: sc.sceneNumber, prompt: sc.prompt, segmentIndices: sc.segmentIndices })), script);
-    setScenes(prev => rebuilt.map((rb, i) => ({ ...rb, imageUrl: prev[i]?.imageUrl, isGenerating: prev[i]?.isGenerating, error: prev[i]?.error })));
-    toast.success('Durations reset from audio.');
-  };
+    if (!hasAudio) { toast.error('Pehle Voice step mein audio generate karo.'); return; }
+
+    // Decode actual audio durations so timeline reflects real timings
+    const audioSegs = script.filter(s => s.audioUrl && (s.duration ?? 0) > 0);
+    if (!audioSegs.length) { toast.error('No valid audio segments found.'); return; }
+
+    toast.info('Audio se timing calculate ho rahi hai…');
+    try {
+      const AC = new AudioContext();
+      const actualDurs: number[] = [];
+      for (const seg of audioSegs) {
+        const buf = await AC.decodeAudioData(await (await fetch(seg.audioUrl!)).arrayBuffer());
+        actualDurs.push(buf.duration);
+      }
+      AC.close();
+
+      // Patch script with actual durations temporarily for buildOffsets
+      const patchedScript = script.map(s => {
+        const aIdx = audioSegs.indexOf(s);
+        return aIdx >= 0 ? { ...s, duration: actualDurs[aIdx] } : { ...s, duration: 0 };
+      });
+
+      const rawData = scenes.map(sc => ({ sceneNumber: sc.sceneNumber, prompt: sc.prompt, segmentIndices: sc.segmentIndices }));
+      const rebuilt = buildScenesFromRaw(rawData, patchedScript);
+
+      setScenes(prev => {
+        const prevByNum = new Map<number, StoryboardScene>(prev.map(s => [s.sceneNumber, s]));
+        return rebuilt.map(rb => {
+          const old = prevByNum.get(rb.sceneNumber);
+          return { ...rb, imageUrl: old?.imageUrl, isGenerating: old?.isGenerating ?? false, error: old?.error };
+        });
+      });
+      toast.success('Scene durations updated from audio!');
+    } catch {
+      toast.error('Audio decode failed — check audio URLs.');
+    }
+  }, [scenes, script, hasAudio]);
 
   // ── Create video ──
   const handleCreateVideo = useCallback(async () => {
