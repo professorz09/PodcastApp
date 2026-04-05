@@ -234,52 +234,82 @@ function sceneTimingsByWordCoverage(
 }
 
 // ── Build scene start times ────────────────────────────────────────────────────
-// Treats the entire audio as ONE continuous timeline and spreads N scenes evenly
-// across it. Priority: wordTimings (exact word timestamps) → equal time split.
+// Each scene shows for exactly as long as its assigned segments play.
+// segmentIndices decides WHEN each scene appears — not equal distribution.
 function buildSceneTimings(
   scenes: StoryboardScene[],
   script: DebateSegment[],
-  audioSegScriptIndices: number[],
-  actualOffsets: number[],
-  _actualDurs: number[],
+  audioSegScriptIndices: number[],  // audio index → script index
+  actualOffsets: number[],          // audio index → absolute start time
+  actualDurs: number[],             // audio index → duration
   totalDuration: number,
 ): number[] {
   if (scenes.length === 0) return [];
-  const N = scenes.length;
 
-  // ── Treat the whole audio as one continuous timeline ──
-  // Build a single flat list of word timestamps across ALL segments (in order)
-  const allWords: { absoluteStart: number }[] = [];
-  audioSegScriptIndices.forEach((scriptIdx, audioIdx) => {
-    const seg = script[scriptIdx];
-    const segOffset = actualOffsets[audioIdx] ?? 0;
-    if (seg?.wordTimings?.length) {
-      for (const wt of seg.wordTimings) {
-        allWords.push({ absoluteStart: segOffset + wt.start });
-      }
-    }
-  });
-
-  if (allWords.length >= N) {
-    // Exact: each scene gets an equal slice of spoken words → use the first
-    // word of that slice's real timestamp as the scene switch point
-    return scenes.map((_, i) => {
-      if (i === 0) return 0;
-      const wordIdx = Math.round((i / N) * allWords.length);
-      return allWords[Math.min(wordIdx, allWords.length - 1)].absoluteStart;
-    });
+  // Single-audio mode (one merged file for whole video): use word-coverage spread
+  if (audioSegScriptIndices.length === 1) {
+    return sceneTimingsByWordCoverage(scenes, script, totalDuration);
   }
 
-  // Fallback: count total words across all script text, spread scenes proportionally
-  const scriptText = audioSegScriptIndices
-    .map(idx => script[idx]?.text ?? '')
-    .join(' ');
-  const totalWords = scriptText.split(/\s+/).filter(Boolean).length || N;
-
-  return scenes.map((_, i) => {
-    if (i === 0) return 0;
-    return (i / N) * totalDuration;
+  // scriptIdx → { start, dur } — O(1) lookup
+  const segInfo = new Map<number, { start: number; dur: number }>();
+  audioSegScriptIndices.forEach((scriptIdx, audioIdx) => {
+    segInfo.set(scriptIdx, {
+      start: actualOffsets[audioIdx] ?? 0,
+      dur: actualDurs[audioIdx] ?? 0,
+    });
   });
+
+  // Each scene's start = actual audio start of its first segment that has audio.
+  // This ensures scene 1 (made for segment A) shows exactly while segment A plays,
+  // scene 2 (made for segment B) shows while segment B plays, and so on.
+  const result: number[] = scenes.map(sc => {
+    for (const idx of sc.segmentIndices) {
+      const info = segInfo.get(idx);
+      if (info) return info.start;
+    }
+    return -1; // scene has no audio — will be filled below
+  });
+
+  // Handle multiple consecutive scenes that share the same anchor segment:
+  // split that segment's duration by wordTimings (exact) or proportionally.
+  let i = 0;
+  while (i < scenes.length) {
+    // Find the run of scenes that all resolve to the same start time
+    let j = i + 1;
+    while (j < scenes.length && result[j] === result[i] && result[i] !== -1) j++;
+    const groupSize = j - i;
+
+    if (groupSize > 1) {
+      const anchor = scenes[i].segmentIndices.find(idx => segInfo.has(idx)) ?? -1;
+      if (anchor !== -1) {
+        const { start, dur } = segInfo.get(anchor)!;
+        const seg = script[anchor];
+        const wt = seg?.wordTimings;
+        const totalWords = (seg?.text ?? '').split(/\s+/).filter(Boolean).length || groupSize;
+
+        for (let g = 0; g < groupSize; g++) {
+          if (g === 0) { result[i + g] = start; continue; }
+          const wordIdx = Math.round((g / groupSize) * totalWords);
+          result[i + g] = (wt && wt.length > wordIdx)
+            ? start + wt[wordIdx].start          // exact spoken timestamp
+            : start + (g / groupSize) * dur;     // proportional fallback
+        }
+      }
+    }
+    i = j;
+  }
+
+  // Fill scenes with no audio by interpolating between neighbours
+  for (let k = 0; k < result.length; k++) {
+    if (result[k] === -1) {
+      const prev = result.slice(0, k).reverse().find(t => t !== -1) ?? 0;
+      const next = result.slice(k + 1).find(t => t !== -1) ?? totalDuration;
+      result[k] = (prev + next) / 2;
+    }
+  }
+
+  return result;
 }
 
 function buildScenesFromRaw(
