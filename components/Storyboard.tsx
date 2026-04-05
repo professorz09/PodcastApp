@@ -349,6 +349,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const previewSrcRef = useRef<AudioBufferSourceNode | null>(null);
   const mergedBufRef = useRef<AudioBuffer | null>(null);
   const actualTotalRef = useRef<number>(0);
+  // Actual per-audioSeg offsets (decoded durations) — same as video export uses
+  const actualSegOffsetsRef = useRef<number[]>([]);
+  const actualAudioSegsRef = useRef<DebateSegment[]>([]);
   const pauseAtRef = useRef<number>(0);
   const wallStartRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
@@ -369,11 +372,20 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   // ── Segment-based lookups (same logic as video export) ──
   const segToImageMemo = useMemo(() => buildSegToImage(scenes), [scenes]);
 
-  // Current segment index based on playTime + script offsets
-  const currentSegIdx = useMemo(
-    () => getAudioSegIdx(Math.min(playTime, totalDuration - 0.001), offsets),
-    [playTime, offsets, totalDuration]
-  );
+  // Current segment index — uses actual decoded offsets if audio is loaded (same as video export)
+  // Falls back to s.duration-based offsets before audio is loaded
+  const currentSegIdx = useMemo(() => {
+    const actualOffsets = actualSegOffsetsRef.current;
+    const audioSegs = actualAudioSegsRef.current;
+    if (actualOffsets.length > 0 && audioSegs.length > 0) {
+      // ── Audio-loaded path: identical to video export ──
+      const safeTime = Math.min(playTime, actualTotalRef.current - 0.001);
+      const audioIdx = getAudioSegIdx(Math.max(0, safeTime), actualOffsets);
+      return script.indexOf(audioSegs[audioIdx]);
+    }
+    // ── Fallback before audio is loaded ──
+    return getAudioSegIdx(Math.min(playTime, totalDuration - 0.001), offsets);
+  }, [playTime, offsets, totalDuration, script]);
 
   // Active scene = the scene that covers currentSegIdx
   const activeScene = useMemo(
@@ -381,14 +393,27 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     [scenes, currentSegIdx]
   );
 
-  // Word-by-word subtitle for preview
+  // Word-by-word subtitle using actual decoded timings when available
   const activeSubtitleText = useMemo(() => {
     const rawText = script[currentSegIdx]?.text ?? '';
+    const actualOffsets = actualSegOffsetsRef.current;
+    const audioSegs = actualAudioSegsRef.current;
+    if (actualOffsets.length > 0 && audioSegs.length > 0) {
+      // Find this segment in audioSegs
+      const audioIdx = audioSegs.findIndex(s => s === script[currentSegIdx]);
+      if (audioIdx >= 0) {
+        const segStart = actualOffsets[audioIdx];
+        const segEnd = audioIdx + 1 < actualOffsets.length
+          ? actualOffsets[audioIdx + 1]
+          : actualTotalRef.current;
+        const segDur = segEnd - segStart;
+        return getVisibleText(rawText, playTime - segStart, segDur);
+      }
+    }
+    // Fallback
     const segStart = offsets[currentSegIdx] ?? 0;
     const segEnd = offsets[currentSegIdx + 1] ?? totalDuration;
-    const segDur = segEnd - segStart;
-    const timeInSeg = playTime - segStart;
-    return getVisibleText(rawText, timeInSeg, segDur);
+    return getVisibleText(rawText, playTime - segStart, segEnd - segStart);
   }, [currentSegIdx, playTime, offsets, totalDuration, script]);
 
   // Active image URL from segment lookup
@@ -480,8 +505,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       for (const seg of audioSegs) {
         decoded.push(await AC.decodeAudioData(await (await fetch(seg.audioUrl!)).arrayBuffer()));
       }
+      // ── Store actual offsets per audioSeg (identical logic to video export) ──
+      const actualDurs = decoded.map(b => b.duration);
+      const actualOffsets: number[] = [0];
+      for (let i = 0; i < actualDurs.length - 1; i++) actualOffsets.push(actualOffsets[i] + actualDurs[i]);
+      const total = actualOffsets[actualOffsets.length - 1] + actualDurs[actualDurs.length - 1];
+
       const sr = decoded[0].sampleRate, ch = decoded[0].numberOfChannels;
-      const total = decoded.reduce((s, b) => s + b.duration, 0);
       const merged = AC.createBuffer(ch, decoded.reduce((s, b) => s + b.length, 0), sr);
       let off = 0;
       for (const buf of decoded) {
@@ -490,6 +520,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       }
       mergedBufRef.current = merged;
       actualTotalRef.current = total;
+      // Save for preview sync — same as video export
+      actualSegOffsetsRef.current = actualOffsets;
+      actualAudioSegsRef.current = audioSegs;
     } finally {
       setIsLoadingAudio(false);
     }
