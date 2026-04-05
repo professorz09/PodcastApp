@@ -53,6 +53,34 @@ function buildOffsets(segs: DebateSegment[]) {
   return { offsets, total: t };
 }
 
+// Given elapsed time + actual offsets, return current audio segment index
+function getAudioSegIdx(elapsed: number, offsets: number[]): number {
+  let idx = offsets.length - 1;
+  for (let i = 0; i < offsets.length; i++) {
+    const end = i < offsets.length - 1 ? offsets[i + 1] : Infinity;
+    if (elapsed >= offsets[i] && elapsed < end) { idx = i; break; }
+  }
+  return idx;
+}
+
+// Build a map: scriptIdx → imageUrl (from scenes' segmentIndices)
+function buildSegToImage(scenes: StoryboardScene[]): Map<number, string> {
+  const m = new Map<number, string>();
+  for (const sc of scenes) {
+    if (!sc.imageUrl) continue;
+    for (const idx of sc.segmentIndices) m.set(idx, sc.imageUrl);
+  }
+  return m;
+}
+
+// Word-by-word subtitle: returns the visible portion of text
+function getVisibleText(text: string, timeInSeg: number, segDuration: number): string {
+  if (segDuration <= 0) return text;
+  const words = text.trim().split(/\s+/);
+  const count = Math.max(1, Math.ceil((timeInSeg / segDuration) * words.length));
+  return words.slice(0, count).join(' ');
+}
+
 function buildScenesFromRaw(
   rawScenes: { sceneNumber: number; prompt: string; segmentIndices: number[] }[],
   segments: DebateSegment[],
@@ -77,7 +105,44 @@ function hexOpacity(hex: string, opacity: number) {
   return `rgba(${r},${g},${b},${(opacity / 100).toFixed(2)})`;
 }
 
-// ── Video creation ──────────────────────────────────────────────────────────
+// Draw subtitle text on canvas context (shared by preview + video export)
+function drawSubtitleOnCtx(
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  text: string,
+  cfg: SubtitleConfig,
+) {
+  if (!cfg.enabled || !text) return;
+  const fs = cfg.fontSize;
+  ctx.font = `bold ${fs}px sans-serif`;
+  const maxW = W - 80;
+  const words = text.trim().split(/\s+/);
+  const lines: string[] = []; let line = '';
+  for (const w of words) {
+    const t = line ? `${line} ${w}` : w;
+    if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
+    else line = t;
+  }
+  if (line) lines.push(line);
+  const lh = fs * 1.55, pad = 12, boxH = lines.length * lh + pad * 2;
+  const boxY = cfg.position === 'top' ? 20 : H - boxH - 20;
+  ctx.fillStyle = hexOpacity(cfg.bgColor, cfg.bgOpacity);
+  ctx.beginPath();
+  ctx.roundRect(40, boxY, W - 80, boxH, cfg.borderRadius);
+  ctx.fill();
+  ctx.fillStyle = cfg.textColor;
+  ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, boxY + pad + (i + 1) * lh - fs * 0.35));
+}
+
+// Draw an image cover-fit on canvas
+function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, W: number, H: number) {
+  if (!img.complete || !img.naturalWidth) return;
+  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  ctx.drawImage(img, (W - img.naturalWidth * scale) / 2, (H - img.naturalHeight * scale) / 2, img.naturalWidth * scale, img.naturalHeight * scale);
+}
+
+// ── Video creation — segment-accurate sync ────────────────────────────────────
 async function createStoryboardVideo(
   scenes: StoryboardScene[],
   script: DebateSegment[],
@@ -85,27 +150,43 @@ async function createStoryboardVideo(
   onProgress: (pct: number, msg: string) => void,
 ): Promise<Blob> {
   onProgress(0, 'Loading audio…');
+
+  // Only segments WITH audio (in script order)
   const audioSegs = script.filter(s => s.audioUrl && (s.duration ?? 0) > 0);
   if (!audioSegs.length) throw new Error('No audio — generate audio in Voice step first.');
+
   const AC = new AudioContext();
   const decoded: AudioBuffer[] = [];
   for (let i = 0; i < audioSegs.length; i++) {
     onProgress(5 + Math.round((i / audioSegs.length) * 25), `Decoding audio ${i + 1}/${audioSegs.length}…`);
     decoded.push(await AC.decodeAudioData(await (await fetch(audioSegs[i].audioUrl!)).arrayBuffer()));
   }
+
+  // ── Actual durations & offsets from decoded buffers (not s.duration) ──
+  const actualDurs = decoded.map(b => b.duration);
+  const actualOffsets: number[] = [0];
+  for (let i = 0; i < actualDurs.length - 1; i++) actualOffsets.push(actualOffsets[i] + actualDurs[i]);
+  const totalDuration = actualOffsets[actualOffsets.length - 1] + actualDurs[actualDurs.length - 1];
+
+  // Merge into one buffer
+  onProgress(30, 'Merging audio…');
   const sr = decoded[0].sampleRate, ch = decoded[0].numberOfChannels;
   const merged = AC.createBuffer(ch, decoded.reduce((s, b) => s + b.length, 0), sr);
   let off = 0;
-  for (const buf of decoded) { for (let c = 0; c < ch; c++) merged.getChannelData(c).set(buf.getChannelData(c), off); off += buf.length; }
-  const totalDuration = merged.duration;
-  const { offsets } = buildOffsets(script);
+  for (const buf of decoded) {
+    for (let c = 0; c < ch; c++) merged.getChannelData(c).set(buf.getChannelData(c), off);
+    off += buf.length;
+  }
+
+  // ── scriptIdx → imageUrl map (from scene.segmentIndices) ──
+  const segToImg = buildSegToImage(scenes);
 
   onProgress(35, 'Loading images…');
-  const imgMap = new Map<string, HTMLImageElement>();
-  for (const sc of scenes.filter(s => s.imageUrl)) {
+  const imgCache = new Map<string, HTMLImageElement>();
+  for (const url of new Set(segToImg.values())) {
     const img = new window.Image();
-    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = sc.imageUrl!; });
-    imgMap.set(sc.id, img);
+    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = url; });
+    imgCache.set(url, img);
   }
 
   const W = 1280, H = 720, FPS = 30;
@@ -113,9 +194,13 @@ async function createStoryboardVideo(
   const ctx = canvas.getContext('2d')!;
   const dest = AC.createMediaStreamDestination();
   const src = AC.createBufferSource(); src.buffer = merged; src.connect(dest);
+
   const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ? 'video/mp4;codecs=avc1' : 'video/webm;codecs=vp9';
   const chunks: Blob[] = [];
-  const recorder = new MediaRecorder(new MediaStream([...canvas.captureStream(FPS).getVideoTracks(), ...dest.stream.getAudioTracks()]), { mimeType, videoBitsPerSecond: 6_000_000 });
+  const recorder = new MediaRecorder(
+    new MediaStream([...canvas.captureStream(FPS).getVideoTracks(), ...dest.stream.getAudioTracks()]),
+    { mimeType, videoBitsPerSecond: 6_000_000 }
+  );
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
   const done = new Promise<void>(r => { recorder.onstop = () => r(); });
   recorder.start(100); src.start(0);
@@ -126,35 +211,24 @@ async function createStoryboardVideo(
     if (elapsed >= totalDuration + 0.1) { recorder.stop(); return; }
     onProgress(50 + Math.round((elapsed / totalDuration) * 46), `Recording ${fmt(elapsed)} / ${fmt(totalDuration)}…`);
 
-    const active = scenes.slice().reverse().find(sc => elapsed >= sc.startTime) ?? scenes[0];
+    // ── Segment-accurate image lookup ──
+    const audioIdx = getAudioSegIdx(elapsed, actualOffsets);
+    const scriptIdx = script.indexOf(audioSegs[audioIdx]);
+    const imgUrl = segToImg.get(scriptIdx);
+    const timeInSeg = elapsed - actualOffsets[audioIdx];
+    const segDur = actualDurs[audioIdx];
+
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-    if (active?.imageUrl) {
-      const img = imgMap.get(active.id);
-      if (img?.complete && img.naturalWidth > 0) {
-        const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-        ctx.drawImage(img, (W - img.naturalWidth * scale) / 2, (H - img.naturalHeight * scale) / 2, img.naturalWidth * scale, img.naturalHeight * scale);
-      }
+    if (imgUrl) {
+      const img = imgCache.get(imgUrl);
+      if (img) drawImageCover(ctx, img, W, H);
     }
 
-    // Subtitles
-    if (subtitleCfg.enabled) {
-      let sub = '';
-      for (let i = offsets.length - 1; i >= 0; i--) { if (elapsed >= offsets[i]) { sub = script[i]?.text ?? ''; break; } }
-      if (sub) {
-        const fs = subtitleCfg.fontSize * 1.4;
-        ctx.font = `bold ${fs}px sans-serif`;
-        const maxW = W - 80, words = sub.split(' ');
-        const lines: string[] = []; let line = '';
-        for (const w of words) { const t = line ? `${line} ${w}` : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
-        if (line) lines.push(line);
-        const lh = fs * 1.4, pad = 14, boxH = lines.length * lh + pad * 2;
-        const boxY = subtitleCfg.position === 'top' ? 28 : H - boxH - 28;
-        ctx.fillStyle = hexOpacity(subtitleCfg.bgColor, subtitleCfg.bgOpacity);
-        ctx.beginPath(); ctx.roundRect(40, boxY, W - 80, boxH, subtitleCfg.borderRadius); ctx.fill();
-        ctx.fillStyle = subtitleCfg.textColor; ctx.textAlign = 'center';
-        lines.forEach((l, i) => ctx.fillText(l, W / 2, boxY + pad + (i + 1) * lh - fs * 0.3));
-      }
-    }
+    // ── Word-by-word subtitle ──
+    const rawText = audioSegs[audioIdx]?.text ?? '';
+    const visibleText = getVisibleText(rawText, timeInSeg, segDur);
+    drawSubtitleOnCtx(ctx, W, H, visibleText, subtitleCfg);
+
     requestAnimationFrame(draw);
   };
   onProgress(50, 'Recording…');
@@ -307,17 +381,36 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const doneImages = scenes.filter(sc => sc.imageUrl).length;
   const allImagesReady = scenes.length > 0 && scenes.every(sc => sc.imageUrl);
 
-  const activeScene = useMemo(
-    () => scenes.slice().reverse().find(sc => playTime >= sc.startTime) ?? scenes[0] ?? null,
-    [playTime, scenes]
+  // ── Segment-based lookups (same logic as video export) ──
+  const segToImageMemo = useMemo(() => buildSegToImage(scenes), [scenes]);
+
+  // Current segment index based on playTime + script offsets
+  const currentSegIdx = useMemo(
+    () => getAudioSegIdx(Math.min(playTime, totalDuration - 0.001), offsets),
+    [playTime, offsets, totalDuration]
   );
 
+  // Active scene = the scene that covers currentSegIdx
+  const activeScene = useMemo(
+    () => scenes.find(sc => sc.segmentIndices.includes(currentSegIdx)) ?? scenes[0] ?? null,
+    [scenes, currentSegIdx]
+  );
+
+  // Word-by-word subtitle for preview
   const activeSubtitleText = useMemo(() => {
-    for (let i = offsets.length - 1; i >= 0; i--) {
-      if (playTime >= offsets[i]) return script[i]?.text ?? '';
-    }
-    return '';
-  }, [playTime, offsets, script]);
+    const rawText = script[currentSegIdx]?.text ?? '';
+    const segStart = offsets[currentSegIdx] ?? 0;
+    const segEnd = offsets[currentSegIdx + 1] ?? totalDuration;
+    const segDur = segEnd - segStart;
+    const timeInSeg = playTime - segStart;
+    return getVisibleText(rawText, timeInSeg, segDur);
+  }, [currentSegIdx, playTime, offsets, totalDuration, script]);
+
+  // Active image URL from segment lookup
+  const activeImageUrl = useMemo(
+    () => segToImageMemo.get(currentSegIdx),
+    [segToImageMemo, currentSegIdx]
+  );
 
   // ── Draw canvas preview ──
   useEffect(() => {
@@ -327,39 +420,29 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     const W = canvas.width, H = canvas.height;
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
 
-    const drawSubtitle = (sub: string) => {
-      if (!subtitle.enabled || !sub) return;
-      const fs = subtitle.fontSize;
-      ctx.font = `bold ${fs}px sans-serif`;
-      const maxW = W - 60, words = sub.split(' ');
-      const lines: string[] = []; let line = '';
-      for (const w of words) { const t = line ? `${line} ${w}` : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
-      if (line) lines.push(line);
-      const lh = fs * 1.5, pad = 10, boxH = lines.length * lh + pad * 2;
-      const boxY = subtitle.position === 'top' ? 16 : H - boxH - 16;
-      ctx.fillStyle = hexOpacity(subtitle.bgColor, subtitle.bgOpacity);
-      ctx.beginPath(); ctx.roundRect(30, boxY, W - 60, boxH, subtitle.borderRadius); ctx.fill();
-      ctx.fillStyle = subtitle.textColor; ctx.textAlign = 'center';
-      lines.forEach((l, i) => ctx.fillText(l, W / 2, boxY + pad + (i + 1) * lh - fs * 0.3));
-    };
-
-    if (activeScene?.imageUrl) {
-      const url = activeScene.imageUrl;
+    if (activeImageUrl) {
       const doRender = (img: HTMLImageElement) => {
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-        const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-        ctx.drawImage(img, (W - img.naturalWidth * scale) / 2, (H - img.naturalHeight * scale) / 2, img.naturalWidth * scale, img.naturalHeight * scale);
-        drawSubtitle(activeSubtitleText);
+        drawImageCover(ctx, img, W, H);
+        drawSubtitleOnCtx(ctx, W, H, activeSubtitleText, subtitle);
       };
-      if (imgCacheRef.current.has(url)) doRender(imgCacheRef.current.get(url)!);
-      else { const img = new window.Image(); img.onload = () => { imgCacheRef.current.set(url, img); doRender(img); }; img.src = url; }
+      if (imgCacheRef.current.has(activeImageUrl)) {
+        doRender(imgCacheRef.current.get(activeImageUrl)!);
+      } else {
+        const img = new window.Image();
+        img.onload = () => { imgCacheRef.current.set(activeImageUrl, img); doRender(img); };
+        img.src = activeImageUrl;
+      }
     } else {
       ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#1e1e1e'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(scenes.length === 0 ? 'Generate scenes below to preview' : `Scene ${activeScene?.sceneNumber ?? 1} — no image yet`, W / 2, H / 2);
-      drawSubtitle(activeSubtitleText);
+      ctx.fillStyle = '#2a2a2a'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(
+        scenes.length === 0 ? 'Generate scenes below to preview' : `Segment ${currentSegIdx + 1} — no image assigned`,
+        W / 2, H / 2
+      );
+      drawSubtitleOnCtx(ctx, W, H, activeSubtitleText, subtitle);
     }
-  }, [activeScene, activeSubtitleText, subtitle, scenes.length]);
+  }, [activeImageUrl, activeSubtitleText, subtitle, scenes.length, currentSegIdx]);
 
   // ── Playback ──
   useEffect(() => {
