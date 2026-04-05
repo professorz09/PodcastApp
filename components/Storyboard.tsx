@@ -964,12 +964,56 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
 
   // Active row highlight is handled via className — no page scroll
 
+  // ── Build per-segment actual timestamps from audio offsets or wordTimings ──
+  const buildSegmentTimestamps = useCallback(() => {
+    // Priority 1: actual decoded audio offsets
+    const offsets = actualSegOffsetsRef.current;
+    const indices = audioSegScriptIdxRef.current;
+    const total = actualTotalRef.current;
+    if (offsets.length && indices.length && total > 0) {
+      const durs = offsets.map((t, i) => (offsets[i + 1] ?? total) - t);
+      const segMap = new Map<number, { start: number; end: number }>();
+      indices.forEach((scriptIdx, audioIdx) => {
+        segMap.set(scriptIdx, { start: offsets[audioIdx], end: offsets[audioIdx] + durs[audioIdx] });
+      });
+      return segMap;
+    }
+    // Priority 2: wordTimings (cumulative across segments)
+    const hasWord = script.some(s => s.wordTimings && s.wordTimings.length > 0);
+    if (hasWord) {
+      const segMap = new Map<number, { start: number; end: number }>();
+      let cum = 0;
+      script.forEach((s, i) => {
+        if (s.wordTimings && s.wordTimings.length > 0) {
+          const segStart = cum;
+          const segEnd = cum + s.wordTimings[s.wordTimings.length - 1].end;
+          segMap.set(i, { start: segStart, end: segEnd });
+          cum = segEnd;
+        } else {
+          const dur = s.duration ?? 0;
+          segMap.set(i, { start: cum, end: cum + dur });
+          cum += dur;
+        }
+      });
+      return segMap;
+    }
+    return null;
+  }, [script]);
+
   // ── Generate scenes ──
   const handleGenerateScenes = useCallback(async () => {
     if (!script.length) { toast.error('No script loaded.'); return; }
     setIsGeneratingScenes(true); setVideoBlob(null); setCharacterGuide('');
     try {
-      const result = await generateStoryboardScenes(script.map(s => ({ speaker: s.speaker, text: s.text, duration: s.duration })), sceneCount, model);
+      const segMap = buildSegmentTimestamps();
+      const segs = script.map((s, i) => ({
+        speaker: s.speaker,
+        text: s.text,
+        duration: s.duration,
+        startTime: segMap?.get(i)?.start,
+        endTime: segMap?.get(i)?.end,
+      }));
+      const result = await generateStoryboardScenes(segs, sceneCount, model);
       const knownTotal = actualTotalRef.current || undefined;
       const built = buildScenesFromRaw(result.scenes, script, knownTotal);
       setScenes(built); setCharacterGuide(result.characterGuide || '');
@@ -977,7 +1021,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       toast.success(`${built.length} scenes created`);
     } catch (e: any) { toast.error(e.message || 'Scene generation failed'); }
     finally { setIsGeneratingScenes(false); }
-  }, [script, sceneCount, model]);
+  }, [script, sceneCount, model, buildSegmentTimestamps]);
 
   // ── Generate single image ──
   const handleGenerateImage = useCallback(async (id: string) => {
@@ -1122,7 +1166,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
               <div className="flex items-center px-4 py-3 border-b border-white/5 gap-2">
                 <Film size={13} className="text-purple-400" />
                 <span className="text-sm font-bold text-white">Timeline</span>
-                <span className="text-[10px] text-gray-600">🖊 click image to edit prompt</span>
+                <span className="text-[10px] text-gray-600 flex-1">🖊 click image to edit prompt</span>
+                <button
+                  onClick={handleGenerateScenes}
+                  disabled={isGeneratingScenes || !script.length}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/15 hover:bg-purple-600/30 disabled:opacity-40 text-purple-300 text-[10px] font-semibold border border-purple-500/20 transition-all"
+                >
+                  {isGeneratingScenes ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                  {isGeneratingScenes ? 'Generating…' : 'Regenerate Scenes'}
+                </button>
               </div>
 
               {/* Scene rows */}

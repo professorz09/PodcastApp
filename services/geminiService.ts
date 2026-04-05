@@ -3889,15 +3889,26 @@ export interface StoryboardScenesResult {
 }
 
 export const generateStoryboardScenes = async (
-  segments: { speaker: string; text: string; duration?: number }[],
+  segments: { speaker: string; text: string; duration?: number; startTime?: number; endTime?: number }[],
   sceneCount: number,
   model: string = 'gemini-3-flash-preview',
 ): Promise<StoryboardScenesResult> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  const scriptText = segments.map((s, i) => `[${i}] ${s.speaker}: ${s.text}`).join('\n');
-  const durInfo = segments.map((s, i) => `[${i}] ${(s.duration ?? 0).toFixed(1)}s`).join(', ');
+  const hasTimestamps = segments.some(s => s.startTime != null && s.endTime != null);
+  const scriptText = segments.map((s, i) => {
+    if (hasTimestamps && s.startTime != null && s.endTime != null) {
+      return `[${i}] (${s.startTime.toFixed(1)}s–${s.endTime.toFixed(1)}s) ${s.speaker}: ${s.text}`;
+    }
+    return `[${i}] ${s.speaker}: ${s.text}`;
+  }).join('\n');
+  const durInfo = segments.map((s, i) => {
+    const dur = s.endTime != null && s.startTime != null
+      ? (s.endTime - s.startTime).toFixed(1)
+      : (s.duration ?? 0).toFixed(1);
+    return `[${i}] ${dur}s`;
+  }).join(', ');
 
   const prompt = `
 You are a professional storyboard artist creating a consistent illustrated story — like a children's picture book or a simple comic strip.
