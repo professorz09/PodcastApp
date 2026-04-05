@@ -269,22 +269,11 @@ function drawSubtitleOnCtx(
   const totalH = lines.length * lh + pad * 2;
   const baseY = cfg.position === 'top' ? 20 : H - totalH - 20;
 
-  // Semi-transparent black background bar (YouTube-style)
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.62)';
-  ctx.beginPath();
-  const barX = W / 2 - maxW / 2 - pad;
-  const barW = maxW + pad * 2;
-  const r = 6;
-  ctx.roundRect(barX, baseY, barW, totalH, r);
-  ctx.fill();
-  ctx.restore();
-
-  // Text with subtle shadow
-  ctx.shadowColor = 'rgba(0,0,0,0.7)';
-  ctx.shadowBlur = 4;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 1;
+  // Strong shadow for legibility without background
+  ctx.shadowColor = 'rgba(0,0,0,0.95)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 2;
   ctx.fillStyle = cfg.textColor;
   lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
   ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
