@@ -1166,15 +1166,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
               <div className="flex items-center px-4 py-3 border-b border-white/5 gap-2">
                 <Film size={13} className="text-purple-400" />
                 <span className="text-sm font-bold text-white">Timeline</span>
-                <span className="text-[10px] text-gray-600 flex-1">🖊 click image to edit prompt</span>
-                <button
-                  onClick={handleGenerateScenes}
-                  disabled={isGeneratingScenes || !script.length}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/15 hover:bg-purple-600/30 disabled:opacity-40 text-purple-300 text-[10px] font-semibold border border-purple-500/20 transition-all"
-                >
-                  {isGeneratingScenes ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
-                  {isGeneratingScenes ? 'Generating…' : 'Regenerate Scenes'}
-                </button>
+                <span className="text-[10px] text-gray-600">🖊 click image to edit prompt</span>
               </div>
 
               {/* Scene rows */}
@@ -1205,6 +1197,37 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                   </div>
                 </div>
               )}
+
+              {/* ── Regenerate scenes bar ── */}
+              <div className="flex items-center gap-2 px-3 py-2 border-t border-white/5 bg-black/30">
+                {/* Scene count */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[9px] text-gray-600">Scenes</span>
+                  <input
+                    type="number" min={1} max={200} value={sceneCount}
+                    onChange={e => setSceneCount(Math.max(1, Math.min(200, Number(e.target.value))))}
+                    className="w-10 bg-white/5 border border-white/8 rounded-lg text-[10px] text-white text-center px-1 py-1 focus:outline-none focus:border-purple-500/50"
+                  />
+                </div>
+                {/* Model toggle */}
+                <div className="flex bg-black border border-white/8 rounded-lg p-0.5 gap-0.5 shrink-0">
+                  {MODEL_OPTIONS.map(o => (
+                    <button key={o.value} onClick={() => setModel(o.value)}
+                      className={`px-2 py-1 rounded-md text-[9px] font-semibold transition-all ${model === o.value ? 'bg-purple-600 text-white' : 'text-gray-600 hover:text-gray-400'}`}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                {/* Regenerate button */}
+                <button
+                  onClick={handleGenerateScenes}
+                  disabled={isGeneratingScenes || !script.length}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 disabled:opacity-40 text-purple-300 text-[9px] font-bold border border-purple-500/25 transition-all ml-auto"
+                >
+                  {isGeneratingScenes ? <Loader2 size={9} className="animate-spin" /> : <RefreshCw size={9} />}
+                  {isGeneratingScenes ? 'Generating…' : 'Regenerate'}
+                </button>
+              </div>
             </div>
           )}
 
