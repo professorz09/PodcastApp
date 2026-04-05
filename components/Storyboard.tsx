@@ -585,12 +585,17 @@ const PromptModal: React.FC<{
 // ── Timeline Row (each scene clip) ────────────────────────────────────────────
 const TimelineRow: React.FC<{
   scene: StoryboardScene;
+  script: DebateSegment[];
   isActive: boolean;
   onSeek: () => void;
   onOpenPrompt: () => void;
   onGenerate: () => void;
-}> = ({ scene, isActive, onSeek, onOpenPrompt, onGenerate }) => {
+}> = ({ scene, script, isActive, onSeek, onOpenPrompt, onGenerate }) => {
   const dur = scene.endTime - scene.startTime;
+  const voiceover = scene.segmentIndices
+    .map(i => script[i]?.text ?? '')
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div onClick={onSeek}
@@ -615,7 +620,7 @@ const TimelineRow: React.FC<{
           <span className="text-[9px] text-gray-700">{fmt(scene.startTime)} → {fmt(scene.endTime)}</span>
           <span className="text-[9px] font-mono text-gray-600 ml-auto">{dur.toFixed(1)}s</span>
         </div>
-        <p className="text-[10px] text-gray-500 line-clamp-1 leading-relaxed">{scene.prompt}</p>
+        <p className="text-[10px] text-gray-400 line-clamp-1 leading-relaxed">{voiceover || scene.prompt}</p>
       </div>
 
       {/* Generate button */}
@@ -1126,6 +1131,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                   <div key={scene.id} ref={activeScene?.id === scene.id ? (activeRowRef as any) : undefined}>
                     <TimelineRow
                       scene={scene}
+                      script={script}
                       isActive={activeScene?.id === scene.id}
                       onSeek={() => seekTo(scene.startTime)}
                       onOpenPrompt={() => setPromptModalId(scene.id)}
