@@ -639,14 +639,10 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Narrator — Opening (SEEDHA, SHORT — 3-4 lines max) 】
-                पहली line में TOPIC का नाम DIRECTLY लो — कोई warmup नहीं, कोई build-up नहीं।
-                Examples:
-                • "Aaj hum baat karenge Robert Greene ki book 48 Laws of Power ke baare mein।"
-                • "Aaj ki baat hogi cryptocurrency ke baare mein — kya hai yeh, kaise kaam karta hai।"
-                • "Aaj hum samjhenge stoicism ko — woh philosophy jo duniya ke top leaders follow karte hain।"
-                फिर 1-2 lines में बताओ is video में क्या-क्या cover होगा — specific, topic के hisaab se।
-                फिर directly discussion शुरू। बस। कोई dramatic intro नहीं।
+                【 Narrator — Opening (2-3 lines max) 】
+                Seedha topic ke naam se shuru karo — koi dramatic hook nahi, koi greeting nahi।
+                Format: "Aaj hum baat karenge [topic] ke baare mein — [ek line: kya cover karenge]।"
+                Example: "Aaj hum baat karenge Robert Greene ki 48 Laws of Power ke baare mein — kya hai yeh book, iske key laws, aur kya yeh practically kaam karte hain।"
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए यह structure follow करो:
@@ -708,25 +704,10 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Opening — Speaker A (SEEDHA SHURU — MANDATORY FORMAT) 】
-
-                ⚠️ PEHLI LINE KA FORMAT EXACTLY AISA HOGA — koi aur option nahi:
-                Speaker A ki PEHLI LINE mein topic ka POORA NAAM aana ZAROORI hai।
-
-                ALLOWED first lines (in ka style follow karo):
-                • "Yaar aaj hum baat karte hain Robert Greene ki 48 Laws of Power ke baare mein।"
-                • "Toh aaj ka topic hai — Cryptocurrency। Kya hai, kaise kaam karta hai, sab dekhte hain।"
-                • "Aaj hum samjhenge Stoicism ko — woh ancient philosophy jo aaj bhi relevant hai।"
-                • "Yaar, aaj baat karte hain [TOPIC] ki — [1 line mein kyun important hai]।"
-
-                BANNED first lines:
-                ✗ "Yaar kaise ho?" — social warmup forbidden
-                ✗ "Aaj ka topic bahut interesting hai..." — topic name pehle aao
-                ✗ "Toh chalo shuru karte hain..." — direct seedha topic pe
-                ✗ Koi bhi line jisme topic ka naam nahi — FORBIDDEN
-
-                Opening ke baad: 1 line mein is discussion mein kya cover karenge (specific)।
-                Phir DIRECTLY Point 1 pe jump karo। Total opening max 3 lines।
+                【 Opening — Speaker A (2-3 lines max) 】
+                Seedha topic ke naam se shuru karo — koi greeting nahi, koi "yaar" nahi।
+                Format: "[Topic ka naam] — [ek line mein kya cover karenge]। Shuru karte hain।"
+                Example: "Aaj hum baat karenge Robert Greene ki 48 Laws of Power ki — kya hai yeh book, iske key laws, aur kya yeh practically kaam karte hain।"
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए:
@@ -752,9 +733,8 @@ export const generateDebateScript = async (
                 ✓ हर point ke saath specific real example
                 ✓ Simple Hinglish — expert ki soch, dost ki bhaasha
                 ✓ Dono speakers ki alag voice
-                ✗ BANNED: Opening mein topic ka naam pehli line mein nahi aaya — HARD RULE
-                ✗ BANNED: "Yaar kaise ho", "Chalo shuru karte hain", koi bhi social warmup
-                ✗ BANNED: Long dramatic opening — max 3 lines total
+                ✗ BANNED: Greeting ya "yaar" se opening — seedha topic se shuru
+                ✗ BANNED: Long intro — opening max 3 lines
                 ✗ BANNED: "yeh zaroori hai", "nirhskarsh mein", generic filler
                 ✗ BANNED: Speakers ek-dusre ke words refer karein
                 ${durFillHi}
@@ -1669,23 +1649,10 @@ export const generateDebateScript = async (
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Opening — Speaker A (DIRECT START — MANDATORY FORMAT) 】
-
-              ⚠️ THE VERY FIRST SENTENCE MUST CONTAIN THE TOPIC NAME — no exceptions.
-
-              ALLOWED first lines:
-              • "Alright, today we're talking about Robert Greene's 48 Laws of Power — what it teaches and whether it works."
-              • "So today — cryptocurrency. What it is, how it works, and what you actually need to know."
-              • "Today we're breaking down [TOPIC] — [one line on why it matters]."
-
-              BANNED first lines:
-              ✗ "Hey, how's it going?" — social warmup forbidden
-              ✗ "Today's topic is really interesting..." — name the topic first
-              ✗ "Let's get started..." — jump straight to the topic name
-              ✗ Any sentence without the topic name — FORBIDDEN
-
-              After the opening line: 1 sentence on what will be covered specifically.
-              Then jump directly to Point 1. Total opening max 3 lines.
+              【 Opening — Speaker A (2-3 lines max) 】
+              Start directly with the topic name — no greeting, no "alright guys", no warmup.
+              Format: "Today we're talking about [topic name] — [one line on what will be covered]."
+              Example: "Today we're talking about Robert Greene's 48 Laws of Power — what it teaches, its key laws, and whether it actually works in real life."
 
               【 Point-by-Point Discussion (this is the entire main content) 】
               For each key aspect/point:
