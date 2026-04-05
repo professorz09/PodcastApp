@@ -75,6 +75,50 @@ function getVisibleText(text: string, timeInSeg: number, segDuration: number): s
   return words.slice(0, count).join(' ');
 }
 
+// ── Proportional timing for single-audio mode ─────────────────────────────────
+// When all audio is one file, distribute scene/segment timing by word count
+interface ProportionalTimings {
+  // per script segment: start time (proportional)
+  segOffsets: number[];
+  // per scene: start time (proportional)  
+  sceneOffsets: number[];
+}
+
+function buildProportionalTimings(
+  scenes: StoryboardScene[],
+  script: DebateSegment[],
+  totalDuration: number,
+): ProportionalTimings {
+  const segWords = script.map(s => Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length));
+  const totalWords = segWords.reduce((a, b) => a + b, 0);
+
+  // Offset for each script segment (proportional to cumulative word count)
+  const segOffsets: number[] = [];
+  let cum = 0;
+  for (let i = 0; i < script.length; i++) {
+    segOffsets.push((cum / totalWords) * totalDuration);
+    cum += segWords[i];
+  }
+
+  // Scene starts at the time its first segment starts
+  const sceneOffsets = scenes.map(sc => {
+    const firstIdx = sc.segmentIndices.length > 0 ? sc.segmentIndices[0] : 0;
+    return segOffsets[Math.min(firstIdx, segOffsets.length - 1)] ?? 0;
+  });
+
+  return { segOffsets, sceneOffsets };
+}
+
+// Given elapsed + proportional scene offsets → which scene index is active
+function getActiveSceneIdx(elapsed: number, sceneOffsets: number[]): number {
+  let idx = 0;
+  for (let i = 0; i < sceneOffsets.length; i++) {
+    if (elapsed >= sceneOffsets[i]) idx = i;
+    else break;
+  }
+  return idx;
+}
+
 function buildScenesFromRaw(
   rawScenes: { sceneNumber: number; prompt: string; segmentIndices: number[] }[],
   segments: DebateSegment[],
@@ -170,12 +214,21 @@ async function createStoryboardVideo(
     off += buf.length;
   }
 
-  // ── scriptIdx → imageUrl map (from scene.segmentIndices) ──
+  // ── Determine sync mode ──
+  // Single-audio: 1 audio file for entire script → proportional word-count timing
+  // Multi-audio: per-segment audio → exact decoded duration timing
+  const singleAudioMode = audioSegs.length === 1;
   const segToImg = buildSegToImage(scenes);
+  const propTimings = singleAudioMode
+    ? buildProportionalTimings(scenes, script, totalDuration)
+    : null;
 
   onProgress(35, 'Loading images…');
   const imgCache = new Map<string, HTMLImageElement>();
-  for (const url of new Set(segToImg.values())) {
+  const allImgUrls = singleAudioMode
+    ? scenes.filter(sc => sc.imageUrl).map(sc => sc.imageUrl!)
+    : [...new Set(segToImg.values())];
+  for (const url of allImgUrls) {
     const img = new window.Image();
     await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = url; });
     imgCache.set(url, img);
@@ -203,22 +256,33 @@ async function createStoryboardVideo(
     if (elapsed >= totalDuration + 0.1) { recorder.stop(); return; }
     onProgress(50 + Math.round((elapsed / totalDuration) * 46), `Recording ${fmt(elapsed)} / ${fmt(totalDuration)}…`);
 
-    // ── Segment-accurate image lookup ──
-    const audioIdx = getAudioSegIdx(elapsed, actualOffsets);
-    const scriptIdx = script.indexOf(audioSegs[audioIdx]);
-    const imgUrl = segToImg.get(scriptIdx);
-    const timeInSeg = elapsed - actualOffsets[audioIdx];
-    const segDur = actualDurs[audioIdx];
+    let imgUrl: string | undefined;
+    let visibleText: string;
+
+    if (singleAudioMode && propTimings) {
+      // ── Single-audio: word-proportional scene + subtitle ──
+      const sceneIdx = getActiveSceneIdx(elapsed, propTimings.sceneOffsets);
+      imgUrl = scenes[sceneIdx]?.imageUrl;
+
+      const segIdx = getAudioSegIdx(elapsed, propTimings.segOffsets);
+      const segStart = propTimings.segOffsets[segIdx] ?? 0;
+      const segEnd = propTimings.segOffsets[segIdx + 1] ?? totalDuration;
+      visibleText = getVisibleText(script[segIdx]?.text ?? '', elapsed - segStart, segEnd - segStart);
+    } else {
+      // ── Multi-audio: exact decoded duration sync ──
+      const audioIdx = getAudioSegIdx(elapsed, actualOffsets);
+      const scriptIdx = script.indexOf(audioSegs[audioIdx]);
+      imgUrl = segToImg.get(scriptIdx);
+      const timeInSeg = elapsed - actualOffsets[audioIdx];
+      const segDur = actualDurs[audioIdx];
+      visibleText = getVisibleText(audioSegs[audioIdx]?.text ?? '', timeInSeg, segDur);
+    }
 
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
     if (imgUrl) {
       const img = imgCache.get(imgUrl);
       if (img) drawImageCover(ctx, img, W, H);
     }
-
-    // ── Word-by-word subtitle ──
-    const rawText = audioSegs[audioIdx]?.text ?? '';
-    const visibleText = getVisibleText(rawText, timeInSeg, segDur);
     drawSubtitleOnCtx(ctx, W, H, visibleText, subtitleCfg);
 
     requestAnimationFrame(draw);
@@ -352,6 +416,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   // Actual per-audioSeg offsets (decoded durations) — same as video export uses
   const actualSegOffsetsRef = useRef<number[]>([]);
   const actualAudioSegsRef = useRef<DebateSegment[]>([]);
+  // Proportional timings for single-audio mode
+  const propTimingsRef = useRef<ProportionalTimings | null>(null);
+  const singleAudioModeRef = useRef(false);
   const pauseAtRef = useRef<number>(0);
   const wallStartRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
@@ -372,55 +439,65 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   // ── Segment-based lookups (same logic as video export) ──
   const segToImageMemo = useMemo(() => buildSegToImage(scenes), [scenes]);
 
-  // Current segment index — uses actual decoded offsets if audio is loaded (same as video export)
-  // Falls back to s.duration-based offsets before audio is loaded
+  // ── Preview sync (mirrors video export exactly) ──
+  // Single-audio mode: use proportional word-count timings
+  // Multi-audio mode: use actual decoded segment offsets
   const currentSegIdx = useMemo(() => {
+    if (singleAudioModeRef.current && propTimingsRef.current) {
+      // Single-audio: segment index from proportional offsets
+      const safeTime = Math.max(0, Math.min(playTime, actualTotalRef.current - 0.001));
+      return getAudioSegIdx(safeTime, propTimingsRef.current.segOffsets);
+    }
     const actualOffsets = actualSegOffsetsRef.current;
     const audioSegs = actualAudioSegsRef.current;
     if (actualOffsets.length > 0 && audioSegs.length > 0) {
-      // ── Audio-loaded path: identical to video export ──
+      // Multi-audio: exact decoded offset → script index
       const safeTime = Math.min(playTime, actualTotalRef.current - 0.001);
       const audioIdx = getAudioSegIdx(Math.max(0, safeTime), actualOffsets);
       return script.indexOf(audioSegs[audioIdx]);
     }
-    // ── Fallback before audio is loaded ──
+    // Fallback (before audio loaded)
     return getAudioSegIdx(Math.min(playTime, totalDuration - 0.001), offsets);
   }, [playTime, offsets, totalDuration, script]);
 
-  // Active scene = the scene that covers currentSegIdx
-  const activeScene = useMemo(
-    () => scenes.find(sc => sc.segmentIndices.includes(currentSegIdx)) ?? scenes[0] ?? null,
-    [scenes, currentSegIdx]
-  );
+  // Active scene:
+  // Single-audio → scene index from proportional scene offsets
+  // Multi-audio  → scene covering currentSegIdx
+  const activeScene = useMemo(() => {
+    if (singleAudioModeRef.current && propTimingsRef.current) {
+      const safeTime = Math.max(0, Math.min(playTime, actualTotalRef.current - 0.001));
+      const idx = getActiveSceneIdx(safeTime, propTimingsRef.current.sceneOffsets);
+      return scenes[idx] ?? scenes[0] ?? null;
+    }
+    return scenes.find(sc => sc.segmentIndices.includes(currentSegIdx)) ?? scenes[0] ?? null;
+  }, [scenes, currentSegIdx, playTime]);
 
-  // Word-by-word subtitle using actual decoded timings when available
+  // Word-by-word subtitle
   const activeSubtitleText = useMemo(() => {
     const rawText = script[currentSegIdx]?.text ?? '';
+    if (singleAudioModeRef.current && propTimingsRef.current) {
+      const segOffsets = propTimingsRef.current.segOffsets;
+      const segStart = segOffsets[currentSegIdx] ?? 0;
+      const segEnd = segOffsets[currentSegIdx + 1] ?? actualTotalRef.current;
+      return getVisibleText(rawText, playTime - segStart, segEnd - segStart);
+    }
     const actualOffsets = actualSegOffsetsRef.current;
     const audioSegs = actualAudioSegsRef.current;
     if (actualOffsets.length > 0 && audioSegs.length > 0) {
-      // Find this segment in audioSegs
       const audioIdx = audioSegs.findIndex(s => s === script[currentSegIdx]);
       if (audioIdx >= 0) {
         const segStart = actualOffsets[audioIdx];
-        const segEnd = audioIdx + 1 < actualOffsets.length
-          ? actualOffsets[audioIdx + 1]
-          : actualTotalRef.current;
-        const segDur = segEnd - segStart;
-        return getVisibleText(rawText, playTime - segStart, segDur);
+        const segEnd = audioIdx + 1 < actualOffsets.length ? actualOffsets[audioIdx + 1] : actualTotalRef.current;
+        return getVisibleText(rawText, playTime - segStart, segEnd - segStart);
       }
     }
-    // Fallback
     const segStart = offsets[currentSegIdx] ?? 0;
     const segEnd = offsets[currentSegIdx + 1] ?? totalDuration;
     return getVisibleText(rawText, playTime - segStart, segEnd - segStart);
   }, [currentSegIdx, playTime, offsets, totalDuration, script]);
 
-  // Active image URL from segment lookup
-  const activeImageUrl = useMemo(
-    () => segToImageMemo.get(currentSegIdx),
-    [segToImageMemo, currentSegIdx]
-  );
+  // Active image URL — from activeScene directly (works for both modes)
+  const activeImageUrl = activeScene?.imageUrl;
 
   // ── Draw canvas preview ──
   useEffect(() => {
@@ -523,10 +600,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       // Save for preview sync — same as video export
       actualSegOffsetsRef.current = actualOffsets;
       actualAudioSegsRef.current = audioSegs;
+      // Single-audio mode: 1 audio file for entire script
+      singleAudioModeRef.current = audioSegs.length === 1;
+      propTimingsRef.current = singleAudioModeRef.current
+        ? buildProportionalTimings(scenes, script, total)
+        : null;
     } finally {
       setIsLoadingAudio(false);
     }
-  }, [script]);
+  }, [script, scenes]);
 
   const seekTo = useCallback((time: number) => {
     const t = Math.max(0, Math.min(time, actualTotalRef.current || totalDuration));
