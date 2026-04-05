@@ -713,12 +713,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       return getAudioSegIdx(safeTime, propTimingsRef.current.segOffsets);
     }
     const actualOffsets = actualSegOffsetsRef.current;
-    const audioSegs = actualAudioSegsRef.current;
-    if (actualOffsets.length > 0 && audioSegs.length > 0) {
+    if (actualOffsets.length > 0 && audioSegScriptIdxRef.current.length > 0) {
       const safeTime = Math.min(playTime, actualTotalRef.current - 0.001);
-      const audioIdx = getAudioSegIdx(Math.max(0, safeTime), actualOffsets);
-      // Use audioIdx as script index directly (same order as script.filter)
-      return audioIdx;
+      return getAudioSegIdx(Math.max(0, safeTime), actualOffsets);
     }
     return getAudioSegIdx(Math.min(playTime, totalDuration - 0.001), offsets);
   }, [playTime, offsets, totalDuration]);
