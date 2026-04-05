@@ -3971,6 +3971,59 @@ Do not add any explanation outside the JSON.
   };
 };
 
+// Time-based scene generation: given pre-computed slots with voiceover text,
+// AI only generates image prompts (no segmentIndices decision needed)
+export const generateStoryboardScenesTimeBased = async (
+  slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
+  model: string = 'gemini-3-flash-preview',
+): Promise<{ prompts: string[]; characterGuide: string }> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const slotText = slots.map(s =>
+    `Scene ${s.sceneNumber} [${s.startTime.toFixed(1)}s–${s.endTime.toFixed(1)}s]:\n"${s.voiceover}"`
+  ).join('\n\n');
+
+  const prompt = `
+You are a professional storyboard artist creating a consistent illustrated story.
+
+Below are ${slots.length} scenes with their exact timestamps and voiceover text (what is being spoken during each scene):
+
+${slotText}
+
+TASK:
+Step 1 — CHARACTER GUIDE:
+Identify the main character(s) from the voiceover text. Create a SHORT visual description (appearance, clothing, hair, skin tone) for consistency across all scenes. Max 60 words, starting with "Main character: ..."
+
+Step 2 — IMAGE PROMPTS:
+For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
+- Show what the character is DOING or EXPERIENCING during those spoken words
+- Style: simple flat 2D illustration, story-book art, consistent character design
+- Be literal and visual — no abstract concepts
+
+Respond ONLY with valid JSON:
+{
+  "characterGuide": "Main character: ...",
+  "prompts": ["prompt for scene 1", "prompt for scene 2", ...]
+}
+Do not add explanation outside the JSON.
+`;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: { responseMimeType: 'application/json', temperature: 0.7 },
+  });
+
+  const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const parsed = JSON.parse(cleaned);
+  return {
+    prompts: (parsed.prompts || []) as string[],
+    characterGuide: (parsed.characterGuide || '') as string,
+  };
+};
+
 export const generateStoryboardImage = async (
   prompt: string,
   characterGuide?: string,

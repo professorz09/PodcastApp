@@ -7,7 +7,7 @@ import {
   Type
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
-import { generateStoryboardScenes, generateStoryboardImage } from '../services/geminiService';
+import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased } from '../services/geminiService';
 import { saveScenes, loadScenes } from '../services/storageService';
 import { toast } from './Toast';
 
@@ -593,16 +593,22 @@ async function createStoryboardVideo(
 const PromptModal: React.FC<{
   scene: StoryboardScene;
   characterGuide: string;
+  absWords: AbsWord[];
+  script: DebateSegment[];
   onSave: (id: string, prompt: string) => void;
   onGenerate: (id: string) => void;
   onClose: () => void;
-}> = ({ scene, characterGuide, onSave, onGenerate, onClose }) => {
+}> = ({ scene, characterGuide, absWords, script, onSave, onGenerate, onClose }) => {
   const [prompt, setPrompt] = useState(scene.prompt);
+  const voiceover = getVoiceoverForRange(absWords, scene.startTime, scene.endTime, script, scene.segmentIndices);
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#0e0e0e] border border-white/10 rounded-2xl w-full max-w-md flex flex-col shadow-2xl max-h-[85vh]">
         <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5">
-          <h3 className="text-white font-bold text-sm">Scene {scene.sceneNumber}</h3>
+          <div>
+            <h3 className="text-white font-bold text-sm">Scene {scene.sceneNumber}</h3>
+            <span className="text-[10px] text-gray-600">{fmt(scene.startTime)} → {fmt(scene.endTime)}</span>
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-white/8 text-gray-500"><X size={15} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -612,6 +618,12 @@ const PromptModal: React.FC<{
               : scene.error ? <div className="absolute inset-0 flex flex-col items-center justify-center gap-1"><AlertCircle size={20} className="text-red-400" /><span className="text-xs text-red-400">{scene.error}</span></div>
               : <div className="absolute inset-0 flex items-center justify-center text-gray-700"><ImagePlus size={28} /></div>}
           </div>
+          {voiceover && (
+            <div className="bg-green-500/5 border border-green-500/15 rounded-xl px-3 py-2.5">
+              <p className="text-[10px] font-bold text-green-400 mb-1">Voiceover</p>
+              <p className="text-[10px] text-gray-400 leading-relaxed">{voiceover}</p>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Image Prompt</label>
             <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={4}
@@ -638,20 +650,59 @@ const PromptModal: React.FC<{
   );
 };
 
+// ── Absolute word timestamps from script's relative wordTimings ───────────────
+type AbsWord = { word: string; absStart: number; absEnd: number };
+
+function getAbsoluteWords(script: DebateSegment[]): AbsWord[] {
+  const result: AbsWord[] = [];
+  let offset = 0;
+  for (const seg of script) {
+    if (seg.wordTimings && seg.wordTimings.length > 0) {
+      for (const wt of seg.wordTimings) {
+        result.push({ word: wt.word, absStart: offset + wt.start, absEnd: offset + wt.end });
+      }
+      offset += seg.wordTimings[seg.wordTimings.length - 1].end;
+    } else {
+      offset += seg.duration ?? 0;
+    }
+  }
+  return result;
+}
+
+// Extract voiceover text for a time range (first … last words)
+function getVoiceoverForRange(
+  absWords: AbsWord[],
+  startTime: number,
+  endTime: number,
+  script: DebateSegment[],
+  segmentIndices: number[],
+): string {
+  // Use absolute word timings if available
+  if (absWords.length > 0 && endTime > startTime) {
+    const inRange = absWords.filter(w => w.absStart >= startTime - 0.15 && w.absStart < endTime + 0.15);
+    if (inRange.length > 0) {
+      if (inRange.length <= 12) return inRange.map(w => w.word).join(' ');
+      const first = inRange.slice(0, 5).map(w => w.word).join(' ');
+      const last = inRange.slice(-3).map(w => w.word).join(' ');
+      return `${first} … ${last}`;
+    }
+  }
+  // Fallback: join segment texts
+  return segmentIndices.map(i => script[i]?.text ?? '').filter(Boolean).join(' ');
+}
+
 // ── Timeline Row (each scene clip) ────────────────────────────────────────────
 const TimelineRow: React.FC<{
   scene: StoryboardScene;
   script: DebateSegment[];
+  absWords: AbsWord[];
   isActive: boolean;
   onSeek: () => void;
   onOpenPrompt: () => void;
   onGenerate: () => void;
-}> = ({ scene, script, isActive, onSeek, onOpenPrompt, onGenerate }) => {
+}> = ({ scene, script, absWords, isActive, onSeek, onOpenPrompt, onGenerate }) => {
   const dur = scene.endTime - scene.startTime;
-  const voiceover = scene.segmentIndices
-    .map(i => script[i]?.text ?? '')
-    .filter(Boolean)
-    .join(' ');
+  const voiceover = getVoiceoverForRange(absWords, scene.startTime, scene.endTime, script, scene.segmentIndices);
 
   return (
     <div onClick={onSeek}
@@ -676,7 +727,7 @@ const TimelineRow: React.FC<{
           <span className="text-[9px] text-gray-700">{fmt(scene.startTime)} → {fmt(scene.endTime)}</span>
           <span className="text-[9px] font-mono text-gray-600 ml-auto">{dur.toFixed(1)}s</span>
         </div>
-        <p className="text-[10px] text-gray-400 line-clamp-1 leading-relaxed">{voiceover || scene.prompt}</p>
+        <p className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">{voiceover || scene.prompt}</p>
       </div>
 
       {/* Generate button */}
@@ -1068,25 +1119,97 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     return null;
   }, [script]);
 
+  // Absolute word timestamps (memoized) for voiceover display in timeline/modal
+  const absWords = useMemo(() => getAbsoluteWords(script), [script]);
+
   // ── Generate scenes ──
   const handleGenerateScenes = useCallback(async () => {
     if (!script.length) { toast.error('No script loaded.'); return; }
     setIsGeneratingScenes(true); setVideoBlob(null); setCharacterGuide('');
     try {
+      const absWords = getAbsoluteWords(script);
+      const hasWordTimings = absWords.length > 0;
+
+      // Compute total duration: actual decoded audio > wordTimings last word > segment durations
       const segMap = buildSegmentTimestamps();
-      const segs = script.map((s, i) => ({
-        speaker: s.speaker,
-        text: s.text,
-        duration: s.duration,
-        startTime: segMap?.get(i)?.start,
-        endTime: segMap?.get(i)?.end,
-      }));
-      const result = await generateStoryboardScenes(segs, sceneCount, model);
-      const knownTotal = actualTotalRef.current || undefined;
-      const built = buildScenesFromRaw(result.scenes, script, knownTotal);
-      setScenes(built); setCharacterGuide(result.characterGuide || '');
+      const totalFromWordTimings = hasWordTimings ? absWords[absWords.length - 1].absEnd : 0;
+      const totalFromSegMap = segMap ? Math.max(...Array.from(segMap.values()).map(v => v.end)) : 0;
+      const totalDur =
+        (actualTotalRef.current > 0 ? actualTotalRef.current : 0) ||
+        totalFromWordTimings ||
+        totalFromSegMap ||
+        script.reduce((s, seg) => s + (seg.duration ?? 0), 0);
+
+      if (hasWordTimings && totalDur > 0) {
+        // ── TIME-BASED approach: divide audio into N equal slots, use real word timings ──
+        const slotDur = totalDur / sceneCount;
+
+        // For each slot: find all words in that time range, determine segmentIndices
+        const slots = Array.from({ length: sceneCount }, (_, i) => {
+          const slotStart = i * slotDur;
+          const slotEnd = Math.min((i + 1) * slotDur, totalDur);
+          const inRange = absWords.filter(w => w.absStart >= slotStart - 0.1 && w.absStart < slotEnd + 0.1);
+          const voiceover = inRange.length === 0 ? '' :
+            inRange.length <= 14 ? inRange.map(w => w.word).join(' ') :
+              `${inRange.slice(0, 6).map(w => w.word).join(' ')} … ${inRange.slice(-4).map(w => w.word).join(' ')}`;
+
+          // Which script segments have words in this slot?
+          const segIndices: number[] = [];
+          script.forEach((seg, si) => {
+            if (!seg.wordTimings?.length) return;
+            // Compute absolute offset for this segment
+            let off = 0;
+            for (let k = 0; k < si; k++) {
+              if (script[k].wordTimings?.length) off += script[k].wordTimings![script[k].wordTimings!.length - 1].end;
+              else off += script[k].duration ?? 0;
+            }
+            const firstAbs = off + seg.wordTimings[0].start;
+            const lastAbs = off + seg.wordTimings[seg.wordTimings.length - 1].end;
+            if (firstAbs < slotEnd + 0.1 && lastAbs > slotStart - 0.1) segIndices.push(si);
+          });
+          if (segIndices.length === 0) {
+            const fallback = Math.min(Math.floor((i / sceneCount) * script.length), script.length - 1);
+            segIndices.push(fallback);
+          }
+
+          return { sceneNumber: i + 1, startTime: slotStart, endTime: slotEnd, voiceover, segmentIndices: segIndices };
+        });
+
+        const result = await generateStoryboardScenesTimeBased(
+          slots.map(s => ({ sceneNumber: s.sceneNumber, startTime: s.startTime, endTime: s.endTime, voiceover: s.voiceover })),
+          model,
+        );
+
+        const built: StoryboardScene[] = slots.map((slot, i) => ({
+          id: `scene-${i + 1}`,
+          sceneNumber: i + 1,
+          prompt: result.prompts[i] || slot.voiceover || `Scene ${i + 1}`,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          segmentIndices: slot.segmentIndices,
+          isGenerating: false,
+        }));
+
+        setScenes(built);
+        setCharacterGuide(result.characterGuide || '');
+      } else {
+        // ── FALLBACK: original AI-based approach ──
+        const segs = script.map((s, i) => ({
+          speaker: s.speaker,
+          text: s.text,
+          duration: s.duration,
+          startTime: segMap?.get(i)?.start,
+          endTime: segMap?.get(i)?.end,
+        }));
+        const result = await generateStoryboardScenes(segs, sceneCount, model);
+        const knownTotal = actualTotalRef.current || undefined;
+        const built = buildScenesFromRaw(result.scenes, script, knownTotal);
+        setScenes(built);
+        setCharacterGuide(result.characterGuide || '');
+      }
+
       setShowSettings(false); setPlayTime(0);
-      toast.success(`${built.length} scenes created`);
+      toast.success(`${sceneCount} scenes created`);
     } catch (e: any) { toast.error(e.message || 'Scene generation failed'); }
     finally { setIsGeneratingScenes(false); }
   }, [script, sceneCount, model, buildSegmentTimestamps]);
@@ -1244,6 +1367,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                     <TimelineRow
                       scene={scene}
                       script={script}
+                      absWords={absWords}
                       isActive={activeScene?.id === scene.id}
                       onSeek={() => seekTo(scene.startTime)}
                       onOpenPrompt={() => setPromptModalId(scene.id)}
@@ -1458,6 +1582,8 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
         <PromptModal
           scene={promptScene}
           characterGuide={characterGuide}
+          absWords={absWords}
+          script={script}
           onSave={handleSavePrompt}
           onGenerate={handleGenerateImage}
           onClose={() => setPromptModalId(null)}
