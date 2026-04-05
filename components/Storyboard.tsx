@@ -1,8 +1,8 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
-  Film, Wand2, Image, Copy, Check, RefreshCw, ChevronDown,
+  Film, Wand2, Image, Copy, Check, ChevronDown,
   Play, Download, Loader2, AlertCircle, Layers, Clock, ArrowLeft,
-  Zap, Settings2, ImagePlus, Video
+  Zap, Settings2, ImagePlus, Video, Mic2
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage } from '../services/geminiService';
@@ -16,15 +16,6 @@ interface StoryboardProps {
 const MODEL_OPTIONS = [
   { value: 'gemini-3-flash-preview', label: 'Gemini Flash (Fast)' },
   { value: 'gemini-3.1-pro-preview', label: 'Gemini Pro (Best)' },
-];
-
-const IMG_STYLES = [
-  'cinematic',
-  'photorealistic',
-  'anime / illustration',
-  'documentary',
-  'dark moody',
-  'bright vibrant',
 ];
 
 const formatTime = (s: number) => {
@@ -223,10 +214,12 @@ async function createStoryboardVideo(
 // ── Scene Card ───────────────────────────────────────────────────────────────
 const SceneCard: React.FC<{
   scene: StoryboardScene;
+  voiceoverText: string;
   onPromptChange: (id: string, p: string) => void;
   onGenerate: (id: string) => void;
-}> = ({ scene, onPromptChange, onGenerate }) => {
+}> = ({ scene, voiceoverText, onPromptChange, onGenerate }) => {
   const [copied, setCopied] = useState(false);
+  const [voiceExpanded, setVoiceExpanded] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(scene.prompt).then(() => {
@@ -282,12 +275,42 @@ const SceneCard: React.FC<{
         )}
       </div>
 
+      {/* Voiceover Text */}
+      {voiceoverText && (
+        <div className="border-t border-white/5">
+          <button
+            onClick={() => setVoiceExpanded(v => !v)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/4 transition-all"
+          >
+            <Mic2 size={11} className="text-blue-400 shrink-0" />
+            <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-widest">Voiceover</span>
+            <ChevronDown size={10} className={`ml-auto text-gray-600 transition-transform ${voiceExpanded ? 'rotate-180' : ''}`} />
+          </button>
+          {voiceExpanded && (
+            <div className="px-3 pb-3">
+              <p className="text-xs text-gray-400 leading-relaxed bg-[#080808] border border-white/4 rounded-lg p-2.5 italic">
+                {voiceoverText}
+              </p>
+            </div>
+          )}
+          {!voiceExpanded && (
+            <p className="px-3 pb-2 text-[11px] text-gray-600 leading-relaxed line-clamp-2">
+              {voiceoverText}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Prompt editor */}
-      <div className="p-3 flex-1 flex flex-col gap-2">
+      <div className="p-3 flex-1 flex flex-col gap-2 border-t border-white/5">
+        <div className="flex items-center gap-1.5 mb-1">
+          <ImagePlus size={10} className="text-purple-400" />
+          <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-widest">Image Prompt</span>
+        </div>
         <textarea
           value={scene.prompt}
           onChange={(e) => onPromptChange(scene.id, e.target.value)}
-          rows={4}
+          rows={3}
           className="w-full bg-[#080808] border border-white/5 rounded-lg px-3 py-2 text-xs text-gray-300 resize-none focus:border-purple-500/40 outline-none leading-relaxed custom-scrollbar"
           placeholder="Image generation prompt…"
         />
@@ -320,7 +343,6 @@ const SceneCard: React.FC<{
 const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [sceneCount, setSceneCount] = useState(10);
   const [model, setModel] = useState('gemini-3-flash-preview');
-  const [imgStyle, setImgStyle] = useState('cinematic');
   const [scenes, setScenes] = useState<StoryboardScene[]>([]);
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
@@ -365,13 +387,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     const scene = scenes.find(sc => sc.id === id);
     if (!scene) return;
     try {
-      const url = await generateStoryboardImage(scene.prompt, imgStyle);
+      const url = await generateStoryboardImage(scene.prompt);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: e.message || 'Failed' } : sc));
       toast.error(`Scene ${scene.sceneNumber}: ${e.message || 'Image generation failed'}`);
     }
-  }, [scenes, imgStyle]);
+  }, [scenes]);
 
   // ── Generate all images ──
   const handleGenerateAll = useCallback(async () => {
@@ -476,9 +498,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
             <h3 className="text-white font-semibold text-sm">Scene Settings</h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Scene Count */}
-            <div className="sm:col-span-1">
+            <div>
               <label className="block text-xs text-gray-500 mb-2">
                 Number of Scenes
                 <span className="ml-2 text-purple-400 font-bold">{sceneCount}</span>
@@ -523,23 +545,10 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                 </select>
                 <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
               </div>
-            </div>
-
-            {/* Image Style */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-2">Image Style</label>
-              <div className="relative">
-                <select
-                  value={imgStyle}
-                  onChange={e => setImgStyle(e.target.value)}
-                  className="w-full bg-[#080808] border border-white/5 rounded-lg px-3 py-2 text-xs text-white appearance-none cursor-pointer outline-none focus:border-purple-500/40"
-                >
-                  {IMG_STYLES.map(s => (
-                    <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-              </div>
+              <p className="text-[10px] text-gray-600 mt-1.5 flex items-center gap-1">
+                <ImagePlus size={9} />
+                Images: MS Paint style (auto)
+              </p>
             </div>
           </div>
 
@@ -667,14 +676,22 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
 
             {/* Scene Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {scenes.map(scene => (
-                <SceneCard
-                  key={scene.id}
-                  scene={scene}
-                  onPromptChange={handlePromptChange}
-                  onGenerate={handleGenerateImage}
-                />
-              ))}
+              {scenes.map(scene => {
+                const voiceoverText = scene.segmentIndices
+                  .map(i => script[i])
+                  .filter(Boolean)
+                  .map(seg => `${seg.speaker}: ${seg.text}`)
+                  .join('\n');
+                return (
+                  <SceneCard
+                    key={scene.id}
+                    scene={scene}
+                    voiceoverText={voiceoverText}
+                    onPromptChange={handlePromptChange}
+                    onGenerate={handleGenerateImage}
+                  />
+                );
+              })}
             </div>
           </>
         )}

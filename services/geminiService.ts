@@ -3947,12 +3947,23 @@ Do not add any explanation outside the JSON.
 
 export const generateStoryboardImage = async (
   prompt: string,
-  style: string = 'cinematic',
 ): Promise<string> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  const fullPrompt = `${prompt}\n\nStyle: ${style}, cinematic photography, 16:9, high quality, no text, no watermarks, photorealistic.`;
+  const fullPrompt = `
+Generate a simple illustration in the style of MS Paint that directly visualizes the following scene description.
+
+Scene: "${prompt}"
+
+Requirements:
+1. Style: MS Paint style — simple drawings, basic colors, flat shading, unpolished, naive art style.
+2. Focus: ONLY illustrate the core concept or action described. Make it easy to understand at a glance.
+3. White Background: The image MUST have a clean, pure white background.
+4. Minimalist: Use simple visual metaphors, stick figures, or basic shapes. Avoid complex details.
+5. No Text in Image: Do not write the prompt text on the image. Use visuals only.
+6. Aspect Ratio: 16:9.
+`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
