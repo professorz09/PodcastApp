@@ -150,45 +150,76 @@ function getActiveSceneIdx(elapsed: number, sceneOffsets: number[]): number {
   return idx;
 }
 
-// ── Build scene start times from actual decoded audio ─────────────────────────
-// Multi-audio: map each scene's segmentIndices → actual decoded offsets
-// Single-audio: use word-proportional distribution
-// Returns sorted array of scene start times (seconds)
-function buildSceneTimings(
+// ── Single-audio scene timing by word coverage ────────────────────────────────
+// Each scene's duration ∝ total words in its script segments.
+// No allSame fallback — always gives per-scene proportional time.
+function sceneTimingsByWordCoverage(
   scenes: StoryboardScene[],
   script: DebateSegment[],
-  audioSegs: DebateSegment[],       // filtered segments that have audioUrl
-  actualOffsets: number[],          // decoded start offset for each audioSeg
-  actualDurs: number[],             // decoded duration for each audioSeg
   totalDuration: number,
 ): number[] {
   if (scenes.length === 0) return [];
 
-  const isSingle = audioSegs.length === 1;
+  const segWords = script.map(s =>
+    Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length)
+  );
 
-  if (isSingle) {
-    // Single-audio: proportional by word count
-    const prop = buildProportionalTimings(scenes, script, totalDuration);
-    return prop.sceneOffsets;
+  // Total words covered by each scene
+  const sceneWordCounts = scenes.map(sc =>
+    sc.segmentIndices.reduce(
+      (sum, idx) => sum + (idx >= 0 && idx < segWords.length ? segWords[idx] : 0),
+      0,
+    )
+  );
+
+  const totalCovered = sceneWordCounts.reduce((a, b) => a + b, 0);
+
+  // Fallback: equal distribution if no segmentIndices are valid
+  if (totalCovered === 0) {
+    return scenes.map((_, i) => (i / scenes.length) * totalDuration);
   }
 
-  // Multi-audio: map audioSeg index → start time
-  // Build a map: scriptIndex → start time (from actual decoded offsets)
+  // Cumulative: scene[i] starts where scene[i-1] ends
+  const timings: number[] = [];
+  let cum = 0;
+  for (const words of sceneWordCounts) {
+    timings.push((cum / totalCovered) * totalDuration);
+    cum += words;
+  }
+  return timings;
+}
+
+// ── Build scene start times from actual decoded audio ─────────────────────────
+// Multi-audio: map each scene's segmentIndices → actual decoded offsets
+// Single-audio: word-coverage proportional (per scene's narration word count)
+function buildSceneTimings(
+  scenes: StoryboardScene[],
+  script: DebateSegment[],
+  audioSegs: DebateSegment[],
+  actualOffsets: number[],
+  actualDurs: number[],
+  totalDuration: number,
+): number[] {
+  if (scenes.length === 0) return [];
+
+  if (audioSegs.length === 1) {
+    // Single-audio: each scene gets time ∝ its segment word count
+    return sceneTimingsByWordCoverage(scenes, script, totalDuration);
+  }
+
+  // Multi-audio: map audioSeg index → actual decoded start time
   const scriptIdxToStart = new Map<number, number>();
   audioSegs.forEach((seg, i) => {
     const scriptIdx = script.indexOf(seg);
     if (scriptIdx >= 0) scriptIdxToStart.set(scriptIdx, actualOffsets[i]);
   });
 
-  // For each scene, find the start time of its first covered audio segment
-  // scenes[i].start = time when scenes[i] should begin
   return scenes.map(sc => {
     for (const idx of sc.segmentIndices) {
       const t = scriptIdxToStart.get(idx);
       if (t !== undefined) return t;
     }
-    // Scene not covered by any audio segment → place after all audio
-    return totalDuration;
+    return totalDuration; // uncovered scene → place at end
   });
 }
 
@@ -204,29 +235,35 @@ function buildScenesFromRaw(
   const segWords = segments.map(s => Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length));
   const totalWords = segWords.reduce((a, b) => a + b, 0);
 
-  // Cumulative word offset per segment
-  const segWordStart: number[] = [];
-  let cum = 0;
-  for (const w of segWords) { segWordStart.push(cum); cum += w; }
-
+  // Build scenes first with indices
   const builtScenes = rawScenes.map((raw) => {
     const indices = raw.segmentIndices.filter(i => i >= 0 && i < segments.length);
-    let startTime = 0, endTime = total;
-    if (indices.length > 0 && totalWords > 0 && total > 0) {
-      startTime = (segWordStart[indices[0]] / totalWords) * total;
-      const lastIdx = indices[indices.length - 1];
-      const endWords = segWordStart[lastIdx] + segWords[lastIdx];
-      endTime = (Math.min(endWords, totalWords) / totalWords) * total;
-    }
     return {
       id: `scene-${raw.sceneNumber}`,
       sceneNumber: raw.sceneNumber,
       prompt: raw.prompt,
-      startTime: Math.max(0, startTime),
-      endTime: Math.max(startTime + 0.5, endTime),
+      startTime: 0,
+      endTime: total,
       segmentIndices: indices,
     };
   });
+
+  // Compute word-coverage timings (same logic as sceneTimingsByWordCoverage)
+  if (total > 0 && totalWords > 0) {
+    const sceneWordCounts = builtScenes.map(sc =>
+      sc.segmentIndices.reduce((sum, idx) => sum + (segWords[idx] ?? 0), 0)
+    );
+    const totalCovered = sceneWordCounts.reduce((a, b) => a + b, 0);
+    if (totalCovered > 0) {
+      let cum = 0;
+      builtScenes.forEach((sc, i) => {
+        sc.startTime = (cum / totalCovered) * total;
+        cum += sceneWordCounts[i];
+        const nextStart = (cum / totalCovered) * total;
+        sc.endTime = i < builtScenes.length - 1 ? nextStart : total;
+      });
+    }
+  }
   return builtScenes;
 }
 
