@@ -4,7 +4,7 @@ import {
   Play, Pause, Download, Loader2, AlertCircle,
   ArrowLeft, Settings2, ImagePlus, Video, X,
   RefreshCw, SkipBack, SkipForward, Zap, Scissors,
-  Type, Minus, Plus, Check
+  Type
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage } from '../services/geminiService';
@@ -294,11 +294,8 @@ const TimelineRow: React.FC<{
   onSeek: () => void;
   onOpenPrompt: () => void;
   onGenerate: () => void;
-  onChangeDuration: (delta: number) => void;
-  totalDuration: number;
-}> = ({ scene, isActive, onSeek, onOpenPrompt, onGenerate, onChangeDuration, totalDuration }) => {
+}> = ({ scene, isActive, onSeek, onOpenPrompt, onGenerate }) => {
   const dur = scene.endTime - scene.startTime;
-  const pct = totalDuration > 0 ? ((dur / totalDuration) * 100).toFixed(1) : '0';
 
   return (
     <div onClick={onSeek}
@@ -321,22 +318,9 @@ const TimelineRow: React.FC<{
         <div className="flex items-center gap-2 mb-0.5">
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isActive ? 'bg-red-500/20 text-red-300' : 'bg-white/6 text-gray-500'}`}>#{scene.sceneNumber}</span>
           <span className="text-[9px] text-gray-700">{fmt(scene.startTime)} → {fmt(scene.endTime)}</span>
-          <span className="text-[9px] text-gray-600 ml-auto">{pct}% of video</span>
+          <span className="text-[9px] font-mono text-gray-600 ml-auto">{dur.toFixed(1)}s</span>
         </div>
         <p className="text-[10px] text-gray-500 line-clamp-1 leading-relaxed">{scene.prompt}</p>
-      </div>
-
-      {/* Duration controls */}
-      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-        <button onClick={() => onChangeDuration(-0.5)}
-          className="w-6 h-6 rounded-lg bg-white/6 hover:bg-white/12 flex items-center justify-center text-gray-500 hover:text-white transition-all">
-          <Minus size={10} />
-        </button>
-        <span className="text-[10px] font-mono text-gray-400 w-10 text-center">{dur.toFixed(1)}s</span>
-        <button onClick={() => onChangeDuration(0.5)}
-          className="w-6 h-6 rounded-lg bg-white/6 hover:bg-white/12 flex items-center justify-center text-gray-500 hover:text-white transition-all">
-          <Plus size={10} />
-        </button>
       </div>
 
       {/* Generate button */}
@@ -365,8 +349,17 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [subtitle, setSubtitle] = useState<SubtitleConfig>(DEFAULT_SUBTITLE);
   const [playTime, setPlayTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const playRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [promptModalId, setPromptModalId] = useState<string | null>(null);
+
+  // Audio playback refs
+  const previewAcRef = useRef<AudioContext | null>(null);
+  const previewSrcRef = useRef<AudioBufferSourceNode | null>(null);
+  const mergedBufRef = useRef<AudioBuffer | null>(null);
+  const actualTotalRef = useRef<number>(0);
+  const pauseAtRef = useRef<number>(0);
+  const wallStartRef = useRef<number>(0);
+  const rafRef = useRef<number>(0);
 
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   const [videoProgress, setVideoProgress] = useState<{ pct: number; msg: string } | null>(null);
@@ -444,15 +437,105 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     }
   }, [activeImageUrl, activeSubtitleText, subtitle, scenes.length, currentSegIdx]);
 
+  // ── Audio preview helpers ──
+  const stopPreviewAudio = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    if (previewSrcRef.current) {
+      try { previewSrcRef.current.stop(); } catch { /* already stopped */ }
+      previewSrcRef.current = null;
+    }
+  }, []);
+
+  const startPreviewAudio = useCallback((fromTime: number) => {
+    stopPreviewAudio();
+    if (!mergedBufRef.current) return;
+    if (!previewAcRef.current || previewAcRef.current.state === 'closed') {
+      previewAcRef.current = new AudioContext();
+    }
+    const AC = previewAcRef.current;
+    if (AC.state === 'suspended') AC.resume();
+    const src = AC.createBufferSource();
+    src.buffer = mergedBufRef.current;
+    src.connect(AC.destination);
+    const startOffset = Math.min(Math.max(fromTime, 0), mergedBufRef.current.duration - 0.01);
+    src.start(0, startOffset);
+    previewSrcRef.current = src;
+    wallStartRef.current = performance.now() - startOffset * 1000;
+    const total = actualTotalRef.current;
+    const tick = () => {
+      const t = (performance.now() - wallStartRef.current) / 1000;
+      if (t >= total) {
+        setIsPlaying(false);
+        setPlayTime(total);
+        pauseAtRef.current = 0;
+        return;
+      }
+      setPlayTime(t);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [stopPreviewAudio]);
+
+  const loadMergedAudio = useCallback(async () => {
+    if (mergedBufRef.current) return; // already loaded
+    const audioSegs = script.filter(s => s.audioUrl && (s.duration ?? 0) > 0);
+    if (!audioSegs.length) { toast.error('Pehle Voice step mein audio generate karo.'); return; }
+    setIsLoadingAudio(true);
+    try {
+      const AC = new AudioContext();
+      previewAcRef.current = AC;
+      const decoded: AudioBuffer[] = [];
+      for (const seg of audioSegs) {
+        decoded.push(await AC.decodeAudioData(await (await fetch(seg.audioUrl!)).arrayBuffer()));
+      }
+      const sr = decoded[0].sampleRate, ch = decoded[0].numberOfChannels;
+      const total = decoded.reduce((s, b) => s + b.duration, 0);
+      const merged = AC.createBuffer(ch, decoded.reduce((s, b) => s + b.length, 0), sr);
+      let off = 0;
+      for (const buf of decoded) {
+        for (let c = 0; c < ch; c++) merged.getChannelData(c).set(buf.getChannelData(c), off);
+        off += buf.length;
+      }
+      mergedBufRef.current = merged;
+      actualTotalRef.current = total;
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  }, [script]);
+
+  const seekTo = useCallback((time: number) => {
+    const t = Math.max(0, Math.min(time, actualTotalRef.current || totalDuration));
+    pauseAtRef.current = t;
+    setPlayTime(t);
+    if (isPlaying) startPreviewAudio(t);
+  }, [isPlaying, startPreviewAudio, totalDuration]);
+
   // ── Playback ──
   useEffect(() => {
     if (isPlaying) {
-      playRef.current = setInterval(() => {
-        setPlayTime(t => { if (t >= totalDuration) { setIsPlaying(false); return totalDuration; } return Math.min(t + 0.05, totalDuration); });
-      }, 50);
-    } else { if (playRef.current) clearInterval(playRef.current); }
-    return () => { if (playRef.current) clearInterval(playRef.current); };
-  }, [isPlaying, totalDuration]);
+      if (!mergedBufRef.current) {
+        // Load then play
+        loadMergedAudio().then(() => {
+          if (mergedBufRef.current) startPreviewAudio(pauseAtRef.current);
+        });
+      } else {
+        startPreviewAudio(pauseAtRef.current);
+      }
+    } else {
+      pauseAtRef.current = playTime;
+      stopPreviewAudio();
+    }
+    return () => stopPreviewAudio();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPreviewAudio();
+      previewAcRef.current?.close();
+    };
+  }, [stopPreviewAudio]);
 
   // ── Scroll active row into view ──
   useEffect(() => {
@@ -506,30 +589,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, prompt } : sc));
   }, []);
 
-  // ── Change scene duration (+/-) ──
-  const handleChangeDuration = useCallback((sceneId: string, delta: number) => {
-    setScenes(prev => {
-      const idx = prev.findIndex(s => s.id === sceneId);
-      if (idx < 0) return prev;
-      const next = [...prev];
-      const scene = { ...next[idx] };
-      const newEnd = Math.max(scene.startTime + 0.5, Math.min(scene.endTime + delta, totalDuration));
-      scene.endTime = newEnd;
-      next[idx] = scene;
-      // Shift subsequent scenes
-      if (idx + 1 < next.length) {
-        const shift = newEnd - prev[idx].endTime;
-        for (let i = idx + 1; i < next.length; i++) {
-          next[i] = {
-            ...next[i],
-            startTime: Math.max(0, next[i].startTime + shift),
-            endTime: Math.min(totalDuration, next[i].endTime + shift),
-          };
-        }
-      }
-      return next;
-    });
-  }, [totalDuration]);
 
   // ── Auto-set durations (from actual audio segment durations) ──
   const handleAutoSet = useCallback(async () => {
@@ -619,25 +678,34 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
 
           {/* Playback controls */}
           <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-3 flex items-center gap-3">
-            <button onClick={() => setPlayTime(0)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
+            <button onClick={() => seekTo(0)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
               <SkipBack size={16} />
             </button>
-            <button onClick={() => { if (playTime >= totalDuration) setPlayTime(0); setIsPlaying(v => !v); }}
-              className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95">
-              {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
+            <button
+              onClick={() => {
+                if (playTime >= (actualTotalRef.current || totalDuration)) seekTo(0);
+                setIsPlaying(v => !v);
+              }}
+              disabled={isLoadingAudio}
+              className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 disabled:opacity-50">
+              {isLoadingAudio ? <Loader2 size={20} className="animate-spin" /> : isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
             </button>
-            <button onClick={() => setPlayTime(totalDuration)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
+            <button onClick={() => seekTo(actualTotalRef.current || totalDuration)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
               <SkipForward size={16} />
             </button>
             <div className="flex-1 min-w-0">
               <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden cursor-pointer"
-                onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setPlayTime(Math.max(0, Math.min(((e.clientX - r.left) / r.width) * totalDuration, totalDuration))); }}>
-                <div className="h-full bg-red-500 transition-all" style={{ width: totalDuration > 0 ? `${(playTime / totalDuration) * 100}%` : '0%' }} />
+                onClick={e => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const total = actualTotalRef.current || totalDuration;
+                  seekTo(Math.max(0, Math.min(((e.clientX - r.left) / r.width) * total, total)));
+                }}>
+                <div className="h-full bg-red-500 transition-none" style={{ width: (actualTotalRef.current || totalDuration) > 0 ? `${(playTime / (actualTotalRef.current || totalDuration)) * 100}%` : '0%' }} />
               </div>
               <div className="flex justify-between text-[10px] text-gray-500 mt-1">
                 <span>{fmt(playTime)}</span>
                 <span>{activeScene ? `Scene ${activeScene.sceneNumber} of ${scenes.length}` : '—'}</span>
-                <span>{fmt(totalDuration)}</span>
+                <span>{fmt(actualTotalRef.current || totalDuration)}</span>
               </div>
             </div>
           </div>
@@ -649,7 +717,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                 {scenes.map(scene => {
                   const isActive = activeScene?.id === scene.id;
                   return (
-                    <button key={scene.id} onClick={() => { setPlayTime(scene.startTime); setIsPlaying(false); }}
+                    <button key={scene.id} onClick={() => { seekTo(scene.startTime); setIsPlaying(false); }}
                       className={`relative flex flex-col items-center gap-0.5 p-1 rounded-xl border transition-all min-w-[60px] ${isActive ? 'bg-white/10 border-white/20' : 'bg-white/3 border-transparent hover:bg-white/8'}`}>
                       <div className="w-full h-9 rounded-lg overflow-hidden bg-[#111] relative">
                         {scene.imageUrl ? <img src={scene.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -672,7 +740,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                 <div className="flex items-center gap-2">
                   <Film size={13} className="text-purple-400" />
                   <span className="text-sm font-bold text-white">Timeline</span>
-                  <span className="text-[10px] text-gray-600">— / + duration adjust · 🖊 click image to edit</span>
+                  <span className="text-[10px] text-gray-600">🖊 click image to edit prompt</span>
                 </div>
                 {hasAudio && (
                   <button onClick={handleAutoSet} className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
@@ -688,11 +756,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                     <TimelineRow
                       scene={scene}
                       isActive={activeScene?.id === scene.id}
-                      onSeek={() => { setPlayTime(scene.startTime); setIsPlaying(false); }}
+                      onSeek={() => { seekTo(scene.startTime); setIsPlaying(false); }}
                       onOpenPrompt={() => setPromptModalId(scene.id)}
                       onGenerate={() => handleGenerateImage(scene.id)}
-                      onChangeDuration={(delta) => handleChangeDuration(scene.id, delta)}
-                      totalDuration={totalDuration}
                     />
                   </div>
                 ))}
