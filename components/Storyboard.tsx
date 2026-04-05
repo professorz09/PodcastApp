@@ -809,10 +809,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     };
   }, [stopPreviewAudio]);
 
-  // ── Scroll active row into view ──
-  useEffect(() => {
-    if (isPlaying) activeRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [activeScene?.id, isPlaying]);
+  // Active row highlight is handled via className — no page scroll
 
   // ── Generate scenes ──
   const handleGenerateScenes = useCallback(async () => {
@@ -950,7 +947,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                 {scenes.map(scene => {
                   const isActive = activeScene?.id === scene.id;
                   return (
-                    <button key={scene.id} onClick={() => { seekTo(scene.startTime); setIsPlaying(false); }}
+                    <button key={scene.id} onClick={() => seekTo(scene.startTime)}
                       className={`relative flex flex-col items-center gap-0.5 p-1 rounded-xl border transition-all min-w-[60px] ${isActive ? 'bg-white/10 border-white/20' : 'bg-white/3 border-transparent hover:bg-white/8'}`}>
                       <div className="w-full h-9 rounded-lg overflow-hidden bg-[#111] relative">
                         {scene.imageUrl ? <img src={scene.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -982,7 +979,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                     <TimelineRow
                       scene={scene}
                       isActive={activeScene?.id === scene.id}
-                      onSeek={() => { seekTo(scene.startTime); setIsPlaying(false); }}
+                      onSeek={() => seekTo(scene.startTime)}
                       onOpenPrompt={() => setPromptModalId(scene.id)}
                       onGenerate={() => handleGenerateImage(scene.id)}
                     />
