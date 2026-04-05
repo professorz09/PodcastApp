@@ -3,7 +3,7 @@ import {
   Film, Wand2, ChevronDown, ChevronUp,
   Play, Pause, Download, Loader2, AlertCircle,
   ArrowLeft, Settings2, ImagePlus, Video, X,
-  RefreshCw, SkipBack, SkipForward, Zap, Scissors,
+  RefreshCw, SkipBack, SkipForward, Zap,
   Type
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
@@ -18,21 +18,15 @@ interface StoryboardProps {
 interface SubtitleConfig {
   enabled: boolean;
   fontSize: number;
-  bgColor: string;
-  bgOpacity: number;
   textColor: string;
   position: 'top' | 'bottom';
-  borderRadius: number;
 }
 
 const DEFAULT_SUBTITLE: SubtitleConfig = {
   enabled: true,
   fontSize: 19,
-  bgColor: '#000000',
-  bgOpacity: 85,
   textColor: '#ffffff',
   position: 'bottom',
-  borderRadius: 8,
 };
 
 const MODEL_OPTIONS = [
@@ -97,13 +91,6 @@ function buildScenesFromRaw(
   });
 }
 
-// hex + opacity → rgba
-function hexOpacity(hex: string, opacity: number) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${(opacity / 100).toFixed(2)})`;
-}
 
 // Draw subtitle text on canvas context (shared by preview + video export)
 function drawSubtitleOnCtx(
@@ -115,6 +102,12 @@ function drawSubtitleOnCtx(
   if (!cfg.enabled || !text) return;
   const fs = cfg.fontSize;
   ctx.font = `bold ${fs}px sans-serif`;
+  ctx.textAlign = 'center';
+  // Text shadow for legibility without background
+  ctx.shadowColor = 'rgba(0,0,0,0.85)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 2;
   const maxW = W - 80;
   const words = text.trim().split(/\s+/);
   const lines: string[] = []; let line = '';
@@ -124,15 +117,14 @@ function drawSubtitleOnCtx(
     else line = t;
   }
   if (line) lines.push(line);
-  const lh = fs * 1.55, pad = 12, boxH = lines.length * lh + pad * 2;
-  const boxY = cfg.position === 'top' ? 20 : H - boxH - 20;
-  ctx.fillStyle = hexOpacity(cfg.bgColor, cfg.bgOpacity);
-  ctx.beginPath();
-  ctx.roundRect(40, boxY, W - 80, boxH, cfg.borderRadius);
-  ctx.fill();
+  const lh = fs * 1.55;
+  const totalH = lines.length * lh;
+  const baseY = cfg.position === 'top' ? 32 : H - totalH - 24;
   ctx.fillStyle = cfg.textColor;
-  ctx.textAlign = 'center';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, boxY + pad + (i + 1) * lh - fs * 0.35));
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + (i + 1) * lh - fs * 0.35));
+  // Reset shadow
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 }
 
 // Draw an image cover-fit on canvas
@@ -590,46 +582,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   }, []);
 
 
-  // ── Auto-set durations (from actual audio segment durations) ──
-  const handleAutoSet = useCallback(async () => {
-    if (!scenes.length) return;
-    if (!hasAudio) { toast.error('Pehle Voice step mein audio generate karo.'); return; }
-
-    // Decode actual audio durations so timeline reflects real timings
-    const audioSegs = script.filter(s => s.audioUrl && (s.duration ?? 0) > 0);
-    if (!audioSegs.length) { toast.error('No valid audio segments found.'); return; }
-
-    toast.info('Audio se timing calculate ho rahi hai…');
-    try {
-      const AC = new AudioContext();
-      const actualDurs: number[] = [];
-      for (const seg of audioSegs) {
-        const buf = await AC.decodeAudioData(await (await fetch(seg.audioUrl!)).arrayBuffer());
-        actualDurs.push(buf.duration);
-      }
-      AC.close();
-
-      // Patch script with actual durations temporarily for buildOffsets
-      const patchedScript = script.map(s => {
-        const aIdx = audioSegs.indexOf(s);
-        return aIdx >= 0 ? { ...s, duration: actualDurs[aIdx] } : { ...s, duration: 0 };
-      });
-
-      const rawData = scenes.map(sc => ({ sceneNumber: sc.sceneNumber, prompt: sc.prompt, segmentIndices: sc.segmentIndices }));
-      const rebuilt = buildScenesFromRaw(rawData, patchedScript);
-
-      setScenes(prev => {
-        const prevByNum = new Map<number, StoryboardScene>(prev.map(s => [s.sceneNumber, s]));
-        return rebuilt.map(rb => {
-          const old = prevByNum.get(rb.sceneNumber);
-          return { ...rb, imageUrl: old?.imageUrl, isGenerating: old?.isGenerating ?? false, error: old?.error };
-        });
-      });
-      toast.success('Scene durations updated from audio!');
-    } catch {
-      toast.error('Audio decode failed — check audio URLs.');
-    }
-  }, [scenes, script, hasAudio]);
 
   // ── Create video ──
   const handleCreateVideo = useCallback(async () => {
@@ -736,17 +688,10 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
           {/* ── Timeline (scene rows) ── */}
           {scenes.length > 0 && (
             <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                <div className="flex items-center gap-2">
-                  <Film size={13} className="text-purple-400" />
-                  <span className="text-sm font-bold text-white">Timeline</span>
-                  <span className="text-[10px] text-gray-600">🖊 click image to edit prompt</span>
-                </div>
-                {hasAudio && (
-                  <button onClick={handleAutoSet} className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
-                    <Scissors size={11} /> Auto-set
-                  </button>
-                )}
+              <div className="flex items-center px-4 py-3 border-b border-white/5 gap-2">
+                <Film size={13} className="text-purple-400" />
+                <span className="text-sm font-bold text-white">Timeline</span>
+                <span className="text-[10px] text-gray-600">🖊 click image to edit prompt</span>
               </div>
 
               {/* Scene rows */}
@@ -839,36 +784,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                     </div>
                   </div>
 
-                  {/* Background */}
-                  <div className="space-y-2">
-                    <span className="text-xs text-gray-400">Background</span>
-                    <div className="flex gap-2 flex-wrap">
-                      {['#000000', '#1a0a2e', '#0a1628', '#1a1a00'].map(c => (
-                        <button key={c} onClick={() => setSubtitle(s => ({ ...s, bgColor: c }))}
-                          style={{ background: c }}
-                          className={`w-8 h-8 rounded-full border-2 transition-all ${subtitle.bgColor === c ? 'border-blue-400 scale-110' : 'border-white/20'}`} />
-                      ))}
-                      <label className="w-8 h-8 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-white/40 transition-all overflow-hidden" style={{ background: subtitle.bgColor }}>
-                        <input type="color" value={subtitle.bgColor} onChange={e => setSubtitle(s => ({ ...s, bgColor: e.target.value }))} className="opacity-0 absolute" />
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* BG Opacity */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-gray-400"><span>Background Opacity</span><span className="font-mono text-blue-400">{subtitle.bgOpacity}%</span></div>
-                    <input type="range" min={0} max={100} step={5} value={subtitle.bgOpacity}
-                      onChange={e => setSubtitle(s => ({ ...s, bgOpacity: Number(e.target.value) }))}
-                      className="w-full accent-blue-500" />
-                  </div>
-
-                  {/* Border radius */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-gray-400"><span>Border Radius</span><span className="font-mono text-blue-400">{subtitle.borderRadius}px</span></div>
-                    <input type="range" min={0} max={24} value={subtitle.borderRadius}
-                      onChange={e => setSubtitle(s => ({ ...s, borderRadius: Number(e.target.value) }))}
-                      className="w-full accent-blue-500" />
-                  </div>
                 </div>
               </div>
             )}
