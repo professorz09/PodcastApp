@@ -276,20 +276,43 @@ function buildSceneTimings(
     anchorToSceneIdxs.get(anchor)!.push(sceneIdx);
   });
 
-  // Build result: scenes that share an anchor split its duration proportionally by word count
+  // Build result
   const result = new Array(scenes.length).fill(totalDuration);
   anchorToSceneIdxs.forEach((sceneIdxs, anchor) => {
     const { start, dur } = segInfo.get(anchor)!;
+    const seg = script[anchor];
+
     if (sceneIdxs.length === 1) {
-      // Common case: one scene per segment — switch exactly when segment starts
+      // One scene per segment — switch exactly when segment starts (perfect sync)
       result[sceneIdxs[0]] = start;
-    } else {
-      // Multiple scenes share one segment — split its duration equally
-      const share = dur / sceneIdxs.length;
-      sceneIdxs.forEach((si, i) => {
-        result[si] = start + i * share;
-      });
+      return;
     }
+
+    // Multiple scenes in one segment — split its text into equal word-chunks
+    // and use wordTimings for exact timestamps when available
+    const N = sceneIdxs.length;
+    const words = (seg?.text ?? '').split(/\s+/).filter(Boolean);
+    const totalWords = words.length || N;
+    const wt = seg?.wordTimings; // { word, start, end }[] — from Google TTS / Sync
+
+    sceneIdxs.forEach((si, i) => {
+      if (i === 0) {
+        // First scene always starts at segment start
+        result[si] = start;
+        return;
+      }
+
+      // Which word marks the start of this scene's chunk?
+      const wordIdx = Math.round((i / N) * totalWords);
+
+      if (wt && wt.length > wordIdx) {
+        // Exact: use the actual spoken timestamp of that word
+        result[si] = start + wt[wordIdx].start;
+      } else {
+        // Proportional fallback: word fraction × segment duration
+        result[si] = start + (i / N) * dur;
+      }
+    });
   });
 
   return result;
