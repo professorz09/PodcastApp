@@ -708,14 +708,25 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Opening — Speaker A (SEEDHA, SHORT — 3-4 lines max) 】
-                पहली line में TOPIC का नाम DIRECTLY लो — कोई warmup नहीं।
-                Examples:
+                【 Opening — Speaker A (SEEDHA SHURU — MANDATORY FORMAT) 】
+
+                ⚠️ PEHLI LINE KA FORMAT EXACTLY AISA HOGA — koi aur option nahi:
+                Speaker A ki PEHLI LINE mein topic ka POORA NAAM aana ZAROORI hai।
+
+                ALLOWED first lines (in ka style follow karo):
                 • "Yaar aaj hum baat karte hain Robert Greene ki 48 Laws of Power ke baare mein।"
-                • "Aaj ka topic hai cryptocurrency — kya hai, kaise kaam karta hai, sab samjhenge।"
-                • "Toh aaj hum stoicism ko samjhenge — woh philosophy jo duniya ke top leaders follow karte hain।"
-                फिर 1 line में bolo is discussion mein kya-kya cover karenge — specific।
-                Phir directly point 1 shuru। Bas।
+                • "Toh aaj ka topic hai — Cryptocurrency। Kya hai, kaise kaam karta hai, sab dekhte hain।"
+                • "Aaj hum samjhenge Stoicism ko — woh ancient philosophy jo aaj bhi relevant hai।"
+                • "Yaar, aaj baat karte hain [TOPIC] ki — [1 line mein kyun important hai]।"
+
+                BANNED first lines:
+                ✗ "Yaar kaise ho?" — social warmup forbidden
+                ✗ "Aaj ka topic bahut interesting hai..." — topic name pehle aao
+                ✗ "Toh chalo shuru karte hain..." — direct seedha topic pe
+                ✗ Koi bhi line jisme topic ka naam nahi — FORBIDDEN
+
+                Opening ke baad: 1 line mein is discussion mein kya cover karenge (specific)।
+                Phir DIRECTLY Point 1 pe jump karo। Total opening max 3 lines।
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए:
@@ -741,7 +752,9 @@ export const generateDebateScript = async (
                 ✓ हर point ke saath specific real example
                 ✓ Simple Hinglish — expert ki soch, dost ki bhaasha
                 ✓ Dono speakers ki alag voice
-                ✗ BANNED: Long dramatic opening — 4 lines se zyada nahi
+                ✗ BANNED: Opening mein topic ka naam pehli line mein nahi aaya — HARD RULE
+                ✗ BANNED: "Yaar kaise ho", "Chalo shuru karte hain", koi bhi social warmup
+                ✗ BANNED: Long dramatic opening — max 3 lines total
                 ✗ BANNED: "yeh zaroori hai", "nirhskarsh mein", generic filler
                 ✗ BANNED: Speakers ek-dusre ke words refer karein
                 ${durFillHi}
@@ -1656,13 +1669,23 @@ export const generateDebateScript = async (
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Opening — Speaker A (DIRECT, SHORT — 3-4 lines MAX) 】
-              Name the topic DIRECTLY in the very first sentence — no warmup.
-              Examples:
-              • "Alright, today we're talking about Robert Greene's 48 Laws of Power — what it actually teaches and whether it's practical."
+              【 Opening — Speaker A (DIRECT START — MANDATORY FORMAT) 】
+
+              ⚠️ THE VERY FIRST SENTENCE MUST CONTAIN THE TOPIC NAME — no exceptions.
+
+              ALLOWED first lines:
+              • "Alright, today we're talking about Robert Greene's 48 Laws of Power — what it teaches and whether it works."
               • "So today — cryptocurrency. What it is, how it works, and what you actually need to know."
-              Then 1 line on what specifically will be covered.
-              Then jump straight into Point 1.
+              • "Today we're breaking down [TOPIC] — [one line on why it matters]."
+
+              BANNED first lines:
+              ✗ "Hey, how's it going?" — social warmup forbidden
+              ✗ "Today's topic is really interesting..." — name the topic first
+              ✗ "Let's get started..." — jump straight to the topic name
+              ✗ Any sentence without the topic name — FORBIDDEN
+
+              After the opening line: 1 sentence on what will be covered specifically.
+              Then jump directly to Point 1. Total opening max 3 lines.
 
               【 Point-by-Point Discussion (this is the entire main content) 】
               For each key aspect/point:
