@@ -364,11 +364,14 @@ async function createStoryboardVideo(
   );
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
   const done = new Promise<void>(r => { recorder.onstop = () => r(); });
-  recorder.start(100); src.start(0);
-  const startWall = performance.now();
+  recorder.start(100);
+  // Use AC.currentTime for drift-free sync — record the AC clock just before start
+  const acStartTime = AC.currentTime;
+  src.start(0);
 
   const draw = () => {
-    const elapsed = (performance.now() - startWall) / 1000;
+    // AC.currentTime is hardware-accurate: no drift on long recordings
+    const elapsed = AC.currentTime - acStartTime;
     if (elapsed >= totalDuration + 0.1) { recorder.stop(); return; }
     onProgress(50 + Math.round((elapsed / totalDuration) * 46), `Recording ${fmt(elapsed)} / ${fmt(totalDuration)}…`);
 
@@ -538,7 +541,8 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   // sceneTimingsRef.current[i] = start time of scenes[i]
   const sceneTimingsRef = useRef<number[]>([]);
   const pauseAtRef = useRef<number>(0);
-  const wallStartRef = useRef<number>(0);
+  const acStartTimeRef = useRef<number>(0);   // AC.currentTime when playback began
+  const playStartOffsetRef = useRef<number>(0); // audio offset we started from
   const rafRef = useRef<number>(0);
 
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
@@ -690,12 +694,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     src.buffer = mergedBufRef.current;
     src.connect(AC.destination);
     const startOffset = Math.min(Math.max(fromTime, 0), mergedBufRef.current.duration - 0.01);
+    // Record AC clock BEFORE starting source so t=0 is exactly the start
+    acStartTimeRef.current = AC.currentTime;
+    playStartOffsetRef.current = startOffset;
     src.start(0, startOffset);
     previewSrcRef.current = src;
-    wallStartRef.current = performance.now() - startOffset * 1000;
     const total = actualTotalRef.current;
     const tick = () => {
-      const t = (performance.now() - wallStartRef.current) / 1000;
+      // AC.currentTime is hardware-accurate — no drift on long audio
+      const t = (AC.currentTime - acStartTimeRef.current) + playStartOffsetRef.current;
       if (t >= total) {
         setIsPlaying(false);
         setPlayTime(total);
