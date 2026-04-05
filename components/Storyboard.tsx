@@ -241,7 +241,7 @@ function buildSceneTimings(
   script: DebateSegment[],
   audioSegScriptIndices: number[],   // script index of each audio segment (in playback order)
   actualOffsets: number[],           // cumulative start time of each audio segment
-  _actualDurs: number[],
+  actualDurs: number[],
   totalDuration: number,
 ): number[] {
   if (scenes.length === 0) return [];
@@ -251,21 +251,48 @@ function buildSceneTimings(
     return sceneTimingsByWordCoverage(scenes, script, totalDuration);
   }
 
-  // Multi-audio: direct index lookup — no object references, no stale-closure bugs
-  // scriptIdx → actual start time in merged audio
-  const scriptIdxToStart = new Map<number, number>();
+  // Build lookup: scriptIdx → { start, duration } of its audio
+  const segInfo = new Map<number, { start: number; dur: number }>();
   audioSegScriptIndices.forEach((scriptIdx, audioIdx) => {
-    scriptIdxToStart.set(scriptIdx, actualOffsets[audioIdx]);
+    segInfo.set(scriptIdx, {
+      start: actualOffsets[audioIdx],
+      dur: actualDurs[audioIdx] ?? (totalDuration - actualOffsets[audioIdx]),
+    });
   });
 
-  return scenes.map(sc => {
+  // For each scene, its "anchor" = first segmentIndex that has audio
+  const sceneAnchor = scenes.map(sc => {
     for (const idx of sc.segmentIndices) {
-      const t = scriptIdxToStart.get(idx);
-      if (t !== undefined) return t;
+      if (segInfo.has(idx)) return idx;
     }
-    // Scene has no matching audio segment — place it after the previous scene
-    return totalDuration;
+    return -1; // no audio for this scene
   });
+
+  // Group scene indices by anchor — detect multiple scenes per segment
+  const anchorToSceneIdxs = new Map<number, number[]>();
+  sceneAnchor.forEach((anchor, sceneIdx) => {
+    if (anchor === -1) return;
+    if (!anchorToSceneIdxs.has(anchor)) anchorToSceneIdxs.set(anchor, []);
+    anchorToSceneIdxs.get(anchor)!.push(sceneIdx);
+  });
+
+  // Build result: scenes that share an anchor split its duration proportionally by word count
+  const result = new Array(scenes.length).fill(totalDuration);
+  anchorToSceneIdxs.forEach((sceneIdxs, anchor) => {
+    const { start, dur } = segInfo.get(anchor)!;
+    if (sceneIdxs.length === 1) {
+      // Common case: one scene per segment — switch exactly when segment starts
+      result[sceneIdxs[0]] = start;
+    } else {
+      // Multiple scenes share one segment — split its duration equally
+      const share = dur / sceneIdxs.length;
+      sceneIdxs.forEach((si, i) => {
+        result[si] = start + i * share;
+      });
+    }
+  });
+
+  return result;
 }
 
 function buildScenesFromRaw(
