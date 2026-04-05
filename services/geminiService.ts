@@ -29,16 +29,29 @@ export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explai
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
     return `
-You are a YouTube copywriter for top-tier Explained / Documentary channels (like Kurzgesagt, Wendover, MKBHD, Veritasium).
-Read the script and generate 4 highly clickable YouTube titles in the "Explained" style — concise, factual-curiosity-driven, slightly dramatic but credible.
+You are a YouTube copywriter for Indian "Explained" channels that do book summaries, biographies, and topic breakdowns in Hindi/Hinglish.
+Read the script and generate 4 direct, conversational YouTube titles — the kind that NAME the topic clearly and invite the viewer to learn it with you.
 
-Requirements:
-1. Clear subject: "Why [X] Is Changing Everything", "The Real Reason [X]", "How [X] Actually Works"
-2. Curiosity gap: the title reveals the topic but withholds the answer
-3. Scope signal: words like "Actually", "Really", "Finally", "Nobody Talks About", "The Truth About"
-4. 55-70 characters max. Readable at a glance. No fluff, no filler.
-5. Mix English + Hindi/Hinglish options if script is Hindi.
-Examples: "Why India's Economy Is Quietly Collapsing", "The Real Reason GPT-4 Feels Different", "Nobody Tells You This About Crypto"
+STYLE: Direct + Conversational. No clickbait tricks. The title should tell exactly what the video is about, but make it sound exciting.
+
+REQUIREMENTS:
+1. ALWAYS name the exact topic/book/person/concept from the script — never be vague.
+2. Sound like you are talking TO the viewer — warm, confident, inviting.
+3. Mix Hindi/Hinglish naturally — this is for Indian audience.
+4. The title should feel like the presenter just sat down and is starting the video.
+5. 55-75 characters max. Complete and readable.
+
+FORMATS to vary across 4 options:
+- Direct intro style: "[Topic] Ki Poori Kahani — Aaj Hum Samjhenge"
+- Conversational hook: "Kya Tumne Suna Hai [Topic] Ke Baare Mein?"
+- Full Hindi title: "[Topic] — [Key Insight Ya Angle]"
+- Hinglish punchy: "[Topic]: The [Angle] No One Explained"
+
+EXAMPLES (if topic is "Robert Greene's 48 Laws of Power"):
+- "48 Laws of Power — Robert Greene Ki Wo Book Jo Duniya Badal De"
+- "Aaj Hum Baat Karenge 48 Laws of Power Ki — Robert Greene"
+- "Kya Hai 48 Laws of Power? Robert Greene Ka Poora Secret"
+- "48 Laws of Power Explained: Duniya Ko Samajhne Ka Formula"
 
 Return ONLY a valid JSON array of 4 strings. No markdown.
     `;
@@ -127,26 +140,27 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
 const getThumbnailTextStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
     return `
-You are a YouTube thumbnail copywriter for "Explained" style channels. Write SHORT, PUNCHY text that appears ON the thumbnail — not the title.
+You are a thumbnail copywriter for Indian "Explained" YouTube channels. Write SHORT text that appears ON the thumbnail image — this is the BIG BOLD TEXT overlay, not the title.
 
-STYLE: Factual-dramatic. Clean. Bold. Like a headline from a newspaper or documentary.
+STYLE: Direct, name-drops the topic. Inviting and informative — not shock clickbait. Indian audience.
 
-CRITICAL RULE — TOPIC SPECIFICITY:
-The text must reference THIS topic. Generic "THE TRUTH" or "EXPLAINED" alone are weak.
-BAD: "THE TRUTH" (meaningless alone)
-GOOD: "STILL ALIVE?" / "THEY LIED" / "IT'S REAL" (topic-specific short punch)
+CRITICAL RULE — NAME THE TOPIC:
+The text must say or strongly hint at the exact subject. Vague generic text like "EXPLAINED" alone is useless.
+BAD: "EXPLAINED" / "THE TRUTH"
+GOOD: "48 LAWS" / "ROBERT GREENE" / "POWER KA RAAZ" / "WO BOOK"
 
-Generate exactly 5 options:
-- Option 1: A short factual-shock phrase about THIS topic (3-4 words, CAPS power words)
-- Option 2: A "nobody told you" punch (e.g. "NOBODY SAW THIS")
-- Option 3: A Hindi/Hinglish punchy phrase (if topic allows)
-- Option 4: A 2-word maximum ultra-short bomb (e.g. "GAME OVER" / "IT'S REAL")
-- Option 5: A question that makes you click (e.g. "HOW?!" / "WHY NOW?")
+Generate exactly 5 options with VARIETY:
+- Option 1: Topic name directly in CAPS (e.g. "48 LAWS OF POWER")
+- Option 2: Short Hindi/Hinglish hook (e.g. "YEH BOOK PADHO!" / "POWER KA RAAZ")
+- Option 3: Action/invitation (e.g. "SAMAJHTE HAIN" / "POORI KAHANI")
+- Option 4: Ultra-short 2 words (e.g. "MUST READ" / "LIFE CHANGING")
+- Option 5: One punchy insight from the topic (e.g. "POWER WINS" / "RULES MATTER")
 
 RULES:
-- Max 4 words each (2-word options preferred)
-- ALL CAPS for punch words
-- Must feel like it belongs on a clean documentary thumbnail
+- Max 4 words each
+- CAPS for the topic name and power words
+- Natural Hindi/Hinglish where appropriate
+- Must feel like it belongs on a clean explained thumbnail with a face
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
@@ -290,10 +304,11 @@ export const generateTitleTextPair = async (scriptText: string, videoStyle: Thum
 - Thumbnail text: 2-5 word confrontational CAPS question or claim. Complements title — adds heat.
 - E.g. Title: "Is Hustle Culture Destroying Your Life?" → Thumbnail: "STOP GRINDING"`
     : videoStyle === 'explained'
-    ? `STYLE — Explained / Documentary:
-- Title: Factual curiosity-gap title. Clear subject, withheld answer. 55-70 chars. E.g. "Why India's Economy Is Quietly Collapsing", "Nobody Tells You This About AI"
-- Thumbnail text: 2-4 word clean bold punch. CAPS for power. Complements without repeating the title.
-- E.g. Title: "The Real Reason EV Cars Are Failing" → Thumbnail: "THEY LIED"`
+    ? `STYLE — Explained / Indian YouTube:
+- Title: Direct, conversational Hindi/Hinglish. NAMES the exact topic/book/person. Inviting tone. 55-75 chars.
+  E.g. "48 Laws of Power — Robert Greene Ki Wo Book Jo Duniya Badal De", "Aaj Hum Baat Karenge 48 Laws of Power Ki"
+- Thumbnail text: 2-4 word CAPS text that names or strongly hints at the topic. Complements title — adds visual punch.
+  E.g. Title: "Aaj Hum Baat Karenge 48 Laws of Power Ki" → Thumbnail: "48 LAWS" or "POWER KA RAAZ"`
     : `STYLE — Podcast / High Energy:
 - Title: Shocking revelation or curiosity bait. Drop a bombshell. 55-65 chars.
 - Thumbnail text: 2-5 word explosive CAPS hook. Amplifies what the title hints at.
