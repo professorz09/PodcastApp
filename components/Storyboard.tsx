@@ -89,6 +89,19 @@ function buildProportionalTimings(
   script: DebateSegment[],
   totalDuration: number,
 ): ProportionalTimings {
+  if (scenes.length === 0) return { segOffsets: [0], sceneOffsets: [] };
+
+  // ── Equal distribution fallback ──
+  // Used when script is a single block or all scenes map to the same segment
+  const equalSceneOffsets = scenes.map((_, i) => (i / scenes.length) * totalDuration);
+  const equalSegOffsets = script.map((_, i) => script.length <= 1 ? 0 : (i / script.length) * totalDuration);
+
+  // If script has only 1 segment (whole audio as one block), distribute scenes equally
+  if (script.length <= 1) {
+    return { segOffsets: [0], sceneOffsets: equalSceneOffsets };
+  }
+
+  // ── Word-proportional distribution ──
   const segWords = script.map(s => Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length));
   const totalWords = segWords.reduce((a, b) => a + b, 0);
 
@@ -101,10 +114,15 @@ function buildProportionalTimings(
   }
 
   // Scene starts at the time its first segment starts
-  const sceneOffsets = scenes.map(sc => {
+  const rawSceneOffsets = scenes.map(sc => {
     const firstIdx = sc.segmentIndices.length > 0 ? sc.segmentIndices[0] : 0;
     return segOffsets[Math.min(firstIdx, segOffsets.length - 1)] ?? 0;
   });
+
+  // If all sceneOffsets collapsed to the same value (e.g. AI used out-of-range indices),
+  // fall back to equal distribution across scenes
+  const allSame = rawSceneOffsets.every(t => t === rawSceneOffsets[0]);
+  const sceneOffsets = allSame ? equalSceneOffsets : rawSceneOffsets;
 
   return { segOffsets, sceneOffsets };
 }
