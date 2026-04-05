@@ -639,12 +639,14 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Narrator — Opening (SHORT — 3-4 lines max) 】
-                बस इतना बताओ:
-                → यह topic क्या है — एक-दो simple lines में
-                → इसके बारे में क्यों जानना ज़रूरी है — एक line
-                → Debate/discussion शुरू। बस।
-                कोई long hook नहीं, कोई dramatic build-up नहीं।
+                【 Narrator — Opening (SEEDHA, SHORT — 3-4 lines max) 】
+                पहली line में TOPIC का नाम DIRECTLY लो — कोई warmup नहीं, कोई build-up नहीं।
+                Examples:
+                • "Aaj hum baat karenge Robert Greene ki book 48 Laws of Power ke baare mein।"
+                • "Aaj ki baat hogi cryptocurrency ke baare mein — kya hai yeh, kaise kaam karta hai।"
+                • "Aaj hum samjhenge stoicism ko — woh philosophy jo duniya ke top leaders follow karte hain।"
+                फिर 1-2 lines में बताओ is video में क्या-क्या cover होगा — specific, topic के hisaab se।
+                फिर directly discussion शुरू। बस। कोई dramatic intro नहीं।
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए यह structure follow करो:
@@ -706,10 +708,14 @@ export const generateDebateScript = async (
                 STRUCTURE:
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-                【 Opening — Speaker A (SHORT — 3-4 lines max) 】
-                → Topic kya hai — ek-do simple lines mein
-                → Kyun important hai — ek line
-                → Discussion shuru। Bas।
+                【 Opening — Speaker A (SEEDHA, SHORT — 3-4 lines max) 】
+                पहली line में TOPIC का नाम DIRECTLY लो — कोई warmup नहीं।
+                Examples:
+                • "Yaar aaj hum baat karte hain Robert Greene ki 48 Laws of Power ke baare mein।"
+                • "Aaj ka topic hai cryptocurrency — kya hai, kaise kaam karta hai, sab samjhenge।"
+                • "Toh aaj hum stoicism ko samjhenge — woh philosophy jo duniya ke top leaders follow karte hain।"
+                फिर 1 line में bolo is discussion mein kya-kya cover karenge — specific।
+                Phir directly point 1 shuru। Bas।
 
                 【 Point-by-Point Discussion (यही main content है) 】
                 हर important aspect/point के लिए:
@@ -1582,12 +1588,14 @@ export const generateDebateScript = async (
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Narrator — Opening (SHORT — 3-4 lines MAX) 】
-              Only say:
-              → What this topic is — 1-2 simple sentences
-              → Why it matters — 1 sentence
-              → Then hand off to speakers immediately.
-              No long hooks, no dramatic build-up.
+              【 Narrator — Opening (DIRECT, SHORT — 3-4 lines MAX) 】
+              Start by naming the topic DIRECTLY in the very first sentence — no warmup, no dramatic build-up.
+              Examples of the right opening tone:
+              • "Today we're talking about Robert Greene's 48 Laws of Power — what it is, and why millions of people swear by it."
+              • "Today's topic is cryptocurrency — what it actually is, how it works, and whether it's worth your attention."
+              • "Today we're breaking down Stoicism — the ancient philosophy that modern CEOs and athletes live by."
+              Then 1-2 sentences on what specifically will be covered in this video.
+              Then hand off immediately to speakers. No long intro.
 
               【 Point-by-Point Discussion (this is the entire main content) 】
               For each key aspect/point, follow this exact pattern:
@@ -1648,10 +1656,13 @@ export const generateDebateScript = async (
               STRUCTURE:
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              【 Opening — Speaker A (SHORT — 3-4 lines MAX) 】
-              → What this topic is — 1-2 simple sentences
-              → Why it matters — 1 sentence
-              → Jump straight into the discussion.
+              【 Opening — Speaker A (DIRECT, SHORT — 3-4 lines MAX) 】
+              Name the topic DIRECTLY in the very first sentence — no warmup.
+              Examples:
+              • "Alright, today we're talking about Robert Greene's 48 Laws of Power — what it actually teaches and whether it's practical."
+              • "So today — cryptocurrency. What it is, how it works, and what you actually need to know."
+              Then 1 line on what specifically will be covered.
+              Then jump straight into Point 1.
 
               【 Point-by-Point Discussion (this is the entire main content) 】
               For each key aspect/point:
