@@ -178,41 +178,66 @@ function sceneTimingsByWordCoverage(
   if (scenes.length === 0) return [];
 
   // ── Method 1: wordTimings (exact spoken durations from Google TTS / STT) ──
-  // If any segment has wordTimings, compute per-segment offsets from actual
-  // spoken durations → exact scene boundary times, not estimates.
   const hasWordTimings = script.some(s => s.wordTimings && s.wordTimings.length > 0);
 
   if (hasWordTimings) {
-    // Per-segment actual spoken duration: last word's end time
     const segSpokenDurs = script.map(s => {
       if (s.wordTimings && s.wordTimings.length > 0) {
         return s.wordTimings[s.wordTimings.length - 1].end;
       }
-      // Segment has no wordTimings → estimate from word count relative to neighbours
       return null;
     });
-
-    // Fill nulls with proportional estimate from total
     const knownTotal = segSpokenDurs.reduce((sum, d) => sum + (d ?? 0), 0);
     const unknownCount = segSpokenDurs.filter(d => d === null).length;
     const unknownEach = unknownCount > 0 ? Math.max(0, totalDuration - knownTotal) / unknownCount : 0;
     const segDurs = segSpokenDurs.map(d => d ?? unknownEach);
-
-    // Cumulative per-segment start times within merged audio
     const segStart: number[] = [];
     let cum = 0;
     for (const d of segDurs) { segStart.push(cum); cum += d; }
 
-    // Each scene starts at its first valid segment's start time
-    return scenes.map(sc => {
+    const raw = scenes.map(sc => {
       for (const idx of sc.segmentIndices) {
         if (idx >= 0 && idx < segStart.length) return segStart[idx];
       }
-      return totalDuration; // no valid indices
+      return -1;
     });
+
+    // If all raw timings are the same (e.g. all scenes map to segment 0),
+    // fall through to Method 2 for proper distribution.
+    const validRaw = raw.filter(t => t >= 0);
+    const allSame = validRaw.length > 0 && validRaw.every(t => t === validRaw[0]);
+    if (!allSame) {
+      // Sub-distribute groups of consecutive scenes sharing the same anchor time
+      const result = [...raw];
+      let i = 0;
+      while (i < result.length) {
+        let j = i + 1;
+        while (j < result.length && result[j] === result[i] && result[i] >= 0) j++;
+        const groupSize = j - i;
+        if (groupSize > 1 && result[i] >= 0) {
+          const anchor = result[i];
+          const anchorIdx = scenes[i].segmentIndices.find(idx => idx >= 0 && idx < segStart.length) ?? -1;
+          const segDur = anchorIdx >= 0 ? segDurs[anchorIdx] : (totalDuration / scenes.length);
+          for (let g = 0; g < groupSize; g++) {
+            result[i + g] = anchor + (g / groupSize) * segDur;
+          }
+        }
+        i = j;
+      }
+      // Fill any -1s by interpolation
+      for (let k = 0; k < result.length; k++) {
+        if (result[k] < 0) {
+          const prev = result.slice(0, k).reverse().find(t => t >= 0) ?? 0;
+          const next = result.slice(k + 1).find(t => t >= 0) ?? totalDuration;
+          result[k] = (prev + next) / 2;
+        }
+      }
+      return result;
+    }
+    // Fall through to Method 2 if all timings collapsed to same value
   }
 
-  // ── Method 2: word-count proportional (fallback when no wordTimings) ──
+  // ── Method 2: word-count proportional ──
   const segWords = script.map(s =>
     Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length)
   );
@@ -222,13 +247,17 @@ function sceneTimingsByWordCoverage(
     )
   );
   const totalCovered = sceneWordCounts.reduce((a, b) => a + b, 0);
-  if (totalCovered === 0) return scenes.map((_, i) => (i / scenes.length) * totalDuration);
+
+  // If all scenes share the same segment (or no valid indices), distribute evenly
+  if (totalCovered === 0 || sceneWordCounts.every(w => w === sceneWordCounts[0])) {
+    return scenes.map((_, i) => (i / scenes.length) * totalDuration);
+  }
 
   const timings: number[] = [];
-  let cum = 0;
+  let cum2 = 0;
   for (const w of sceneWordCounts) {
-    timings.push((cum / totalCovered) * totalDuration);
-    cum += w;
+    timings.push((cum2 / totalCovered) * totalDuration);
+    cum2 += w;
   }
   return timings;
 }
@@ -322,7 +351,6 @@ function buildScenesFromRaw(
   const total = knownTotal ?? (durBased > 0 ? durBased : 0);
 
   const segWords = segments.map(s => Math.max(1, s.text.trim().split(/\s+/).filter(Boolean).length));
-  const totalWords = segWords.reduce((a, b) => a + b, 0);
 
   // Build scenes first with indices
   const builtScenes = rawScenes.map((raw) => {
@@ -337,19 +365,47 @@ function buildScenesFromRaw(
     };
   });
 
-  // Compute word-coverage timings (same logic as sceneTimingsByWordCoverage)
-  if (total > 0 && totalWords > 0) {
-    const sceneWordCounts = builtScenes.map(sc =>
-      sc.segmentIndices.reduce((sum, idx) => sum + (segWords[idx] ?? 0), 0)
-    );
-    const totalCovered = sceneWordCounts.reduce((a, b) => a + b, 0);
-    if (totalCovered > 0) {
+  // ── Detect collapsed segmentIndices (AI assigned same/few indices to all scenes) ──
+  // If >60% of scenes share the same segment index, redistribute evenly across segments
+  const allIndices = builtScenes.flatMap(sc => sc.segmentIndices);
+  const uniqueIndices = new Set(allIndices);
+  const collapsed =
+    builtScenes.length > 1 &&
+    (uniqueIndices.size <= 1 || uniqueIndices.size < Math.ceil(segments.length * 0.3));
+
+  if (collapsed && segments.length > 1) {
+    // Reassign: distribute scenes evenly across all script segments
+    const segPerScene = segments.length / builtScenes.length;
+    builtScenes.forEach((sc, i) => {
+      const lo = Math.round(i * segPerScene);
+      const hi = Math.round((i + 1) * segPerScene) - 1;
+      sc.segmentIndices = Array.from(
+        { length: Math.max(1, hi - lo + 1) },
+        (_, k) => Math.min(lo + k, segments.length - 1),
+      );
+    });
+  }
+
+  // Compute word-coverage timings
+  const sceneWordCounts = builtScenes.map(sc =>
+    sc.segmentIndices.reduce((sum, idx) => sum + (segWords[idx] ?? 0), 0)
+  );
+  const totalCovered = sceneWordCounts.reduce((a, b) => a + b, 0);
+
+  if (total > 0) {
+    if (totalCovered > 0 && !sceneWordCounts.every(w => w === sceneWordCounts[0])) {
+      // Word-proportional
       let cum = 0;
       builtScenes.forEach((sc, i) => {
         sc.startTime = (cum / totalCovered) * total;
         cum += sceneWordCounts[i];
-        const nextStart = (cum / totalCovered) * total;
-        sc.endTime = i < builtScenes.length - 1 ? nextStart : total;
+        sc.endTime = i < builtScenes.length - 1 ? (cum / totalCovered) * total : total;
+      });
+    } else {
+      // Equal distribution fallback
+      builtScenes.forEach((sc, i) => {
+        sc.startTime = (i / builtScenes.length) * total;
+        sc.endTime = ((i + 1) / builtScenes.length) * total;
       });
     }
   }
