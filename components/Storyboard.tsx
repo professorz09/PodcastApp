@@ -344,6 +344,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [sceneCount, setSceneCount] = useState(10);
   const [model, setModel] = useState('gemini-3-flash-preview');
   const [scenes, setScenes] = useState<StoryboardScene[]>([]);
+  const [characterGuide, setCharacterGuide] = useState<string>('');
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingAllProgress, setGeneratingAllProgress] = useState(0);
@@ -363,14 +364,16 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     if (script.length === 0) { toast.error('No script loaded. Go back and generate a script first.'); return; }
     setIsGeneratingScenes(true);
     setVideoBlob(null);
+    setCharacterGuide('');
     try {
-      const raw = await generateStoryboardScenes(
+      const result = await generateStoryboardScenes(
         script.map(s => ({ speaker: s.speaker, text: s.text, duration: s.duration })),
         sceneCount,
         model,
       );
-      const built = buildScenesFromRaw(raw, script);
+      const built = buildScenesFromRaw(result.scenes, script);
       setScenes(built);
+      setCharacterGuide(result.characterGuide || '');
       toast.success(`${built.length} scenes created`);
     } catch (e: any) {
       toast.error(e.message || 'Scene generation failed');
@@ -385,13 +388,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     const scene = scenes.find(sc => sc.id === id);
     if (!scene) return;
     try {
-      const url = await generateStoryboardImage(scene.prompt);
+      const url = await generateStoryboardImage(scene.prompt, characterGuide);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: e.message || 'Failed' } : sc));
       toast.error(`Scene ${scene.sceneNumber}: ${e.message || 'Image generation failed'}`);
     }
-  }, [scenes]);
+  }, [scenes, characterGuide]);
 
   // ── Generate all images ──
   const handleGenerateAll = useCallback(async () => {
@@ -578,6 +581,20 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
             )}
           </div>
         </div>
+
+        {/* Character Guide */}
+        {characterGuide && (
+          <div className="bg-[#0e0e0e] border border-blue-500/15 rounded-2xl p-4 flex items-start gap-3">
+            <div className="w-8 h-8 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+              <Mic2 size={14} className="text-blue-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Character Guide</p>
+              <p className="text-xs text-gray-300 leading-relaxed">{characterGuide}</p>
+              <p className="text-[10px] text-gray-600 mt-1.5">Yeh description har image mein use hogi — character consistent rahega</p>
+            </div>
+          </div>
+        )}
 
         {/* Scene Grid */}
         {scenes.length > 0 && (

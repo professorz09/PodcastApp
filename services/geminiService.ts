@@ -3883,11 +3883,16 @@ export interface StoryboardSceneRaw {
   segmentIndices: number[];
 }
 
+export interface StoryboardScenesResult {
+  scenes: StoryboardSceneRaw[];
+  characterGuide: string;
+}
+
 export const generateStoryboardScenes = async (
   segments: { speaker: string; text: string; duration?: number }[],
   sceneCount: number,
   model: string = 'gemini-3-flash-preview',
-): Promise<StoryboardSceneRaw[]> => {
+): Promise<StoryboardScenesResult> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
@@ -3895,9 +3900,9 @@ export const generateStoryboardScenes = async (
   const durInfo = segments.map((s, i) => `[${i}] ${(s.duration ?? 0).toFixed(1)}s`).join(', ');
 
   const prompt = `
-You are a professional video director and storyboard artist.
+You are a professional storyboard artist creating a consistent illustrated story — like a children's picture book or a simple comic strip.
 
-Below is a voiceover/podcast script split into segments with durations:
+Below is a script split into segments with durations:
 
 SCRIPT:
 ${scriptText}
@@ -3905,23 +3910,30 @@ ${scriptText}
 SEGMENT DURATIONS: ${durInfo}
 
 TASK:
-Create exactly ${sceneCount} cinematic storyboard scenes that visually represent this script.
-Each scene must cover one or more consecutive script segments.
-Every segment must be covered by exactly one scene (no gaps, no overlaps).
+Step 1 — CHARACTER GUIDE:
+First, identify the main character(s) from the script.
+Create a SHORT, PRECISE visual description for each character that will be copy-pasted into EVERY image generation prompt to ensure visual consistency.
+This must include: appearance, clothing, hair, skin tone, distinguishing features.
+Write it as a single compact paragraph starting with "Main character: ..."
+If there are 2 speakers, describe both. Keep it under 60 words total.
 
-For each scene, provide:
-1. A detailed, vivid IMAGE GENERATION PROMPT suitable for AI image generation (Stable Diffusion / DALL-E / Imagen style).
-   - Be specific: lighting, camera angle, mood, style, subject, background.
-   - Style: cinematic, photorealistic, 16:9 composition.
-   - NO text, NO subtitles in the image.
-2. Which segment indices ([0], [1], ...) this scene covers.
+Step 2 — SCENES:
+Create exactly ${sceneCount} storyboard scenes that visually represent this script as a story.
+Each scene covers one or more consecutive script segments. Every segment must be covered (no gaps, no overlaps).
+
+For each scene prompt:
+- Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
+- Include the character's action, expression, and setting
+- Style: simple flat 2D illustration, story-book art, consistent character design, white or simple background
+- Keep prompts clear and visual — no abstract concepts, show what is literally happening
 
 Respond ONLY with valid JSON in this exact format:
 {
+  "characterGuide": "Main character: ...",
   "scenes": [
     {
       "sceneNumber": 1,
-      "prompt": "Detailed image generation prompt here...",
+      "prompt": "Scene description here using the character...",
       "segmentIndices": [0, 1]
     },
     ...
@@ -3942,26 +3954,34 @@ Do not add any explanation outside the JSON.
   const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const parsed = JSON.parse(cleaned);
-  return (parsed.scenes || []) as StoryboardSceneRaw[];
+  return {
+    scenes: (parsed.scenes || []) as StoryboardSceneRaw[],
+    characterGuide: (parsed.characterGuide || '') as string,
+  };
 };
 
 export const generateStoryboardImage = async (
   prompt: string,
+  characterGuide?: string,
 ): Promise<string> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  const fullPrompt = `
-Generate a simple illustration in the style of MS Paint that directly visualizes the following scene description.
+  const characterSection = characterGuide
+    ? `\nCHARACTER CONSISTENCY — always draw the character exactly as described below. Same appearance in every scene:\n${characterGuide}\n`
+    : '';
 
+  const fullPrompt = `
+Generate a simple illustration in the style of MS Paint that directly visualizes the following scene from a story.
+${characterSection}
 Scene: "${prompt}"
 
 Requirements:
-1. Style: MS Paint style — simple drawings, basic colors, flat shading, unpolished, naive art style.
-2. Focus: ONLY illustrate the core concept or action described. Make it easy to understand at a glance.
-3. White Background: The image MUST have a clean, pure white background.
-4. Minimalist: Use simple visual metaphors, stick figures, or basic shapes. Avoid complex details.
-5. No Text in Image: Do not write the prompt text on the image. Use visuals only.
+1. Style: MS Paint style — simple drawings, basic bold colors, flat shading, unpolished, naive art style. Like a hand-drawn story illustration.
+2. Character Consistency: Draw the character(s) exactly as described in the CHARACTER CONSISTENCY section. Same face, same clothes, same hair in every image.
+3. White or very simple background.
+4. Show WHAT IS HAPPENING in the scene — action, expression, setting.
+5. No text written inside the image.
 6. Aspect Ratio: 16:9.
 `;
 
