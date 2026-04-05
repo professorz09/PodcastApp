@@ -68,12 +68,22 @@ function buildSegToImage(scenes: StoryboardScene[]): Map<number, string> {
   return m;
 }
 
-// Word-by-word subtitle: returns the visible portion of text
+// Phrase-by-phrase subtitle: splits segment text into ~6-word chunks,
+// shows the chunk that matches current time position in segment.
+const WORDS_PER_PHRASE = 6;
 function getVisibleText(text: string, timeInSeg: number, segDuration: number): string {
-  if (segDuration <= 0) return text;
-  const words = text.trim().split(/\s+/);
-  const count = Math.max(1, Math.ceil((timeInSeg / segDuration) * words.length));
-  return words.slice(0, count).join(' ');
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '';
+  if (segDuration <= 0) return words.slice(0, WORDS_PER_PHRASE).join(' ');
+
+  const totalPhrases = Math.ceil(words.length / WORDS_PER_PHRASE);
+  // Which phrase chunk are we in?
+  const phraseIdx = Math.min(
+    totalPhrases - 1,
+    Math.floor((Math.max(0, timeInSeg) / segDuration) * totalPhrases),
+  );
+  const start = phraseIdx * WORDS_PER_PHRASE;
+  return words.slice(start, start + WORDS_PER_PHRASE).join(' ');
 }
 
 // ── Proportional timing for single-audio mode ─────────────────────────────────
@@ -241,15 +251,10 @@ function drawSubtitleOnCtx(
   text: string,
   cfg: SubtitleConfig,
 ) {
-  if (!cfg.enabled || !text) return;
+  if (!cfg.enabled || !text.trim()) return;
   const fs = cfg.fontSize;
   ctx.font = `bold ${fs}px sans-serif`;
   ctx.textAlign = 'center';
-  // Text shadow for legibility without background
-  ctx.shadowColor = 'rgba(0,0,0,0.85)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 2;
   const maxW = W - 80;
   const words = text.trim().split(/\s+/);
   const lines: string[] = []; let line = '';
@@ -260,13 +265,29 @@ function drawSubtitleOnCtx(
   }
   if (line) lines.push(line);
   const lh = fs * 1.55;
-  const totalH = lines.length * lh;
-  const baseY = cfg.position === 'top' ? 32 : H - totalH - 24;
+  const pad = 10;
+  const totalH = lines.length * lh + pad * 2;
+  const baseY = cfg.position === 'top' ? 20 : H - totalH - 20;
+
+  // Semi-transparent black background bar (YouTube-style)
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  ctx.beginPath();
+  const barX = W / 2 - maxW / 2 - pad;
+  const barW = maxW + pad * 2;
+  const r = 6;
+  ctx.roundRect(barX, baseY, barW, totalH, r);
+  ctx.fill();
+  ctx.restore();
+
+  // Text with subtle shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
   ctx.fillStyle = cfg.textColor;
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + (i + 1) * lh - fs * 0.35));
-  // Reset shadow
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 }
 
 // Draw an image cover-fit on canvas
