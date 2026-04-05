@@ -1,7 +1,8 @@
 import { get, set, del } from 'idb-keyval';
-import { AppState, DebateSegment, ThumbnailState, YoutubeImportData } from '../types';
+import { AppState, DebateSegment, StoryboardScene, ThumbnailState, YoutubeImportData } from '../types';
 
 const STORE_KEY = 'autovid_state';
+const SCENES_KEY = 'autovid_scenes';
 
 interface StoredSegment extends DebateSegment {
   audioBlob?: Blob | null;
@@ -14,6 +15,56 @@ interface StoredState {
   youtubeData?: YoutubeImportData | null;
 }
 
+interface StoredScenes {
+  scriptSignature: string;
+  scenes: StoryboardScene[];
+  characterGuide: string;
+}
+
+// Script signature — unique identifier for a given script (join of segment IDs)
+export const getScriptSignature = (script: DebateSegment[]): string =>
+  script.map(s => s.id).join('|');
+
+// ── Scene persistence ──────────────────────────────────────────────────────────
+
+export const saveScenes = async (
+  script: DebateSegment[],
+  scenes: StoryboardScene[],
+  characterGuide: string,
+): Promise<void> => {
+  try {
+    const stored: StoredScenes = {
+      scriptSignature: getScriptSignature(script),
+      scenes,
+      characterGuide,
+    };
+    await set(SCENES_KEY, stored);
+  } catch (e) {
+    console.error('Failed to save scenes', e);
+  }
+};
+
+export const loadScenes = async (
+  script: DebateSegment[],
+): Promise<{ scenes: StoryboardScene[]; characterGuide: string } | null> => {
+  try {
+    const stored = await get<StoredScenes>(SCENES_KEY);
+    if (!stored) return null;
+    // Only restore if script matches
+    if (stored.scriptSignature !== getScriptSignature(script)) return null;
+    return { scenes: stored.scenes, characterGuide: stored.characterGuide };
+  } catch (e) {
+    console.error('Failed to load scenes', e);
+    return null;
+  }
+};
+
+export const clearScenes = async (): Promise<void> => {
+  try { await del(SCENES_KEY); } catch { /* ignore */ }
+};
+
+// ── Main state persistence ─────────────────────────────────────────────────────
+
 export const saveState = async (
   appState: AppState,
   script: DebateSegment[],
@@ -21,7 +72,6 @@ export const saveState = async (
   youtubeData?: YoutubeImportData | null,
 ) => {
   try {
-    // Convert audioUrls to Blobs for storage
     const scriptToStore = await Promise.all(script.map(async (seg) => {
       let audioBlob = null;
       if (seg.audioUrl) {
@@ -32,11 +82,7 @@ export const saveState = async (
           console.error("Failed to fetch blob for storage", e);
         }
       }
-      return {
-        ...seg,
-        audioBlob,
-        audioUrl: undefined // Don't store the blob URL
-      };
+      return { ...seg, audioBlob, audioUrl: undefined };
     }));
 
     await set(STORE_KEY, { appState, script: scriptToStore, thumbnailState, youtubeData: youtubeData ?? null });
@@ -45,7 +91,6 @@ export const saveState = async (
   }
 };
 
-// Track blob URLs created from loadState so we can revoke them on the next load
 let _activeBlobUrls: string[] = [];
 
 export const loadState = async (): Promise<{ appState: AppState, script: DebateSegment[], thumbnailState?: ThumbnailState, youtubeData?: YoutubeImportData | null } | null> => {
@@ -53,23 +98,17 @@ export const loadState = async (): Promise<{ appState: AppState, script: DebateS
     const stored = await get<StoredState>(STORE_KEY);
     if (!stored) return null;
 
-    // Revoke any blob URLs from the previous load to free memory
     _activeBlobUrls.forEach(u => URL.revokeObjectURL(u));
     _activeBlobUrls = [];
 
-    // Convert Blobs back to audioUrls
     const loadedScript: DebateSegment[] = stored.script.map(seg => {
       let audioUrl = seg.audioUrl;
       if (seg.audioBlob) {
         audioUrl = URL.createObjectURL(seg.audioBlob);
         _activeBlobUrls.push(audioUrl);
       }
-      
       const { audioBlob, ...rest } = seg;
-      return {
-        ...rest,
-        audioUrl
-      } as DebateSegment;
+      return { ...rest, audioUrl } as DebateSegment;
     });
 
     return {
@@ -87,7 +126,7 @@ export const loadState = async (): Promise<{ appState: AppState, script: DebateS
 export const clearState = async () => {
   try {
     await del(STORE_KEY);
-    // Revoke any active blob URLs to free memory
+    await del(SCENES_KEY);
     _activeBlobUrls.forEach(u => URL.revokeObjectURL(u));
     _activeBlobUrls = [];
   } catch (error) {

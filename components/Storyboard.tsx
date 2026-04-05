@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage } from '../services/geminiService';
+import { saveScenes, loadScenes } from '../services/storageService';
 import { toast } from './Toast';
 
 interface StoryboardProps {
@@ -205,8 +206,8 @@ async function createStoryboardVideo(
 ): Promise<Blob> {
   onProgress(0, 'Loading audio…');
 
-  // Only segments WITH audio (in script order)
-  const audioSegs = script.filter(s => s.audioUrl && (s.duration ?? 0) > 0);
+  // Any segment with an audioUrl (duration may be 0 for ElevenLabs — AudioBuffer gives real duration)
+  const audioSegs = script.filter(s => !!s.audioUrl);
   if (!audioSegs.length) throw new Error('No audio — generate audio in Voice step first.');
 
   const AC = new AudioContext();
@@ -415,6 +416,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
 
   const [scenes, setScenes] = useState<StoryboardScene[]>([]);
   const [characterGuide, setCharacterGuide] = useState('');
+  const scenesLoadedRef = useRef(false);
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingAllProgress, setGeneratingAllProgress] = useState(0);
@@ -449,8 +451,28 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const activeRowRef = useRef<HTMLDivElement>(null);
 
+  // ── Persist scenes to IndexedDB (base64 imageUrls survive refresh) ──
+  useEffect(() => {
+    // Load saved scenes on mount if they match the current script
+    if (scenesLoadedRef.current) return;
+    scenesLoadedRef.current = true;
+    loadScenes(script).then(saved => {
+      if (saved && saved.scenes.length > 0) {
+        setScenes(saved.scenes);
+        setCharacterGuide(saved.characterGuide);
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // Don't save empty state (before first generate)
+    if (scenes.length === 0) return;
+    saveScenes(script, scenes, characterGuide);
+  }, [scenes, characterGuide, script]);
+
   const { offsets, total: totalDuration } = useMemo(() => buildOffsets(script), [script]);
-  const hasAudio = script.some(s => s.audioUrl && (s.duration ?? 0) > 0);
+  // hasAudio: audioUrl present, duration optional (ElevenLabs returns 0)
+  const hasAudio = script.some(s => !!s.audioUrl);
   const doneImages = scenes.filter(sc => sc.imageUrl).length;
   const allImagesReady = scenes.length > 0 && scenes.every(sc => sc.imageUrl);
 
@@ -589,8 +611,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   }, [stopPreviewAudio]);
 
   const loadMergedAudio = useCallback(async () => {
-    if (mergedBufRef.current) return; // already loaded
-    const audioSegs = script.filter(s => s.audioUrl && (s.duration ?? 0) > 0);
+    if (mergedBufRef.current) return; // already decoded — use propTimings update effect for scene changes
+    // Include any segment with an audioUrl — duration may be 0 (ElevenLabs) but AudioBuffer gives real duration
+    const audioSegs = script.filter(s => !!s.audioUrl);
     if (!audioSegs.length) { toast.error('Pehle Voice step mein audio generate karo.'); return; }
     setIsLoadingAudio(true);
     try {
@@ -627,6 +650,14 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       setIsLoadingAudio(false);
     }
   }, [script, scenes]);
+
+  // When scenes change and audio is already loaded in single-audio mode,
+  // update propTimings so the preview immediately uses correct scene offsets
+  useEffect(() => {
+    if (singleAudioModeRef.current && mergedBufRef.current && scenes.length > 0) {
+      propTimingsRef.current = buildProportionalTimings(scenes, script, actualTotalRef.current);
+    }
+  }, [scenes, script]);
 
   const seekTo = useCallback((time: number) => {
     const t = Math.max(0, Math.min(time, actualTotalRef.current || totalDuration));
