@@ -595,12 +595,13 @@ const PromptModal: React.FC<{
   characterGuide: string;
   absWords: AbsWord[];
   script: DebateSegment[];
+  totalDuration: number;
   onSave: (id: string, prompt: string) => void;
   onGenerate: (id: string) => void;
   onClose: () => void;
-}> = ({ scene, characterGuide, absWords, script, onSave, onGenerate, onClose }) => {
+}> = ({ scene, characterGuide, absWords, script, totalDuration, onSave, onGenerate, onClose }) => {
   const [prompt, setPrompt] = useState(scene.prompt);
-  const voiceover = getVoiceoverForRange(absWords, scene.startTime, scene.endTime, script, scene.segmentIndices);
+  const voiceover = getVoiceoverForRange(absWords, scene.startTime, scene.endTime, script, scene.segmentIndices, totalDuration);
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#0e0e0e] border border-white/10 rounded-2xl w-full max-w-md flex flex-col shadow-2xl max-h-[85vh]">
@@ -669,6 +670,12 @@ function getAbsoluteWords(script: DebateSegment[]): AbsWord[] {
   return result;
 }
 
+// Helper: truncate word array to "first … last" form
+function wordsToSnippet(words: string[]): string {
+  if (words.length <= 12) return words.join(' ');
+  return `${words.slice(0, 5).join(' ')} … ${words.slice(-3).join(' ')}`;
+}
+
 // Extract voiceover text for a time range (first … last words)
 function getVoiceoverForRange(
   absWords: AbsWord[],
@@ -676,18 +683,29 @@ function getVoiceoverForRange(
   endTime: number,
   script: DebateSegment[],
   segmentIndices: number[],
+  totalDuration?: number,
 ): string {
-  // Use absolute word timings if available
-  if (absWords.length > 0 && endTime > startTime) {
+  if (startTime >= endTime) return '';
+
+  // Priority 1: absolute word timings from STT
+  if (absWords.length > 0) {
     const inRange = absWords.filter(w => w.absStart >= startTime - 0.15 && w.absStart < endTime + 0.15);
-    if (inRange.length > 0) {
-      if (inRange.length <= 12) return inRange.map(w => w.word).join(' ');
-      const first = inRange.slice(0, 5).map(w => w.word).join(' ');
-      const last = inRange.slice(-3).map(w => w.word).join(' ');
-      return `${first} … ${last}`;
+    if (inRange.length > 0) return wordsToSnippet(inRange.map(w => w.word));
+  }
+
+  // Priority 2: proportional word extraction from full script text (no STT needed)
+  const total = totalDuration ?? 0;
+  if (total > 0) {
+    const allWords = script.flatMap(seg => seg.text.trim().split(/\s+/).filter(Boolean));
+    if (allWords.length > 0) {
+      const startIdx = Math.floor((startTime / total) * allWords.length);
+      const endIdx = Math.min(Math.ceil((endTime / total) * allWords.length), allWords.length);
+      const rangeWords = allWords.slice(startIdx, endIdx);
+      if (rangeWords.length > 0) return wordsToSnippet(rangeWords);
     }
   }
-  // Fallback: join segment texts
+
+  // Priority 3: segment text fallback
   return segmentIndices.map(i => script[i]?.text ?? '').filter(Boolean).join(' ');
 }
 
@@ -696,13 +714,14 @@ const TimelineRow: React.FC<{
   scene: StoryboardScene;
   script: DebateSegment[];
   absWords: AbsWord[];
+  totalDuration: number;
   isActive: boolean;
   onSeek: () => void;
   onOpenPrompt: () => void;
   onGenerate: () => void;
-}> = ({ scene, script, absWords, isActive, onSeek, onOpenPrompt, onGenerate }) => {
+}> = ({ scene, script, absWords, totalDuration, isActive, onSeek, onOpenPrompt, onGenerate }) => {
   const dur = scene.endTime - scene.startTime;
-  const voiceover = getVoiceoverForRange(absWords, scene.startTime, scene.endTime, script, scene.segmentIndices);
+  const voiceover = getVoiceoverForRange(absWords, scene.startTime, scene.endTime, script, scene.segmentIndices, totalDuration);
 
   return (
     <div onClick={onSeek}
@@ -1367,6 +1386,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                       scene={scene}
                       script={script}
                       absWords={absWords}
+                      totalDuration={actualTotalRef.current || (scenes.length > 0 ? scenes[scenes.length - 1].endTime : totalDuration)}
                       isActive={activeScene?.id === scene.id}
                       onSeek={() => seekTo(scene.startTime)}
                       onOpenPrompt={() => setPromptModalId(scene.id)}
@@ -1583,6 +1603,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
           characterGuide={characterGuide}
           absWords={absWords}
           script={script}
+          totalDuration={actualTotalRef.current || (scenes.length > 0 ? scenes[scenes.length - 1].endTime : totalDuration)}
           onSave={handleSavePrompt}
           onGenerate={handleGenerateImage}
           onClose={() => setPromptModalId(null)}
