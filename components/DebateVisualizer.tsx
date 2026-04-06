@@ -117,6 +117,14 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [showSettings, setShowSettings] = useState(false);
   const [questionMode, setQuestionMode] = useState(false);
 
+  // When Neon theme is selected, default speakers & subtitle background to OFF
+  useEffect(() => {
+    if (theme === 'neon') {
+      setShowSpeakers(false);
+      setSubtitleBackground(false);
+    }
+  }, [theme]);
+
   // Subtitle Interaction State
   const [draggingSubtitle, setDraggingSubtitle] = useState(false);
   const [resizingSubtitle, setResizingSubtitle] = useState<string | null>(null); // 'tl', 'tr', 'bl', 'br'
