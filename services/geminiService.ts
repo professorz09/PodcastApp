@@ -4024,6 +4024,48 @@ Do not add explanation outside the JSON.
   };
 };
 
+// ── Chirp 3 HD (Google Cloud TTS) ──────────────────────────────────────────────
+export const generateSpeechChirp3HD = async (
+  text: string,
+  voiceName: string,
+  languageCode: string = 'en-US',
+): Promise<{ audioUrl: string; duration: number }> => {
+  const apiKey = getApiKey();
+  const fullVoiceName = `${languageCode}-Chirp3-HD-${voiceName}`;
+
+  const response = await fetch(
+    `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode, name: fullVoiceName },
+        audioConfig: { audioEncoding: 'MP3' },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    const msg = err?.error?.message || `Chirp 3 HD error: ${response.status}`;
+    if (response.status === 400) throw new Error(`Voice "${fullVoiceName}" not supported. Try a different voice.`);
+    throw new Error(msg);
+  }
+
+  const data = await response.json();
+  const base64Audio: string = data.audioContent;
+  if (!base64Audio) throw new Error('No audio content from Chirp 3 HD');
+
+  const binary = window.atob(base64Audio);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+  const blob = new Blob([bytes], { type: 'audio/mpeg' });
+  const audioUrl = URL.createObjectURL(blob);
+  return { audioUrl, duration: 0 };
+};
+
 export const generateStoryboardImage = async (
   prompt: string,
   characterGuide?: string,

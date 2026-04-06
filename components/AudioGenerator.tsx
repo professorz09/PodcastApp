@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebateSegment, TranscriptSegment } from '../types';
 import { toast } from './Toast';
-import { generateSpeech, transcribeAudioBlob, generateClipIntro } from '../services/geminiService';
+import { generateSpeech, transcribeAudioBlob, generateClipIntro, generateSpeechChirp3HD } from '../services/geminiService';
 import { getElevenLabsVoices, generateElevenLabsSpeech, ElevenLabsVoice } from '../services/elevenLabsService';
 import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
 import { mergeAudioUrls } from '../services/audioUtils';
@@ -21,7 +21,7 @@ interface AudioGeneratorProps {
 }
 
 const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript, onNext, onBack, onVoicesChange, youtubeData }) => {
-  const [ttsProvider, setTtsProvider] = useState<'google' | 'elevenlabs'>('google');
+  const [ttsProvider, setTtsProvider] = useState<'google' | 'elevenlabs' | 'chirp3hd'>('google');
   const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoice[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -171,6 +171,8 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
   };
 
   useEffect(() => {
+    const chirp3HdValidIds = ['Aoede','Kore','Zephyr','Leda','Sulafat','Despina','Gacrux','Achernar','Puck','Charon','Fenrir','Orus','Algieba','Iapetus','Umbriel','Sadaltager'];
+    const chirp3HdDefaults = ['Zephyr', 'Puck', 'Aoede', 'Charon', 'Kore', 'Fenrir'];
     if (ttsProvider === 'elevenlabs') {
       if (elevenLabsVoices.length > 0) {
         setVoices(prev => {
@@ -206,6 +208,16 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
           })
           .finally(() => setLoadingVoices(false));
       }
+    } else if (ttsProvider === 'chirp3hd') {
+      setVoices(prev => {
+        const newVoices = { ...prev };
+        uniqueSpeakers.forEach((speaker, idx) => {
+          if (!newVoices[speaker] || !chirp3HdValidIds.includes(newVoices[speaker])) {
+            newVoices[speaker] = chirp3HdDefaults[idx % chirp3HdDefaults.length];
+          }
+        });
+        return newVoices;
+      });
     }
   }, [ttsProvider, uniqueSpeakers]);
 
@@ -226,6 +238,26 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       </div>
     );
   }
+
+  // Chirp 3 HD supports a curated set of voices via Cloud TTS API
+  const chirp3HdVoices = [
+    { id: 'Aoede',      label: 'Aoede',      desc: 'Breezy',      gender: 'Female' },
+    { id: 'Kore',       label: 'Kore',       desc: 'Firm',        gender: 'Female' },
+    { id: 'Zephyr',     label: 'Zephyr',     desc: 'Bright',      gender: 'Female' },
+    { id: 'Leda',       label: 'Leda',       desc: 'Youthful',    gender: 'Female' },
+    { id: 'Sulafat',    label: 'Sulafat',    desc: 'Warm',        gender: 'Female' },
+    { id: 'Despina',    label: 'Despina',    desc: 'Smooth',      gender: 'Female' },
+    { id: 'Gacrux',     label: 'Gacrux',     desc: 'Mature',      gender: 'Female' },
+    { id: 'Achernar',   label: 'Achernar',   desc: 'Soft',        gender: 'Female' },
+    { id: 'Puck',       label: 'Puck',       desc: 'Upbeat',      gender: 'Male'   },
+    { id: 'Charon',     label: 'Charon',     desc: 'Informative', gender: 'Male'   },
+    { id: 'Fenrir',     label: 'Fenrir',     desc: 'Excitable',   gender: 'Male'   },
+    { id: 'Orus',       label: 'Orus',       desc: 'Firm',        gender: 'Male'   },
+    { id: 'Algieba',    label: 'Algieba',    desc: 'Smooth',      gender: 'Male'   },
+    { id: 'Iapetus',    label: 'Iapetus',    desc: 'Clear',       gender: 'Male'   },
+    { id: 'Umbriel',    label: 'Umbriel',    desc: 'Easy-going',  gender: 'Male'   },
+    { id: 'Sadaltager', label: 'Sadaltager', desc: 'Knowledgeable', gender: 'Male' },
+  ];
 
   const googleVoices = [
     { id: 'Zephyr',        label: 'Zephyr',        desc: 'Bright',        gender: 'Female' },
@@ -274,6 +306,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       let audioUrl: string;
       if (ttsProvider === 'elevenlabs') {
         const res = await generateElevenLabsSpeech(seg.text, voice);
+        audioUrl = res.audioUrl;
+      } else if (ttsProvider === 'chirp3hd') {
+        const res = await generateSpeechChirp3HD(seg.text, voice, transcriptLanguage);
         audioUrl = res.audioUrl;
       } else {
         const res = await generateSpeech(seg.text, voice);
@@ -354,6 +389,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         let audioUrl: string;
         if (ttsProvider === 'elevenlabs') {
           const res = await generateElevenLabsSpeech(seg.text, voice);
+          audioUrl = res.audioUrl;
+        } else if (ttsProvider === 'chirp3hd') {
+          const res = await generateSpeechChirp3HD(seg.text, voice, transcriptLanguage);
           audioUrl = res.audioUrl;
         } else {
           const res = await generateSpeech(seg.text, voice);
@@ -635,6 +673,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         <button onClick={() => setTtsProvider('google')} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${ttsProvider === 'google' ? 'bg-purple-600/20 border border-purple-500/40 text-purple-300' : 'text-gray-500 border border-white/5 hover:bg-white/5'}`}>
           <Globe size={13} /> Gemini
         </button>
+        <button onClick={() => setTtsProvider('chirp3hd')} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${ttsProvider === 'chirp3hd' ? 'bg-cyan-600/20 border border-cyan-500/40 text-cyan-300' : 'text-gray-500 border border-white/5 hover:bg-white/5'}`}>
+          <Mic2 size={13} /> Chirp HD
+        </button>
         <button onClick={() => setTtsProvider('elevenlabs')} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${ttsProvider === 'elevenlabs' ? 'bg-purple-600/20 border border-purple-500/40 text-purple-300' : 'text-gray-500 border border-white/5 hover:bg-white/5'}`}>
           <Zap size={13} /> ElevenLabs
         </button>
@@ -671,6 +712,17 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
           >
             <Globe size={15} />
             Gemini 2.5
+          </button>
+          <button
+            onClick={() => setTtsProvider('chirp3hd')}
+            className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl text-[10px] font-medium transition-all w-full ${
+              ttsProvider === 'chirp3hd'
+                ? 'bg-cyan-600/20 border border-cyan-500/40 text-cyan-300'
+                : 'text-gray-600 hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Mic2 size={15} />
+            Chirp 3 HD
           </button>
           <button
             onClick={() => setTtsProvider('elevenlabs')}
@@ -808,7 +860,11 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                 ? googleVoices.find(v => v.id === voices[role])
                   ? `${voices[role]} · ${googleVoices.find(v => v.id === voices[role])!.gender}, ${googleVoices.find(v => v.id === voices[role])!.desc}`
                   : voices[role]
-                : elevenLabsVoices.find(v => v.voice_id === voices[role])?.name || voices[role];
+                : ttsProvider === 'chirp3hd'
+                  ? chirp3HdVoices.find(v => v.id === voices[role])
+                    ? `${voices[role]} · ${chirp3HdVoices.find(v => v.id === voices[role])!.gender}, ${chirp3HdVoices.find(v => v.id === voices[role])!.desc}`
+                    : voices[role]
+                  : elevenLabsVoices.find(v => v.voice_id === voices[role])?.name || voices[role];
 
               return (
                 <div key={role} className={`rounded-2xl border p-3.5 ${styles.card}`}>
@@ -841,13 +897,21 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                               ))}
                             </optgroup>
                           ))
-                        : elevenLabsVoices.length > 0
-                          ? elevenLabsVoices.map(v => (
-                              <option key={v.voice_id} value={v.voice_id}>
-                                {v.name}{v.labels?.accent ? ` · ${v.labels.accent}` : ''}
-                              </option>
+                        : ttsProvider === 'chirp3hd'
+                          ? (['Female', 'Male'] as const).map(g => (
+                              <optgroup key={g} label={g === 'Female' ? '♀ Female' : '♂ Male'}>
+                                {chirp3HdVoices.filter(v => v.gender === g).map(v => (
+                                  <option key={v.id} value={v.id}>{v.label} · {v.desc}</option>
+                                ))}
+                              </optgroup>
                             ))
-                          : <option disabled>Loading voices...</option>}
+                          : elevenLabsVoices.length > 0
+                            ? elevenLabsVoices.map(v => (
+                                <option key={v.voice_id} value={v.voice_id}>
+                                  {v.name}{v.labels?.accent ? ` · ${v.labels.accent}` : ''}
+                                </option>
+                              ))
+                            : <option disabled>Loading voices...</option>}
                     </select>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
                       {loadingVoices ? <RefreshCw size={12} className="animate-spin" /> : <Mic2 size={12} />}
