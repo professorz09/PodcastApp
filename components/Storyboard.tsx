@@ -1127,7 +1127,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     if (!script.length) { toast.error('No script loaded.'); return; }
     setIsGeneratingScenes(true); setVideoBlob(null); setCharacterGuide('');
     try {
-      const absWords = getAbsoluteWords(script);
       const hasWordTimings = absWords.length > 0;
 
       // Compute total duration: actual decoded audio > wordTimings last word > segment durations
@@ -1212,7 +1211,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       toast.success(`${sceneCount} scenes created`);
     } catch (e: any) { toast.error(e.message || 'Scene generation failed'); }
     finally { setIsGeneratingScenes(false); }
-  }, [script, sceneCount, model, buildSegmentTimestamps]);
+  }, [script, sceneCount, model, buildSegmentTimestamps, absWords]);
 
   // ── Generate single image ──
   const handleGenerateImage = useCallback(async (id: string) => {
