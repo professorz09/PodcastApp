@@ -1,3 +1,31 @@
+// ── Offline fallback: decode audio duration purely in the browser ──────────
+export const getAudioDurationFromBlob = async (blob: Blob): Promise<number> => {
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  const ctx = new AudioContextClass();
+  try {
+    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+    return buf.duration;
+  } finally {
+    if (ctx.state !== 'closed') await ctx.close();
+  }
+};
+
+// ── Offline fallback: proportional word timings from text + duration ────────
+// No server or API key needed — just divides audio time evenly across words.
+export const generateProportionalWordTimings = (
+  text: string,
+  duration: number,
+): { word: string; start: number; end: number }[] => {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length || duration <= 0) return [];
+  const timePerWord = duration / words.length;
+  return words.map((word, i) => ({
+    word,
+    start: parseFloat((i * timePerWord).toFixed(3)),
+    end: parseFloat(((i + 1) * timePerWord).toFixed(3)),
+  }));
+};
+
 export const transcribeAudioGoogleCloud = async (
   audioBlob: Blob,
   languageCode: string = 'en-US'

@@ -3,7 +3,7 @@ import { DebateSegment, TranscriptSegment } from '../types';
 import { toast } from './Toast';
 import { generateSpeech, transcribeAudioBlob, generateClipIntro, generateSpeechChirp3HD } from '../services/geminiService';
 import { getElevenLabsVoices, generateElevenLabsSpeech, ElevenLabsVoice } from '../services/elevenLabsService';
-import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
+import { transcribeAudioGoogleCloud, getAudioDurationFromBlob, generateProportionalWordTimings } from '../services/googleCloudService';
 import { mergeAudioUrls } from '../services/audioUtils';
 import {
   Play, Check, ChevronLeft, Wand2, User, Mic2, MessageSquare,
@@ -545,13 +545,27 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const response = await fetch(seg.audioUrl);
       if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
       const blob = await response.blob();
-      const wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
+
+      let wordTimings: { word: string; start: number; end: number }[];
+      let usedFallback = false;
+      try {
+        wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
+      } catch (cloudErr) {
+        console.warn('Cloud STT unavailable, using offline proportional timing:', cloudErr);
+        usedFallback = true;
+        const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
+        wordTimings = generateProportionalWordTimings(seg.text, duration);
+      }
+
       const phraseTimings = buildPhrases(wordTimings);
       onUpdateScript(prev => {
         const newScript = [...prev];
         newScript[index] = { ...newScript[index], wordTimings, phraseTimings };
         return newScript;
       });
+      if (usedFallback) {
+        toast.info('Offline mode: approximate timings applied (Google Cloud STT unavailable)');
+      }
     } catch (error) {
       console.error('Failed to sync transcript', error);
       toast.error('Failed to sync transcript: ' + (error as Error).message);
@@ -562,6 +576,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
 
   const handleSyncAll = async () => {
     setSyncStatus('loading');
+    let fallbackCount = 0;
     try {
       const syncResults: Record<number, { wordTimings: any[]; phraseTimings: any[] }> = {};
       for (let i = 0; i < script.length; i++) {
@@ -571,13 +586,23 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
           const response = await fetch(seg.audioUrl);
           if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
           const blob = await response.blob();
-          const wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
+
+          let wordTimings: { word: string; start: number; end: number }[];
+          try {
+            wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
+          } catch (cloudErr) {
+            console.warn(`Segment ${i}: Cloud STT unavailable, using offline fallback`, cloudErr);
+            fallbackCount++;
+            const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
+            wordTimings = generateProportionalWordTimings(seg.text, duration);
+          }
+
           const phraseTimings = buildPhrases(wordTimings);
           syncResults[i] = { wordTimings, phraseTimings };
         } catch (err) {
           console.error(`Failed to sync segment ${i}`, err);
         }
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 200));
       }
       onUpdateScript(prev => {
         const newScript = [...prev];
@@ -592,6 +617,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         return newScript;
       });
       setSyncStatus('success');
+      if (fallbackCount > 0) {
+        toast.info(`Offline mode: ${fallbackCount} segment(s) used approximate timings (Google Cloud STT unavailable)`);
+      }
     } catch (error) {
       console.error('Sync All Failed', error);
       setSyncStatus('error');
