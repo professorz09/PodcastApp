@@ -743,11 +743,16 @@ export const generateDebateScript = async (
         } else if (style === 'image') {
           prompt = `
             ═══════════════════════════════════════
-            STYLE: IMAGE STYLE — SINGLE VOICE, RELATABLE HOOK, USA AUDIENCE
+            STYLE: IMAGE STYLE — SINGLE VOICE, SINGLE MAN SCENARIO
             एक ही speaker। कोई narrator नहीं, कोई दूसरा speaker नहीं।
             यह psychology / finance / self-improvement topic पर एक voiceover script है।
             Audience: USA-based adults। Language: English।
-            Hook format: एक specific, relatable scenario/character से शुरू — जो सीधे audience की life को reflect करे।
+
+            ⚠️ CRITICAL VISUAL RULE:
+            हर scenario में केवल एक अकेला आदमी (a single man) होना चाहिए।
+            कोई औरत नहीं। कोई group नहीं। कोई couple नहीं।
+            हर example, हर scenario, हर reference में — ONLY ONE MAN।
+            यह इसलिए ज़रूरी है क्योंकि script के साथ AI-generated images बनेंगी जिनमें सिर्फ वही एक आदमी दिखेगा।
             ═══════════════════════════════════════
 
             Topic: "${topic}"
@@ -760,28 +765,29 @@ export const generateDebateScript = async (
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
             【 HOOK (first 3-5 lines — this is everything) 】
-            Start with a specific, vivid character scenario — a real-feeling person in a real-feeling situation.
-            Then flip it to the audience with "Have you ever...?" or "Sound familiar?" or "That's most of us."
-            Examples of good hooks:
+            एक specific, vivid MAN के scenario से शुरू करो — real-feeling situation।
+            फिर audience को flip करो: "Have you ever...?" / "Sound familiar?" / "That's most of us."
+            ALWAYS a man. Never a woman. Never a group.
+            Good hook examples:
             • "A man who never misses a gym session, eats clean, sleeps 8 hours — but still feels completely empty inside. Have you ever met someone like that? Or maybe... that's you."
-            • "There's a woman who checks her bank account every morning, not out of habit — out of fear. She earns decent money. It still never feels like enough."
-            • "A 29-year-old who looks successful on paper — good job, decent apartment, nice clothes — but spends every Sunday night dreading Monday. Not because the job is hard. Because it doesn't mean anything."
-            The hook MUST feel like it could describe someone the audience actually knows — or themselves.
+            • "There's a man who checks his bank account every morning — not out of habit. Out of fear. He earns good money. It still never feels like enough."
+            • "A 29-year-old man who looks successful on paper — good job, decent apartment, nice clothes — but spends every Sunday night dreading Monday. Not because the job is hard. Because it doesn't mean anything."
 
             【 THE CORE INSIGHT 】
-            After the hook, explain the real psychology or financial principle behind it.
+            Hook के बाद real psychology या financial principle explain करो।
             — What is actually happening (the mechanism, the pattern)
             — Why most people don't see it clearly
             — What it costs them (emotionally, financially, time-wise)
+            ✓ Examples में भी हमेशा "a man", "he", "him" — never "she" or "they"
 
             【 THE SHIFT 】
-            Now give the audience a reframe — a new way to see this.
+            Audience को एक reframe दो — एक नया नज़रिया।
             — A simple, concrete principle or action
-            — A real example of someone who understood this and what changed
-            — Make it feel achievable, not preachy
+            — Example of a man who understood this and what changed
+            — Grounded, not preachy
 
             【 CLOSING LINE (1-2 lines max) 】
-            End with one line that stays in the head. A question, a truth, or a challenge.
+            एक line जो याद रहे। A question, a truth, or a challenge.
             Example: "The goal was never the money. The goal was the feeling you thought money would give you."
 
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -789,12 +795,13 @@ export const generateDebateScript = async (
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ✓ Single speaker — no dialogue, no back-and-forth
             ✓ English — USA audience, conversational but smart
-            ✓ Hook must be a specific scenario, not a generic statement
-            ✓ Every insight must have a real, grounded example
-            ✓ Tone: calm, direct, intelligent — like someone who actually knows this
+            ✓ EVERY scenario/example = ONE MAN only (he/him/his)
+            ✓ Hook must be a specific male character scenario, not generic
+            ✓ Tone: calm, direct, intelligent
+            ✗ BANNED: Any female character or "she/her"
+            ✗ BANNED: Groups, couples, or "they/them" scenarios
             ✗ BANNED: "In today's video we will..." — start with the hook directly
             ✗ BANNED: Preachy advice, motivational poster lines, hollow positivity
-            ✗ BANNED: "As we know", "It is important to", generic filler
             ✗ BANNED: Multiple speakers or dialogue format
             ${durFillHi}
           `;
@@ -1828,11 +1835,17 @@ export const generateDebateScript = async (
         } else if (style === 'image') {
           prompt = `
             ═══════════════════════════════════════
-            STYLE: IMAGE STYLE — SINGLE VOICE, RELATABLE HOOK, USA AUDIENCE
+            STYLE: IMAGE STYLE — SINGLE VOICE, SINGLE MAN SCENARIO
             One speaker. No narrator. No second speaker. No dialogue.
             Psychology / finance / self-improvement topic.
             Audience: USA-based adults. Language: English.
-            Hook: A specific, relatable character scenario that mirrors the audience's real life.
+
+            ⚠️ CRITICAL VISUAL RULE — READ THIS FIRST:
+            Every scenario, every example, every character reference in this script
+            must feature ONLY ONE SINGLE MAN (he / him / his).
+            NO women. NO couples. NO groups. NO "they".
+            This is mandatory because AI images will be generated for each scene
+            — and every image must show the exact same lone man.
             ═══════════════════════════════════════
 
             Topic: "${topic}"
@@ -1845,28 +1858,30 @@ export const generateDebateScript = async (
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
             【 HOOK (3-5 lines — this determines everything) 】
-            Open with a specific, vivid character in a specific, real-feeling situation.
-            Then turn it toward the audience — "Have you ever...?" / "Sound familiar?" / "That's most of us."
-            The character is not famous. They are ordinary. The situation is specific, not abstract.
-            Examples:
+            Open with ONE specific man in a specific, real-feeling situation.
+            He is ordinary. Not famous. The situation is concrete and visual.
+            Then pivot to the audience — "Have you ever...?" / "Sound familiar?" / "That's most of us."
+            The character is ALWAYS male. Every pronoun is he/him/his.
+            Strong hook examples:
             • "A man who never misses a gym session, eats clean, sleeps 8 hours — but still feels completely empty inside. Have you ever met someone like that? Or maybe... that's you."
-            • "There's a woman who checks her bank account every morning — not out of habit. Out of fear. She earns good money. It still never feels like enough."
-            • "A 29-year-old who looks successful on paper — good job, decent apartment, nice clothes — but spends every Sunday night dreading Monday. Not because the job is hard. Because it doesn't mean anything."
+            • "There's a man who checks his bank account every morning — not out of habit. Out of fear. He earns good money. It still never feels like enough."
+            • "A 29-year-old man who looks successful on paper — good job, decent apartment, nice clothes — but spends every Sunday night dreading Monday. Not because the job is hard. Because it doesn't mean anything."
 
             【 THE CORE INSIGHT 】
-            Now explain the real psychology or financial principle at play.
-            — What is actually happening beneath the surface (the mechanism, the pattern)
+            Explain the real psychology or financial principle at play.
+            — What is happening beneath the surface (the mechanism, the pattern)
             — Why most people don't see it or name it
-            — What it costs them — emotionally, financially, in time or energy
+            — What it costs him — emotionally, financially, in time or energy
+            ✓ All examples use "a man", "he", "him" — never "she", "her", or "they"
 
             【 THE SHIFT 】
-            Give the audience a reframe. A concrete new way to see this situation.
-            — One principle or shift in thinking, specific to this topic
-            — A real-world example of someone who applied this and what actually changed
-            — Keep it grounded. Not motivational. Practical.
+            Give the audience a reframe — a concrete new way to see the situation.
+            — One principle or shift in thinking tied to this topic
+            — A real example of a man who applied this and what actually changed for him
+            — Grounded. Not motivational. Practical.
 
             【 CLOSING (1-2 lines only) 】
-            One line that stays. A truth, a question, or a quiet challenge.
+            One line that lingers. A truth, a question, or a quiet challenge.
             Example: "The goal was never the money. The goal was the feeling you thought money would give you."
 
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1874,13 +1889,15 @@ export const generateDebateScript = async (
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ✓ Single speaker only — no back-and-forth, no names exchanged
             ✓ English — USA audience, conversational but intelligent
-            ✓ Hook must open with a specific human scenario, not a general statement
-            ✓ Every insight must have a grounded, real example
-            ✓ Tone: calm, direct, unhurried — like someone who has actually lived this
-            ✗ BANNED: "In today's video..." — start with the hook directly, no intro
-            ✗ BANNED: Hollow motivational lines, generic life advice
-            ✗ BANNED: "As we know", "It is important to note", any filler
-            ✗ BANNED: Multiple speakers or any dialogue
+            ✓ EVERY character/scenario = ONE MAN (he/him/his) — no exceptions
+            ✓ Hook must open with a specific male character, not a generic statement
+            ✓ Every insight must have a grounded real example with a man
+            ✓ Tone: calm, direct, unhurried
+            ✗ BANNED: Any female character or "she/her/woman"
+            ✗ BANNED: Groups, couples, "they/them", or plural people
+            ✗ BANNED: "In today's video..." — start with the hook directly
+            ✗ BANNED: Hollow motivational lines, generic life advice, filler phrases
+            ✗ BANNED: Multiple speakers or any form of dialogue
             ${durFillEn}
           `;
         } else if (style === 'explained_solo') {

@@ -447,7 +447,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'debate2') { setSpeakerCount(2); setIncludeNarrator(true); }
                       if (newStyle === 'explained') { setSpeakerCount(2); }
                       if (newStyle === 'explained_solo') { setSpeakerCount(1); }
-                      if (newStyle === 'image') { setSpeakerCount(1); }
+                      if (newStyle === 'image') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'podcast_breakdown') { setSpeakerCount(2); }
                       if (newStyle === 'documentary') { setSpeakerCount(2); }
                       if (newStyle === 'joe_rogan') { setSpeakerCount(2); }
