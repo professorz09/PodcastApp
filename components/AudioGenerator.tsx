@@ -171,7 +171,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
   };
 
   useEffect(() => {
-    const chirp3HdValidIds = ['Aoede','Kore','Zephyr','Leda','Sulafat','Despina','Gacrux','Achernar','Puck','Charon','Fenrir','Orus','Algieba','Iapetus','Umbriel','Sadaltager'];
+    const chirp3HdValidIds = ['Achernar','Achird','Algenib','Algieba','Alnilam','Aoede','Autonoe','Callirrhoe','Charon','Despina','Enceladus','Erinome','Fenrir','Gacrux','Iapetus','Kore','Laomedeia','Leda','Orus','Puck','Pulcherrima','Rasalgethi','Sadachbia','Sadaltager','Schedar','Sulafat','Umbriel','Vindemiatrix','Zephyr','Zubenelgenubi'];
     const chirp3HdDefaults = ['Zephyr', 'Puck', 'Aoede', 'Charon', 'Kore', 'Fenrir'];
     if (ttsProvider === 'elevenlabs') {
       if (elevenLabsVoices.length > 0) {
@@ -239,24 +239,38 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     );
   }
 
-  // Chirp 3 HD supports a curated set of voices via Cloud TTS API
+  // Chirp 3 HD — all 30 official Cloud TTS voices (en-US & hi-IN supported)
   const chirp3HdVoices = [
-    { id: 'Aoede',      label: 'Aoede',      desc: 'Breezy',      gender: 'Female' },
-    { id: 'Kore',       label: 'Kore',       desc: 'Firm',        gender: 'Female' },
-    { id: 'Zephyr',     label: 'Zephyr',     desc: 'Bright',      gender: 'Female' },
-    { id: 'Leda',       label: 'Leda',       desc: 'Youthful',    gender: 'Female' },
-    { id: 'Sulafat',    label: 'Sulafat',    desc: 'Warm',        gender: 'Female' },
-    { id: 'Despina',    label: 'Despina',    desc: 'Smooth',      gender: 'Female' },
-    { id: 'Gacrux',     label: 'Gacrux',     desc: 'Mature',      gender: 'Female' },
-    { id: 'Achernar',   label: 'Achernar',   desc: 'Soft',        gender: 'Female' },
-    { id: 'Puck',       label: 'Puck',       desc: 'Upbeat',      gender: 'Male'   },
-    { id: 'Charon',     label: 'Charon',     desc: 'Informative', gender: 'Male'   },
-    { id: 'Fenrir',     label: 'Fenrir',     desc: 'Excitable',   gender: 'Male'   },
-    { id: 'Orus',       label: 'Orus',       desc: 'Firm',        gender: 'Male'   },
-    { id: 'Algieba',    label: 'Algieba',    desc: 'Smooth',      gender: 'Male'   },
-    { id: 'Iapetus',    label: 'Iapetus',    desc: 'Clear',       gender: 'Male'   },
-    { id: 'Umbriel',    label: 'Umbriel',    desc: 'Easy-going',  gender: 'Male'   },
-    { id: 'Sadaltager', label: 'Sadaltager', desc: 'Knowledgeable', gender: 'Male' },
+    { id: 'Achernar',      label: 'Achernar',      desc: 'Soft',          gender: 'Female' },
+    { id: 'Aoede',         label: 'Aoede',         desc: 'Breezy',        gender: 'Female' },
+    { id: 'Autonoe',       label: 'Autonoe',       desc: 'Bright',        gender: 'Female' },
+    { id: 'Callirrhoe',    label: 'Callirrhoe',    desc: 'Easy-going',    gender: 'Female' },
+    { id: 'Despina',       label: 'Despina',       desc: 'Smooth',        gender: 'Female' },
+    { id: 'Erinome',       label: 'Erinome',       desc: 'Clear',         gender: 'Female' },
+    { id: 'Gacrux',        label: 'Gacrux',        desc: 'Mature',        gender: 'Female' },
+    { id: 'Kore',          label: 'Kore',          desc: 'Firm',          gender: 'Female' },
+    { id: 'Laomedeia',     label: 'Laomedeia',     desc: 'Upbeat',        gender: 'Female' },
+    { id: 'Leda',          label: 'Leda',          desc: 'Youthful',      gender: 'Female' },
+    { id: 'Pulcherrima',   label: 'Pulcherrima',   desc: 'Forward',       gender: 'Female' },
+    { id: 'Sulafat',       label: 'Sulafat',       desc: 'Warm',          gender: 'Female' },
+    { id: 'Vindemiatrix',  label: 'Vindemiatrix',  desc: 'Gentle',        gender: 'Female' },
+    { id: 'Zephyr',        label: 'Zephyr',        desc: 'Bright',        gender: 'Female' },
+    { id: 'Achird',        label: 'Achird',        desc: 'Friendly',      gender: 'Male'   },
+    { id: 'Algenib',       label: 'Algenib',       desc: 'Gravelly',      gender: 'Male'   },
+    { id: 'Algieba',       label: 'Algieba',       desc: 'Smooth',        gender: 'Male'   },
+    { id: 'Alnilam',       label: 'Alnilam',       desc: 'Firm',          gender: 'Male'   },
+    { id: 'Charon',        label: 'Charon',        desc: 'Informative',   gender: 'Male'   },
+    { id: 'Enceladus',     label: 'Enceladus',     desc: 'Breathy',       gender: 'Male'   },
+    { id: 'Fenrir',        label: 'Fenrir',        desc: 'Excitable',     gender: 'Male'   },
+    { id: 'Iapetus',       label: 'Iapetus',       desc: 'Clear',         gender: 'Male'   },
+    { id: 'Orus',          label: 'Orus',          desc: 'Firm',          gender: 'Male'   },
+    { id: 'Puck',          label: 'Puck',          desc: 'Upbeat',        gender: 'Male'   },
+    { id: 'Rasalgethi',    label: 'Rasalgethi',    desc: 'Informative',   gender: 'Male'   },
+    { id: 'Sadachbia',     label: 'Sadachbia',     desc: 'Lively',        gender: 'Male'   },
+    { id: 'Sadaltager',    label: 'Sadaltager',    desc: 'Knowledgeable', gender: 'Male'   },
+    { id: 'Schedar',       label: 'Schedar',       desc: 'Even',          gender: 'Male'   },
+    { id: 'Umbriel',       label: 'Umbriel',       desc: 'Easy-going',    gender: 'Male'   },
+    { id: 'Zubenelgenubi', label: 'Zubenelgenubi', desc: 'Casual',        gender: 'Male'   },
   ];
 
   const googleVoices = [
