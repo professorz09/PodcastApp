@@ -4107,46 +4107,72 @@ Do not add explanation outside the JSON.
   };
 };
 
-// ── Chirp 3 HD (Google Cloud TTS) ──────────────────────────────────────────────
+// ── Chirp 3 HD — Gemini Pro TTS (higher quality than Flash, same API key) ─────
 export const generateSpeechChirp3HD = async (
   text: string,
   voiceName: string,
-  languageCode: string = 'en-US',
+  _languageCode: string = 'en-US',
 ): Promise<{ audioUrl: string; duration: number }> => {
   const apiKey = getApiKey();
-  const fullVoiceName = `${languageCode}-Chirp3-HD-${voiceName}`;
+  const ai = new GoogleGenAI({ apiKey });
 
-  const response = await fetch(
-    `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: { text },
-        voice: { languageCode, name: fullVoiceName },
-        audioConfig: { audioEncoding: 'MP3' },
-      }),
-    },
-  );
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro-preview-tts',
+      contents: { parts: [{ text }] },
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName },
+          },
+        },
+      },
+    });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    const msg = err?.error?.message || `Chirp 3 HD error: ${response.status}`;
-    if (response.status === 400) throw new Error(`Voice "${fullVoiceName}" not supported. Try a different voice.`);
-    throw new Error(msg);
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) throw new Error('No audio content from Chirp 3 HD');
+
+    const binaryString = window.atob(base64Audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // Raw PCM: 16-bit, 24kHz, mono — wrap in WAV header
+    const sampleRate = 24000;
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+    const blockAlign = numChannels * (bitsPerSample / 8);
+    const dataSize = bytes.length;
+    const wavBuffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(wavBuffer);
+
+    const ws = (o: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); ws(8, 'WAVE');
+    ws(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true); view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true); view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    ws(36, 'data'); view.setUint32(40, dataSize, true);
+    new Uint8Array(wavBuffer, 44).set(bytes);
+
+    const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+    const audioUrl = URL.createObjectURL(blob);
+    const duration = dataSize / byteRate;
+    return { audioUrl, duration };
+  } catch (error: any) {
+    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
+      throw new Error('Gemini API Quota Exceeded. Please wait a few minutes before retrying.');
+    }
+    // Fallback: if pro model unavailable, try flash model
+    if (error?.message?.includes('model') || error?.status === 404) {
+      return generateSpeech(text, voiceName);
+    }
+    console.error('Error in generateSpeechChirp3HD:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  const base64Audio: string = data.audioContent;
-  if (!base64Audio) throw new Error('No audio content from Chirp 3 HD');
-
-  const binary = window.atob(base64Audio);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-  const blob = new Blob([bytes], { type: 'audio/mpeg' });
-  const audioUrl = URL.createObjectURL(blob);
-  return { audioUrl, duration: 0 };
 };
 
 export const generateStoryboardImage = async (
