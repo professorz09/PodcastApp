@@ -747,12 +747,7 @@ export const generateDebateScript = async (
             एक ही speaker। कोई narrator नहीं, कोई दूसरा speaker नहीं।
             यह psychology / finance / self-improvement topic पर एक voiceover script है।
             Audience: USA-based adults। Language: English।
-
-            ⚠️ CRITICAL VISUAL RULE:
-            हर scenario में केवल एक अकेला आदमी (a single man) होना चाहिए।
-            कोई औरत नहीं। कोई group नहीं। कोई couple नहीं।
-            हर example, हर scenario, हर reference में — ONLY ONE MAN।
-            यह इसलिए ज़रूरी है क्योंकि script के साथ AI-generated images बनेंगी जिनमें सिर्फ वही एक आदमी दिखेगा।
+            Hook: Prefer scenarios featuring a single man — relatable, ordinary, real-feeling.
             ═══════════════════════════════════════
 
             Topic: "${topic}"
@@ -1839,13 +1834,7 @@ export const generateDebateScript = async (
             One speaker. No narrator. No second speaker. No dialogue.
             Psychology / finance / self-improvement topic.
             Audience: USA-based adults. Language: English.
-
-            ⚠️ CRITICAL VISUAL RULE — READ THIS FIRST:
-            Every scenario, every example, every character reference in this script
-            must feature ONLY ONE SINGLE MAN (he / him / his).
-            NO women. NO couples. NO groups. NO "they".
-            This is mandatory because AI images will be generated for each scene
-            — and every image must show the exact same lone man.
+            Hook: Prefer scenarios featuring a single man — ordinary, relatable, real-feeling.
             ═══════════════════════════════════════
 
             Topic: "${topic}"
