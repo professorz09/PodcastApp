@@ -135,8 +135,18 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     setIsGeneratingIntroAudio(true);
     try {
       const firstSpeaker = uniqueSpeakers.find(s => !isNarrator(s)) || uniqueSpeakers[0] || '';
-      const voice = (voices[firstSpeaker]) || 'Zubenelgenubi';
-      const { audioUrl } = await generateSpeech(clipIntro, voice);
+      const voice = voices[firstSpeaker] || 'Zephyr';
+      let audioUrl: string;
+      if (ttsProvider === 'elevenlabs') {
+        const res = await generateElevenLabsSpeech(clipIntro, voice);
+        audioUrl = res.audioUrl;
+      } else if (ttsProvider === 'chirp3hd') {
+        const res = await generateSpeechChirp3HD(clipIntro, voice, transcriptLanguage);
+        audioUrl = res.audioUrl;
+      } else {
+        const res = await generateSpeech(clipIntro, voice);
+        audioUrl = res.audioUrl;
+      }
       setIntroAudioUrlSafe(audioUrl);
     } catch (e: any) {
       toast.error(e.message || 'Intro audio generation failed. Please try again.');
@@ -162,9 +172,10 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
 
   const handleDownloadIntroAudio = () => {
     if (!introAudioUrl) return;
+    const ext = ttsProvider === 'google' ? 'wav' : 'mp3';
     const a = document.createElement('a');
     a.href = introAudioUrl;
-    a.download = 'clip-intro.mp3';
+    a.download = `clip-intro.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
