@@ -237,6 +237,61 @@ async function startServer() {
     }
   });
 
+  // ── Google Cloud Text-to-Speech (Chirp 3 HD) ────────────────────────────
+  app.post('/api/google/text-to-speech', async (req, res) => {
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GOOGLE_CLOUD_API_KEY is missing' });
+    }
+
+    const { text, voiceName, languageCode = 'en-US' } = req.body;
+    if (!text || !voiceName) {
+      return res.status(400).json({ error: 'Missing text or voiceName' });
+    }
+
+    const fullVoiceName = `${languageCode}-Chirp3-HD-${voiceName}`;
+
+    try {
+      const ttsResponse = await fetch(
+        `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input: { text },
+            voice: { languageCode, name: fullVoiceName },
+            audioConfig: { audioEncoding: 'MP3' },
+          }),
+        }
+      );
+
+      const contentType = ttsResponse.headers.get('content-type');
+      let data: any;
+      if (contentType && contentType.includes('application/json')) {
+        data = await ttsResponse.json();
+      } else {
+        const raw = await ttsResponse.text();
+        console.error(`Cloud TTS returned non-JSON (${ttsResponse.status}):`, raw.slice(0, 200));
+        throw new Error(`Cloud TTS non-JSON response: ${raw.slice(0, 100)}`);
+      }
+
+      if (!ttsResponse.ok) {
+        const msg = data.error?.message || 'Cloud TTS error';
+        console.error(`Cloud TTS Error (${ttsResponse.status}):`, msg);
+        throw new Error(msg);
+      }
+
+      if (!data.audioContent) {
+        throw new Error('No audioContent in Cloud TTS response');
+      }
+
+      res.json({ audioContent: data.audioContent });
+    } catch (error: any) {
+      console.error('Google Cloud TTS Error:', error);
+      res.status(500).json({ error: error.message || 'Failed to synthesize speech' });
+    }
+  });
+
   // Flask proxy routes — forward YouTube/video/files API calls to Flask on port 8000
   const FLASK_URL = 'http://localhost:8000';
   const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/health', '/api/instagram', '/api/cookies', '/api/reddit'];
