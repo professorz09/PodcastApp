@@ -35,7 +35,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview'>('gemini-3-flash-preview');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -438,12 +438,13 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive';
+                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
                       if (newStyle === 'context_bridge') { setSpeakerCount(1); }
                       if (newStyle === 'debate') { setSpeakerCount(2); }
+                      if (newStyle === 'debate2') { setSpeakerCount(2); setIncludeNarrator(true); }
                       if (newStyle === 'explained') { setSpeakerCount(2); }
                       if (newStyle === 'explained_solo') { setSpeakerCount(1); }
                       if (newStyle === 'image') { setSpeakerCount(1); }
@@ -455,6 +456,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
                     <option value="debate">Debate</option>
+                    <option value="debate2">⚔️ Debate 2 (Rounds)</option>
                     <option value="situational">Situational</option>
                     <option value="finance_deep_dive">💰 Finance Deep Dive</option>
                     <option value="explained">Explained</option>

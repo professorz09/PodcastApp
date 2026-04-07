@@ -514,7 +514,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1367,6 +1367,89 @@ export const generateDebateScript = async (
                 ${durFillHi}
               `;
             }
+        } else if (style === 'debate2') {
+            const debaterA = speakers.length >= 1 ? speakers[0] : null;
+            const debaterB = speakers.length >= 2 ? speakers[1] : null;
+            const debaterLine = debaterA && debaterB
+              ? `Debater A: ${debaterA} | Debater B: ${debaterB}`
+              : debaterA
+              ? `Debater A: ${debaterA} | Debater B: Topic के opposite side का एक relevant expert/figure — fresh, topic-specific`
+              : `Topic के हिसाब से दो opposing real/fictional personas choose करो — जो उस debate को genuinely represent करें। Generic नाम मत use करो।`;
+            prompt = `
+              तुम्हें "${topic}" पर एक Debate 2 style वीडियो स्क्रिप्ट लिखनी है।
+              ${specificDetails ? `अतिरिक्त संदर्भ: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: हिंदी / Hinglish (punchy, cinematic — जैसे high-stakes YouTube debate video हो)।
+
+              ════════════════════════════════════════════
+              CHARACTERS:
+              ════════════════════════════════════════════
+              - Narrator → HOST का role: intro + rounds announce + outro। Label हमेशा "Narrator" रहेगा।
+              - ${debaterLine}
+
+              ════════════════════════════════════════════
+              STRUCTURE — इसी exact order में:
+              ════════════════════════════════════════════
+
+              【 PART 1 — HOST INTRO (Narrator) 】
+              ─────────────────────────────────────
+              Cinematic, dramatic hook — 4-5 short punchy lines:
+              - पहली line: एक universal tension या paradox जो audience को instantly relate हो
+              - दूसरी line: उस tension को amplify करो — "ek side promises X, dusri side promises Y"
+              - तीसरी line: एक explosive question — "Lekin kya agar ek choice quietly tumhara future barbaad kar rahi hai?"
+              - Debaters introduce करो — naam + unka exact stance एक line में
+              - End: "Aaj [Debater A] vs [Debater B] — [Topic] ka ultimate debate."
+
+              【 PART 2 — ROUND 1: CORE PHILOSOPHY 】
+              ─────────────────────────────────────
+              Narrator: "⚔️ Round 1 — Core Philosophy" jaise ek line announce karo (short, punchy)
+              Debater A: अपनी philosophical core position — 4-6 lines, clear reasoning, one strong analogy
+              Debater B: अपनी opposing philosophy — 4-6 lines, directly counter करो, equally strong
+
+              【 PART 3 — ROUND 2: MONEY & NUMBERS 】
+              ─────────────────────────────────────
+              Narrator: "⚡ Round 2 — [relevant sub-topic]" announce (one punchy line)
+              Debater A: Practical argument — real numbers, examples, logical data-driven angle
+              Debater B: Counter with opposing logic — leverage, long-term perspective, counter-data
+
+              【 PART 4 — ROUND 3: REAL-LIFE SITUATIONS 】
+              ─────────────────────────────────────
+              Narrator: "💥 Round 3 — [relevant sub-topic]" announce (one line)
+              Debater A: Real-world example/scenario जो उनकी side को prove करे — specific, relatable
+              Debater B: Counter with a different real-world angle — long-term या different perspective
+
+              【 PART 5 — ROUND 4: DIRECT CLASH (Short & Sharp) 】
+              ─────────────────────────────────────
+              Narrator: "⚔️ Round 4 — Direct Clash" announce (one line)
+              Debater A: 2-3 lines max — one sharp, punchy statement या counter-punch
+              Debater B: 2-3 lines max — directly respond karo, no long arguments
+
+              【 PART 6 — FINAL STATEMENTS 】
+              ─────────────────────────────────────
+              Narrator: "🧠 Final Statements" announce (one line)
+              Debater A: 3-4 lines — अपनी core position confidently summarize करो। Motivational tone।
+              Debater B: 3-4 lines — equally strong closing। अपनी side का strongest point।
+
+              【 PART 7 — HOST OUTRO (Narrator) 】
+              ─────────────────────────────────────
+              - एक line में दोनों sides का essence capture करो
+              - Audience को polarize करो — "Ek side choose kar lo"
+              - End with a sharp, emotionally charged question जो audience को comment section में engage करे
+
+              ════════════════════════════════════════════
+              RULES:
+              ════════════════════════════════════════════
+              ✓ हर Round का Narrator announcement एक line में sharp — like a boxing match announcer
+              ✓ दोनों debaters genuinely strong — कोई side weaker नहीं लगनी चाहिए
+              ✓ Real examples, analogies, numbers — surface-level assertions नहीं
+              ✓ Host/Narrator tone: cinematic, high-energy, TV presenter जैसा
+              ✓ Debaters tone: confident, passionate, expert — जैसे actually वो लोग बोल रहे हों
+              ✗ BANNED: Generic filler, पहले से सुने conclusion, obvious statements
+              ✗ BANNED: Narrator बहुत ज़्यादा बोले — सिर्फ structure anchoring के लिए
+              ✗ BANNED: कोई side strawman argument दे
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ${durFillHi}
+            `;
         } else if (style === 'joe_rogan') {
           const guest = speakers.length >= 2 ? speakers[1] : (speakers[0] && speakers[0] !== 'Joe Rogan' ? speakers[0] : 'Elon Musk');
           prompt = `
