@@ -3481,8 +3481,8 @@ KEY VISUAL RULES:
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
 
     // ── Step 1: Extract topic-specific visual entities from script ──
-    let leftVisual = 'A large dramatically lit national flag of the primary country mentioned in the script, waving, with bold country name text below it';
-    let rightVisual = 'A large dramatically lit national flag of the secondary country or organization in the script, with bold name text, red atmospheric glow';
+    let leftVisual = 'A dramatic close-up of a world political leader relevant to the script topic, in formal attire, with their country flag behind them, intense red atmospheric lighting';
+    let rightVisual = 'A dramatic close-up of a second world political leader or symbolic figure relevant to the script, with their country flag behind them, dark red vignette';
     let bgAtmosphere = 'Deep crimson red with dramatic vignette and faint downward stock chart lines';
 
     if (scriptSnippet) {
@@ -3492,24 +3492,35 @@ KEY VISUAL RULES:
           contents: [{
             role: 'user',
             parts: [{
-              text: `Read this script/title and extract the 2 most important VISUAL ELEMENTS for a Fox News breaking news thumbnail. IMPORTANT: Do NOT name specific politicians or real people — use FLAGS, SYMBOLS, OBJECTS, and ABSTRACT VISUALS instead.
+              text: `Read this script/title and identify the 2 most prominent political figures or world leaders mentioned. Then write PRECISE PHYSICAL DESCRIPTIONS for each so an image generator can draw the CORRECT person.
 
 SCRIPT:
 ${scriptSnippet}
 
 TITLE: "${title}"
 
-Rules for your visual descriptions:
-- Use country FLAGS with country name, not politician faces
-- Use symbolic objects: crashing stock chart, dollar/rupee symbol with arrow, military jets, nuclear symbol, oil barrels, broken chains, etc.
-- Use institutional buildings: White House exterior, Kremlin, Parliament building, Chinese flag with building
-- Use abstract economy visuals: red downtrend chart, collapsing currency symbol, fire on money, gold bars
+For each person, describe:
+- Their DISTINCTIVE physical features: hair color+style, age, build, skin tone
+- Their TYPICAL clothing: suit color, tie color, uniform, kurta, etc.
+- Their COUNTRY'S FLAG to show behind them
+- Their EXPRESSION matching the script's tone
 
-Reply in JSON only — no explanation:
+Known descriptions to use exactly if matched:
+- Trump → "older US politician, swept-back golden-blonde hair, dark navy suit, red tie, stern aggressive expression, American flag behind him, red dramatic lighting"
+- Biden → "elderly US politician, white hair, blue suit, concerned expression, American flag behind him"  
+- Modi → "Indian leader, white beard and white hair, white kurta or dark suit, serious expression, Indian tricolor flag behind him"
+- Xi Jinping → "Chinese leader, dark formal suit, short black hair, composed serious expression, Chinese red flag with gold stars behind him"
+- Putin → "Russian leader, short grey hair, dark suit, cold stern expression, Russian tricolor flag behind him"
+- Zelensky → "Ukrainian leader, olive military attire, short dark hair, determined expression, Ukrainian blue-yellow flag behind him"
+- Netanyahu → "Israeli politician, grey hair, dark suit, serious expression, Israeli flag with Star of David behind him"
+
+If the person is NOT in the list, describe their well-known physical features precisely.
+
+Reply in JSON only:
 {
-  "left": "Detailed visual description for LEFT side (flag / symbol / object — NO real person faces). E.g.: 'A massive waving American flag with bold USA text, dramatic red spotlight, dark background' OR 'A crashing red stock market chart with large downward arrow and numbers falling, fire effect'",
-  "right": "Detailed visual description for RIGHT side. E.g.: 'A large Chinese red flag with five yellow stars, waving dramatically, bold CHINA text below, dark atmospheric lighting' OR 'Indian Rupee symbol ₹ crashing with red arrows, Indian tricolor flag faded behind it'",
-  "bgMood": "Background atmosphere description, e.g. 'deep crimson red with falling stock numbers' or 'dark geopolitical tension blue-red gradient with explosion glow'"
+  "left": "Full precise visual description for LEFT SIDE person including physical features, clothing, and flag background",
+  "right": "Full precise visual description for RIGHT SIDE person or symbolic element (can be a powerful symbol/chart/flag if only 1 person is in the script)",
+  "bgMood": "One-line background atmosphere description"
 }`
             }]
           }],
