@@ -1153,7 +1153,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       // Compute total duration: actual decoded audio > wordTimings last word > segment durations
       const segMap = buildSegmentTimestamps();
       const totalFromWordTimings = hasWordTimings ? absWords[absWords.length - 1].absEnd : 0;
-      const totalFromSegMap = segMap ? Math.max(...Array.from(segMap.values()).map(v => v.end)) : 0;
+      const totalFromSegMap = segMap ? Math.max(...Array.from(segMap.values()).map(v => (v as { start: number; end: number }).end)) : 0;
       const totalDur =
         (actualTotalRef.current > 0 ? actualTotalRef.current : 0) ||
         totalFromWordTimings ||
