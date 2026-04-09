@@ -847,9 +847,9 @@ export const generateDebateScript = async (
             【 WHAT COULD HAPPEN NEXT — STRUCTURED PREDICTIONS 】
             3 clearly labeled scenarios — each realistic, each distinct:
 
-            Scenario A — [Most Likely]: explain why yeh ho sakta hai, kis direction mein jaayega
-            Scenario B — [Best Case]: optimal outcome, conditions jo chahiye
-            Scenario C — [Worst Case]: agar cheezein galat disha mein gayeen
+            Scenario A, Most Likely: explain why yeh ho sakta hai, kis direction mein jaayega
+            Scenario B, Best Case: optimal outcome, conditions jo chahiye
+            Scenario C, Worst Case: agar cheezein galat disha mein gayeen
 
             Each scenario 2-3 sentences। Grounded in logic, not fear।
 
@@ -870,6 +870,8 @@ export const generateDebateScript = async (
             ✗ BANNED: Emotional manipulation, sensational framing
             ✗ BANNED: Second speaker or dialogue of any kind
             ✗ BANNED: Vague conclusions ("time will tell", "only time will tell")
+            ✗ BANNED: Any brackets in the output — no [ ], no 【 】, no ( ) around labels — plain text only
+            ✗ BANNED: Section headings in the output — just flow naturally from one section to next
             ${durFillHi}
           `;
         } else if (style === 'explained_solo') {
@@ -2009,9 +2011,9 @@ export const generateDebateScript = async (
             【 WHAT COULD HAPPEN NEXT — STRUCTURED PREDICTIONS 】
             Three clearly labeled scenarios:
 
-            Scenario A — [Most Likely]: What will probably happen and why. What indicators point here.
-            Scenario B — [Best Case]: The optimal outcome. What conditions need to hold for this.
-            Scenario C — [Worst Case]: If things go wrong. What triggers this and how bad it gets.
+            Scenario A, Most Likely: What will probably happen and why. What indicators point here.
+            Scenario B, Best Case: The optimal outcome. What conditions need to hold for this.
+            Scenario C, Worst Case: If things go wrong. What triggers this and how bad it gets.
 
             Each scenario: 2-3 sentences. Grounded in logic, evidence, and precedent — not fear.
 
@@ -2035,6 +2037,8 @@ export const generateDebateScript = async (
             ✗ BANNED: Emotional manipulation or sensational framing
             ✗ BANNED: Any second speaker, dialogue, or debate format
             ✗ BANNED: "Only time will tell" or other vague non-conclusions
+            ✗ BANNED: Any brackets in output — no [ ], no 【 】, no ( ) around labels — plain spoken text only
+            ✗ BANNED: Section headings in the output — content must flow naturally without printed headers
             ${durFillEn}
           `;
         } else if (style === 'explained_solo') {
