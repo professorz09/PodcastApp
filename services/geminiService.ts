@@ -514,7 +514,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3-flash-preview',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -798,6 +798,78 @@ export const generateDebateScript = async (
             ✗ BANNED: "In today's video we will..." — start with the hook directly
             ✗ BANNED: Preachy advice, motivational poster lines, hollow positivity
             ✗ BANNED: Multiple speakers or dialogue format
+            ${durFillHi}
+          `;
+        } else if (style === 'professor_jiang') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: PROFESSOR JIANG XUEQIN — CURRENT EVENTS DEEP ANALYSIS
+            Speaker: Professor Jiang Xueqin — एक analytical, measured, globally-informed thinker।
+            अकेला एक speaker। कोई dialogue नहीं, कोई debate नहीं।
+            यह एक structured current-events breakdown है — जैसे एक professor किसी घटना को dissect करे।
+            Language: English। Tone: academic but accessible, direct, never sensational।
+            ═══════════════════════════════════════
+
+            Topic/Event: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineHi}
+            Speaker Name: ${speakers.length > 0 ? speakers[0] : 'Professor Jiang Xueqin'}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE — इसी exact order में:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 OPENING — THE MOMENT 】
+            Topic को seedha ek sharp, factual statement से शुरू करो।
+            Conversational lekin authoritative — जैसे professor class shuru karta hai।
+            Example: "So today, Trump agreed to a ceasefire. But at what cost?"
+            "The Fed held rates again. Let's talk about what that actually means."
+            2-3 sentences max। No filler। No "In today's video..."
+
+            【 WHAT HAPPENED — THE FACTS 】
+            Precisely batao kya hua — verified, specific।
+            Key players, dates, decisions — jo important hain।
+            Neutrally stated। No opinion yet।
+            Bullet-point style thinking lekin flowing prose में।
+
+            【 WHY IT HAPPENED — THE DEEPER CONTEXT 】
+            Ab explain karo kyun yeh hua।
+            Historical context, power dynamics, underlying pressures — jo common audience miss karta hai।
+            Yahan professor ka asli value hai: connection points jo surface-level coverage skip kar deti hai।
+
+            【 WHAT IT ACTUALLY MEANS — THE REAL IMPLICATIONS 】
+            Iska real-world impact kya hai?
+            — Ordinary people pe
+            — Geopolitically / financially / socially
+            — Short-term vs long-term
+            Specific, grounded — no vague "this will have big consequences"
+
+            【 WHAT COULD HAPPEN NEXT — STRUCTURED PREDICTIONS 】
+            3 clearly labeled scenarios — each realistic, each distinct:
+
+            Scenario A — [Most Likely]: explain why yeh ho sakta hai, kis direction mein jaayega
+            Scenario B — [Best Case]: optimal outcome, conditions jo chahiye
+            Scenario C — [Worst Case]: agar cheezein galat disha mein gayeen
+
+            Each scenario 2-3 sentences। Grounded in logic, not fear।
+
+            【 CLOSING LINE 】
+            Ek observation ya question jo listener ke saath rehta ho।
+            Not hopeful, not hopeless — honest।
+            Example: "The question now is not whether a deal was made. It's what was given up to make it."
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Single speaker — Professor Jiang Xueqin's voice only
+            ✓ English — clear, academic but not jargon-heavy
+            ✓ Every claim grounded — no speculation without basis
+            ✓ Structured predictions clearly labeled (A/B/C)
+            ✓ Tone: measured, confident, never alarmist or cheerleader
+            ✗ BANNED: "In today's video..." / "Don't forget to like and subscribe"
+            ✗ BANNED: Emotional manipulation, sensational framing
+            ✗ BANNED: Second speaker or dialogue of any kind
+            ✗ BANNED: Vague conclusions ("time will tell", "only time will tell")
             ${durFillHi}
           `;
         } else if (style === 'explained_solo') {
@@ -1887,6 +1959,82 @@ export const generateDebateScript = async (
             ✗ BANNED: "In today's video..." — start with the hook directly
             ✗ BANNED: Hollow motivational lines, generic life advice, filler phrases
             ✗ BANNED: Multiple speakers or any form of dialogue
+            ${durFillEn}
+          `;
+        } else if (style === 'professor_jiang') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: PROFESSOR JIANG XUEQIN — CURRENT EVENTS DEEP ANALYSIS
+            Speaker: Professor Jiang Xueqin — a globally-informed, analytically rigorous thinker.
+            ONE speaker only. No dialogue. No second voice. No debate format.
+            This is a structured breakdown of a current event — like a professor dissecting what just happened.
+            Language: English. Tone: academic but accessible, measured, never sensational.
+            ═══════════════════════════════════════
+
+            Topic/Event: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Speaker Name: ${speakers.length > 0 ? speakers[0] : 'Professor Jiang Xueqin'}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE — follow this exact order:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 OPENING — THE MOMENT 】
+            Start with a sharp, factual statement that drops the audience directly into the event.
+            Conversational but authoritative — like a professor opening a lecture without preamble.
+            Examples:
+            "So today, Trump agreed to a ceasefire. But at what cost?"
+            "The Fed held rates again. Let's talk about what that actually means."
+            "India just crossed a line. And most people don't realize it yet."
+            2-3 sentences. No filler. Never start with "In today's video..."
+
+            【 WHAT HAPPENED — THE FACTS 】
+            State precisely what occurred — specific, verifiable.
+            Key actors, decisions, dates, numbers — only what's relevant.
+            Neutral framing. No opinion yet. Just the facts arranged clearly.
+
+            【 WHY IT HAPPENED — THE DEEPER CONTEXT 】
+            Now explain why this happened.
+            Historical background, power dynamics, pressure points, prior agreements — the context that surface-level coverage skips.
+            This is where Professor Jiang's value shows: drawing the connections most analysts miss.
+
+            【 WHAT IT ACTUALLY MEANS — THE REAL IMPLICATIONS 】
+            What does this actually mean in practice?
+            — For ordinary people (economically, socially, physically)
+            — Geopolitically or institutionally
+            — Short-term disruption vs long-term shift
+            Be specific. Avoid vague "this will have significant consequences."
+
+            【 WHAT COULD HAPPEN NEXT — STRUCTURED PREDICTIONS 】
+            Three clearly labeled scenarios:
+
+            Scenario A — [Most Likely]: What will probably happen and why. What indicators point here.
+            Scenario B — [Best Case]: The optimal outcome. What conditions need to hold for this.
+            Scenario C — [Worst Case]: If things go wrong. What triggers this and how bad it gets.
+
+            Each scenario: 2-3 sentences. Grounded in logic, evidence, and precedent — not fear.
+
+            【 CLOSING LINE 】
+            One observation or question that stays with the listener.
+            Not hopeful, not hopeless — just honest.
+            Examples:
+            "The question now is not whether a deal was made. It's what was given up to make it."
+            "History doesn't repeat. But it rhymes loudly."
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Single speaker — Professor Jiang Xueqin voice only
+            ✓ English — precise, academic but not jargon-heavy
+            ✓ All claims grounded — no bare speculation
+            ✓ Predictions clearly labeled Scenario A / B / C
+            ✓ Tone: measured, confident, never alarmist or partisan
+            ✓ Use Google Search to verify facts if relevant (dates, names, figures)
+            ✗ BANNED: "In today's video..." / YouTube-style intros
+            ✗ BANNED: Emotional manipulation or sensational framing
+            ✗ BANNED: Any second speaker, dialogue, or debate format
+            ✗ BANNED: "Only time will tell" or other vague non-conclusions
             ${durFillEn}
           `;
         } else if (style === 'explained_solo') {
