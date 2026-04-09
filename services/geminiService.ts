@@ -866,6 +866,7 @@ export const generateDebateScript = async (
             ✓ Every claim grounded — no speculation without basis
             ✓ Structured predictions clearly labeled (A/B/C)
             ✓ Tone: measured, confident, never alarmist or cheerleader
+            ✓ EXPLAIN every term, acronym, institution, or event the first time it is mentioned — weave the explanation naturally into the sentence, like a good professor would. Example: "The IMF — the International Monetary Fund, which acts as a global lender of last resort — stepped in." Or: "Section 301 tariffs, which the US uses to punish unfair trade practices, were invoked." Never assume the audience already knows.
             ✗ BANNED: "In today's video..." / "Don't forget to like and subscribe"
             ✗ BANNED: Emotional manipulation, sensational framing
             ✗ BANNED: Second speaker or dialogue of any kind
@@ -2033,6 +2034,7 @@ export const generateDebateScript = async (
             ✓ Predictions clearly labeled Scenario A / B / C
             ✓ Tone: measured, confident, never alarmist or partisan
             ✓ Use Google Search to verify facts if relevant (dates, names, figures)
+            ✓ EXPLAIN every term, acronym, institution, or event the first time it appears — fold the explanation naturally into the sentence. Example: "The Fed — the US Federal Reserve, which controls interest rates — held rates steady." Or: "Article 370, which had given Jammu and Kashmir special autonomous status within India, was revoked." Never assume the listener already knows the term. Treat it like a smart friend explaining, not a textbook footnote.
             ✗ BANNED: "In today's video..." / YouTube-style intros
             ✗ BANNED: Emotional manipulation or sensational framing
             ✗ BANNED: Any second speaker, dialogue, or debate format
