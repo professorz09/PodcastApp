@@ -173,6 +173,16 @@ const App: React.FC = () => {
         );
         setScript(generatedScript);
       }
+      // Clear stale thumbnail titles/combos whenever a new script is generated
+      setThumbnailState(prev => ({
+        ...prev,
+        titles: [],
+        selectedTitle: '',
+        thumbnailTexts: [],
+        selectedThumbnailText: '',
+        comboPairs: [],
+        scriptSignature: undefined,
+      }));
 
       setScriptStyle(config.style);
       setAppState(AppState.SCRIPT);

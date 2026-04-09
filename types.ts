@@ -121,6 +121,7 @@ export interface ThumbnailState {
   thumbnailUrl: string | null;
   referenceImage: { data: string, mimeType: string, url: string } | null;
   videoStyle?: 'situational' | 'debate' | 'podcast';
+  scriptSignature?: string;
 }
 
 export interface StoryboardScene {

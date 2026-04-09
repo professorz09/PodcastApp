@@ -69,6 +69,30 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const hasEitherSource = hasScript || hasTranscript;
   const isStyleCopyMode = !!referenceImage;
 
+  const computeScriptSignature = (segs: typeof script) =>
+    segs.map(s => s.text).join('').substring(0, 400);
+
+  // On mount: detect script change and clear stale generated content
+  useEffect(() => {
+    if (!hasScript) return;
+    const currentSig = computeScriptSignature(script);
+    const storedSig = thumbnailState.scriptSignature;
+    if (storedSig && storedSig !== currentSig) {
+      onUpdateThumbnailState({
+        ...thumbnailStateRef.current,
+        titles: [],
+        selectedTitle: '',
+        thumbnailTexts: [],
+        selectedThumbnailText: '',
+        comboPairs: [],
+        scriptSignature: currentSig,
+      });
+    } else if (!storedSig) {
+      onUpdateThumbnailState({ ...thumbnailStateRef.current, scriptSignature: currentSig });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Only initialize speaker names on mount — NO auto-generate
   useEffect(() => {
     const speakers = Array.from(new Set<string>(script.map(s => s.speaker))).filter(s => s !== 'Narrator');
@@ -107,6 +131,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       onUpdateThumbnailState({
         ...thumbnailStateRef.current,
         titles: generatedTitles,
+        scriptSignature: computeScriptSignature(script),
       });
     } catch (e: any) {
       setGenerateError(e?.message || 'Title generation failed. Please try again.');
@@ -125,6 +150,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       onUpdateThumbnailState({
         ...thumbnailStateRef.current,
         thumbnailTexts: generatedTexts,
+        scriptSignature: computeScriptSignature(script),
       });
     } catch (e: any) {
       setGenerateError(e?.message || 'Thumbnail text generation failed. Please try again.');
@@ -190,7 +216,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       if (result.length === 0) {
         setPairError('Koi pair nahi aaya — dobara try karo.');
       } else {
-        onUpdateThumbnailState({ ...thumbnailStateRef.current, comboPairs: result });
+        onUpdateThumbnailState({ ...thumbnailStateRef.current, comboPairs: result, scriptSignature: computeScriptSignature(script) });
       }
     } catch (err: any) {
       setPairError(err?.message || 'Generation fail hui. Dobara try karo.');
