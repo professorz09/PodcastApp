@@ -3586,6 +3586,65 @@ ${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic ima
 - 16:9 aspect ratio, 1920×1080
 - High contrast, sharp edges, no blur${extraNote}`;
 
+  } else if (videoStyle === 'situational') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    prompt = `You are a world-class YouTube thumbnail designer specializing in personal story and emotional content.
+
+YOUR TASK:
+Create a powerful single-person YouTube thumbnail for the story/situation below. No reference image provided — design from scratch.
+
+CRITICAL — ANALYZE THE SCRIPT AND DETERMINE THE PERSON TYPE:
+Read the script carefully and identify WHO the main person is. Choose from:
+- Young man (22-30, modern casual clothes, city person)
+- Middle-class man (30-45, plain shirt or simple suit, ordinary look)
+- Wealthy/rich man (40-55, expensive suit, watch, polished look)
+- Young woman (22-32, modern professional or casual)
+- Middle-aged woman (35-50, everyday practical look)
+- Elderly man or woman (60+, aged face, life-worn look)
+- Working class / simple person (any age, plain worn clothes)
+Pick the type that EXACTLY matches who this story is about.
+
+HOOK TEXT: "${title}"
+${scriptSnippet ? `SCRIPT / TOPIC CONTENT:\n${scriptSnippet}` : ''}
+
+LAYOUT (follow strictly):
+- ONE person only — positioned on the RIGHT side of the frame, looking slightly left (toward the text), natural pose
+- Hook text on the LEFT side — bold, large, prominent, 2-3 lines max, high contrast color (yellow/white on dark background)
+- Background: dark, dramatic, moody — deep charcoal, dark teal, or deep maroon. NOT white.
+- Expression: matches the emotional weight — stressed, reflective, shocked, or determined based on the topic
+- A studio microphone visible near the person (subtle, not dominant)
+- NO second person. ONE compelling face that tells the whole story.
+
+STYLE RULES:
+- High contrast, cinematic quality, sharply focused
+- Photorealistic, NOT illustrated or cartoon
+- 16:9 aspect ratio, 1920×1080 quality
+- Bold, clean sans-serif typography for the hook text${extraNote}`;
+
+  } else if (videoStyle === 'debate') {
+    prompt = `You are a world-class YouTube thumbnail designer specializing in debate and confrontational content.
+
+YOUR TASK:
+Create a high-impact YouTube debate thumbnail — two people on opposite sides, tense confrontation energy.
+
+HOOK TEXT: "${title}"
+${hostName ? `LEFT PERSON: ${hostName}` : 'LEFT PERSON: Generate a realistic confident male debater'}
+${guestName ? `RIGHT PERSON: ${guestName}` : 'RIGHT PERSON: Generate a realistic confident male debater'}
+
+LAYOUT (follow strictly):
+1. LEFT SIDE: ${hostName || 'Person A'} — large face close-up, pointing aggressively or looking serious. Expression: confident, challenging.
+2. RIGHT SIDE: ${guestName || 'Person B'} — large face close-up, matching energy. Expression: defensive or equally confident.
+3. CENTER: Bold hook text "${title}" — large, split across two lines, in high-contrast color (red/yellow/white). Can have a thin divider line between the two faces.
+4. BACKGROUND: Dark gradient, deep blue or charcoal, with dramatic lighting hitting both faces.
+5. Optional: A subtle VS graphic or divider between the two people.
+
+STYLE RULES:
+- High contrast, cinematic quality, tense energy
+- Both faces must look photorealistic and different from each other
+- Text must be LARGE and clearly readable
+- NOT illustrated or cartoon
+- 16:9 aspect ratio, 1920×1080 quality${extraNote}`;
+
   } else {
     prompt = `
     Create a high-quality, professional YouTube podcast thumbnail in the style of the Joe Rogan Experience.
