@@ -417,15 +417,15 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                           <p className="text-xs text-gray-400 leading-snug">{pair.title}</p>
                           <p className={`text-base font-black tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>{pair.thumbnailText}</p>
                           {pair.description && (
-                            <p className="text-[10px] text-gray-600 leading-snug line-clamp-2">{pair.description}</p>
+                            <div className={`rounded-lg px-2.5 py-2 mt-1 ${isSelected ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/4 border border-white/8'}`}>
+                              <p className={`text-[10px] leading-relaxed ${isSelected ? 'text-yellow-200/80' : 'text-gray-400'}`}>{pair.description}</p>
+                            </div>
                           )}
-                          {isSelected ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-semibold">
-                              <Check size={9} /> Selected — description auto-filled below
+                          {isSelected && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-semibold mt-0.5">
+                              <Check size={9} /> Selected — prompt auto-filled
                             </span>
-                          ) : pair.description ? (
-                            <span className="text-[10px] text-gray-600">Click → description auto-fill hogi</span>
-                          ) : null}
+                          )}
                         </div>
                       );
                     })}
@@ -607,87 +607,89 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 </div>
               )}
 
-              {/* ── STEP 4: Style ── */}
+              {/* ── STEP 4: Style + Extra Instructions ── */}
               <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
                 <div>
-                  <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 4 — Style</p>
+                  <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 4 — Prompt & Style</p>
                   <p className="text-xs text-gray-600 mt-0.5">
                     {isStyleCopyMode
                       ? 'Style Copy Mode — reference image ki style copy hogi, topic nayi hogi'
-                      : 'Apni thumbnail ki reference image upload karo (optional)'}
+                      : 'Combo select karo → prompt auto-fill hoga. Ya khud likhо / edit karo.'}
                   </p>
                 </div>
 
-                {/* Reference image area */}
-                {!referenceImage ? (
-                  <div
-                    className="w-full border-2 border-dashed border-white/10 rounded-xl p-5 flex flex-col items-center justify-center text-gray-500 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all cursor-pointer gap-2"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload size={20} />
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-gray-400">Style copy ke liye upload karo</p>
-                      <p className="text-xs text-gray-600 mt-0.5">JPEG · PNG · WEBP — optional</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {/* Preview */}
-                    <div className="relative w-full h-28 rounded-xl overflow-hidden border border-orange-500/30 group">
-                      <img src={referenceImage.url} alt="Reference" className="w-full h-full object-cover" />
-                      <div className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Copy size={9} /> Style Copy Mode
-                      </div>
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button
-                          onClick={handleRemoveImage}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
-                        >
-                          <X size={12} /> Remove
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Info note */}
-                    <div className="flex items-start gap-2 bg-orange-500/8 border border-orange-500/20 rounded-lg px-3 py-2">
-                      <Info size={12} className="text-orange-400 shrink-0 mt-0.5" />
-                      <p className="text-xs text-orange-300/80">
-                        Only the <strong>visual style</strong> will be copied (color, layout, font style). Topic and faces will stay new.
-                      </p>
-                    </div>
-
-                    {/* Extra instructions */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
-                          Extra Instructions <span className="text-gray-700">(optional)</span>
-                        </label>
-                        <button
-                          onClick={handleInspire}
-                          disabled={isGeneratingInspiration}
-                          className="flex items-center gap-1.5 text-[11px] font-semibold text-orange-400 hover:text-orange-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-orange-500/10"
-                          title="Script padh ke AI khud suggest karega"
-                        >
-                          {isGeneratingInspiration ? (
-                            <><Loader2 size={11} className="animate-spin" /> Thinking...</>
-                          ) : (
-                            <><Wand2 size={11} /> Inspire from Script</>
-                          )}
-                        </button>
-                      </div>
-                      <textarea
-                        value={extraInstructions}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, extraInstructions: e.target.value })}
-                        placeholder="e.g. Dark background, red text, dramatic expression, bold layout..."
-                        rows={3}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500 transition-colors placeholder-gray-600 resize-none"
-                      />
-                      {inspirationError && (
-                        <p className="text-xs text-red-400 mt-1">{inspirationError}</p>
+                {/* Extra instructions — always visible */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
+                      Thumbnail Prompt <span className="text-gray-700">(combo se auto-fill ya khud likho)</span>
+                    </label>
+                    <button
+                      onClick={handleInspire}
+                      disabled={isGeneratingInspiration}
+                      className="flex items-center gap-1.5 text-[11px] font-semibold text-orange-400 hover:text-orange-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors px-2 py-1 rounded-lg hover:bg-orange-500/10"
+                      title="Script padh ke AI khud suggest karega"
+                    >
+                      {isGeneratingInspiration ? (
+                        <><Loader2 size={11} className="animate-spin" /> Thinking...</>
+                      ) : (
+                        <><Wand2 size={11} /> Inspire from Script</>
                       )}
-                    </div>
+                    </button>
                   </div>
-                )}
+                  <textarea
+                    value={extraInstructions}
+                    onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, extraInstructions: e.target.value })}
+                    placeholder="Combo select karo → yahan auto-fill hoga. Ya khud likho: e.g. Dark background, red text, stressed person on right..."
+                    rows={4}
+                    className={`w-full bg-white/5 border rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none transition-colors placeholder-gray-600 resize-none ${
+                      extraInstructions ? 'border-orange-500/40 focus:border-orange-500' : 'border-white/10 focus:border-orange-500/50'
+                    }`}
+                  />
+                  {inspirationError && (
+                    <p className="text-xs text-red-400 mt-1">{inspirationError}</p>
+                  )}
+                </div>
+
+                {/* Reference image area */}
+                <div className="space-y-2">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Style Copy (optional)</p>
+                  {!referenceImage ? (
+                    <div
+                      className="w-full border-2 border-dashed border-white/8 rounded-xl p-4 flex items-center justify-center text-gray-600 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all cursor-pointer gap-3"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload size={16} />
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">Reference thumbnail upload karo</p>
+                        <p className="text-[10px] text-gray-700 mt-0.5">JPEG · PNG · WEBP — optional</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-orange-500/30 group">
+                        <img src={referenceImage.url} alt="Reference" className="w-full h-full object-cover" />
+                        <div className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Copy size={9} /> Style Copy Mode
+                        </div>
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            onClick={handleRemoveImage}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+                          >
+                            <X size={12} /> Remove
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2 bg-orange-500/8 border border-orange-500/20 rounded-lg px-3 py-2">
+                        <Info size={12} className="text-orange-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-orange-300/80">
+                          Only the <strong>visual style</strong> will be copied (color, layout, font style). Topic and faces will stay new.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <input
                   type="file"
