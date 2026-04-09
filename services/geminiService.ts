@@ -3272,6 +3272,8 @@ export const generateThumbnail = async (title: string, hostName: string, guestNa
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
+  let professorImagePart: any = null;
+
   const extraNote = extraInstructions?.trim()
     ? `\n\nCREATOR EXTRA INSTRUCTIONS (apply these on top):\n${extraInstructions.trim()}`
     : '';
@@ -3406,18 +3408,31 @@ KEY VISUAL RULES:
 
   } else if (videoStyle === 'professor_jiang') {
     const scriptSnippet = scriptText?.slice(0, 1500) || '';
+    // Load professor's reference photo
+    try {
+      const resp = await fetch('/professor_jiang.png');
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const b64 = await blobToBase64(blob);
+        professorImagePart = { inlineData: { data: b64.split(',')[1], mimeType: 'image/png' } };
+      }
+    } catch (_) {}
+
     prompt = `You are a world-class YouTube thumbnail designer specializing in breaking news and current events analysis content — Fox News Alert / CNN Breaking style.
+
+${professorImagePart ? `REFERENCE PERSON — CRITICAL:
+I have provided a reference photo of the HOST/ANALYST. You MUST use this exact person's face, features, hairstyle, skin tone, and glasses in the thumbnail. Do NOT change their appearance. Keep them photorealistic and recognizable as the same person shown in the reference image.` : ''}
 
 YOUR TASK:
 Create a dramatic, photorealistic YouTube thumbnail for a breaking news analysis video.
 
 TOPIC / HOOK TEXT: "${title}"
 ${scriptSnippet ? `SCRIPT CONTEXT (use to pick the right political figures, flags, countries):\n${scriptSnippet}` : ''}
-${hostName ? `ANALYST / HOST: ${hostName} — show this person in the center` : 'ANALYST: A photorealistic concerned-looking male analyst in his 30s-40s, wearing a casual shirt, centered in frame'}
+HOST / ANALYST: ${professorImagePart ? 'Use the person from the reference photo — Asian male, middle-aged, salt-and-pepper hair, rectangular glasses, light blue casual shirt. This is the exact person who must appear centered.' : hostName ? hostName : 'A photorealistic concerned-looking male analyst in his 30s-40s, wearing a casual shirt, centered in frame'}
 
 LAYOUT — Follow this EXACTLY (modeled on viral Fox News / breaking news thumbnails):
 
-1. CENTER (main focal point): The host/analyst. Positioned dead center, face clearly visible, hands pressed together near chin in a "thinking" or "concerned" prayer gesture. Expression: deeply concerned, thoughtful, slightly worried. Photorealistic. Clean casual clothing.
+1. CENTER (main focal point): The host/analyst from the reference photo. Positioned dead center, face clearly visible, expression: deeply concerned, thoughtful, slightly worried — hands pressed together near chin. Photorealistic, faithful to reference photo.
 
 2. LEFT SIDE (40% of frame): A highly recognizable political figure or leader relevant to the script topic (e.g. Trump, Biden, Xi Jinping, Putin, Modi — whoever fits the content). Placed to the left of the host, slightly larger than life, dramatic close-up. Behind them: their country's flag as background with a dramatic red glow/vignette effect.
 
@@ -3433,7 +3448,7 @@ LAYOUT — Follow this EXACTLY (modeled on viral Fox News / breaking news thumbn
 STYLE RULES:
 - Photorealistic, cinematic, ultra-high quality — NOT illustrated or cartoon
 - The red banner with yellow text is the MOST IMPORTANT ELEMENT — make it bold, clean, perfectly readable
-- Political figures must look photorealistic and recognizable by pose/silhouette (don't copy exact likenesses — make them look type-accurate)
+- Political figures must look photorealistic and recognizable by pose/silhouette
 - Dramatic lighting with red/orange color cast across entire image
 - 16:9 aspect ratio, 1920×1080 quality
 - High contrast, sharp details, no blur${extraNote}`;
@@ -3457,6 +3472,10 @@ STYLE RULES:
 
   try {
     const parts: any[] = [];
+    // For professor_jiang style, prepend the reference photo so Gemini uses that face
+    if (professorImagePart) {
+      parts.push(professorImagePart);
+    }
     parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
