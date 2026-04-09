@@ -289,6 +289,16 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     });
   };
 
+  const [scriptCopied, setScriptCopied] = useState(false);
+  const handleCopyScript = () => {
+    const text = script.map(seg => `${seg.speaker}: ${seg.text}`).join('\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setScriptCopied(true);
+      toast.success('Script copied!');
+      setTimeout(() => setScriptCopied(false), 2500);
+    });
+  };
+
   const getSpeakerColorClass = (speaker: string) => {
       if (isNarrator(speaker)) return 'bg-zinc-800 text-zinc-300';
       const index = uniqueSpeakers.indexOf(speaker);
@@ -344,6 +354,15 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
           >
             {isTranslating ? <Loader2 size={13} className="animate-spin" /> : <Languages size={13} />}
             <span className="hidden sm:inline">{translateView ? 'Original' : 'Hindi'}</span>
+          </button>
+
+          <button
+            onClick={handleCopyScript}
+            className="h-8 px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border bg-white/5 text-zinc-400 border-white/5 hover:text-zinc-200 hover:bg-white/8"
+            title="Copy full script"
+          >
+            {scriptCopied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+            <span className="hidden sm:inline">{scriptCopied ? 'Copied!' : 'Copy'}</span>
           </button>
 
           <button
