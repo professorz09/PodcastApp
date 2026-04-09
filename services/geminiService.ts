@@ -4172,7 +4172,7 @@ Each scene covers one or more consecutive script segments. Every segment must be
 For each scene prompt:
 - Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
 - Include the character's action, expression, and setting
-- Style: thick impasto oil painting, vibrant colors, heavy expressive brushstrokes, painterly background — like Erin Hanson style
+- Style: simple flat 2D illustration, story-book art, consistent character design, white or simple background
 - Keep prompts clear and visual — no abstract concepts, show what is literally happening
 
 Respond ONLY with valid JSON in this exact format:
@@ -4235,7 +4235,7 @@ Identify the main character(s) from the voiceover text. Create a SHORT visual de
 Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
 - Show what the character is DOING or EXPERIENCING during those spoken words
-- Style: thick impasto oil painting, vibrant bold colors, heavy expressive brushstrokes, painterly background — like Erin Hanson style
+- Style: simple flat 2D illustration, story-book art, consistent character design
 - Be literal and visual — no abstract concepts
 
 Respond ONLY with valid JSON:
@@ -4311,6 +4311,7 @@ export const generateSpeechChirp3HD = async (
 export const generateStoryboardImage = async (
   prompt: string,
   characterGuide?: string,
+  aspectRatio: '16:9' | '3:4' | '1:1' | '9:16' = '16:9',
 ): Promise<string> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
@@ -4320,24 +4321,24 @@ export const generateStoryboardImage = async (
     : '';
 
   const fullPrompt = `
-Generate a richly textured oil painting that directly visualizes the following scene.
+Generate a simple illustration in the style of MS Paint that directly visualizes the following scene from a story.
 ${characterSection}
 Scene: "${prompt}"
 
 Requirements:
-1. Style: Thick impasto oil painting — heavy, expressive brushstrokes with visible paint texture, like Erin Hanson or Van Gogh. Bold, vibrant colors (oranges, blues, purples, pinks, teals). Rich painterly surface — no flat or digital look whatsoever.
-2. Character Consistency: Paint the character(s) exactly as described in the CHARACTER CONSISTENCY section. Same face, clothes, and hair in every image.
-3. Background: Painterly and colorful — thick strokes, impressionist feel, vivid hues.
-4. Show WHAT IS HAPPENING in the scene — action, expression, environment.
+1. Style: MS Paint style — simple drawings, basic bold colors, flat shading, unpolished, naive art style. Like a hand-drawn story illustration.
+2. Character Consistency: Draw the character(s) exactly as described in the CHARACTER CONSISTENCY section. Same face, same clothes, same hair in every image.
+3. White or very simple background.
+4. Show WHAT IS HAPPENING in the scene — action, expression, setting.
 5. No text written inside the image.
-6. Portrait orientation, 3:4 aspect ratio.
+6. Aspect Ratio: ${aspectRatio}.
 `;
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: { parts: [{ text: fullPrompt }] },
     config: {
-      imageConfig: { aspectRatio: '3:4' },
+      imageConfig: { aspectRatio },
     },
   });
 

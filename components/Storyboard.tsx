@@ -613,7 +613,7 @@ const PromptModal: React.FC<{
           <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-white/8 text-gray-500"><X size={15} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-          <div className="w-full bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/6 relative" style={{ aspectRatio: '3/4' }}>
+          <div className="aspect-video bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/6 relative">
             {scene.imageUrl ? <img src={scene.imageUrl} alt="" className="w-full h-full object-cover" />
               : scene.isGenerating ? <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={24} className="animate-spin text-purple-500" /></div>
               : scene.error ? <div className="absolute inset-0 flex flex-col items-center justify-center gap-1"><AlertCircle size={20} className="text-red-400" /><span className="text-xs text-red-400">{scene.error}</span></div>
@@ -729,7 +729,7 @@ const TimelineRow: React.FC<{
     >
       {/* Thumbnail */}
       <button onClick={e => { e.stopPropagation(); onOpenPrompt(); }}
-        className="relative w-[30px] h-[40px] shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/6 hover:border-purple-500/50 transition-all group">
+        className="relative w-[72px] h-[40px] shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/6 hover:border-purple-500/50 transition-all group">
         {scene.imageUrl
           ? <><img src={scene.imageUrl} alt="" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><RefreshCw size={11} className="text-white" /></div></>
           : scene.isGenerating
@@ -772,6 +772,8 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingAllProgress, setGeneratingAllProgress] = useState(0);
   const abortRef = useRef(false);
+
+  const [imageAspectRatio, setImageAspectRatio] = useState<'16:9' | '3:4' | '1:1' | '9:16'>('16:9');
 
   const [subtitle, setSubtitle] = useState<SubtitleConfig>(DEFAULT_SUBTITLE);
   const [playTime, setPlayTime] = useState(0);
@@ -1238,7 +1240,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     if (!scene) return;
     setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: true, error: undefined } : sc));
     try {
-      const url = await generateStoryboardImage(scene.prompt, characterGuide);
+      const url = await generateStoryboardImage(scene.prompt, characterGuide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: e.message || 'Failed' } : sc));
@@ -1536,6 +1538,18 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                         </button>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-500 mb-2">Image Ratio</label>
+                  <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
+                    {(['16:9', '9:16', '3:4', '1:1'] as const).map(r => (
+                      <button key={r} onClick={() => setImageAspectRatio(r)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${imageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                        {r}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
