@@ -347,45 +347,99 @@ export const generateTitleTextPair = async (scriptText: string, videoStyle: Thum
 
   const styleGuide = videoStyle === 'situational'
     ? `STYLE — Situational / Personal Story:
-- Title: Full YouTube title. Specific story hook, emotionally charged. 55-70 chars. E.g. "Maine Apni Naukri, Biwi Aur Ghar 6 Mahine Mein Kho Diya"
-- Thumbnail text: 2-5 word BOLD CAPS hook on thumbnail. Must COMPLEMENT the title (not repeat it). E.g. if title says "lost everything" → thumbnail says "IT COLLAPSED" or "NO WAY BACK"
-- The pair should together tell a bigger story than either alone.`
+TITLE RULES:
+- Tell a SPECIFIC personal story hook. Use real numbers/timeframes/emotions. 55-70 chars.
+- MUST feel like the person is confessing something shocking or deeply personal.
+- BAD: "Meri Life Mein Bahut Kuch Hua" (too vague)
+- GOOD: "Maine 3 Saal Baad Pata Chala — Meri Company Mujhe Barbad Kar Rahi Thi"
+- GOOD: "Ek Raat Mein Rs 40 Lakh Gaye — Ye Galti Mat Karna"
+
+THUMBNAIL TEXT RULES:
+- 2-4 words. ALL CAPS. The EMOTIONAL PUNCH that the title builds toward.
+- Must ADD a new dimension, never repeat title words.
+- BAD: "LIFE KHARAB HUI" (repeats title idea)
+- GOOD (for "lost money" title) → "NO ESCAPE" / "SACH CHUPA THA" / "TAB PATA CHALA"
+- Together they hint at a story bigger than either alone.`
+
     : videoStyle === 'debate'
     ? `STYLE — Debate / Two Sides:
-- Title: Clear two-sides framing. Who's right, who's wrong, big clash. 55-70 chars.
-- Thumbnail text: 2-5 word confrontational CAPS question or claim. Complements title — adds heat.
-- E.g. Title: "Is Hustle Culture Destroying Your Life?" → Thumbnail: "STOP GRINDING"`
+TITLE RULES:
+- Name the TWO SPECIFIC sides clearly. Real names, real stakes, real tension. 55-70 chars.
+- MUST create a "who's right?" tension the viewer wants resolved.
+- BAD: "Kya Hustle Culture Sahi Hai?" (no stakes, too safe)
+- GOOD: "Sandeep Maheshwari vs Vivek Bindra — Kaun Sach Bol Raha Hai?"
+- GOOD: "Delhi vs Mumbai: Kaun Zyada Paisa Banata Hai Aur Kyun?"
+
+THUMBNAIL TEXT RULES:
+- 2-4 words. CONFRONTATIONAL CAPS. Name one side's verdict or the clash itself.
+- BAD: "BIG FIGHT" (generic)
+- GOOD: "BINDRA EXPOSED" / "DELHI JEET GAYI" / "DONO GALAT HAIN"`
+
     : videoStyle === 'explained'
     ? `STYLE — Explained / Indian YouTube:
-- Title: Direct, conversational Hindi/Hinglish. NAMES the exact topic/book/person. Inviting tone. 55-75 chars.
-  E.g. "48 Laws of Power — Robert Greene Ki Wo Book Jo Duniya Badal De", "Aaj Hum Baat Karenge 48 Laws of Power Ki"
-- Thumbnail text: 2-4 word CAPS text that names or strongly hints at the topic. Complements title — adds visual punch.
-  E.g. Title: "Aaj Hum Baat Karenge 48 Laws of Power Ki" → Thumbnail: "48 LAWS" or "POWER KA RAAZ"`
-    : videoStyle === 'professor_jiang'
-    ? `STYLE — Breaking News / Current Events Analysis:
-- Title: Urgent, analytical, names the specific event/leader/country. 55-70 chars. Like a news editorial headline.
-  E.g. "The REAL Reason Trump Paused Tariffs — China's Secret Move Explained", "What the Fed's Rate Hold Means For Your Money In 2025"
-- Thumbnail text: 2-4 word ALL CAPS news chyron. Something that would appear on a red Fox News Alert banner. Punchy, declarative, topic-specific.
-  E.g. Title: "Why China's Economy Is Crashing Faster Than Anyone Expected" → Thumbnail: "CHINA FALLS" or "SYSTEM FAILING"
-- Together they should feel like a massive breaking story.`
-    : `STYLE — Podcast / High Energy:
-- Title: Shocking revelation or curiosity bait. Drop a bombshell. 55-65 chars.
-- Thumbnail text: 2-5 word explosive CAPS hook. Amplifies what the title hints at.
-- E.g. Title: "He Walked Away From a $10M Deal — Here's Why" → Thumbnail: "WALKED AWAY"`;
+TITLE RULES:
+- NAME the exact topic, book, person, country, or concept directly. No vague hooks. 55-75 chars.
+- Conversational — like a friend saying "aaj main tumhe bataunga…"
+- BAD: "Ek Aisi Kitaab Jo Sab Kuch Badal De" (no name)
+- GOOD: "48 Laws of Power — Robert Greene Ki Wo Kitaab Jo Duniya Ko Samjhati Hai"
+- GOOD: "Israel-Hamas War Ka Sachcha Sach — Jo Media Nahi Batata"
 
-  const prompt = `You are a viral YouTube content strategist. Read the script and generate 3 paired combos — each combo has a (Title + Thumbnail Text) that COMPLEMENT each other perfectly.
+THUMBNAIL TEXT RULES:
+- 2-4 words CAPS. NAME the core concept or drop the most shocking fact.
+- BAD: "MUST WATCH" (says nothing)
+- GOOD: "48 LAWS" / "WAR KA SACH" / "ASLI WAJAH" / "HIDDEN TRUTH"`
+
+    : videoStyle === 'professor_jiang'
+    ? `STYLE — Breaking News / Current Events Analysis (Fox News Alert style):
+TITLE RULES:
+- NAME the specific country/leader/event/organization. Sound like a breaking news headline. 55-70 chars.
+- MUST include: WHO did WHAT and WHY it matters — like a news editor wrote it.
+- BAD: "Duniya Mein Kuch Bada Hone Wala Hai" (zero information)
+- BAD: "Trump Ne Kuch Kiya" (too vague)
+- GOOD: "Trump Ne China Pe 145% Tariff Lagaya — Ab India Ko Kya Hoga?"
+- GOOD: "Fed Ne Rate Nahi Ghataya — Dollar Crash Kyun Nahi Hua Abhi Tak?"
+- GOOD: "Russia-Ukraine Deal — Putin Ki Asli Sharat Kya Hai?"
+
+THUMBNAIL TEXT RULES:
+- 2-4 words ALL CAPS. Must be a news chyron — direct, declarative, topic-SPECIFIC.
+- Names the OUTCOME or KEY ACTOR from the script.
+- BAD: "SYSTEM FAILING" (too generic — for what system?)
+- BAD: "BIG NEWS" (useless)
+- GOOD (for Trump tariff script) → "CHINA TRAPPED" / "INDIA SAFE?" / "145% TARIFF"
+- GOOD (for Russia-Ukraine) → "PUTIN'S DEAL" / "WAR ENDS?" / "UKRAINE WINS"
+- Together = feels like a breaking story viewers CANNOT ignore.`
+
+    : `STYLE — Podcast / High Energy:
+TITLE RULES:
+- Drop a specific bombshell or reveal. Name names. Use real numbers. 55-65 chars.
+- MUST make viewer feel: "I need to know what happened here"
+- BAD: "Ek Aadmi Ki Kahani Jo Bahut Rich Ban Gaya"
+- GOOD: "Rs 2 Crore Ki Naukri Chodke — Ye Banda Gaon Wapas Kyun Gaya?"
+- GOOD: "Parag Agrawal Ne Twitter Join Kiya Tha $5M Ke Liye — Ye Sach Nahi Jaante Tum"
+
+THUMBNAIL TEXT RULES:
+- 2-4 words explosive CAPS. Amplifies the title's most shocking element.
+- BAD: "CRAZY STORY" (no info)
+- GOOD: "₹2CR CHOD DI" / "PARAG EXPOSED" / "REAL REASON"`;
+
+  const prompt = `You are India's top viral YouTube content strategist — you've helped channels like NDTV, ABP, Dhruv Rathee, and Ranveer Allahbadia crack 10M+ views with title+thumbnail combos.
+
+YOUR TASK: Read the script carefully. Extract the MOST SHOCKING, SPECIFIC, INTERESTING element. Then write 3 killer combos.
 
 ${styleGuide}
 
-RULES:
-- Title: Full YouTube video title. Specific, emotional, clear. Under 70 chars.
-- Thumbnail text: 2-5 words MAX. ALL CAPS for power words. NO repetition from the title — it should ADD to it, not echo it.
-- Together they should create more curiosity than either alone.
-- Match script language: Hindi-heavy script → Hinglish okay. English script → English.
-- Return ONLY valid JSON: array of 3 objects with keys "title" and "thumbnailText". No markdown.
+━━━ GLOBAL RULES (apply to ALL styles) ━━━
+1. SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real: a person, a country, a number, an event, a year.
+2. Each of the 3 combos must approach the SAME topic from a DIFFERENT ANGLE:
+   - Combo 1: Lead with the SHOCKING OUTCOME / consequence
+   - Combo 2: Lead with the MYSTERY / hidden reason ("Asli Wajah", "Real Reason", "Jo Koi Nahi Batata")  
+   - Combo 3: Lead with the PERSONAL STAKES for the viewer ("Tumhare Liye Kya Matlab?", "What This Means For You")
+3. Thumbnail text MUST complement the title — NEVER echo the same words.
+4. Language: Match the script's language naturally (Hindi script → Hinglish/Hindi titles, English script → English titles).
+5. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "..."}, ...]
 
-SCRIPT:
-${scriptText.slice(0, 3000)}`;
+SCRIPT TO ANALYZE:
+${scriptText.slice(0, 3500)}`;
 
   try {
     const response = await ai.models.generateContent({
