@@ -3481,9 +3481,9 @@ KEY VISUAL RULES:
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
 
     // ── Step 1: Extract topic-specific visual entities from script ──
-    let leftFigure = 'a relevant world political leader (matching the script topic)';
-    let rightFigure = 'a second relevant political figure or symbolic visual (matching the script topic)';
-    let bgAtmosphere = 'Deep crimson red with dramatic vignette';
+    let leftVisual = 'A large dramatically lit national flag of the primary country mentioned in the script, waving, with bold country name text below it';
+    let rightVisual = 'A large dramatically lit national flag of the secondary country or organization in the script, with bold name text, red atmospheric glow';
+    let bgAtmosphere = 'Deep crimson red with dramatic vignette and faint downward stock chart lines';
 
     if (scriptSnippet) {
       try {
@@ -3492,29 +3492,40 @@ KEY VISUAL RULES:
           contents: [{
             role: 'user',
             parts: [{
-              text: `Read this script and extract EXACTLY the 2 most prominent people, countries, or organizations visually described or mentioned. These will be placed on LEFT and RIGHT sides of a Fox News-style thumbnail.
+              text: `Read this script/title and extract the 2 most important VISUAL ELEMENTS for a Fox News breaking news thumbnail. IMPORTANT: Do NOT name specific politicians or real people — use FLAGS, SYMBOLS, OBJECTS, and ABSTRACT VISUALS instead.
 
 SCRIPT:
 ${scriptSnippet}
 
 TITLE: "${title}"
 
+Rules for your visual descriptions:
+- Use country FLAGS with country name, not politician faces
+- Use symbolic objects: crashing stock chart, dollar/rupee symbol with arrow, military jets, nuclear symbol, oil barrels, broken chains, etc.
+- Use institutional buildings: White House exterior, Kremlin, Parliament building, Chinese flag with building
+- Use abstract economy visuals: red downtrend chart, collapsing currency symbol, fire on money, gold bars
+
 Reply in JSON only — no explanation:
 {
-  "left": "SPECIFIC person/country/symbol to show on LEFT (e.g. 'Donald Trump in a suit pointing finger', 'Xi Jinping in military uniform', 'Indian PM Modi with folded hands', 'A crashing stock market red chart', 'The US Federal Reserve building')",
-  "right": "SPECIFIC person/country/symbol to show on RIGHT",
-  "bgMood": "one short atmospheric description matching the topic (e.g. 'deep red war atmosphere', 'dark financial crisis with falling numbers', 'blue-tinted geopolitical tension')"
+  "left": "Detailed visual description for LEFT side (flag / symbol / object — NO real person faces). E.g.: 'A massive waving American flag with bold USA text, dramatic red spotlight, dark background' OR 'A crashing red stock market chart with large downward arrow and numbers falling, fire effect'",
+  "right": "Detailed visual description for RIGHT side. E.g.: 'A large Chinese red flag with five yellow stars, waving dramatically, bold CHINA text below, dark atmospheric lighting' OR 'Indian Rupee symbol ₹ crashing with red arrows, Indian tricolor flag faded behind it'",
+  "bgMood": "Background atmosphere description, e.g. 'deep crimson red with falling stock numbers' or 'dark geopolitical tension blue-red gradient with explosion glow'"
 }`
             }]
           }],
           config: { responseMimeType: 'application/json' },
         });
         const entityRaw = entityResponse.text?.trim() || '{}';
+        console.log('[Prof.Jiang] Entity extraction raw:', entityRaw);
         const entities = JSON.parse(entityRaw);
-        if (entities.left) leftFigure = entities.left;
-        if (entities.right) rightFigure = entities.right;
+        if (entities.left) leftVisual = entities.left;
+        if (entities.right) rightVisual = entities.right;
         if (entities.bgMood) bgAtmosphere = entities.bgMood;
-      } catch (_) {}
+        console.log('[Prof.Jiang] Left:', leftVisual);
+        console.log('[Prof.Jiang] Right:', rightVisual);
+      } catch (e) {
+        console.warn('[Prof.Jiang] Entity extraction failed, using fallback:', e);
+      }
     }
 
     // ── Step 2: Load professor's reference photo ──
@@ -3540,13 +3551,13 @@ HOST / ANALYST: ${professorImagePart ? 'Asian male, middle-aged, salt-and-pepper
 ▶ CENTER (focal point):
 The host/analyst ${professorImagePart ? 'from the reference photo' : ''}. Dead center. Face fully visible. Expression: deeply concerned, worried, hands pressed near chin in prayer gesture. Photorealistic.
 
-▶ LEFT SIDE — MANDATORY SPECIFIC FIGURE:
-"${leftFigure}"
-Dramatic close-up, slightly larger than life. Behind them: their country's flag or relevant symbol with intense red glow and vignette.
+▶ LEFT SIDE — TOPIC-SPECIFIC VISUAL (40% of frame):
+${leftVisual}
+Large, dramatic, fills the left side. Intense red/orange atmospheric glow. Dark vignette at edges. This visual MUST match the script topic.
 
-▶ RIGHT SIDE — MANDATORY SPECIFIC FIGURE:
-"${rightFigure}"
-Same dramatic close-up treatment. Red atmospheric lighting.
+▶ RIGHT SIDE — TOPIC-SPECIFIC VISUAL (40% of frame):
+${rightVisual}
+Large, dramatic, fills the right side. Same intense red atmospheric treatment. This visual MUST match the script topic.
 
 ▶ BOTTOM BANNER — MOST CRITICAL ELEMENT:
 Wide bold RED horizontal banner — full width, bottom 20% of image.
@@ -3558,12 +3569,13 @@ Wide bold RED horizontal banner — full width, bottom 20% of image.
 ${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic imagery in background. Urgent, tense.
 
 ════ STRICT RULES ════
-- DO NOT use generic or random people — use ONLY the specific figures named above for left and right
-- The left and right figures MUST visually match the topic: "${title}"
-- Red banner + yellow text = most important — bold, clean, readable
-- Photorealistic, cinematic — NOT illustrated or cartoon
+- LEFT and RIGHT visuals MUST be EXACTLY as described above — flags, symbols, charts, buildings — NOT random generic people
+- These side visuals must visually represent the TOPIC: "${title}" — a viewer should instantly recognize which countries/forces are involved
+- Red banner + yellow/gold text = most important element — bold, clean, highly readable
+- CENTER person must look exactly like the reference photo (if provided)
+- Photorealistic, cinematic quality — NOT illustrated or cartoon
 - 16:9 aspect ratio, 1920×1080
-- High contrast, sharp, no blur${extraNote}`;
+- High contrast, sharp edges, no blur${extraNote}`;
 
   } else {
     prompt = `
