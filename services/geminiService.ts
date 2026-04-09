@@ -399,15 +399,23 @@ TITLE RULES:
 - GOOD: "Trump Ne China Pe 145% Tariff Lagaya — Ab India Ko Kya Hoga?"
 - GOOD: "Fed Ne Rate Nahi Ghataya — Dollar Crash Kyun Nahi Hua Abhi Tak?"
 - GOOD: "Russia-Ukraine Deal — Putin Ki Asli Sharat Kya Hai?"
+- GOOD: "China Ne Ghutne Tek Diye — America Ki Jeet Ya Trap?"
 
 THUMBNAIL TEXT RULES:
-- 2-4 words ALL CAPS. Must be a news chyron — direct, declarative, topic-SPECIFIC.
-- Names the OUTCOME or KEY ACTOR from the script.
-- BAD: "SYSTEM FAILING" (too generic — for what system?)
-- BAD: "BIG NEWS" (useless)
-- GOOD (for Trump tariff script) → "CHINA TRAPPED" / "INDIA SAFE?" / "145% TARIFF"
-- GOOD (for Russia-Ukraine) → "PUTIN'S DEAL" / "WAR ENDS?" / "UKRAINE WINS"
-- Together = feels like a breaking story viewers CANNOT ignore.`
+- 2-4 words ALL CAPS. Must be a FOX NEWS ALERT chyron — shocking, declarative, punchy.
+- Pick the MOST EXPLOSIVE outcome word from the script. Make the viewer feel dread or urgency.
+- BAD: "BIG NEWS" / "SYSTEM FAILING" / "BREAKING" (too generic — meaningless)
+- STRONG FORMULA WORDS TO USE (pick whichever fits the script):
+  Defeat/Surrender: "CHINA TRAPPED" / "US SURRENDERED" / "INDIA CORNERED" / "[COUNTRY] FALLS"
+  Currency/Economy: "DOLLAR THE END" / "RUPEE CRASHES" / "MARKET COLLAPSED" / "FED FAILED"
+  War/Geopolitics: "WAR BEGINS" / "DEAL BROKEN" / "LAST CHANCE" / "POINT OF NO RETURN"
+  Power shift: "CHINA WINS" / "AMERICA LOSES" / "INDIA RISES" / "EMPIRE ENDS"
+  Urgency: "LAST CHANCE" / "TOO LATE NOW" / "IT'S OVER" / "NO WAY BACK"
+- The thumbnail text must NAME something from the actual script — not a generic phrase.
+- GOOD (tariff war script) → "CHINA TRAPPED" / "145% TARIFF" / "DOLLAR THE END"
+- GOOD (Russia-Ukraine) → "PUTIN'S DEAL" / "LAST CHANCE" / "US SURRENDERED"
+- GOOD (India economy) → "RUPEE CRASHES" / "INDIA CORNERED" / "FED FAILED"
+- Together = feels like a BREAKING STORY viewers CANNOT ignore.`
 
     : `STYLE — Podcast / High Energy:
 TITLE RULES:
