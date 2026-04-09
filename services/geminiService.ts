@@ -3339,7 +3339,7 @@ Return ONLY a structured list — no commentary, no explanation. Be extremely sp
   return text.trim();
 };
 
-export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'generating') => void, videoStyle?: string, scriptText?: string): Promise<string> => {
+export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'analyzing' | 'generating') => void, videoStyle?: string, scriptText?: string): Promise<string> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
@@ -3486,6 +3486,7 @@ KEY VISUAL RULES:
     let bgAtmosphere = 'Deep crimson red with dramatic vignette and faint downward stock chart lines';
 
     if (scriptSnippet) {
+      onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
@@ -3599,6 +3600,11 @@ ${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic ima
     
     The final image should look exactly like a professional podcast thumbnail from a top-tier show.${extraNote}
     `;
+  }
+
+  // Signal image generation is starting (for non-referenceImage flows)
+  if (!referenceImage) {
+    onStep?.('generating');
   }
 
   try {

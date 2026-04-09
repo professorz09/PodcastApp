@@ -40,7 +40,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   } = thumbnailState;
 
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState<'inspecting' | 'generating' | null>(null);
+  const [loadingStep, setLoadingStep] = useState<'inspecting' | 'analyzing' | 'generating' | null>(null);
   const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
   const [isGeneratingThumbnailText, setIsGeneratingThumbnailText] = useState(false);
   const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
@@ -159,7 +159,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     const textForThumbnail = selectedThumbnailText || selectedTitle;
     if (!textForThumbnail) return;
     setIsLoading(true);
-    setLoadingStep(referenceImage ? 'inspecting' : 'generating');
+    setLoadingStep(referenceImage ? 'inspecting' : videoStyle === 'professor_jiang' ? 'analyzing' : 'generating');
     try {
       const refImgData = referenceImage
         ? { data: referenceImage.data, mimeType: referenceImage.mimeType }
@@ -753,20 +753,26 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 {isLoading && (
                   <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 z-10">
                     <Loader2 className="animate-spin text-purple-400" size={40} />
-                    <div className="text-center">
+                    <div className="text-center space-y-1">
                       {loadingStep === 'inspecting' ? (
                         <>
-                          <p className="text-white font-semibold text-sm">Step 1: Inspecting reference image...</p>
-                          <p className="text-gray-400 text-xs mt-1">Style extract ho rahi hai</p>
+                          <p className="text-yellow-300 text-[10px] font-bold uppercase tracking-widest">Step 1 of 2</p>
+                          <p className="text-white font-semibold text-sm">Reference image inspect ho rahi hai...</p>
+                          <p className="text-gray-400 text-xs">Style extract ho raha hai</p>
+                        </>
+                      ) : loadingStep === 'analyzing' ? (
+                        <>
+                          <p className="text-yellow-300 text-[10px] font-bold uppercase tracking-widest">Step 1 of 2</p>
+                          <p className="text-white font-semibold text-sm">Script analyze ho rahi hai...</p>
+                          <p className="text-gray-400 text-xs">Topic se visuals identify ho rahe hain</p>
                         </>
                       ) : (
                         <>
-                          <p className="text-white font-semibold text-sm">
-                            {isStyleCopyMode ? 'Step 2: Generating thumbnail...' : 'Generating thumbnail...'}
+                          <p className="text-green-400 text-[10px] font-bold uppercase tracking-widest">
+                            {isStyleCopyMode || videoStyle === 'professor_jiang' ? 'Step 2 of 2' : 'Generating'}
                           </p>
-                          <p className="text-gray-400 text-xs mt-1">
-                            {isStyleCopyMode ? 'Style apply ho rahi hai' : '15-30 seconds lag sakte hain'}
-                          </p>
+                          <p className="text-white font-semibold text-sm">Thumbnail generate ho rahi hai...</p>
+                          <p className="text-gray-400 text-xs">15–30 seconds lag sakte hain</p>
                         </>
                       )}
                     </div>
