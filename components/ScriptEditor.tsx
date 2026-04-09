@@ -50,6 +50,9 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
   const [isAnalyzingContextTimeline, setIsAnalyzingContextTimeline] = useState(false);
   const [contextTimelineCopied, setContextTimelineCopied] = useState(false);
 
+  // Split Script State
+  const [splitScriptDone, setSplitScriptDone] = useState(false);
+
   if (!script || script.length === 0) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-center p-8 bg-[#0a0a0a]">
@@ -99,6 +102,62 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
 
   const handleDelete = (id: string) => {
     setSegmentToDelete(id);
+  };
+
+  const handleSplitScript = () => {
+    const MAX_CHARS = 2000;
+    const sentenceEndRx = /[.!?।]+(?:\s|$)/g;
+    const splitText = (text: string): string[] => {
+      const sentences: string[] = [];
+      let lastIdx = 0;
+      let m: RegExpExecArray | null;
+      while ((m = sentenceEndRx.exec(text)) !== null) {
+        const s = text.slice(lastIdx, m.index + m[0].length).trim();
+        if (s) sentences.push(s);
+        lastIdx = m.index + m[0].length;
+        sentenceEndRx.lastIndex = lastIdx;
+      }
+      if (lastIdx < text.length) {
+        const tail = text.slice(lastIdx).trim();
+        if (tail) sentences.push(tail);
+      }
+      const chunks: string[] = [];
+      let current = '';
+      for (const sentence of sentences) {
+        if (current.length + sentence.length + 1 > MAX_CHARS && current.length > 0) {
+          chunks.push(current.trim());
+          current = sentence;
+        } else {
+          current = current ? current + ' ' + sentence : sentence;
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+      return chunks.length > 0 ? chunks : [text];
+    };
+
+    const newScript: DebateSegment[] = [];
+    let changed = false;
+    script.forEach(seg => {
+      if (seg.text.length > MAX_CHARS) {
+        const parts = splitText(seg.text);
+        if (parts.length > 1) {
+          changed = true;
+          parts.forEach((part, i) => {
+            newScript.push({ ...seg, id: `${seg.id}_split_${i}_${Date.now()}`, text: part, audioUrl: undefined, phraseTimings: undefined, duration: undefined });
+          });
+          return;
+        }
+      }
+      newScript.push(seg);
+    });
+
+    if (!changed) {
+      toast.error('Script already split — no segment exceeds 3 min length.');
+      return;
+    }
+    onUpdateScript(newScript);
+    setSplitScriptDone(true);
+    toast.success(`Script split into ${newScript.length} segments.`);
   };
 
   const toggleInlineRewrite = (id: string) => {
@@ -858,6 +917,20 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
           </div>
           )}
 
+
+        {/* ── Split Script Button ── */}
+        {uniqueSpeakers.length === 1 && script.some(s => s.text.length > 2000) && (
+          <div className="px-4 pb-4 pt-2">
+            <button
+              onClick={handleSplitScript}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-teal-600/10 hover:bg-teal-600/20 border border-teal-500/20 text-teal-300 text-sm font-semibold transition-all group"
+            >
+              <Scissors size={15} className="text-teal-400 group-hover:scale-110 transition-transform" />
+              {splitScriptDone ? 'Split Again (under 3 min each)' : 'Split Script — 3 min parts'}
+            </button>
+            <p className="text-[10px] text-zinc-600 text-center mt-1.5">Sentence boundary pe split hoga — koi bhi audio 3 min se lamba nahi hoga</p>
+          </div>
+        )}
 
         </div>
       </div>
