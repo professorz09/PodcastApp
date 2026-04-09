@@ -403,18 +403,16 @@ TITLE RULES:
 
 THUMBNAIL TEXT RULES:
 - 2-4 words ALL CAPS. Must be a FOX NEWS ALERT chyron — shocking, declarative, punchy.
-- Pick the MOST EXPLOSIVE outcome word from the script. Make the viewer feel dread or urgency.
-- BAD: "BIG NEWS" / "SYSTEM FAILING" / "BREAKING" (too generic — meaningless)
-- STRONG FORMULA WORDS TO USE (pick whichever fits the script):
-  Defeat/Surrender: "CHINA TRAPPED" / "US SURRENDERED" / "INDIA CORNERED" / "[COUNTRY] FALLS"
-  Currency/Economy: "DOLLAR THE END" / "RUPEE CRASHES" / "MARKET COLLAPSED" / "FED FAILED"
-  War/Geopolitics: "WAR BEGINS" / "DEAL BROKEN" / "LAST CHANCE" / "POINT OF NO RETURN"
-  Power shift: "CHINA WINS" / "AMERICA LOSES" / "INDIA RISES" / "EMPIRE ENDS"
-  Urgency: "LAST CHANCE" / "TOO LATE NOW" / "IT'S OVER" / "NO WAY BACK"
-- The thumbnail text must NAME something from the actual script — not a generic phrase.
-- GOOD (tariff war script) → "CHINA TRAPPED" / "145% TARIFF" / "DOLLAR THE END"
-- GOOD (Russia-Ukraine) → "PUTIN'S DEAL" / "LAST CHANCE" / "US SURRENDERED"
-- GOOD (India economy) → "RUPEE CRASHES" / "INDIA CORNERED" / "FED FAILED"
+- Pick the MOST EXPLOSIVE outcome/actor/fact FROM THIS SPECIFIC SCRIPT. Make the viewer feel dread or urgency.
+- BAD: "BIG NEWS" / "BREAKING" / any phrase that could apply to ANY topic (too generic)
+- The text MUST be invented fresh from the script — do NOT copy or reuse example phrases below. Examples are only to show the TONE and STRUCTURE, not the words.
+- TONE CATEGORIES (use as inspiration for structure only — create your own words from the script):
+  Defeat/Surrender tone: "[ACTOR] TRAPPED" / "[COUNTRY] SURRENDERED" / "[PARTY] CORNERED"
+  Economy/Currency tone: "[CURRENCY] CRASHES" / "[INSTITUTION] FAILED" / "[MARKET] COLLAPSED"  
+  War/Deal tone: "[DEAL NAME] BROKEN" / "LAST [X]" / "NO RETURN"
+  Power-shift tone: "[WINNER] WINS" / "[LOSER] FALLS" / "[COUNTRY] RISES"
+  Urgency tone: "TOO LATE" / "IT ENDS" / "POINT CROSSED"
+- Each combo must generate a DIFFERENT thumbnail text — never repeat the same phrase across the 3 combos.
 - Together = feels like a BREAKING STORY viewers CANNOT ignore.`
 
     : `STYLE — Podcast / High Energy:
@@ -437,14 +435,16 @@ YOUR TASK: Read the script carefully. Extract the MOST SHOCKING, SPECIFIC, INTER
 ${styleGuide}
 
 ━━━ GLOBAL RULES (apply to ALL styles) ━━━
-1. SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real: a person, a country, a number, an event, a year.
+1. SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real from the script: a person, a country, a number, an event, a year.
 2. Each of the 3 combos must approach the SAME topic from a DIFFERENT ANGLE:
    - Combo 1: Lead with the SHOCKING OUTCOME / consequence
    - Combo 2: Lead with the MYSTERY / hidden reason ("Asli Wajah", "Real Reason", "Jo Koi Nahi Batata")  
    - Combo 3: Lead with the PERSONAL STAKES for the viewer ("Tumhare Liye Kya Matlab?", "What This Means For You")
 3. Thumbnail text MUST complement the title — NEVER echo the same words.
-4. Language: Match the script's language naturally (Hindi script → Hinglish/Hindi titles, English script → English titles).
-5. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "..."}, ...]
+4. DO NOT copy or reuse example phrases verbatim — all examples in the style guide above are only to show FORMAT and TONE. Your output must be freshly written from the actual script content.
+5. Each of the 3 thumbnail texts must be DIFFERENT from each other — vary the words, angle, and emotional hook.
+6. Language: Match the script's language naturally (Hindi script → Hinglish/Hindi titles, English script → English titles).
+7. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "..."}, ...]
 
 SCRIPT TO ANALYZE:
 ${scriptText.slice(0, 3500)}`;
