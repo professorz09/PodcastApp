@@ -85,7 +85,11 @@ export const saveState = async (
       return { ...seg, audioBlob, audioUrl: undefined };
     }));
 
-    await set(STORE_KEY, { appState, script: scriptToStore, thumbnailState, youtubeData: youtubeData ?? null });
+    const thumbnailStateToStore = thumbnailState
+      ? { ...thumbnailState, referenceImage: null, thumbnailUrl: undefined }
+      : thumbnailState;
+
+    await set(STORE_KEY, { appState, script: scriptToStore, thumbnailState: thumbnailStateToStore, youtubeData: youtubeData ?? null });
   } catch (error) {
     console.error("Failed to save state to IndexedDB", error);
   }

@@ -284,7 +284,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Content Style</p>
                   <p className="text-xs text-gray-600 mt-0.5">Title aur thumbnail text ka tone is pe depend karta hai</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {styleOptions.map(opt => (
                     <button
                       key={opt.value}
@@ -295,6 +295,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                             ? 'bg-rose-600/20 border-rose-500/60 text-white'
                             : opt.color === 'amber'
                             ? 'bg-amber-600/20 border-amber-500/60 text-white'
+                            : opt.color === 'emerald'
+                            ? 'bg-emerald-600/20 border-emerald-500/60 text-white'
                             : 'bg-purple-600/20 border-purple-500/60 text-white'
                           : 'bg-white/3 border-white/8 text-gray-400 hover:bg-white/6 hover:border-white/15'
                       }`}
