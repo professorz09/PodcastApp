@@ -8,7 +8,7 @@ import { mergeAudioUrls } from '../services/audioUtils';
 import {
   Play, Check, ChevronLeft, Wand2, User, Mic2, MessageSquare,
   RefreshCw, Download, AlertCircle, FileText, Globe, Zap, FileAudio, ArrowRight,
-  Copy, Loader2, X
+  Copy, Loader2, X, Scissors
 } from 'lucide-react';
 
 interface AudioGeneratorProps {
@@ -468,6 +468,79 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     setGlobalGenerating(false);
   };
 
+  // ── Split Generate ──
+  type SplitChunk = { text: string; audioUrl?: string; status: 'idle' | 'loading' | 'success' | 'error' };
+  const [splitChunks, setSplitChunks] = useState<SplitChunk[]>([]);
+  const [isSplitGenerating, setIsSplitGenerating] = useState(false);
+
+  const isSingleSpeaker = React.useMemo(
+    () => uniqueSpeakers.filter(s => !isNarrator(s)).length === 1,
+    [uniqueSpeakers]
+  );
+
+  const splitTextIntoChunks = (text: string, maxChars = 2000): string[] => {
+    const sentenceEndRx = /[.!?।]+(?:\s|$)/g;
+    const sentences: string[] = [];
+    let lastIdx = 0;
+    let m: RegExpExecArray | null;
+    while ((m = sentenceEndRx.exec(text)) !== null) {
+      const s = text.slice(lastIdx, m.index + m[0].length).trim();
+      if (s) sentences.push(s);
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastIdx < text.length) {
+      const tail = text.slice(lastIdx).trim();
+      if (tail) sentences.push(tail);
+    }
+    const chunks: string[] = [];
+    let current = '';
+    for (const sentence of sentences) {
+      if (current.length + sentence.length + 1 > maxChars && current.length > 0) {
+        chunks.push(current.trim());
+        current = sentence;
+      } else {
+        current = current ? current + ' ' + sentence : sentence;
+      }
+    }
+    if (current.trim()) chunks.push(current.trim());
+    return chunks;
+  };
+
+  const handleSplitGenerate = async () => {
+    if (isSplitGenerating) return;
+    const speaker = uniqueSpeakers.find(s => !isNarrator(s)) || uniqueSpeakers[0];
+    const voice = voices[speaker];
+    if (!voice) { toast.error('Please select a voice first.'); return; }
+    const fullText = script.map(s => s.text).join(' ');
+    const chunks = splitTextIntoChunks(fullText, 2000);
+    if (chunks.length === 0) { toast.error('No text to generate.'); return; }
+    setSplitChunks(chunks.map(text => ({ text, status: 'idle' })));
+    setIsSplitGenerating(true);
+    const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+    for (let i = 0; i < chunks.length; i++) {
+      setSplitChunks(prev => prev.map((c, idx) => idx === i ? { ...c, status: 'loading' } : c));
+      try {
+        let audioUrl: string;
+        if (ttsProvider === 'elevenlabs') {
+          const res = await generateElevenLabsSpeech(chunks[i], voice);
+          audioUrl = res.audioUrl;
+        } else if (ttsProvider === 'chirp3hd') {
+          const res = await generateSpeechChirp3HD(chunks[i], voice, transcriptLanguage);
+          audioUrl = res.audioUrl;
+        } else {
+          const res = await generateSpeech(chunks[i], voice);
+          audioUrl = res.audioUrl;
+        }
+        setSplitChunks(prev => prev.map((c, idx) => idx === i ? { ...c, audioUrl, status: 'success' } : c));
+      } catch (e: any) {
+        setSplitChunks(prev => prev.map((c, idx) => idx === i ? { ...c, status: 'error' } : c));
+        toast.error(`Part ${i + 1} failed: ${e.message}`);
+      }
+      if (i < chunks.length - 1) await delay(1500);
+    }
+    setIsSplitGenerating(false);
+  };
+
   const [playingSegment, setPlayingSegment] = useState<string | null>(null);
   const [syncingSegments, setSyncingSegments] = useState<Record<string, boolean>>({});
   const [expandedSegments, setExpandedSegments] = useState<Record<string, boolean>>({});
@@ -738,9 +811,14 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         <div className="w-px h-6 bg-white/10 shrink-0" />
         <div className="text-[11px] font-bold text-white whitespace-nowrap">{audioReadyCount}/{script.length} done</div>
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          <button onClick={handleGenerateAll} disabled={globalGenerating} className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-[11px] font-bold px-3 py-2 rounded-xl transition-all active:scale-95">
+          <button onClick={handleGenerateAll} disabled={globalGenerating || isSplitGenerating} className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-[11px] font-bold px-3 py-2 rounded-xl transition-all active:scale-95">
             <Wand2 size={13} className={globalGenerating ? 'animate-spin' : ''} /> {globalGenerating ? 'Generating' : allAudioGenerated ? 'Regen All' : 'Gen All'}
           </button>
+          {isSingleSpeaker && (
+            <button onClick={handleSplitGenerate} disabled={isSplitGenerating || globalGenerating} title="Split generate — under 3 min parts" className="flex items-center gap-1 bg-teal-600/20 border border-teal-500/30 text-teal-300 text-[11px] font-bold px-2.5 py-2 rounded-xl transition-all active:scale-95 disabled:opacity-50">
+              {isSplitGenerating ? <Loader2 size={13} className="animate-spin" /> : <Scissors size={13} />}
+            </button>
+          )}
           <button onClick={onNext} disabled={!allAudioGenerated} className={`flex items-center gap-1 text-[11px] font-bold px-3 py-2 rounded-xl transition-all active:scale-95 ${allAudioGenerated ? 'bg-white text-black hover:bg-gray-200' : 'bg-white/8 text-gray-600 cursor-not-allowed'}`}>
             Next <ArrowRight size={12} />
           </button>
@@ -825,12 +903,25 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
           {/* Generate All */}
           <button
             onClick={handleGenerateAll}
-            disabled={globalGenerating}
+            disabled={globalGenerating || isSplitGenerating}
             className="w-full flex flex-col items-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[10px] font-bold py-2.5 rounded-xl transition-all shadow-lg shadow-purple-900/30"
           >
             <Wand2 size={14} className={globalGenerating ? 'animate-spin' : ''} />
             {globalGenerating ? 'Generating' : allAudioGenerated ? 'Regen All' : 'Gen All'}
           </button>
+
+          {/* Split Generate — single speaker only */}
+          {isSingleSpeaker && (
+            <button
+              onClick={handleSplitGenerate}
+              disabled={isSplitGenerating || globalGenerating}
+              title="Generate as separate audio parts, each under 3 minutes"
+              className="w-full flex flex-col items-center gap-1 bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-teal-300 text-[9px] font-bold py-2 rounded-xl transition-all"
+            >
+              {isSplitGenerating ? <Loader2 size={12} className="animate-spin" /> : <Scissors size={12} />}
+              {isSplitGenerating ? 'Splitting…' : 'Split Gen'}
+            </button>
+          )}
 
           {/* Sync All */}
           <button
@@ -901,6 +992,37 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                     style={{ width: `${progress}%` }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* ── Split Chunks Display ── */}
+            {splitChunks.length > 0 && (
+              <div className="bg-teal-950/20 border border-teal-500/20 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Scissors size={13} className="text-teal-400" />
+                    <span className="text-xs font-bold text-teal-300">Split Parts</span>
+                    <span className="text-[10px] text-teal-600">{splitChunks.filter(c => c.status === 'success').length}/{splitChunks.length} ready</span>
+                  </div>
+                  <button onClick={() => setSplitChunks([])} className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors">
+                    <X size={12} />
+                  </button>
+                </div>
+                {splitChunks.map((chunk, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-black/30 rounded-xl px-3 py-2">
+                    <span className="text-[10px] font-bold text-teal-500 w-12 shrink-0">Part {i + 1}</span>
+                    <span className="text-[10px] text-gray-500 flex-1 truncate">{chunk.text.slice(0, 60)}…</span>
+                    {chunk.status === 'loading' && <Loader2 size={12} className="text-teal-400 animate-spin shrink-0" />}
+                    {chunk.status === 'success' && chunk.audioUrl && (
+                      <a href={chunk.audioUrl} download={`part_${i + 1}.${ttsProvider === 'google' ? 'wav' : 'mp3'}`}
+                        className="flex items-center gap-1 text-[10px] font-semibold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 px-2 py-1 rounded-lg transition-all shrink-0">
+                        <Download size={10} /> Download
+                      </a>
+                    )}
+                    {chunk.status === 'error' && <span className="text-[10px] text-red-400 shrink-0">Failed</span>}
+                    {chunk.status === 'idle' && <span className="text-[10px] text-gray-600 shrink-0">Pending</span>}
+                  </div>
+                ))}
               </div>
             )}
 
