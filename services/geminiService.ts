@@ -140,7 +140,7 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-flash-lite-preview',
       contents: prompt,
       config: {
         temperature: 1.2,
@@ -324,7 +324,7 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-flash-lite-preview',
       contents: prompt,
       config: {
         temperature: 1.2,
@@ -460,7 +460,7 @@ ${scriptText.slice(0, 3500)}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-flash-lite-preview',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { responseMimeType: 'application/json', temperature: 1.2 },
     });
@@ -642,7 +642,7 @@ export const generateDebateScript = async (
   includeNarrator: boolean,
   customScript?: string,
   contextFileContent?: string,
-  model: string = 'gemini-3-flash-preview',
+  model: string = 'gemini-3.1-flash-lite-preview',
   language: string = 'English',
   style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' = 'debate',
   speakerCount: number = 2,
@@ -3489,7 +3489,7 @@ KEY VISUAL RULES:
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-3.1-flash-lite-preview',
           contents: [{
             role: 'user',
             parts: [{
@@ -4383,7 +4383,7 @@ export interface StoryboardScenesResult {
 export const generateStoryboardScenes = async (
   segments: { speaker: string; text: string; duration?: number; startTime?: number; endTime?: number }[],
   sceneCount: number,
-  model: string = 'gemini-3-flash-preview',
+  model: string = 'gemini-3.1-flash-lite-preview',
 ): Promise<StoryboardScenesResult> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
@@ -4467,7 +4467,7 @@ Do not add any explanation outside the JSON.
 // AI only generates image prompts (no segmentIndices decision needed)
 export const generateStoryboardScenesTimeBased = async (
   slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
-  model: string = 'gemini-3-flash-preview',
+  model: string = 'gemini-3.1-flash-lite-preview',
 ): Promise<{ prompts: string[]; characterGuide: string }> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
