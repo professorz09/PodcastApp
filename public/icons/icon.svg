@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#111111"/>
+  <rect x="60" y="60" width="392" height="392" rx="60" fill="#1a1a2e"/>
+  <!-- Film frame corners -->
+  <rect x="80" y="80" width="48" height="48" rx="8" fill="#8b5cf6"/>
+  <rect x="384" y="80" width="48" height="48" rx="8" fill="#8b5cf6"/>
+  <rect x="80" y="384" width="48" height="48" rx="8" fill="#8b5cf6"/>
+  <rect x="384" y="384" width="48" height="48" rx="8" fill="#8b5cf6"/>
+  <!-- Play triangle -->
+  <polygon points="196,180 196,332 356,256" fill="#8b5cf6" opacity="0.9"/>
+  <!-- Sparkle top-right -->
+  <circle cx="380" cy="148" r="10" fill="#c4b5fd"/>
+  <line x1="380" y1="128" x2="380" y2="112" stroke="#c4b5fd" stroke-width="5" stroke-linecap="round"/>
+  <line x1="380" y1="168" x2="380" y2="184" stroke="#c4b5fd" stroke-width="5" stroke-linecap="round"/>
+  <line x1="360" y1="148" x2="344" y2="148" stroke="#c4b5fd" stroke-width="5" stroke-linecap="round"/>
+  <line x1="400" y1="148" x2="416" y2="148" stroke="#c4b5fd" stroke-width="5" stroke-linecap="round"/>
+</svg>
