@@ -3407,8 +3407,46 @@ KEY VISUAL RULES:
 - Photorealistic — NOT illustrated or cartoon${extraNote}`;
 
   } else if (videoStyle === 'professor_jiang') {
-    const scriptSnippet = scriptText?.slice(0, 1500) || '';
-    // Load professor's reference photo
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+
+    // ── Step 1: Extract topic-specific visual entities from script ──
+    let leftFigure = 'a relevant world political leader (matching the script topic)';
+    let rightFigure = 'a second relevant political figure or symbolic visual (matching the script topic)';
+    let bgAtmosphere = 'Deep crimson red with dramatic vignette';
+
+    if (scriptSnippet) {
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `Read this script and extract EXACTLY the 2 most prominent people, countries, or organizations visually described or mentioned. These will be placed on LEFT and RIGHT sides of a Fox News-style thumbnail.
+
+SCRIPT:
+${scriptSnippet}
+
+TITLE: "${title}"
+
+Reply in JSON only — no explanation:
+{
+  "left": "SPECIFIC person/country/symbol to show on LEFT (e.g. 'Donald Trump in a suit pointing finger', 'Xi Jinping in military uniform', 'Indian PM Modi with folded hands', 'A crashing stock market red chart', 'The US Federal Reserve building')",
+  "right": "SPECIFIC person/country/symbol to show on RIGHT",
+  "bgMood": "one short atmospheric description matching the topic (e.g. 'deep red war atmosphere', 'dark financial crisis with falling numbers', 'blue-tinted geopolitical tension')"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const entityRaw = entityResponse.text?.trim() || '{}';
+        const entities = JSON.parse(entityRaw);
+        if (entities.left) leftFigure = entities.left;
+        if (entities.right) rightFigure = entities.right;
+        if (entities.bgMood) bgAtmosphere = entities.bgMood;
+      } catch (_) {}
+    }
+
+    // ── Step 2: Load professor's reference photo ──
     try {
       const resp = await fetch('/professor_jiang.png');
       if (resp.ok) {
@@ -3418,40 +3456,43 @@ KEY VISUAL RULES:
       }
     } catch (_) {}
 
-    prompt = `You are a world-class YouTube thumbnail designer specializing in breaking news and current events analysis content — Fox News Alert / CNN Breaking style.
+    prompt = `You are a world-class YouTube thumbnail designer specializing in breaking news and current events analysis — Fox News Alert / CNN Breaking style.
 
-${professorImagePart ? `REFERENCE PERSON — CRITICAL:
-I have provided a reference photo of the HOST/ANALYST. You MUST use this exact person's face, features, hairstyle, skin tone, and glasses in the thumbnail. Do NOT change their appearance. Keep them photorealistic and recognizable as the same person shown in the reference image.` : ''}
-
-YOUR TASK:
-Create a dramatic, photorealistic YouTube thumbnail for a breaking news analysis video.
+${professorImagePart ? `REFERENCE PERSON — MANDATORY:
+A reference photo of the HOST/ANALYST is provided. You MUST replicate this exact person's face, hairstyle, skin tone, and glasses precisely. Do NOT invent a different person.` : ''}
 
 TOPIC / HOOK TEXT: "${title}"
-${scriptSnippet ? `SCRIPT CONTEXT (use to pick the right political figures, flags, countries):\n${scriptSnippet}` : ''}
-HOST / ANALYST: ${professorImagePart ? 'Use the person from the reference photo — Asian male, middle-aged, salt-and-pepper hair, rectangular glasses, light blue casual shirt. This is the exact person who must appear centered.' : hostName ? hostName : 'A photorealistic concerned-looking male analyst in his 30s-40s, wearing a casual shirt, centered in frame'}
+HOST / ANALYST: ${professorImagePart ? 'Asian male, middle-aged, salt-and-pepper hair, rectangular metal-frame glasses, light blue casual shirt — MATCH THE REFERENCE PHOTO EXACTLY.' : hostName || 'Concerned-looking male analyst, centered.'}
 
-LAYOUT — Follow this EXACTLY (modeled on viral Fox News / breaking news thumbnails):
+════ LAYOUT — FOLLOW EXACTLY ════
 
-1. CENTER (main focal point): The host/analyst from the reference photo. Positioned dead center, face clearly visible, expression: deeply concerned, thoughtful, slightly worried — hands pressed together near chin. Photorealistic, faithful to reference photo.
+▶ CENTER (focal point):
+The host/analyst ${professorImagePart ? 'from the reference photo' : ''}. Dead center. Face fully visible. Expression: deeply concerned, worried, hands pressed near chin in prayer gesture. Photorealistic.
 
-2. LEFT SIDE (40% of frame): A highly recognizable political figure or leader relevant to the script topic (e.g. Trump, Biden, Xi Jinping, Putin, Modi — whoever fits the content). Placed to the left of the host, slightly larger than life, dramatic close-up. Behind them: their country's flag as background with a dramatic red glow/vignette effect.
+▶ LEFT SIDE — MANDATORY SPECIFIC FIGURE:
+"${leftFigure}"
+Dramatic close-up, slightly larger than life. Behind them: their country's flag or relevant symbol with intense red glow and vignette.
 
-3. RIGHT SIDE (40% of frame): A second relevant political figure or symbol (a different leader, or a stock market crash chart, or a country flag/symbol). Placed to the right of the host. Same dramatic red atmospheric treatment.
+▶ RIGHT SIDE — MANDATORY SPECIFIC FIGURE:
+"${rightFigure}"
+Same dramatic close-up treatment. Red atmospheric lighting.
 
-4. BOTTOM BANNER (most critical element): A wide, bold RED horizontal banner covering the bottom 20% of the image. Inside this banner:
-   - TOP LINE: The hook text "${title}" in MASSIVE bold yellow/gold Impact-style ALL CAPS font. Huge. Dominant. Takes up 70% of banner height.
-   - BOTTOM LINE: "FOX NEWS ALERT" or "BREAKING ANALYSIS" in smaller white bold text on the same red banner. Clean, professional news-network style.
-   - Left side of banner: A small "FOX NEWS" / news network logo area (stylized, not copied).
+▶ BOTTOM BANNER — MOST CRITICAL ELEMENT:
+Wide bold RED horizontal banner — full width, bottom 20% of image.
+  • TOP LINE: "${title}" — MASSIVE yellow/gold ALL CAPS Impact-style font. Huge, dominant, 70% of banner height.
+  • BOTTOM LINE: "FOX NEWS ALERT" in smaller white bold text.
+  • Small stylized news logo on left side of banner.
 
-5. BACKGROUND ATMOSPHERE: Deep crimson red with dramatic vignette. Dark red gradient behind the center figure. Stock chart lines faintly visible in background (red downtrend). Urgent, tense mood.
+▶ BACKGROUND:
+${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic imagery in background. Urgent, tense.
 
-STYLE RULES:
-- Photorealistic, cinematic, ultra-high quality — NOT illustrated or cartoon
-- The red banner with yellow text is the MOST IMPORTANT ELEMENT — make it bold, clean, perfectly readable
-- Political figures must look photorealistic and recognizable by pose/silhouette
-- Dramatic lighting with red/orange color cast across entire image
-- 16:9 aspect ratio, 1920×1080 quality
-- High contrast, sharp details, no blur${extraNote}`;
+════ STRICT RULES ════
+- DO NOT use generic or random people — use ONLY the specific figures named above for left and right
+- The left and right figures MUST visually match the topic: "${title}"
+- Red banner + yellow text = most important — bold, clean, readable
+- Photorealistic, cinematic — NOT illustrated or cartoon
+- 16:9 aspect ratio, 1920×1080
+- High contrast, sharp, no blur${extraNote}`;
 
   } else {
     prompt = `

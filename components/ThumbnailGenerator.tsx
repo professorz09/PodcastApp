@@ -164,7 +164,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       const refImgData = referenceImage
         ? { data: referenceImage.data, mimeType: referenceImage.mimeType }
         : undefined;
-      const scriptTextForGen = videoStyle === 'situational' ? getSourceText(titleSource) : undefined;
+      const scriptTextForGen = (videoStyle === 'situational' || videoStyle === 'professor_jiang') ? getSourceText(titleSource) : undefined;
       const url = await generateThumbnail(
         textForThumbnail, hostName, guestName, refImgData, extraInstructions,
         (step) => setLoadingStep(step),
