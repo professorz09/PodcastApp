@@ -3488,11 +3488,11 @@ KEY VISUAL RULES:
     if (scriptSnippet) {
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.1-pro-preview',
+          model: 'gemini-3-flash-preview',
           contents: [{
             role: 'user',
             parts: [{
-              text: `You are a creative Fox News thumbnail art director. Read this script and decide the 2 most VISUALLY DRAMATIC and TOPIC-RELEVANT elements to show on the LEFT and RIGHT sides of a breaking news thumbnail. Use your real-world knowledge of current events, people, and news to make the visuals accurate.
+              text: `You are a creative Fox News thumbnail art director. Read this script and decide the 2 most VISUALLY DRAMATIC and TOPIC-RELEVANT elements to show on the LEFT and RIGHT sides of a breaking news thumbnail.
 
 SCRIPT:
 ${scriptSnippet}
@@ -3516,9 +3516,7 @@ Reply in JSON only — no extra text, no markdown:
 }`
             }]
           }],
-          config: {
-            tools: [{ googleSearch: {} }],
-          },
+          config: { responseMimeType: 'application/json' },
         });
         const entityRaw = (() => {
           const raw = entityResponse.text?.trim() || '{}';
