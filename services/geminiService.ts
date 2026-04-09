@@ -29,7 +29,7 @@ export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explai
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
     return `
-You are a YouTube copywriter for Indian "Explained" channels that do book summaries, biographies, and topic breakdowns in Hindi/Hinglish.
+You are a YouTube copywriter for "Explained" channels that do book summaries, biographies, and topic breakdowns.
 Read the script and generate 4 direct, conversational YouTube titles — the kind that NAME the topic clearly and invite the viewer to learn it with you.
 
 STYLE: Direct + Conversational. No clickbait tricks. The title should tell exactly what the video is about, but make it sound exciting.
@@ -37,21 +37,21 @@ STYLE: Direct + Conversational. No clickbait tricks. The title should tell exact
 REQUIREMENTS:
 1. ALWAYS name the exact topic/book/person/concept from the script — never be vague.
 2. Sound like you are talking TO the viewer — warm, confident, inviting.
-3. Mix Hindi/Hinglish naturally — this is for Indian audience.
+3. ALWAYS write in English only — do NOT use Hindi, Hinglish, or any other language.
 4. The title should feel like the presenter just sat down and is starting the video.
 5. 55-75 characters max. Complete and readable.
 
 FORMATS to vary across 4 options:
-- Direct intro style: "[Topic] Ki Poori Kahani — Aaj Hum Samjhenge"
-- Conversational hook: "Kya Tumne Suna Hai [Topic] Ke Baare Mein?"
-- Full Hindi title: "[Topic] — [Key Insight Ya Angle]"
-- Hinglish punchy: "[Topic]: The [Angle] No One Explained"
+- Direct intro style: "The Full Story Of [Topic] — Everything Explained"
+- Conversational hook: "Have You Heard About [Topic]? Here's The Truth"
+- Bold claim: "[Topic] — The [Key Insight] Nobody Talks About"
+- Punchy: "[Topic]: The [Angle] No One Explained"
 
 EXAMPLES (if topic is "Robert Greene's 48 Laws of Power"):
-- "48 Laws of Power — Robert Greene Ki Wo Book Jo Duniya Badal De"
-- "Aaj Hum Baat Karenge 48 Laws of Power Ki — Robert Greene"
-- "Kya Hai 48 Laws of Power? Robert Greene Ka Poora Secret"
-- "48 Laws of Power Explained: Duniya Ko Samajhne Ka Formula"
+- "48 Laws of Power — The Book That Changes How You See The World"
+- "Robert Greene's 48 Laws of Power Fully Explained"
+- "What Is 48 Laws of Power? Robert Greene's Complete Secret"
+- "48 Laws of Power Explained: The Formula To Understand Power"
 
 Return ONLY a valid JSON array of 4 strings. No markdown.
     `;
@@ -66,7 +66,7 @@ Return ONLY a valid JSON array of 4 strings. No markdown.
     2. Make the viewer feel "this is literally my situation" or "I need to watch this"
     3. Emotional words: "Broke Me", "Changed Everything", "Nobody Told Me", "I Finally Understood", "Worst Mistake"
     4. Under 65 characters. No generic clickbait — must feel like a real person's real story.
-    5. Match the language/tone of the script (Hindi topics → Hinglish titles okay)
+    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
     6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
     `;
   }
@@ -80,7 +80,7 @@ Return ONLY a valid JSON array of 4 strings. No markdown.
     2. Challenge conventional wisdom: "Stop Believing This About X", "X Is A Lie — Here's Proof"
     3. Strong opinion words: "EXPOSED", "DEBUNKED", "The REAL Truth", "WRONG", "FIGHT BACK", "Unpopular Opinion"
     4. Under 65 characters. Must feel like a hot debate, not a tutorial.
-    5. Match the language/tone of the script (Hindi topics → Hinglish titles okay)
+    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
     6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
     `;
   }
@@ -97,7 +97,8 @@ REQUIREMENTS:
 2. Feel like a breaking news chyron or urgent editorial — serious, not sensational gossip
 3. Use power words: "EXPLAINED", "BREAKING", "REAL REASON", "WHAT THIS MEANS", "NOBODY IS SAYING", "THE TRUTH"
 4. Under 70 characters. Clear, readable.
-5. Mix formats across 4 options.
+5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
+6. Mix formats across 4 options.
 
 FORMATS to vary:
 - Urgent question: "Why Did [Event] Happen? The Answer Will Shock You"
@@ -119,7 +120,7 @@ Return ONLY a valid JSON array of 4 strings. No markdown.
     2. Hook/Curiosity: intense FOMO or curiosity bait.
     3. Strong words: "Exposed", "The Truth", "Why You're Wrong", "Secret", "Nobody Talks About This"
     4. Under 60 characters so they don't get cut off on mobile.
-    5. Match the language/tone of the script (Hindi topics → Hinglish titles okay)
+    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
     6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
   `;
 };
@@ -168,26 +169,26 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
 const getThumbnailTextStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
     return `
-You are a thumbnail copywriter for Indian "Explained" YouTube channels. Write SHORT text that appears ON the thumbnail image — this is the BIG BOLD TEXT overlay, not the title.
+You are a thumbnail copywriter for "Explained" YouTube channels. Write SHORT text that appears ON the thumbnail image — this is the BIG BOLD TEXT overlay, not the title.
 
-STYLE: Direct, name-drops the topic. Inviting and informative — not shock clickbait. Indian audience.
+STYLE: Direct, name-drops the topic. Inviting and informative — not shock clickbait.
 
 CRITICAL RULE — NAME THE TOPIC:
 The text must say or strongly hint at the exact subject. Vague generic text like "EXPLAINED" alone is useless.
 BAD: "EXPLAINED" / "THE TRUTH"
-GOOD: "48 LAWS" / "ROBERT GREENE" / "POWER KA RAAZ" / "WO BOOK"
+GOOD: "48 LAWS" / "ROBERT GREENE" / "THE SECRET" / "THE BOOK"
 
 Generate exactly 5 options with VARIETY:
 - Option 1: Topic name directly in CAPS (e.g. "48 LAWS OF POWER")
-- Option 2: Short Hindi/Hinglish hook (e.g. "YEH BOOK PADHO!" / "POWER KA RAAZ")
-- Option 3: Action/invitation (e.g. "SAMAJHTE HAIN" / "POORI KAHANI")
+- Option 2: Short punchy hook (e.g. "READ THIS NOW!" / "POWER SECRETS")
+- Option 3: Action/invitation (e.g. "FULL STORY" / "EVERYTHING EXPLAINED")
 - Option 4: Ultra-short 2 words (e.g. "MUST READ" / "LIFE CHANGING")
 - Option 5: One punchy insight from the topic (e.g. "POWER WINS" / "RULES MATTER")
 
 RULES:
 - Max 4 words each
 - CAPS for the topic name and power words
-- Natural Hindi/Hinglish where appropriate
+- ALWAYS write in English only — do NOT use Hindi or Hinglish
 - Must feel like it belongs on a clean explained thumbnail with a face
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
@@ -202,13 +203,13 @@ CRITICAL RULE — TOPIC SPECIFICITY:
 Every option MUST hint at the actual topic from the script. Generic phrases like "It Broke Me" or "My Biggest Regret" that could apply to ANY video are FORBIDDEN unless combined with a topic hint.
 BAD: "It Broke Me" (could be anything)
 GOOD: "My Job Broke Me..." (topic: job loss)
-BAD: "Toot Gaya Main"
-GOOD: "Rishta Toot Gaya..." (topic: relationship)
+BAD: "Everything Is Over" (too vague)
+GOOD: "My Relationship Ended..." (topic: relationship)
 
 Generate exactly 5 options with VARIETY — not all the same tone:
 - Option 1: Pure emotional first-person with topic hint (e.g. "Lost Everything at 40...")
 - Option 2: The unspoken truth about this topic (e.g. "Nobody Warns You About This")
-- Option 3: Hindi/Hinglish emotional (e.g. "Galti Ho Gayi Mujhse...")
+- Option 3: Raw confession style (e.g. "I Was So Wrong...")
 - Option 4: The question this person is living (e.g. "Can I Still Fix This?")
 - Option 5: The hardest moment, specific (e.g. "That One Phone Call...")
 
@@ -217,7 +218,7 @@ RULES:
 - Trailing "..." welcome for emotion
 - One word can be light caps (CAPS for 1 word max)
 - NO generic topic-free phrases
-- Match script language (Hindi script → mix Hindi + English options)
+- ALWAYS write in English only — do NOT use Hindi or Hinglish
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
@@ -238,7 +239,7 @@ Generate exactly 5 options with VARIETY:
 - Option 1: Direct yes/no question about THIS topic (e.g. "Is Hustle Culture DEAD?")
 - Option 2: Explosive claim about THIS topic (e.g. "MARRIAGE Is A TRAP")  
 - Option 3: Challenge conventional wisdom (e.g. "Stop Believing This LIE")
-- Option 4: Hindi/Hinglish confrontational (e.g. "Sachchi Baat Karo!")
+- Option 4: Bold accusation (e.g. "They LIED To You!" / "You're Being FOOLED")
 - Option 5: Censored-style if controversial (e.g. "It's All BULL**IT") — use * for letters
 
 RULES:
@@ -246,7 +247,7 @@ RULES:
 - ALL CAPS for 1-2 key power words
 - ! or ? welcome
 - Censored style (F**K, BULL**IT) only if topic is genuinely controversial
-- Match script language (Hindi script → mix Hindi + English options)
+- ALWAYS write in English only — do NOT use Hindi or Hinglish
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
@@ -295,7 +296,7 @@ Generate exactly 5 options with VARIETY:
 - Option 1: Shocking revelation about THIS topic (e.g. "He Knew All Along...")
 - Option 2: Explosive question (e.g. "She Said WHAT To Him?!")
 - Option 3: The bombshell moment (e.g. "It's OVER For Real")
-- Option 4: Hindi/Hinglish high-energy (e.g. "Sach Bol Diya Finally!")
+- Option 4: Raw honest reaction (e.g. "Nobody Saw This Coming!")
 - Option 5: Censored shock (e.g. "That Was F***ING Crazy") — only if warranted
 
 RULES:
@@ -303,7 +304,7 @@ RULES:
 - ALL CAPS for 1-2 shock words
 - Ellipsis (...) or !? for drama
 - Censored style (F***ING, SH*T) only if content warrants
-- Match script language (Hindi script → mix Hindi + English options)
+- ALWAYS write in English only — do NOT use Hindi or Hinglish
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
   `;
 };
@@ -358,15 +359,15 @@ export const generateTitleTextPair = async (scriptText: string, videoStyle: Thum
 TITLE RULES:
 - Tell a SPECIFIC personal story hook. Use real numbers/timeframes/emotions. 55-70 chars.
 - MUST feel like the person is confessing something shocking or deeply personal.
-- BAD: "Meri Life Mein Bahut Kuch Hua" (too vague)
-- GOOD: "Maine 3 Saal Baad Pata Chala — Meri Company Mujhe Barbad Kar Rahi Thi"
-- GOOD: "Ek Raat Mein Rs 40 Lakh Gaye — Ye Galti Mat Karna"
+- BAD: "A Lot Happened In My Life" (too vague)
+- GOOD: "I Found Out After 3 Years — My Company Was Destroying Me"
+- GOOD: "Rs 40 Lakh Gone In One Night — Never Make This Mistake"
 
 THUMBNAIL TEXT RULES:
 - 2-4 words. ALL CAPS. The EMOTIONAL PUNCH that the title builds toward.
 - Must ADD a new dimension, never repeat title words.
-- BAD: "LIFE KHARAB HUI" (repeats title idea)
-- GOOD (for "lost money" title) → "NO ESCAPE" / "SACH CHUPA THA" / "TAB PATA CHALA"
+- BAD: "LIFE RUINED" (repeats title idea)
+- GOOD (for "lost money" title) → "NO ESCAPE" / "TRUTH HIDDEN" / "TOO LATE NOW"
 - Together they hint at a story bigger than either alone.`
 
     : videoStyle === 'debate'
@@ -374,40 +375,40 @@ THUMBNAIL TEXT RULES:
 TITLE RULES:
 - Name the TWO SPECIFIC sides clearly. Real names, real stakes, real tension. 55-70 chars.
 - MUST create a "who's right?" tension the viewer wants resolved.
-- BAD: "Kya Hustle Culture Sahi Hai?" (no stakes, too safe)
-- GOOD: "Sandeep Maheshwari vs Vivek Bindra — Kaun Sach Bol Raha Hai?"
-- GOOD: "Delhi vs Mumbai: Kaun Zyada Paisa Banata Hai Aur Kyun?"
+- BAD: "Is Hustle Culture Right?" (no stakes, too safe)
+- GOOD: "Sandeep Maheshwari vs Vivek Bindra — Who Is Actually Telling The Truth?"
+- GOOD: "Delhi vs Mumbai: Who Makes More Money And Why?"
 
 THUMBNAIL TEXT RULES:
 - 2-4 words. CONFRONTATIONAL CAPS. Name one side's verdict or the clash itself.
 - BAD: "BIG FIGHT" (generic)
-- GOOD: "BINDRA EXPOSED" / "DELHI JEET GAYI" / "DONO GALAT HAIN"`
+- GOOD: "BINDRA EXPOSED" / "DELHI WINS" / "BOTH WRONG"`
 
     : videoStyle === 'explained'
-    ? `STYLE — Explained / Indian YouTube:
+    ? `STYLE — Explained / Educational YouTube:
 TITLE RULES:
 - NAME the exact topic, book, person, country, or concept directly. No vague hooks. 55-75 chars.
-- Conversational — like a friend saying "aaj main tumhe bataunga…"
-- BAD: "Ek Aisi Kitaab Jo Sab Kuch Badal De" (no name)
-- GOOD: "48 Laws of Power — Robert Greene Ki Wo Kitaab Jo Duniya Ko Samjhati Hai"
-- GOOD: "Israel-Hamas War Ka Sachcha Sach — Jo Media Nahi Batata"
+- Conversational — like a friend saying "let me explain this to you…"
+- BAD: "A Book That Changes Everything" (no name)
+- GOOD: "48 Laws of Power — The Book That Changed How The World Works"
+- GOOD: "The Real Truth About The Israel-Hamas War — What Media Won't Tell You"
 
 THUMBNAIL TEXT RULES:
 - 2-4 words CAPS. NAME the core concept or drop the most shocking fact.
 - BAD: "MUST WATCH" (says nothing)
-- GOOD: "48 LAWS" / "WAR KA SACH" / "ASLI WAJAH" / "HIDDEN TRUTH"`
+- GOOD: "48 LAWS" / "WAR TRUTH" / "REAL REASON" / "HIDDEN TRUTH"`
 
     : videoStyle === 'professor_jiang'
     ? `STYLE — Breaking News / Current Events Analysis (Fox News Alert style):
 TITLE RULES:
 - NAME the specific country/leader/event/organization. Sound like a breaking news headline. 55-70 chars.
 - MUST include: WHO did WHAT and WHY it matters — like a news editor wrote it.
-- BAD: "Duniya Mein Kuch Bada Hone Wala Hai" (zero information)
-- BAD: "Trump Ne Kuch Kiya" (too vague)
-- GOOD: "Trump Ne China Pe 145% Tariff Lagaya — Ab India Ko Kya Hoga?"
-- GOOD: "Fed Ne Rate Nahi Ghataya — Dollar Crash Kyun Nahi Hua Abhi Tak?"
-- GOOD: "Russia-Ukraine Deal — Putin Ki Asli Sharat Kya Hai?"
-- GOOD: "China Ne Ghutne Tek Diye — America Ki Jeet Ya Trap?"
+- BAD: "Something Big Is About To Happen In The World" (zero information)
+- BAD: "Trump Did Something" (too vague)
+- GOOD: "Trump Just Put 145% Tariffs On China — What Does This Mean For India?"
+- GOOD: "Fed Refused To Cut Rates — Why Hasn't The Dollar Crashed Yet?"
+- GOOD: "Russia-Ukraine Deal — What Are Putin's Real Demands?"
+- GOOD: "China Backed Down — Is This America's Victory Or A Trap?"
 
 THUMBNAIL TEXT RULES:
 - 2-4 words ALL CAPS. Must be a FOX NEWS ALERT chyron — shocking, declarative, punchy.
@@ -427,14 +428,14 @@ THUMBNAIL TEXT RULES:
 TITLE RULES:
 - Drop a specific bombshell or reveal. Name names. Use real numbers. 55-65 chars.
 - MUST make viewer feel: "I need to know what happened here"
-- BAD: "Ek Aadmi Ki Kahani Jo Bahut Rich Ban Gaya"
-- GOOD: "Rs 2 Crore Ki Naukri Chodke — Ye Banda Gaon Wapas Kyun Gaya?"
-- GOOD: "Parag Agrawal Ne Twitter Join Kiya Tha $5M Ke Liye — Ye Sach Nahi Jaante Tum"
+- BAD: "The Story Of A Man Who Got Very Rich"
+- GOOD: "He Quit A Rs 2 Crore Job — And Moved Back To His Village. Here's Why."
+- GOOD: "Parag Agrawal Joined Twitter For $5M — Here's What You Don't Know"
 
 THUMBNAIL TEXT RULES:
 - 2-4 words explosive CAPS. Amplifies the title's most shocking element.
 - BAD: "CRAZY STORY" (no info)
-- GOOD: "₹2CR CHOD DI" / "PARAG EXPOSED" / "REAL REASON"`;
+- GOOD: "HE QUIT IT ALL" / "PARAG EXPOSED" / "REAL REASON"`;
 
   const variationSeed = Math.floor(Math.random() * 9999);
   const prompt = `You are India's top viral YouTube content strategist — you've helped channels like NDTV, ABP, Dhruv Rathee, and Ranveer Allahbadia crack 10M+ views with title+thumbnail combos.
@@ -447,12 +448,12 @@ ${styleGuide}
 1. SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real from the script: a person, a country, a number, an event, a year.
 2. Each of the 3 combos must approach the SAME topic from a DIFFERENT ANGLE:
    - Combo 1: Lead with the SHOCKING OUTCOME / consequence
-   - Combo 2: Lead with the MYSTERY / hidden reason ("Asli Wajah", "Real Reason", "Jo Koi Nahi Batata")  
-   - Combo 3: Lead with the PERSONAL STAKES for the viewer ("Tumhare Liye Kya Matlab?", "What This Means For You")
+   - Combo 2: Lead with the MYSTERY / hidden reason ("Real Reason", "The Truth Nobody Says", "What Nobody Mentions")  
+   - Combo 3: Lead with the PERSONAL STAKES for the viewer ("What This Means For You", "Why You Should Care", "Your Life Changes")
 3. Thumbnail text MUST complement the title — NEVER echo the same words.
 4. DO NOT copy or reuse example phrases verbatim — all examples in the style guide above are only to show FORMAT and TONE. Your output must be freshly written from the actual script content.
 5. Each of the 3 thumbnail texts must be DIFFERENT from each other — vary the words, angle, and emotional hook.
-6. Language: Match the script's language naturally (Hindi script → Hinglish/Hindi titles, English script → English titles).
+6. Language: ALWAYS write titles and thumbnail text in English only — do NOT use Hindi, Hinglish, or any other language, regardless of the script language.
 7. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "..."}, ...]
 
 SCRIPT TO ANALYZE:
