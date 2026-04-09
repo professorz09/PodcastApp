@@ -32,7 +32,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [specificDetails, setSpecificDetails] = useState('');
   const [customScript, setCustomScript] = useState('');
   const [includeNarrator, setIncludeNarrator] = useState(false);
-  const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview'>('gemini-3-flash-preview');
+  const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview'>('gemini-3.1-flash-lite-preview');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
   const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang'>(
@@ -592,7 +592,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
                 <span className="font-semibold text-sm">AI Model</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setModel('gemini-3-flash-preview')}
                   className={`p-2.5 rounded-lg border text-left transition-all flex flex-col gap-0.5 group ${
@@ -602,10 +602,24 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">Gemini 3 Flash</div>
+                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">3 Flash</div>
                     <Zap size={10} className={model === 'gemini-3-flash-preview' ? 'text-cyan-400' : 'text-gray-600'} />
                   </div>
                   <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">Fast</div>
+                </button>
+                <button
+                  onClick={() => setModel('gemini-3.1-flash-lite-preview')}
+                  className={`p-2.5 rounded-lg border text-left transition-all flex flex-col gap-0.5 group ${
+                    model === 'gemini-3.1-flash-lite-preview'
+                      ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400'
+                      : 'bg-[#111111] border-transparent text-gray-400 hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">3.1 Lite</div>
+                    <Sparkles size={10} className={model === 'gemini-3.1-flash-lite-preview' ? 'text-cyan-400' : 'text-gray-600'} />
+                  </div>
+                  <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">New</div>
                 </button>
                 <button
                   onClick={() => setModel('gemini-3.1-pro-preview')}
@@ -616,7 +630,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">Gemini 3.1 Pro</div>
+                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">3.1 Pro</div>
                     <Brain size={10} className={model === 'gemini-3.1-pro-preview' ? 'text-cyan-400' : 'text-gray-600'} />
                   </div>
                   <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">Smart</div>
