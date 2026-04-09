@@ -3492,35 +3492,27 @@ KEY VISUAL RULES:
           contents: [{
             role: 'user',
             parts: [{
-              text: `Read this script/title and identify the 2 most prominent political figures or world leaders mentioned. Then write PRECISE PHYSICAL DESCRIPTIONS for each so an image generator can draw the CORRECT person.
+              text: `You are a creative Fox News thumbnail art director. Read this script and decide the 2 most VISUALLY DRAMATIC and TOPIC-RELEVANT elements to show on the LEFT and RIGHT sides of a breaking news thumbnail.
 
 SCRIPT:
 ${scriptSnippet}
 
 TITLE: "${title}"
 
-For each person, describe:
-- Their DISTINCTIVE physical features: hair color+style, age, build, skin tone
-- Their TYPICAL clothing: suit color, tie color, uniform, kurta, etc.
-- Their COUNTRY'S FLAG to show behind them
-- Their EXPRESSION matching the script's tone
+Be completely creative — you can show anything that visually tells the story:
+- A political leader in a dramatic action or pose (e.g. "Trump sitting in a B2 stealth bomber cockpit, fierce expression, American flag reflected in visor")
+- A country's military or power symbol (e.g. "Iranian missile launch with fire and smoke, Iran flag in background")
+- A dramatic scene or metaphor (e.g. "A burning US dollar bill with crumbling stock charts, red smoke")
+- A person + action combo (e.g. "Xi Jinping pointing aggressively at a crashing chart, red dramatic lighting")
+- Any cinematic visual that INSTANTLY tells the viewer what the story is about
 
-Known descriptions to use exactly if matched:
-- Trump → "older US politician, swept-back golden-blonde hair, dark navy suit, red tie, stern aggressive expression, American flag behind him, red dramatic lighting"
-- Biden → "elderly US politician, white hair, blue suit, concerned expression, American flag behind him"  
-- Modi → "Indian leader, white beard and white hair, white kurta or dark suit, serious expression, Indian tricolor flag behind him"
-- Xi Jinping → "Chinese leader, dark formal suit, short black hair, composed serious expression, Chinese red flag with gold stars behind him"
-- Putin → "Russian leader, short grey hair, dark suit, cold stern expression, Russian tricolor flag behind him"
-- Zelensky → "Ukrainian leader, olive military attire, short dark hair, determined expression, Ukrainian blue-yellow flag behind him"
-- Netanyahu → "Israeli politician, grey hair, dark suit, serious expression, Israeli flag with Star of David behind him"
+Read the script, understand the story, then pick the 2 most impactful visuals. No restrictions — be bold and creative.
 
-If the person is NOT in the list, describe their well-known physical features precisely.
-
-Reply in JSON only:
+Reply in JSON only — no explanation:
 {
-  "left": "Full precise visual description for LEFT SIDE person including physical features, clothing, and flag background",
-  "right": "Full precise visual description for RIGHT SIDE person or symbolic element (can be a powerful symbol/chart/flag if only 1 person is in the script)",
-  "bgMood": "One-line background atmosphere description"
+  "left": "One vivid cinematic description for the LEFT SIDE — be specific about pose, action, setting, atmosphere (1-2 sentences)",
+  "right": "One vivid cinematic description for the RIGHT SIDE — be specific about pose, action, setting, atmosphere (1-2 sentences)",
+  "bgMood": "Background atmosphere (e.g. 'deep crimson with explosion glow' or 'dark stormy sky with falling numbers')"
 }`
             }]
           }],
