@@ -212,11 +212,19 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     setIsGeneratingPair(true);
     setPairError(null);
     try {
-      const result = await generateTitleTextPair(sourceText, videoStyle);
-      if (result.length === 0) {
+      const [pairResult, titleResult] = await Promise.all([
+        generateTitleTextPair(sourceText, videoStyle),
+        generateTitles(sourceText, videoStyle),
+      ]);
+      if (pairResult.length === 0) {
         setPairError('Koi pair nahi aaya — dobara try karo.');
       } else {
-        onUpdateThumbnailState({ ...thumbnailStateRef.current, comboPairs: result, scriptSignature: computeScriptSignature(script) });
+        onUpdateThumbnailState({
+          ...thumbnailStateRef.current,
+          comboPairs: pairResult,
+          titles: titleResult,
+          scriptSignature: computeScriptSignature(script),
+        });
       }
     } catch (err: any) {
       setPairError(err?.message || 'Generation fail hui. Dobara try karo.');
@@ -225,11 +233,12 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     }
   };
 
-  const handleSelectPair = (pair: { title: string; thumbnailText: string }) => {
+  const handleSelectPair = (pair: { title: string; thumbnailText: string; description?: string }) => {
     onUpdateThumbnailState({
       ...thumbnailState,
       selectedTitle: pair.title,
       selectedThumbnailText: pair.thumbnailText,
+      extraInstructions: pair.description || thumbnailState.extraInstructions || '',
     });
   };
 
@@ -389,7 +398,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 {isGeneratingPair ? (
                   <div className="flex items-center gap-2 text-gray-500 py-3">
                     <Loader2 className="animate-spin" size={14} />
-                    <span className="text-sm">Matched pairs ban rahe hain...</span>
+                    <span className="text-sm">Combos + Titles + Descriptions ban rahe hain...</span>
                   </div>
                 ) : comboPairs.length > 0 ? (
                   <div className="space-y-2">
@@ -407,11 +416,16 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                         >
                           <p className="text-xs text-gray-400 leading-snug">{pair.title}</p>
                           <p className={`text-base font-black tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>{pair.thumbnailText}</p>
-                          {isSelected && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-semibold">
-                              <Check size={9} /> Selected
-                            </span>
+                          {pair.description && (
+                            <p className="text-[10px] text-gray-600 leading-snug line-clamp-2">{pair.description}</p>
                           )}
+                          {isSelected ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-semibold">
+                              <Check size={9} /> Selected — description auto-filled below
+                            </span>
+                          ) : pair.description ? (
+                            <span className="text-[10px] text-gray-600">Click → description auto-fill hogi</span>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -419,7 +433,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 ) : pairError ? (
                   <p className="text-xs text-red-400 py-1">{pairError}</p>
                 ) : (
-                  <p className="text-xs text-gray-600 py-1">"Generate Both" dabao → 3 matched pairs milenge. Ek click mein dono set ho jaayenge.</p>
+                  <p className="text-xs text-gray-600 py-1">"Generate Both" dabao → 3 combos + titles + thumbnail descriptions ek saath milenge.</p>
                 )}
               </div>
 

@@ -350,7 +350,7 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
   }
 };
 
-export const generateTitleTextPair = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<{ title: string; thumbnailText: string }[]> => {
+export const generateTitleTextPair = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<{ title: string; thumbnailText: string; description: string }[]> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
@@ -454,7 +454,13 @@ ${styleGuide}
 4. DO NOT copy or reuse example phrases verbatim — all examples in the style guide above are only to show FORMAT and TONE. Your output must be freshly written from the actual script content.
 5. Each of the 3 thumbnail texts must be DIFFERENT from each other — vary the words, angle, and emotional hook.
 6. Language: ALWAYS write titles and thumbnail text in English only — do NOT use Hindi, Hinglish, or any other language, regardless of the script language.
-7. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "..."}, ...]
+7. For each combo, also write a "description" — a precise visual thumbnail brief for an AI image generator. Include:
+   - Background: exact color/mood (e.g. "deep charcoal black", "crimson red with vignette", "pure white")
+   - Person/subject: who, where in frame, pose, expression (e.g. "single stressed Indian man, right side, mid-shot, looking down defeated")
+   - Text placement: where and how the thumbnailText appears (e.g. "bold yellow ALL CAPS on left side, 2 lines")
+   - Any props or key visual elements specific to this topic (e.g. "pile of cash on table", "burning document", "country flags in background")
+   - Keep it 2-4 sentences, actionable and specific.
+8. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "...", "description": "..."}, ...]
 
 SCRIPT TO ANALYZE:
 ${scriptText.slice(0, 3500)}`;
@@ -470,7 +476,8 @@ ${scriptText.slice(0, 3500)}`;
     if (!Array.isArray(parsed)) throw new Error('Expected array from AI');
     return parsed
       .filter((p: any) => p && typeof p.title === 'string' && typeof p.thumbnailText === 'string')
-      .slice(0, 3);
+      .slice(0, 3)
+      .map((p: any) => ({ title: p.title, thumbnailText: p.thumbnailText, description: p.description || '' }));
   } catch (error: any) {
     if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
       throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
