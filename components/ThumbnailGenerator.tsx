@@ -58,6 +58,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'debate', label: 'Debate', desc: 'Confrontational & bold', color: 'amber' },
     { value: 'podcast', label: 'Podcast', desc: 'Shocking clickbait', color: 'purple' },
     { value: 'explained', label: 'Explained', desc: 'Big face + topic visual', color: 'emerald' },
+    { value: 'professor_jiang', label: '🎓 Prof. Jiang', desc: 'Fox News Alert — breaking news', color: 'red' },
   ];
 
   const hasScript = script.length > 0;
@@ -297,6 +298,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                             ? 'bg-amber-600/20 border-amber-500/60 text-white'
                             : opt.color === 'emerald'
                             ? 'bg-emerald-600/20 border-emerald-500/60 text-white'
+                            : opt.color === 'red'
+                            ? 'bg-red-600/20 border-red-500/60 text-white'
                             : 'bg-purple-600/20 border-purple-500/60 text-white'
                           : 'bg-white/3 border-white/8 text-gray-400 hover:bg-white/6 hover:border-white/15'
                       }`}

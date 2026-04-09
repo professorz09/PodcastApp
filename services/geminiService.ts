@@ -24,7 +24,7 @@ const getApiKey = () => {
   return apiKey;
 };
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -82,6 +82,30 @@ Return ONLY a valid JSON array of 4 strings. No markdown.
     4. Under 65 characters. Must feel like a hot debate, not a tutorial.
     5. Match the language/tone of the script (Hindi topics → Hinglish titles okay)
     6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
+    `;
+  }
+  if (style === 'professor_jiang') {
+    return `
+You are a YouTube copywriter for serious current-events analysis channels — think Fox News, CNN Breaking, geopolitical commentary. Titles must feel urgent, important, and analytical.
+
+Read the script and generate 4 highly clickable YouTube titles for a BREAKING NEWS ANALYSIS video. The topic is a real current event.
+
+STYLE: Urgent, authoritative, analytical. Makes the viewer feel they MUST watch this RIGHT NOW to understand what just happened.
+
+REQUIREMENTS:
+1. Name the SPECIFIC event, country, leader, or policy from the script — never vague
+2. Feel like a breaking news chyron or urgent editorial — serious, not sensational gossip
+3. Use power words: "EXPLAINED", "BREAKING", "REAL REASON", "WHAT THIS MEANS", "NOBODY IS SAYING", "THE TRUTH"
+4. Under 70 characters. Clear, readable.
+5. Mix formats across 4 options.
+
+FORMATS to vary:
+- Urgent question: "Why Did [Event] Happen? The Answer Will Shock You"
+- Bold claim: "[Leader/Country] Just Changed Everything — Here's Why"
+- Analysis hook: "The REAL Reason Behind [Event] Nobody Is Talking About"
+- Prediction: "What [Event] Means For [Country/World] In The Next 6 Months"
+
+Return ONLY a valid JSON array of 4 strings. No markdown.
     `;
   }
   // podcast / default
@@ -222,6 +246,34 @@ RULES:
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
+  if (style === 'professor_jiang') {
+    return `
+You are a thumbnail copywriter for breaking news and current-events analysis channels. Write the BIG BOLD TEXT that appears on the thumbnail — the 2-4 word SHOCKER in huge yellow/white caps on a red breaking news banner.
+
+STYLE: Fox News Alert / CNN Breaking — urgent, declarative, impossible to ignore. The text tells you something massive just happened.
+
+CRITICAL RULE — TOPIC SPECIFIC:
+The text MUST hint at the actual event from the script. Generic "IT'S OVER" with no context is weak.
+BAD: "IT'S OVER" (could be anything)
+GOOD: "TRADE WAR OVER" (topic: US-China trade deal)
+BAD: "BREAKING NEWS"
+GOOD: "CEASEFIRE BROKEN" (topic: ceasefire collapse)
+
+Generate exactly 5 options with VARIETY:
+- Option 1: 2-3 word declarative statement (e.g. "SYSTEM FAILING", "DEAL COLLAPSED")
+- Option 2: Quoted speech style (e.g. "IT'S OVER", "WE LOST") — with quote marks 
+- Option 3: Action claim (e.g. "WAR STARTS NOW", "RATES FROZEN")
+- Option 4: Urgent warning (e.g. "WATCH THIS NOW", "DON'T MISS THIS")
+- Option 5: Verdict style (e.g. "CHINA WINS", "TRUMP BLINKS", "INDIA LOSES")
+
+RULES:
+- Maximum 4 words each — shorter is more powerful
+- ALL CAPS — this is a breaking news chyron
+- No trailing "..." — declarative and final
+- Must feel like it belongs on a red news alert banner
+- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+    `;
+  }
   // podcast / default
   return `
 You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT for a podcast-style thumbnail.
@@ -309,6 +361,13 @@ export const generateTitleTextPair = async (scriptText: string, videoStyle: Thum
   E.g. "48 Laws of Power — Robert Greene Ki Wo Book Jo Duniya Badal De", "Aaj Hum Baat Karenge 48 Laws of Power Ki"
 - Thumbnail text: 2-4 word CAPS text that names or strongly hints at the topic. Complements title — adds visual punch.
   E.g. Title: "Aaj Hum Baat Karenge 48 Laws of Power Ki" → Thumbnail: "48 LAWS" or "POWER KA RAAZ"`
+    : videoStyle === 'professor_jiang'
+    ? `STYLE — Breaking News / Current Events Analysis:
+- Title: Urgent, analytical, names the specific event/leader/country. 55-70 chars. Like a news editorial headline.
+  E.g. "The REAL Reason Trump Paused Tariffs — China's Secret Move Explained", "What the Fed's Rate Hold Means For Your Money In 2025"
+- Thumbnail text: 2-4 word ALL CAPS news chyron. Something that would appear on a red Fox News Alert banner. Punchy, declarative, topic-specific.
+  E.g. Title: "Why China's Economy Is Crashing Faster Than Anyone Expected" → Thumbnail: "CHINA FALLS" or "SYSTEM FAILING"
+- Together they should feel like a massive breaking story.`
     : `STYLE — Podcast / High Energy:
 - Title: Shocking revelation or curiosity bait. Drop a bombshell. 55-65 chars.
 - Thumbnail text: 2-5 word explosive CAPS hook. Amplifies what the title hints at.
@@ -3344,6 +3403,40 @@ KEY VISUAL RULES:
 - NO generic stock photo look — cinematic, dramatic, editorial quality
 - 16:9 aspect ratio, 1920×1080 quality feel
 - Photorealistic — NOT illustrated or cartoon${extraNote}`;
+
+  } else if (videoStyle === 'professor_jiang') {
+    const scriptSnippet = scriptText?.slice(0, 1500) || '';
+    prompt = `You are a world-class YouTube thumbnail designer specializing in breaking news and current events analysis content — Fox News Alert / CNN Breaking style.
+
+YOUR TASK:
+Create a dramatic, photorealistic YouTube thumbnail for a breaking news analysis video.
+
+TOPIC / HOOK TEXT: "${title}"
+${scriptSnippet ? `SCRIPT CONTEXT (use to pick the right political figures, flags, countries):\n${scriptSnippet}` : ''}
+${hostName ? `ANALYST / HOST: ${hostName} — show this person in the center` : 'ANALYST: A photorealistic concerned-looking male analyst in his 30s-40s, wearing a casual shirt, centered in frame'}
+
+LAYOUT — Follow this EXACTLY (modeled on viral Fox News / breaking news thumbnails):
+
+1. CENTER (main focal point): The host/analyst. Positioned dead center, face clearly visible, hands pressed together near chin in a "thinking" or "concerned" prayer gesture. Expression: deeply concerned, thoughtful, slightly worried. Photorealistic. Clean casual clothing.
+
+2. LEFT SIDE (40% of frame): A highly recognizable political figure or leader relevant to the script topic (e.g. Trump, Biden, Xi Jinping, Putin, Modi — whoever fits the content). Placed to the left of the host, slightly larger than life, dramatic close-up. Behind them: their country's flag as background with a dramatic red glow/vignette effect.
+
+3. RIGHT SIDE (40% of frame): A second relevant political figure or symbol (a different leader, or a stock market crash chart, or a country flag/symbol). Placed to the right of the host. Same dramatic red atmospheric treatment.
+
+4. BOTTOM BANNER (most critical element): A wide, bold RED horizontal banner covering the bottom 20% of the image. Inside this banner:
+   - TOP LINE: The hook text "${title}" in MASSIVE bold yellow/gold Impact-style ALL CAPS font. Huge. Dominant. Takes up 70% of banner height.
+   - BOTTOM LINE: "FOX NEWS ALERT" or "BREAKING ANALYSIS" in smaller white bold text on the same red banner. Clean, professional news-network style.
+   - Left side of banner: A small "FOX NEWS" / news network logo area (stylized, not copied).
+
+5. BACKGROUND ATMOSPHERE: Deep crimson red with dramatic vignette. Dark red gradient behind the center figure. Stock chart lines faintly visible in background (red downtrend). Urgent, tense mood.
+
+STYLE RULES:
+- Photorealistic, cinematic, ultra-high quality — NOT illustrated or cartoon
+- The red banner with yellow text is the MOST IMPORTANT ELEMENT — make it bold, clean, perfectly readable
+- Political figures must look photorealistic and recognizable by pose/silhouette (don't copy exact likenesses — make them look type-accurate)
+- Dramatic lighting with red/orange color cast across entire image
+- 16:9 aspect ratio, 1920×1080 quality
+- High contrast, sharp details, no blur${extraNote}`;
 
   } else {
     prompt = `
