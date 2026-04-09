@@ -128,8 +128,11 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
+  const variationSeed = Math.floor(Math.random() * 9999);
   const prompt = `
     ${getTitleStylePrompt(videoStyle)}
+    
+    Generate completely fresh titles — do NOT repeat or paraphrase any previously generated titles. Variation seed: ${variationSeed}.
     
     Script:
     ${scriptText}
@@ -140,6 +143,7 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        temperature: 1.2,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -308,8 +312,11 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
+  const variationSeed = Math.floor(Math.random() * 9999);
   const prompt = `
     ${getThumbnailTextStylePrompt(videoStyle)}
+
+    Generate completely fresh thumbnail text options — do NOT repeat any previously generated options. Variation seed: ${variationSeed}.
 
     Content:
     ${scriptText}
@@ -320,6 +327,7 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        temperature: 1.2,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -428,9 +436,10 @@ THUMBNAIL TEXT RULES:
 - BAD: "CRAZY STORY" (no info)
 - GOOD: "₹2CR CHOD DI" / "PARAG EXPOSED" / "REAL REASON"`;
 
+  const variationSeed = Math.floor(Math.random() * 9999);
   const prompt = `You are India's top viral YouTube content strategist — you've helped channels like NDTV, ABP, Dhruv Rathee, and Ranveer Allahbadia crack 10M+ views with title+thumbnail combos.
 
-YOUR TASK: Read the script carefully. Extract the MOST SHOCKING, SPECIFIC, INTERESTING element. Then write 3 killer combos.
+YOUR TASK: Read the script carefully. Extract the MOST SHOCKING, SPECIFIC, INTERESTING element. Then write 3 killer combos. Variation seed: ${variationSeed} — generate fresh output every time, never repeat previous runs.
 
 ${styleGuide}
 
@@ -453,7 +462,7 @@ ${scriptText.slice(0, 3500)}`;
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', temperature: 1.2 },
     });
     const raw = response.text?.trim() || '[]';
     const parsed = JSON.parse(raw);
