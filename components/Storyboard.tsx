@@ -613,7 +613,7 @@ const PromptModal: React.FC<{
           <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-white/8 text-gray-500"><X size={15} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-          <div className="aspect-video bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/6 relative">
+          <div className="w-full bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/6 relative" style={{ aspectRatio: '3/4' }}>
             {scene.imageUrl ? <img src={scene.imageUrl} alt="" className="w-full h-full object-cover" />
               : scene.isGenerating ? <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={24} className="animate-spin text-purple-500" /></div>
               : scene.error ? <div className="absolute inset-0 flex flex-col items-center justify-center gap-1"><AlertCircle size={20} className="text-red-400" /><span className="text-xs text-red-400">{scene.error}</span></div>
@@ -729,7 +729,7 @@ const TimelineRow: React.FC<{
     >
       {/* Thumbnail */}
       <button onClick={e => { e.stopPropagation(); onOpenPrompt(); }}
-        className="relative w-[72px] h-[40px] shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/6 hover:border-purple-500/50 transition-all group">
+        className="relative w-[30px] h-[40px] shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/6 hover:border-purple-500/50 transition-all group">
         {scene.imageUrl
           ? <><img src={scene.imageUrl} alt="" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><RefreshCw size={11} className="text-white" /></div></>
           : scene.isGenerating
