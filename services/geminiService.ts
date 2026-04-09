@@ -3122,7 +3122,7 @@ export const detectSpeakers = async (topic: string, count: number = 2): Promise<
     Identify ${count} distinct opposing characters, personas, or specific people best suited to debate this.
     
     Rules:
-    1. If the topic mentions names (e.g. "Trump vs Biden"), use them.
+    1. If the topic mentions names (e.g. "Trump vs Xi Jinping"), use them.
     2. If the topic is abstract (e.g. "AI Safety"), create representative personas (e.g. "AI Optimist", "AI Skeptic").
     3. Return ONLY a JSON object with a "speakers" array of strings.
   `;
@@ -3488,11 +3488,11 @@ KEY VISUAL RULES:
     if (scriptSnippet) {
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-3.1-pro-preview',
           contents: [{
             role: 'user',
             parts: [{
-              text: `You are a creative Fox News thumbnail art director. Read this script and decide the 2 most VISUALLY DRAMATIC and TOPIC-RELEVANT elements to show on the LEFT and RIGHT sides of a breaking news thumbnail.
+              text: `You are a creative Fox News thumbnail art director. Read this script and decide the 2 most VISUALLY DRAMATIC and TOPIC-RELEVANT elements to show on the LEFT and RIGHT sides of a breaking news thumbnail. Use your real-world knowledge of current events, people, and news to make the visuals accurate.
 
 SCRIPT:
 ${scriptSnippet}
@@ -3508,7 +3508,7 @@ Be completely creative — you can show anything that visually tells the story:
 
 Read the script, understand the story, then pick the 2 most impactful visuals. No restrictions — be bold and creative.
 
-Reply in JSON only — no explanation:
+Reply in JSON only — no extra text, no markdown:
 {
   "left": "One vivid cinematic description for the LEFT SIDE — be specific about pose, action, setting, atmosphere (1-2 sentences)",
   "right": "One vivid cinematic description for the RIGHT SIDE — be specific about pose, action, setting, atmosphere (1-2 sentences)",
@@ -3516,9 +3516,15 @@ Reply in JSON only — no explanation:
 }`
             }]
           }],
-          config: { responseMimeType: 'application/json' },
+          config: {
+            tools: [{ googleSearch: {} }],
+          },
         });
-        const entityRaw = entityResponse.text?.trim() || '{}';
+        const entityRaw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const jsonMatch = raw.match(/\{[\s\S]*\}/);
+          return jsonMatch ? jsonMatch[0] : '{}';
+        })();
         console.log('[Prof.Jiang] Entity extraction raw:', entityRaw);
         const entities = JSON.parse(entityRaw);
         if (entities.left) leftVisual = entities.left;
