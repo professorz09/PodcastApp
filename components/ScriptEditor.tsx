@@ -294,7 +294,6 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     const text = script.map(seg => `${seg.speaker}: ${seg.text}`).join('\n\n');
     navigator.clipboard.writeText(text).then(() => {
       setScriptCopied(true);
-      toast.success('Script copied!');
       setTimeout(() => setScriptCopied(false), 2500);
     });
   };
@@ -330,25 +329,26 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     <div className="w-full h-full bg-[#050505] text-zinc-100 flex flex-col overflow-hidden relative font-sans">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="h-14 md:h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-[#050505]/95 backdrop-blur-xl z-20 shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-zinc-500 hover:text-white flex items-center gap-1.5 transition-colors px-2 py-1.5 rounded-lg hover:bg-white/5">
+      <div className="h-14 md:h-16 border-b border-white/5 flex items-center justify-between px-3 md:px-6 gap-2 bg-[#050505]/95 backdrop-blur-xl z-20 shrink-0">
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+          <button onClick={onBack} className="shrink-0 text-zinc-500 hover:text-white flex items-center gap-1 transition-colors px-2 py-1.5 rounded-lg hover:bg-white/5">
             <ChevronLeft size={16} />
             <span className="hidden sm:inline text-sm font-medium">Back</span>
           </button>
-          <div className="h-5 w-px bg-white/8 hidden sm:block" />
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-white">Script Editor</h2>
-            <span className="text-[10px] font-mono bg-white/8 text-zinc-400 px-1.5 py-0.5 rounded-md border border-white/5">{script.length} segments</span>
-            {translateView && <span className="text-[10px] bg-orange-500/15 text-orange-300 px-1.5 py-0.5 rounded-md border border-orange-500/20">Hindi View</span>}
+          <div className="h-5 w-px bg-white/8 hidden sm:block shrink-0" />
+          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            <h2 className="text-sm font-semibold text-white truncate">Script Editor</h2>
+            <span className="shrink-0 text-[10px] font-mono bg-white/8 text-zinc-400 px-1.5 py-0.5 rounded-md border border-white/5">{script.length}</span>
+            {translateView && <span className="hidden sm:inline shrink-0 text-[10px] bg-orange-500/15 text-orange-300 px-1.5 py-0.5 rounded-md border border-orange-500/20">Hindi</span>}
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 md:gap-2">
+        <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
           <button
             onClick={handleTranslate}
             disabled={isTranslating}
-            className={`h-8 px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
+            title={translateView ? 'Original' : 'Translate to Hindi'}
+            className={`w-8 h-8 sm:w-auto sm:px-2.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 border ${
               translateView ? 'bg-orange-500/15 text-orange-300 border-orange-500/25' : 'bg-white/5 text-zinc-400 border-white/5 hover:text-zinc-200 hover:bg-white/8'
             }`}
           >
@@ -358,8 +358,8 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
 
           <button
             onClick={handleCopyScript}
-            className="h-8 px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border bg-white/5 text-zinc-400 border-white/5 hover:text-zinc-200 hover:bg-white/8"
             title="Copy full script"
+            className="w-8 h-8 sm:w-auto sm:px-2.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 border bg-white/5 text-zinc-400 border-white/5 hover:text-zinc-200 hover:bg-white/8"
           >
             {scriptCopied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
             <span className="hidden sm:inline">{scriptCopied ? 'Copied!' : 'Copy'}</span>
@@ -367,7 +367,8 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
 
           <button
             onClick={() => { setEditMode(!editMode); if (translateView) setTranslateView(false); }}
-            className={`h-8 px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${
+            title={editMode ? 'Done editing' : 'Edit script'}
+            className={`w-8 h-8 sm:w-auto sm:px-2.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 border ${
               editMode ? 'bg-white/10 text-white border-white/15' : 'bg-white/5 text-zinc-400 border-white/5 hover:text-zinc-200 hover:bg-white/8'
             }`}
           >
@@ -377,7 +378,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
 
           <button
             onClick={onNext}
-            className="h-8 bg-white text-black px-4 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 hover:bg-zinc-200"
+            className="h-8 bg-white text-black px-3 sm:px-4 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 hover:bg-zinc-200"
           >
             <span className="hidden sm:inline">Next</span>
             <ArrowRight size={14} />
