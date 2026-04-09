@@ -86,7 +86,7 @@ export const saveState = async (
     }));
 
     const thumbnailStateToStore = thumbnailState
-      ? { ...thumbnailState, referenceImage: null, thumbnailUrl: undefined }
+      ? { ...thumbnailState, referenceImage: null }
       : thumbnailState;
 
     await set(STORE_KEY, { appState, script: scriptToStore, thumbnailState: thumbnailStateToStore, youtubeData: youtubeData ?? null });

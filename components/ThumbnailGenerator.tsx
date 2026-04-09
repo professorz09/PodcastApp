@@ -52,6 +52,9 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
   const videoStyle: ThumbnailVideoStyle = thumbnailState.videoStyle || 'situational';
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Always-fresh ref so async handlers don't use stale state
+  const thumbnailStateRef = useRef(thumbnailState);
+  useEffect(() => { thumbnailStateRef.current = thumbnailState; }, [thumbnailState]);
 
   const styleOptions: { value: ThumbnailVideoStyle; label: string; desc: string; color: string }[] = [
     { value: 'situational', label: 'Situational', desc: 'Emotional & personal story', color: 'rose' },
@@ -102,7 +105,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       const text = getSourceText(titleSource);
       const generatedTitles = await generateTitles(text, videoStyle);
       onUpdateThumbnailState({
-        ...thumbnailState,
+        ...thumbnailStateRef.current,
         titles: generatedTitles,
       });
     } catch (e: any) {
@@ -120,7 +123,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       const text = getSourceText(titleSource);
       const generatedTexts = await generateThumbnailText(text, videoStyle);
       onUpdateThumbnailState({
-        ...thumbnailState,
+        ...thumbnailStateRef.current,
         thumbnailTexts: generatedTexts,
       });
     } catch (e: any) {
@@ -168,7 +171,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
         videoStyle,
         scriptTextForGen
       );
-      onUpdateThumbnailState({ ...thumbnailState, thumbnailUrl: url });
+      onUpdateThumbnailState({ ...thumbnailStateRef.current, thumbnailUrl: url });
     } catch (error: any) {
       setGenerateError(error.message || 'Thumbnail generation failed. Please try again.');
     } finally {
@@ -187,7 +190,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
       if (result.length === 0) {
         setPairError('Koi pair nahi aaya — dobara try karo.');
       } else {
-        onUpdateThumbnailState({ ...thumbnailState, comboPairs: result });
+        onUpdateThumbnailState({ ...thumbnailStateRef.current, comboPairs: result });
       }
     } catch (err: any) {
       setPairError(err?.message || 'Generation fail hui. Dobara try karo.');
@@ -211,7 +214,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     setInspirationError(null);
     try {
       const inspiration = await generateThumbnailInspiration(sourceText, videoStyle);
-      onUpdateThumbnailState({ ...thumbnailState, extraInstructions: inspiration });
+      onUpdateThumbnailState({ ...thumbnailStateRef.current, extraInstructions: inspiration });
     } catch (err: any) {
       setInspirationError(err?.message || 'Inspiration generate nahi hui. Dobara try karo.');
     } finally {

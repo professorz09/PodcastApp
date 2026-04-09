@@ -396,9 +396,9 @@ ${scriptText.slice(0, 3000)}`;
     const raw = response.text?.trim() || '[]';
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) throw new Error('Expected array from AI');
-    return parsed.slice(0, 3).filter(
-      (p: any) => p && typeof p.title === 'string' && typeof p.thumbnailText === 'string'
-    );
+    return parsed
+      .filter((p: any) => p && typeof p.title === 'string' && typeof p.thumbnailText === 'string')
+      .slice(0, 3);
   } catch (error: any) {
     if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
       throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
