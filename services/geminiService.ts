@@ -1014,80 +1014,220 @@ export const generateDebateScript = async (
             ${durFillHi}
           `;
         } else if (style === 'book_summary') {
-          prompt = `
-            ═══════════════════════════════════════
-            STYLE: BOOK SUMMARIZER — STRUCTURED BOOK/CHAPTER BREAKDOWN
-            एक solo voice। कोई dialogue नहीं। एक ही speaker पूरी book या chapter को
-            simple, relatable Hinglish में explain करता है।
-            Tone: Friendly teacher/dost — जैसे कोई आपको chai पिलाते हुए book explain कर रहा हो।
-            ═══════════════════════════════════════
-            Book / Chapter: "${topic}"
-            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
-            ${durLineHi}
-            Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
+          if (speakerCount === 1) {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: BOOK SUMMARIZER — SOLO VOICE EXPLAINER
+              One speaker only. No dialogue. No second voice.
+              Language: English — clear, conversational, warm.
+              Tone: Like a knowledgeable friend who just read the book and is telling you everything over coffee.
+              ═══════════════════════════════════════
+              Book / Chapter: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+              Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            STEP 0 — DETECT WHAT WAS GIVEN:
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            Topic ko analyze karo:
-            - Agar PURI BOOK ka naam hai (jaise "48 Laws of Power", "Atomic Habits", "The Psychology of Money") → poori book summarize karo — sabse important laws/chapters/concepts cover karo.
-            - Agar EK CHAPTER ya EK LAW hai (jaise "Law 1: Never Outshine The Master", "Chapter 3: Make Small Changes") → sirf usi ek chapter/law ka deep breakdown karo.
-            Dono cases mein SAME structured format follow karo.
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              DETECT INPUT TYPE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Full book title (e.g. "48 Laws of Power", "Atomic Habits") → summarize the whole book, covering the most important laws/chapters/concepts.
+              - One chapter or law (e.g. "Law 1: Never Outshine The Master") → deep breakdown of just that chapter/law.
+              Same structure applies in both cases.
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            STRUCTURE (EXACTLY isi order mein):
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE (in this exact order):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-            INTRO — SEEDHA SHURU KARO
-            Pehli line mein book/chapter ka naam bolo aur ek line mein core idea capture karo.
-            Example: "48 Laws of Power — Robert Greene ki woh book jo power ke rules explain karti hai jo koi nahi batata."
-            Ya: "Atomic Habits — yeh book bataati hai ki choti choti habits kaise aapki zindagi badal sakti hain."
-            2-3 lines mein batao is video mein kya cover hoga.
+              INTRO — START DIRECTLY
+              First line names the book/chapter and captures the core idea.
+              Example: "48 Laws of Power — Robert Greene's guide to understanding how power really works, and how to use it without being used."
+              Then 2-3 lines telling the listener exactly what this video covers.
 
-            BOOK/CHAPTER KYA HAI — BACKGROUND
-            - Author kaun hai aur unhone yeh kyun likha?
-            - Yeh book/chapter kis problem ko solve karta hai?
-            - Kitni important hai yeh — kisi real example ya stat se batao.
-            Simple language. Zero jargon.
+              BACKGROUND
+              Who wrote it and why? What problem does this book/chapter solve?
+              One real example or fact that shows why it matters. Simple language. Zero jargon.
 
-            MAIN CONTENT — LAW / CONCEPT / CHAPTER BREAKDOWN
-            Agar PURI BOOK hai: Har major law/chapter/concept ke liye ek block likho.
-            Agar EK CHAPTER hai: Us chapter ke 3-5 key ideas cover karo.
+              MAIN BREAKDOWN
+              For a full book: cover the 5-10 most important laws/chapters/concepts.
+              For one chapter: cover 3-5 key ideas from that chapter.
 
-            Har ek concept ke liye:
-            → CONCEPT KA NAAM clearly bolo
-            → 2-3 lines mein explain karo — bilkul simple, jaise kisi bachche ko samjha rahe ho
-            → Ek REAL-LIFE EXAMPLE do — kisi famous person, history, ya everyday situation se
-            → PRACTICAL APPLICATION — isko apni life mein kaise use karein? Specific batao.
+              For each concept:
+              → State the concept name clearly
+              → Explain it in 2-3 simple lines — as if explaining to someone who has never heard of this
+              → Give one real-life example — a famous person, historical event, or relatable everyday scenario
+              → Practical application — how can the listener use this in their own life? Be specific.
 
-            COMMON MISTAKE — LOGO KI GALTI
-            Ek common mistake ya misconception batao jo log is book/chapter ke baare mein rakhte hain.
-            1-2 lines. Sharp aur specific.
+              COMMON MISTAKE
+              One common mistake or misconception people have about this book/chapter.
+              1-2 sharp, specific lines.
 
-            KEY TAKEAWAYS — YAAD RAKHNE WALI BAATEIN
-            3-5 key points jo aaj se hi apply ho sakein.
-            Practical, doable, specific.
+              KEY TAKEAWAYS
+              3-5 things the listener can apply starting today. Practical, actionable, specific.
 
-            CLOSING — POWERFUL LAST LINE
-            Ek strong, memorable line se khatam karo — jo sunte hi dil mein baith jaaye.
-            Phir: "I hope you find this video informative. Thanks for watching."
+              CLOSING
+              One strong, memorable final line that captures the whole message.
+              Then: "I hope you found this video informative. Thanks for watching."
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            RULES:
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            ✓ Sirf 1 speaker — conversational Hinglish
-            ✓ Har concept ke saath ek real example — koi bhi generic nahi
-            ✓ Simple words — jargon ko immediately explain karo
-            ✓ Friendly, warm tone — jaise ek knowledgeable dost bata raha ho
-            ✓ Structure strict follow karo — every section must be present
-            ✓ PURI book deni hai to sabse important 5-10 laws/concepts cover karo
-            ✗ BANNED: Multiple speakers ya dialogue format
-            ✗ BANNED: "Aaj main aapko bataunga" — seedha shuru karo
-            ✗ BANNED: Generic filler ("yeh bahut zaroori hai", "yeh book bahut acchi hai")
-            ✗ BANNED: Formatting marks — no **, no --, no [], no bullet symbols
-            ✗ BANNED: Section headings in output — sirf natural flowing speech
-            ${durFillHi}
-          `;
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Single speaker throughout — warm, confident, conversational
+              ✓ Real example for every concept — no vague placeholders
+              ✓ Explain any term immediately when used — zero assumed knowledge
+              ✓ Every section must be present
+              ✗ BANNED: Second speaker or dialogue of any kind
+              ✗ BANNED: Generic opener like "Today I'm going to tell you about..." — start directly
+              ✗ BANNED: Filler phrases ("This is very important", "This book is amazing")
+              ✗ BANNED: Formatting marks — no **, no --, no [], no bullet symbols in output
+              ✗ BANNED: Section headings in output — natural flowing speech only
+              ${durFillEn}
+            `;
+          } else if (!includeNarrator) {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: BOOK SUMMARIZER — 2 HOSTS DISCUSSION (NO NARRATOR)
+              Two hosts break down the book/chapter together in a natural back-and-forth conversation.
+              No narrator. No third voice. Just two engaged, curious hosts.
+              Language: English — conversational, energetic, easy to follow.
+              ═══════════════════════════════════════
+              Book / Chapter: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+              Hosts: ${speakers.length >= 2 ? `${speakers[0]} and ${speakers[1]}` : 'Choose two natural-sounding names — one male, one female'}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              DETECT INPUT TYPE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Full book title → cover the most important 5-10 laws/concepts from the whole book.
+              - One chapter/law → go deep on just that chapter — cover 3-5 key ideas from it.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              HOST PERSONALITIES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Host A: Curious, asks questions, plays devil's advocate — sometimes skeptical.
+              Host B: Well-read on the topic, explains clearly, gives examples, sees multiple angles.
+              Both sound natural — not scripted. They react, build on each other, occasionally push back.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              OPENING (Host A or B — 3-4 lines)
+              Jump straight in. Name the book/chapter. One-line hook on what it's about.
+              Tell the listener what they'll learn in this episode. No warm-up. No generic greetings.
+              Example: "Today we're diving into 48 Laws of Power — the book that basically wrote the rulebook on how power works in the real world. We'll break down the biggest laws, the most shocking examples, and whether any of this is actually useful in everyday life."
+
+              BACKGROUND — SHORT (2-3 exchanges)
+              Host A asks: who wrote it and why does this book exist?
+              Host B answers with the context — author background, what problem the book solves, one striking fact about the book.
+
+              CONCEPT BREAKDOWN (this is the main bulk)
+              Go through each major law/concept one by one:
+              → Host B introduces the concept in simple terms
+              → Host A reacts — asks a follow-up, challenges it, or gives a real-world angle
+              → Host B gives a real example — specific name, event, or scenario (not vague)
+              → Both agree on the practical takeaway — how does someone use this today?
+              Transition naturally between concepts — "Okay, next one..." or "That reminds me of another law..."
+
+              COMMON MISTAKE (1 exchange)
+              Host A raises a common misconception about the book/chapter.
+              Host B corrects it clearly and specifically.
+
+              KEY TAKEAWAYS (1 exchange — Host A or B)
+              3-5 specific things the listener can actually apply. Not vague advice — real, actionable steps.
+
+              CLOSING (2-3 lines — one or both hosts)
+              One strong final thought that captures the message of the book/chapter.
+              End with: "Hope you found this useful. See you in the next one."
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Exactly 2 speakers — no narrator, no third voice
+              ✓ Real example for every concept — no generic "imagine someone does X..."
+              ✓ Explain any term the moment it's used — zero jargon left unexplained
+              ✓ Hosts must sound different — not a monologue split into two
+              ✗ BANNED: Narrator or any third speaker
+              ✗ BANNED: Generic opener ("Hey guys, welcome back to...") — start on topic immediately
+              ✗ BANNED: Filler agreement ("Absolutely!", "Great point!", "Totally!") — every exchange adds value
+              ✗ BANNED: Formatting marks in output — no **, no --, no [], no bullet symbols
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          } else {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: BOOK SUMMARIZER — NARRATED 2 HOST FORMAT
+              Narrator opens and closes. Two hosts do the main breakdown.
+              Language: English — clear, engaging, accessible.
+              ═══════════════════════════════════════
+              Book / Chapter: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+              Narrator: Narrator
+              Hosts: ${speakers.length >= 2 ? `${speakers[0]} and ${speakers[1]}` : 'Choose two natural-sounding names — one male, one female'}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              DETECT INPUT TYPE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Full book title → cover the most important 5-10 laws/concepts from the whole book.
+              - One chapter/law → deep breakdown of just that chapter — cover 3-5 key ideas.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              HOST PERSONALITIES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Host A: Curious, questions-driven, occasionally skeptical — the learner in the room.
+              Host B: Knowledgeable, example-driven, explains both sides — the expert in the room.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE (strictly in this order):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              NARRATOR — OPENING (3-4 lines max)
+              State the book/chapter name directly. One-sentence hook on the core idea.
+              Tell the listener what they'll take away from this episode. No warmup. No generic intro.
+              Example: "48 Laws of Power by Robert Greene — a book that reveals how power really works in the world, who has it, who loses it, and why. Today, we break down the biggest laws and what they mean for your real life."
+
+              HOSTS — BACKGROUND (2-3 exchanges)
+              Host A asks about the book's origin — who wrote it, why does it exist?
+              Host B answers: author background, the problem the book solves, one striking real fact.
+
+              HOSTS — CONCEPT BREAKDOWN (main content)
+              Go through each major concept/law one by one:
+              → Host B introduces the concept simply
+              → Host A reacts — questions, challenges, or real-world angle
+              → Host B gives a specific real example — name, event, scenario
+              → Both land on a practical takeaway — how to apply this today
+              Transition naturally between concepts.
+
+              HOSTS — COMMON MISTAKE (1 exchange)
+              Host A raises a common misconception. Host B corrects it sharply.
+
+              HOSTS — KEY TAKEAWAYS (1 exchange)
+              3-5 specific, actionable things the listener can use today.
+
+              NARRATOR — CLOSING (2-3 lines)
+              One strong line capturing the essence of the book/chapter.
+              Then: "I hope you found this video informative. Thanks for watching."
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Narrator only appears at the very start and very end — nowhere in the middle
+              ✓ Exactly 2 hosts for the main discussion
+              ✓ Real, specific example for every concept — no generic placeholders
+              ✓ Explain every term immediately — no unexplained jargon
+              ✗ BANNED: Narrator speaking in the middle of the discussion
+              ✗ BANNED: Generic opener — Narrator must name the book/topic in the first line
+              ✗ BANNED: Filler agreement ("Absolutely!", "Great point!") — every line must add value
+              ✗ BANNED: Formatting marks in output — no **, no --, no [], no bullet symbols
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          }
         } else if (style === 'explained_solo') {
           prompt = `
             ═══════════════════════════════════════
@@ -2257,75 +2397,220 @@ export const generateDebateScript = async (
             ${durFillEn}
           `;
         } else if (style === 'book_summary') {
-          prompt = `
-            ═══════════════════════════════════════
-            STYLE: BOOK SUMMARIZER — STRUCTURED BOOK/CHAPTER BREAKDOWN
-            One solo voice. No dialogue. No debate.
-            Explain the full book or a specific chapter in simple, conversational language.
-            Tone: Friendly teacher — like a knowledgeable friend explaining over coffee.
-            Language: Hinglish (natural blend of Hindi and English — conversational YouTube style).
-            ═══════════════════════════════════════
-            Book / Chapter: "${topic}"
-            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
-            ${durLineEn}
-            Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
+          if (speakerCount === 1) {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: BOOK SUMMARIZER — SOLO VOICE EXPLAINER
+              One speaker only. No dialogue. No second voice.
+              Language: English — clear, conversational, warm.
+              Tone: Like a knowledgeable friend who just read the book and is telling you everything over coffee.
+              ═══════════════════════════════════════
+              Book / Chapter: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+              Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            DETECT WHAT WAS GIVEN:
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            - If FULL BOOK name (e.g. "48 Laws of Power", "Atomic Habits") → summarize the whole book covering the most important laws/chapters/concepts.
-            - If ONE CHAPTER or LAW (e.g. "Law 1: Never Outshine The Master") → deep breakdown of just that chapter/law.
-            Same structure either way.
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              DETECT INPUT TYPE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Full book title (e.g. "48 Laws of Power", "Atomic Habits") → summarize the whole book, covering the most important laws/chapters/concepts.
+              - One chapter or law (e.g. "Law 1: Never Outshine The Master") → deep breakdown of just that chapter/law.
+              Same structure applies in both cases.
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            STRUCTURE (exactly in this order):
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE (in this exact order):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-            INTRO — START DIRECTLY
-            First line: book/chapter name + one-line core idea.
-            Example: "48 Laws of Power — Robert Greene ki woh book jo power ke rules batati hai jo koi nahi batata."
-            2-3 lines preview of what this video covers.
+              INTRO — START DIRECTLY
+              First line names the book/chapter and captures the core idea.
+              Example: "48 Laws of Power — Robert Greene's guide to understanding how power really works, and how to use it without being used."
+              Then 2-3 lines telling the listener exactly what this video covers.
 
-            BACKGROUND
-            Who wrote it and why? What problem does this book/chapter solve?
-            One real example or fact to show why it matters. Simple language, zero jargon.
+              BACKGROUND
+              Who wrote it and why? What problem does this book/chapter solve?
+              One real example or fact that shows why it matters. Simple language. Zero jargon.
 
-            MAIN BREAKDOWN
-            For full book: cover the 5-10 most important laws/chapters/concepts.
-            For one chapter: cover 3-5 key ideas from that chapter.
+              MAIN BREAKDOWN
+              For a full book: cover the 5-10 most important laws/chapters/concepts.
+              For one chapter: cover 3-5 key ideas from that chapter.
 
-            For each concept:
-            → Name the concept clearly
-            → Explain in 2-3 simple lines — like explaining to a child
-            → One real-life example (famous person, historical event, or everyday situation)
-            → Practical application — how to use this in your own life? Be specific.
+              For each concept:
+              → State the concept name clearly
+              → Explain it in 2-3 simple lines — as if explaining to someone who has never heard of this
+              → Give one real-life example — a famous person, historical event, or relatable everyday scenario
+              → Practical application — how can the listener use this in their own life? Be specific.
 
-            COMMON MISTAKE
-            One common mistake or misconception people have about this book/chapter.
-            1-2 sharp, specific lines.
+              COMMON MISTAKE
+              One common mistake or misconception people have about this book/chapter.
+              1-2 sharp, specific lines.
 
-            KEY TAKEAWAYS
-            3-5 things the listener can apply starting today. Practical and specific.
+              KEY TAKEAWAYS
+              3-5 things the listener can apply starting today. Practical, actionable, specific.
 
-            CLOSING
-            One strong, memorable final line.
-            Then: "I hope you find this video informative. Thanks for watching."
+              CLOSING
+              One strong, memorable final line that captures the whole message.
+              Then: "I hope you found this video informative. Thanks for watching."
 
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            RULES:
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            ✓ Single speaker — Hinglish throughout
-            ✓ Real example for every concept — no generic placeholders
-            ✓ Simple words — explain any jargon immediately
-            ✓ Warm, friendly, engaging tone
-            ✓ Every section must be present
-            ✗ BANNED: Multiple speakers or dialogue
-            ✗ BANNED: "Aaj main aapko bataunga" — start directly
-            ✗ BANNED: Generic filler phrases
-            ✗ BANNED: Formatting marks — no **, no --, no [], no bullet symbols
-            ✗ BANNED: Section headings in output — natural flowing speech only
-            ${durFillEn}
-          `;
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Single speaker throughout — warm, confident, conversational
+              ✓ Real example for every concept — no vague placeholders
+              ✓ Explain any term immediately when used — zero assumed knowledge
+              ✓ Every section must be present
+              ✗ BANNED: Second speaker or dialogue of any kind
+              ✗ BANNED: Generic opener like "Today I'm going to tell you about..." — start directly
+              ✗ BANNED: Filler phrases ("This is very important", "This book is amazing")
+              ✗ BANNED: Formatting marks — no **, no --, no [], no bullet symbols in output
+              ✗ BANNED: Section headings in output — natural flowing speech only
+              ${durFillEn}
+            `;
+          } else if (!includeNarrator) {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: BOOK SUMMARIZER — 2 HOSTS DISCUSSION (NO NARRATOR)
+              Two hosts break down the book/chapter together in a natural back-and-forth conversation.
+              No narrator. No third voice. Just two engaged, curious hosts.
+              Language: English — conversational, energetic, easy to follow.
+              ═══════════════════════════════════════
+              Book / Chapter: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+              Hosts: ${speakers.length >= 2 ? `${speakers[0]} and ${speakers[1]}` : 'Choose two natural-sounding names — one male, one female'}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              DETECT INPUT TYPE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Full book title → cover the most important 5-10 laws/concepts from the whole book.
+              - One chapter/law → go deep on just that chapter — cover 3-5 key ideas from it.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              HOST PERSONALITIES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Host A: Curious, asks questions, plays devil's advocate — sometimes skeptical.
+              Host B: Well-read on the topic, explains clearly, gives examples, sees multiple angles.
+              Both sound natural — not scripted. They react, build on each other, occasionally push back.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              OPENING (Host A or B — 3-4 lines)
+              Jump straight in. Name the book/chapter. One-line hook on what it's about.
+              Tell the listener what they'll learn in this episode. No warm-up. No generic greetings.
+              Example: "Today we're diving into 48 Laws of Power — the book that basically wrote the rulebook on how power works in the real world. We'll break down the biggest laws, the most shocking examples, and whether any of this is actually useful in everyday life."
+
+              BACKGROUND — SHORT (2-3 exchanges)
+              Host A asks: who wrote it and why does this book exist?
+              Host B answers with context — author background, what problem the book solves, one striking fact.
+
+              CONCEPT BREAKDOWN (main content)
+              Go through each major law/concept one by one:
+              → Host B introduces the concept in simple terms
+              → Host A reacts — asks a follow-up, challenges it, or gives a real-world angle
+              → Host B gives a real example — specific name, event, or scenario (not vague)
+              → Both agree on the practical takeaway — how does someone use this today?
+              Transition naturally between concepts — "Okay, next one..." or "That reminds me of..."
+
+              COMMON MISTAKE (1 exchange)
+              Host A raises a common misconception about the book/chapter.
+              Host B corrects it clearly and specifically.
+
+              KEY TAKEAWAYS (1 exchange)
+              3-5 specific things the listener can actually apply. Not vague advice — real, actionable steps.
+
+              CLOSING (2-3 lines — one or both hosts)
+              One strong final thought that captures the message of the book/chapter.
+              End with: "Hope you found this useful. See you in the next one."
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Exactly 2 speakers — no narrator, no third voice
+              ✓ Real example for every concept — no generic "imagine someone does X..."
+              ✓ Explain any term the moment it's used — zero jargon left unexplained
+              ✓ Hosts must sound different — not a monologue split into two
+              ✗ BANNED: Narrator or any third speaker
+              ✗ BANNED: Generic opener ("Hey guys, welcome back to...") — start on topic immediately
+              ✗ BANNED: Filler agreement ("Absolutely!", "Great point!", "Totally!") — every exchange adds value
+              ✗ BANNED: Formatting marks in output — no **, no --, no [], no bullet symbols
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          } else {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: BOOK SUMMARIZER — NARRATED 2 HOST FORMAT
+              Narrator opens and closes. Two hosts do the main breakdown.
+              Language: English — clear, engaging, accessible.
+              ═══════════════════════════════════════
+              Book / Chapter: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+              Narrator: Narrator
+              Hosts: ${speakers.length >= 2 ? `${speakers[0]} and ${speakers[1]}` : 'Choose two natural-sounding names — one male, one female'}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              DETECT INPUT TYPE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              - Full book title → cover the most important 5-10 laws/concepts from the whole book.
+              - One chapter/law → deep breakdown of just that chapter — cover 3-5 key ideas.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              HOST PERSONALITIES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Host A: Curious, questions-driven, occasionally skeptical — the learner in the room.
+              Host B: Knowledgeable, example-driven, explains both sides — the expert in the room.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE (strictly in this order):
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              NARRATOR — OPENING (3-4 lines max)
+              State the book/chapter name directly. One-sentence hook on the core idea.
+              Tell the listener what they'll take away from this episode. No warmup. No generic intro.
+              Example: "48 Laws of Power by Robert Greene — a book that reveals how power really works in the world, who has it, who loses it, and why. Today, we break down the biggest laws and what they mean for your real life."
+
+              HOSTS — BACKGROUND (2-3 exchanges)
+              Host A asks about the book's origin — who wrote it, why does it exist?
+              Host B answers: author background, the problem the book solves, one striking real fact.
+
+              HOSTS — CONCEPT BREAKDOWN (main content)
+              Go through each major concept/law one by one:
+              → Host B introduces the concept simply
+              → Host A reacts — questions, challenges, or real-world angle
+              → Host B gives a specific real example — name, event, scenario
+              → Both land on a practical takeaway — how to apply this today
+              Transition naturally between concepts.
+
+              HOSTS — COMMON MISTAKE (1 exchange)
+              Host A raises a common misconception. Host B corrects it sharply.
+
+              HOSTS — KEY TAKEAWAYS (1 exchange)
+              3-5 specific, actionable things the listener can use today.
+
+              NARRATOR — CLOSING (2-3 lines)
+              One strong line capturing the essence of the book/chapter.
+              Then: "I hope you found this video informative. Thanks for watching."
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Narrator only appears at the very start and very end — nowhere in the middle
+              ✓ Exactly 2 hosts for the main discussion
+              ✓ Real, specific example for every concept — no generic placeholders
+              ✓ Explain every term immediately — no unexplained jargon
+              ✗ BANNED: Narrator speaking in the middle of the discussion
+              ✗ BANNED: Generic opener — Narrator must name the book/topic in the first line
+              ✗ BANNED: Filler agreement ("Absolutely!", "Great point!") — every line must add value
+              ✗ BANNED: Formatting marks in output — no **, no --, no [], no bullet symbols
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          }
         } else if (style === 'explained_solo') {
           prompt = `
             ═══════════════════════════════════════
