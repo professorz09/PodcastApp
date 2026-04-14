@@ -35,7 +35,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview'>('gemini-3.1-flash-lite-preview');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -202,14 +202,30 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   type="text"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Enter a controversial topic (e.g., 'Is AI dangerous?')"
+                  placeholder={
+                    style === 'book_summary'
+                      ? "Book ka naam likhо (e.g. '48 Laws of Power') ya chapter (e.g. 'Atomic Habits - Chapter 1')"
+                      : "Enter a controversial topic (e.g., 'Is AI dangerous?')"
+                  }
                   className="w-full bg-transparent text-white px-5 py-4 text-base md:text-lg placeholder:text-gray-600 focus:outline-none font-medium"
                 />
+                {style === 'book_summary' && (
+                  <div className="px-5">
+                    <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-300/80">
+                      📚 <strong>Puri book</strong> ke liye: "Atomic Habits" ya "The Psychology of Money" — sab key concepts cover honge.<br/>
+                      📖 <strong>Ek chapter/law</strong> ke liye: "48 Laws of Power - Law 1" ya "Atomic Habits Chapter 3" — sirf usi ka deep breakdown.
+                    </div>
+                  </div>
+                )}
                 <div className="px-5 pb-4">
                   <textarea
                     value={specificDetails}
                     onChange={(e) => setSpecificDetails(e.target.value)}
-                    placeholder="Optional: Add specific details, context, or background info..."
+                    placeholder={
+                      style === 'book_summary'
+                        ? "Optional: Koi specific angle ya focus? (e.g. 'Business ke liye apply karna' ya 'Relationships pe focus karo')"
+                        : "Optional: Add specific details, context, or background info..."
+                    }
                     rows={2}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-3 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-purple-500/50 resize-none"
                   />
@@ -438,7 +454,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang';
+                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
@@ -453,6 +469,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'joe_rogan') { setSpeakerCount(2); }
                       if (newStyle === 'finance_deep_dive') { setSpeakerCount(3); }
                       if (newStyle === 'professor_jiang') { setSpeakerCount(1); setIncludeNarrator(false); }
+                      if (newStyle === 'book_summary') { setSpeakerCount(1); setIncludeNarrator(false); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
@@ -469,6 +486,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="podcast_breakdown">Podcast Breakdown</option>
                     <option value="context_bridge">Context Analyst</option>
                     <option value="professor_jiang">🎓 Prof. Jiang Xueqin</option>
+                    <option value="book_summary">📚 Book Summarizer</option>
                   </select>
                 </div>
               </div>

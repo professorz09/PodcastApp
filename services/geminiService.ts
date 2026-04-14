@@ -652,7 +652,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.1-flash-lite-preview',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1011,6 +1011,81 @@ export const generateDebateScript = async (
             ✗ BANNED: Vague conclusions ("time will tell", "only time will tell")
             ✗ BANNED: Any brackets in the output — no [ ], no 【 】, no ( ) around labels — plain text only
             ✗ BANNED: Section headings in the output — just flow naturally from one section to next
+            ${durFillHi}
+          `;
+        } else if (style === 'book_summary') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: BOOK SUMMARIZER — STRUCTURED BOOK/CHAPTER BREAKDOWN
+            एक solo voice। कोई dialogue नहीं। एक ही speaker पूरी book या chapter को
+            simple, relatable Hinglish में explain करता है।
+            Tone: Friendly teacher/dost — जैसे कोई आपको chai पिलाते हुए book explain कर रहा हो।
+            ═══════════════════════════════════════
+            Book / Chapter: "${topic}"
+            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+            ${durLineHi}
+            Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STEP 0 — DETECT WHAT WAS GIVEN:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Topic ko analyze karo:
+            - Agar PURI BOOK ka naam hai (jaise "48 Laws of Power", "Atomic Habits", "The Psychology of Money") → poori book summarize karo — sabse important laws/chapters/concepts cover karo.
+            - Agar EK CHAPTER ya EK LAW hai (jaise "Law 1: Never Outshine The Master", "Chapter 3: Make Small Changes") → sirf usi ek chapter/law ka deep breakdown karo.
+            Dono cases mein SAME structured format follow karo.
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE (EXACTLY isi order mein):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            INTRO — SEEDHA SHURU KARO
+            Pehli line mein book/chapter ka naam bolo aur ek line mein core idea capture karo.
+            Example: "48 Laws of Power — Robert Greene ki woh book jo power ke rules explain karti hai jo koi nahi batata."
+            Ya: "Atomic Habits — yeh book bataati hai ki choti choti habits kaise aapki zindagi badal sakti hain."
+            2-3 lines mein batao is video mein kya cover hoga.
+
+            BOOK/CHAPTER KYA HAI — BACKGROUND
+            - Author kaun hai aur unhone yeh kyun likha?
+            - Yeh book/chapter kis problem ko solve karta hai?
+            - Kitni important hai yeh — kisi real example ya stat se batao.
+            Simple language. Zero jargon.
+
+            MAIN CONTENT — LAW / CONCEPT / CHAPTER BREAKDOWN
+            Agar PURI BOOK hai: Har major law/chapter/concept ke liye ek block likho.
+            Agar EK CHAPTER hai: Us chapter ke 3-5 key ideas cover karo.
+
+            Har ek concept ke liye:
+            → CONCEPT KA NAAM clearly bolo
+            → 2-3 lines mein explain karo — bilkul simple, jaise kisi bachche ko samjha rahe ho
+            → Ek REAL-LIFE EXAMPLE do — kisi famous person, history, ya everyday situation se
+            → PRACTICAL APPLICATION — isko apni life mein kaise use karein? Specific batao.
+
+            COMMON MISTAKE — LOGO KI GALTI
+            Ek common mistake ya misconception batao jo log is book/chapter ke baare mein rakhte hain.
+            1-2 lines. Sharp aur specific.
+
+            KEY TAKEAWAYS — YAAD RAKHNE WALI BAATEIN
+            3-5 key points jo aaj se hi apply ho sakein.
+            Practical, doable, specific.
+
+            CLOSING — POWERFUL LAST LINE
+            Ek strong, memorable line se khatam karo — jo sunte hi dil mein baith jaaye.
+            Phir: "I hope you find this video informative. Thanks for watching."
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Sirf 1 speaker — conversational Hinglish
+            ✓ Har concept ke saath ek real example — koi bhi generic nahi
+            ✓ Simple words — jargon ko immediately explain karo
+            ✓ Friendly, warm tone — jaise ek knowledgeable dost bata raha ho
+            ✓ Structure strict follow karo — every section must be present
+            ✓ PURI book deni hai to sabse important 5-10 laws/concepts cover karo
+            ✗ BANNED: Multiple speakers ya dialogue format
+            ✗ BANNED: "Aaj main aapko bataunga" — seedha shuru karo
+            ✗ BANNED: Generic filler ("yeh bahut zaroori hai", "yeh book bahut acchi hai")
+            ✗ BANNED: Formatting marks — no **, no --, no [], no bullet symbols
+            ✗ BANNED: Section headings in output — sirf natural flowing speech
             ${durFillHi}
           `;
         } else if (style === 'explained_solo') {
@@ -2179,6 +2254,76 @@ export const generateDebateScript = async (
             ✗ BANNED: "Only time will tell" or other vague non-conclusions
             ✗ BANNED: Any brackets in output — no [ ], no 【 】, no ( ) around labels — plain spoken text only
             ✗ BANNED: Section headings in the output — content must flow naturally without printed headers
+            ${durFillEn}
+          `;
+        } else if (style === 'book_summary') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: BOOK SUMMARIZER — STRUCTURED BOOK/CHAPTER BREAKDOWN
+            One solo voice. No dialogue. No debate.
+            Explain the full book or a specific chapter in simple, conversational language.
+            Tone: Friendly teacher — like a knowledgeable friend explaining over coffee.
+            Language: Hinglish (natural blend of Hindi and English — conversational YouTube style).
+            ═══════════════════════════════════════
+            Book / Chapter: "${topic}"
+            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Speaker: ${speakers.length > 0 ? speakers[0] : 'Voiceover'}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            DETECT WHAT WAS GIVEN:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            - If FULL BOOK name (e.g. "48 Laws of Power", "Atomic Habits") → summarize the whole book covering the most important laws/chapters/concepts.
+            - If ONE CHAPTER or LAW (e.g. "Law 1: Never Outshine The Master") → deep breakdown of just that chapter/law.
+            Same structure either way.
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE (exactly in this order):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            INTRO — START DIRECTLY
+            First line: book/chapter name + one-line core idea.
+            Example: "48 Laws of Power — Robert Greene ki woh book jo power ke rules batati hai jo koi nahi batata."
+            2-3 lines preview of what this video covers.
+
+            BACKGROUND
+            Who wrote it and why? What problem does this book/chapter solve?
+            One real example or fact to show why it matters. Simple language, zero jargon.
+
+            MAIN BREAKDOWN
+            For full book: cover the 5-10 most important laws/chapters/concepts.
+            For one chapter: cover 3-5 key ideas from that chapter.
+
+            For each concept:
+            → Name the concept clearly
+            → Explain in 2-3 simple lines — like explaining to a child
+            → One real-life example (famous person, historical event, or everyday situation)
+            → Practical application — how to use this in your own life? Be specific.
+
+            COMMON MISTAKE
+            One common mistake or misconception people have about this book/chapter.
+            1-2 sharp, specific lines.
+
+            KEY TAKEAWAYS
+            3-5 things the listener can apply starting today. Practical and specific.
+
+            CLOSING
+            One strong, memorable final line.
+            Then: "I hope you find this video informative. Thanks for watching."
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Single speaker — Hinglish throughout
+            ✓ Real example for every concept — no generic placeholders
+            ✓ Simple words — explain any jargon immediately
+            ✓ Warm, friendly, engaging tone
+            ✓ Every section must be present
+            ✗ BANNED: Multiple speakers or dialogue
+            ✗ BANNED: "Aaj main aapko bataunga" — start directly
+            ✗ BANNED: Generic filler phrases
+            ✗ BANNED: Formatting marks — no **, no --, no [], no bullet symbols
+            ✗ BANNED: Section headings in output — natural flowing speech only
             ${durFillEn}
           `;
         } else if (style === 'explained_solo') {
