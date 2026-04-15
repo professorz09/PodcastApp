@@ -652,7 +652,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.1-flash-lite-preview',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1224,6 +1224,187 @@ export const generateDebateScript = async (
               ✗ BANNED: Generic opener — Narrator must name the book/topic in the first line
               ✗ BANNED: Filler agreement ("Absolutely!", "Great point!") — every line must add value
               ✗ BANNED: Formatting marks in output — no **, no --, no [], no bullet symbols
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          }
+        } else if (style === 'questioning') {
+          const speakerBlock = speakerCount >= 4 && speakers.length >= 4
+            ? `Speaker 1: ${speakers[0]}\nSpeaker 2: ${speakers[1]}\nSpeaker 3: ${speakers[2]}\nSpeaker 4: ${speakers[3]}`
+            : `Auto-select 4 speakers whose worldviews are most interesting and contrasting for this specific topic.
+Examples:
+- For a moral/religious topic → Christian, Muslim, Buddhist, Atheist
+- For an AI topic → ChatGPT, Grok, Claude, Gemini
+- For a financial topic → Warren Buffett, Elon Musk, Dave Ramsey, a broke 25-year-old
+- For a political topic → Democrat, Republican, Libertarian, Socialist
+- For a health topic → Strict doctor, naturopath, fitness bro, couch potato
+Pick whatever 4 make the most entertaining AND most informative combination for this specific topic.`;
+
+          if (!includeNarrator) {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: QUESTIONING — 4 PERSPECTIVES, NO NARRATOR
+              4 speakers. One of them opens and drives the conversation as the host.
+              Language: English. Audience: USA adults.
+              Tone: Engaging, funny at moments, always substantive — like a great panel show.
+              ═══════════════════════════════════════
+              Topic / Scenario: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+
+              ${speakerBlock}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES FOR EACH SPEAKER:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Every speaker has a consistent, distinct personality and worldview throughout.
+              They argue from their lens — they don't flip-flop or suddenly agree with everyone.
+              Speakers can react to each other's lines — short, sharp reactions add energy.
+              Every argument needs a real example. No abstract reasoning without an anchor.
+              Funny moments are encouraged — a speaker being unexpectedly self-aware, a brutal comeback, an absurd analogy — but never at the cost of substance.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              OPENING — Speaker 1 sets up the scenario (2-3 lines)
+              State the situation clearly. Make it feel real and immediate. Pose the central question to the group.
+              Example: "Okay so here's the situation — [scenario]. The question is: [question]. I want to hear what each of you actually thinks, no safe answers."
+
+              ROUND 1 — Initial takes (each speaker: 3-4 lines)
+              Each of the 4 speakers gives their honest first reaction from their worldview.
+              End each take with their core position in one clear sentence.
+
+              FOLLOW-UP — Speaker 1 challenges one specific point (1-2 lines)
+              Pick the most interesting tension or contradiction from Round 1 and push on it.
+              "Wait — [Speaker X], you said [Y]. But what about [Z]?"
+
+              ROUND 2 — Deeper arguments (each speaker: 3-5 lines)
+              Speakers go deeper. They respond to the follow-up and to each other.
+              At least one speaker should acknowledge a genuine weakness in their own position.
+              At least one speaker should call out another's argument directly.
+
+              CURVEBALL — Speaker 1 introduces a twist or edge case (1-2 lines)
+              Add a real complication that makes the question harder.
+              Something like: "But what if [twist]? Does your answer change?"
+
+              ROUND 3 — Twist response (each speaker: 2-3 lines)
+              Speakers adapt (or refuse to). Some hold firm, some shift. Genuine disagreement is better than consensus.
+
+              FINAL QUESTION — Speaker 1 asks for one-line verdict (1 line)
+              "One sentence. What's your actual answer to [the original question]?"
+
+              VERDICTS — Each speaker gives exactly 1-2 lines
+              Their final position. No hedging. No "it depends." A real stance.
+
+              CLOSE — Speaker 1 wraps (2-3 lines)
+              A sharp observation on what just happened. What the conversation revealed.
+              No moral of the story, no lecture — just a smart final thought.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              NON-NEGOTIABLE RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Exactly 4 speakers throughout
+              ✓ Every speaker sounds clearly different — not 4 versions of the same voice
+              ✓ Every major argument has a real example — a name, an event, a specific situation
+              ✓ Explain any term the moment it appears — USA general audience, not academics
+              ✓ Funny lines welcome — but every joke still makes a point
+              ✗ BANNED: Speakers suddenly agreeing on everything — tension must stay alive
+              ✗ BANNED: Safe, wishy-washy answers ("well, it depends on the person...")
+              ✗ BANNED: Preaching or moralizing — inform and entertain, don't lecture
+              ✗ BANNED: Generic filler ("That's a great point!", "Absolutely!", "I totally agree!")
+              ✗ BANNED: Formatting marks — no **, no --, no bullet symbols in output
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          } else {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: QUESTIONING — NARRATOR + 4 PERSPECTIVES
+              Narrator is the sharp, curious host. 4 speakers give their worldview on a real situation.
+              Language: English. Audience: USA adults.
+              Tone: Engaging, funny at moments, always substantive — like a great panel show.
+              ═══════════════════════════════════════
+              Topic / Scenario: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+
+              Narrator: Narrator (sharp, curious, occasionally funny host — never neutral and boring)
+              ${speakerBlock}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              NARRATOR RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Narrator is NOT a news anchor. They are a sharp, curious host who genuinely wants to understand.
+              They ask pointed questions, push back on weak answers, and occasionally crack a dry joke.
+              They connect the dots between different answers at the end.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              SPEAKER RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Every speaker has a consistent, distinct personality and worldview throughout.
+              They argue from their lens — they don't flip-flop or suddenly agree with everyone.
+              Speakers can react to each other's lines — short, sharp reactions add energy.
+              Every argument needs a real example. No abstract reasoning without a concrete anchor.
+              Funny moments are encouraged — but never at the cost of substance.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              NARRATOR — OPENING (3-4 lines)
+              Lay out the situation clearly and vividly. Make it feel real and immediate.
+              Pose the central question. Introduce who's here to answer it.
+              Example: "Here's the scenario: [situation]. It sounds simple — but it isn't. Today we've got [Speaker 1], [Speaker 2], [Speaker 3], and [Speaker 4] to tell us exactly what they'd do and why. Let's get into it."
+
+              ROUND 1 — Narrator asks: "What's your first reaction?"
+              Narrator poses the question directly to all 4 speakers.
+              Each speaker: 3-4 lines. Their honest first reaction from their worldview.
+              End each take with a one-sentence position.
+
+              NARRATOR — FOLLOW-UP (1-2 lines)
+              Pick the most interesting tension from Round 1. Push on it directly.
+              "Okay — [Speaker X] said [Y]. [Speaker Z], you basically said the opposite. Who's right?"
+
+              ROUND 2 — Deeper arguments
+              Each speaker: 3-5 lines. Go deeper. Respond to the follow-up and to each other.
+              At least one speaker acknowledges a real weakness in their own position.
+              At least one speaker directly challenges another's argument.
+
+              NARRATOR — CURVEBALL (1-2 lines)
+              Throw a twist or edge case that makes the question harder.
+              "But here's the thing — what if [twist]? Does anyone's answer change?"
+
+              ROUND 3 — Twist response (each speaker: 2-3 lines)
+              Some speakers adapt, some hold firm. Real disagreement is better than consensus.
+
+              NARRATOR — FINAL QUESTION (1 line)
+              "One sentence. What's your actual final answer?"
+
+              VERDICTS — Each speaker: 1-2 lines
+              No hedging. A real, specific stance.
+
+              NARRATOR — CLOSING (3-4 lines)
+              A sharp observation about what the conversation revealed.
+              What the different perspectives together teach us — without picking a winner.
+              No moral lecture. Just a genuinely smart final thought.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              NON-NEGOTIABLE RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Exactly 4 speakers + Narrator
+              ✓ Every speaker sounds clearly different — distinct voice, distinct worldview
+              ✓ Every major argument has a real example — a name, an event, a specific situation
+              ✓ Explain any term the moment it appears — USA general audience, not academics
+              ✓ Funny moments welcome — every joke still makes a point
+              ✗ BANNED: Speakers suddenly agreeing on everything — tension must stay alive
+              ✗ BANNED: Safe, wishy-washy answers ("well, it depends on the person...")
+              ✗ BANNED: Preaching or moralizing — inform and entertain, don't lecture
+              ✗ BANNED: Generic filler ("That's a great point!", "Absolutely!", "I totally agree!")
+              ✗ BANNED: Narrator disappearing for long stretches — they must stay engaged
+              ✗ BANNED: Formatting marks — no **, no --, no bullet symbols in output
               ✗ BANNED: Section headings in output — natural flowing dialogue only
               ${durFillEn}
             `;
@@ -2607,6 +2788,187 @@ export const generateDebateScript = async (
               ✗ BANNED: Generic opener — Narrator must name the book/topic in the first line
               ✗ BANNED: Filler agreement ("Absolutely!", "Great point!") — every line must add value
               ✗ BANNED: Formatting marks in output — no **, no --, no [], no bullet symbols
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          }
+        } else if (style === 'questioning') {
+          const speakerBlock = speakerCount >= 4 && speakers.length >= 4
+            ? `Speaker 1: ${speakers[0]}\nSpeaker 2: ${speakers[1]}\nSpeaker 3: ${speakers[2]}\nSpeaker 4: ${speakers[3]}`
+            : `Auto-select 4 speakers whose worldviews are most interesting and contrasting for this specific topic.
+Examples:
+- For a moral/religious topic → Christian, Muslim, Buddhist, Atheist
+- For an AI topic → ChatGPT, Grok, Claude, Gemini
+- For a financial topic → Warren Buffett, Elon Musk, Dave Ramsey, a broke 25-year-old
+- For a political topic → Democrat, Republican, Libertarian, Socialist
+- For a health topic → Strict doctor, naturopath, fitness bro, couch potato
+Pick whatever 4 make the most entertaining AND most informative combination for this specific topic.`;
+
+          if (!includeNarrator) {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: QUESTIONING — 4 PERSPECTIVES, NO NARRATOR
+              4 speakers. One of them opens and drives the conversation as the host.
+              Language: English. Audience: USA adults.
+              Tone: Engaging, funny at moments, always substantive — like a great panel show.
+              ═══════════════════════════════════════
+              Topic / Scenario: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+
+              ${speakerBlock}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              RULES FOR EACH SPEAKER:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Every speaker has a consistent, distinct personality and worldview throughout.
+              They argue from their lens — they don't flip-flop or suddenly agree with everyone.
+              Speakers can react to each other's lines — short, sharp reactions add energy.
+              Every argument needs a real example. No abstract reasoning without an anchor.
+              Funny moments are encouraged — a speaker being unexpectedly self-aware, a brutal comeback, an absurd analogy — but never at the cost of substance.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              OPENING — Speaker 1 sets up the scenario (2-3 lines)
+              State the situation clearly. Make it feel real and immediate. Pose the central question to the group.
+              Example: "Okay so here's the situation — [scenario]. The question is: [question]. I want to hear what each of you actually thinks, no safe answers."
+
+              ROUND 1 — Initial takes (each speaker: 3-4 lines)
+              Each of the 4 speakers gives their honest first reaction from their worldview.
+              End each take with their core position in one clear sentence.
+
+              FOLLOW-UP — Speaker 1 challenges one specific point (1-2 lines)
+              Pick the most interesting tension or contradiction from Round 1 and push on it.
+              "Wait — [Speaker X], you said [Y]. But what about [Z]?"
+
+              ROUND 2 — Deeper arguments (each speaker: 3-5 lines)
+              Speakers go deeper. They respond to the follow-up and to each other.
+              At least one speaker should acknowledge a genuine weakness in their own position.
+              At least one speaker should call out another's argument directly.
+
+              CURVEBALL — Speaker 1 introduces a twist or edge case (1-2 lines)
+              Add a real complication that makes the question harder.
+              Something like: "But what if [twist]? Does your answer change?"
+
+              ROUND 3 — Twist response (each speaker: 2-3 lines)
+              Speakers adapt (or refuse to). Some hold firm, some shift. Genuine disagreement is better than consensus.
+
+              FINAL QUESTION — Speaker 1 asks for one-line verdict (1 line)
+              "One sentence. What's your actual answer to [the original question]?"
+
+              VERDICTS — Each speaker gives exactly 1-2 lines
+              Their final position. No hedging. No "it depends." A real stance.
+
+              CLOSE — Speaker 1 wraps (2-3 lines)
+              A sharp observation on what just happened. What the conversation revealed.
+              No moral of the story, no lecture — just a genuinely smart final thought.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              NON-NEGOTIABLE RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Exactly 4 speakers throughout
+              ✓ Every speaker sounds clearly different — not 4 versions of the same voice
+              ✓ Every major argument has a real example — a name, an event, a specific situation
+              ✓ Explain any term the moment it appears — USA general audience, not academics
+              ✓ Funny lines welcome — every joke still makes a point
+              ✗ BANNED: Speakers suddenly agreeing on everything — tension must stay alive
+              ✗ BANNED: Safe, wishy-washy answers ("well, it depends on the person...")
+              ✗ BANNED: Preaching or moralizing — inform and entertain, don't lecture
+              ✗ BANNED: Generic filler ("That's a great point!", "Absolutely!", "I totally agree!")
+              ✗ BANNED: Formatting marks — no **, no --, no bullet symbols in output
+              ✗ BANNED: Section headings in output — natural flowing dialogue only
+              ${durFillEn}
+            `;
+          } else {
+            prompt = `
+              ═══════════════════════════════════════
+              STYLE: QUESTIONING — NARRATOR + 4 PERSPECTIVES
+              Narrator is the sharp, curious host. 4 speakers give their worldview on a real situation.
+              Language: English. Audience: USA adults.
+              Tone: Engaging, funny at moments, always substantive — like a great panel show.
+              ═══════════════════════════════════════
+              Topic / Scenario: "${topic}"
+              ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+              ${durLineEn}
+
+              Narrator: Narrator (sharp, curious, occasionally funny host — never neutral and boring)
+              ${speakerBlock}
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              NARRATOR RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Narrator is NOT a news anchor. They are a sharp, curious host who genuinely wants to understand.
+              They ask pointed questions, push back on weak answers, and occasionally crack a dry joke.
+              They connect the dots between different answers at the end.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              SPEAKER RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              Every speaker has a consistent, distinct personality and worldview throughout.
+              They argue from their lens — they don't flip-flop or suddenly agree with everyone.
+              Speakers can react to each other's lines — short, sharp reactions add energy.
+              Every argument needs a real example. No abstract reasoning without a concrete anchor.
+              Funny moments are encouraged — but never at the cost of substance.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              STRUCTURE:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+              NARRATOR — OPENING (3-4 lines)
+              Lay out the situation clearly and vividly. Make it feel real and immediate.
+              Pose the central question. Introduce who's here to answer it.
+              Example: "Here's the scenario: [situation]. It sounds simple — but it isn't. Today we've got [Speaker 1], [Speaker 2], [Speaker 3], and [Speaker 4] to tell us exactly what they'd do and why. Let's get into it."
+
+              ROUND 1 — Narrator asks: "What's your first reaction?"
+              Narrator poses the question directly to all 4 speakers.
+              Each speaker: 3-4 lines. Their honest first reaction from their worldview.
+              End each take with a one-sentence position.
+
+              NARRATOR — FOLLOW-UP (1-2 lines)
+              Pick the most interesting tension from Round 1. Push on it directly.
+              "Okay — [Speaker X] said [Y]. [Speaker Z], you basically said the opposite. Who's right?"
+
+              ROUND 2 — Deeper arguments
+              Each speaker: 3-5 lines. Go deeper. Respond to the follow-up and to each other.
+              At least one speaker acknowledges a real weakness in their own position.
+              At least one speaker directly challenges another's argument.
+
+              NARRATOR — CURVEBALL (1-2 lines)
+              Throw a twist or edge case that makes the question harder.
+              "But here's the thing — what if [twist]? Does anyone's answer change?"
+
+              ROUND 3 — Twist response (each speaker: 2-3 lines)
+              Some speakers adapt, some hold firm. Real disagreement is better than consensus.
+
+              NARRATOR — FINAL QUESTION (1 line)
+              "One sentence. What's your actual final answer?"
+
+              VERDICTS — Each speaker: 1-2 lines
+              No hedging. A real, specific stance.
+
+              NARRATOR — CLOSING (3-4 lines)
+              A sharp observation about what the conversation revealed.
+              What the different perspectives together teach us — without picking a winner.
+              No moral lecture. Just a genuinely smart final thought.
+
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              NON-NEGOTIABLE RULES:
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              ✓ Always write in English only
+              ✓ Exactly 4 speakers + Narrator
+              ✓ Every speaker sounds clearly different — distinct voice, distinct worldview
+              ✓ Every major argument has a real example — a name, an event, a specific situation
+              ✓ Explain any term the moment it appears — USA general audience, not academics
+              ✓ Funny moments welcome — every joke still makes a point
+              ✗ BANNED: Speakers suddenly agreeing on everything — tension must stay alive
+              ✗ BANNED: Safe, wishy-washy answers ("well, it depends on the person...")
+              ✗ BANNED: Preaching or moralizing — inform and entertain, don't lecture
+              ✗ BANNED: Generic filler ("That's a great point!", "Absolutely!", "I totally agree!")
+              ✗ BANNED: Narrator disappearing for long stretches — they must stay engaged
+              ✗ BANNED: Formatting marks — no **, no --, no bullet symbols in output
               ✗ BANNED: Section headings in output — natural flowing dialogue only
               ${durFillEn}
             `;
