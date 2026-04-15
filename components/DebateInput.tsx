@@ -54,7 +54,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
     'Hindi'
   ];
 
-  const durationOptions = [1, 2, 3, 5, 8, 10, 15, 20, 25];
+  const durationOptions = [1, 2, 3, 5, 8, 10, 15, 20, 25, 30, 40, 50];
 
   const handleSubmit = async () => {
     // Filter out empty names or use defaults if needed, but we want auto-detect if empty
