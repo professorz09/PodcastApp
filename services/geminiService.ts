@@ -1230,14 +1230,25 @@ export const generateDebateScript = async (
           }
         } else if (style === 'questioning') {
           const speakerBlock = speakerCount >= 4 && speakers.length >= 4
-            ? `Speakers: ${speakers[0]}, ${speakers[1]}, ${speakers[2]}, ${speakers[3]}`
+            ? `Speaker 1: ${speakers[0]}
+Speaker 2: ${speakers[1]}
+Speaker 3: ${speakers[2]}
+Speaker 4: ${speakers[3]}
+
+CRITICAL — Use EXACTLY these names as speaker labels throughout. Do NOT rename them.
+Each name represents its identity/worldview:
+- A religion name (Muslim, Christian, Hindu, Buddhist, Atheist) → speak from that faith's perspective, in the voice of a believer
+- An AI name (ChatGPT, Grok, Claude, Gemini) → speak as that AI system would, in its tone and style
+- A public figure name → speak in that person's known voice, views, and style
+- Any other name → represent whatever worldview or identity that name implies`
             : `Choose 4 speakers whose perspectives are most naturally contrasting for this specific topic.
 Examples (pick what fits the topic — don't copy blindly):
 - Religious/moral topic: Christian, Muslim, Buddhist, Atheist
 - AI topic: ChatGPT, Grok, Claude, Gemini
 - Finance topic: Warren Buffett, Elon Musk, Dave Ramsey, a broke 25-year-old
 - Political topic: Democrat, Republican, Libertarian, Independent voter
-Choose whatever 4 make the most sense for THIS specific topic.`;
+Choose whatever 4 make the most sense for THIS specific topic.
+Use those labels as speaker names throughout.`;
 
           if (!includeNarrator) {
             prompt = `
@@ -1249,21 +1260,23 @@ Choose whatever 4 make the most sense for THIS specific topic.`;
 
               ${speakerBlock}
 
-              Write a natural conversation where 4 speakers each share their genuine perspective on this topic.
-              Speaker 1 opens by briefly stating the situation and the central question — then all 4 weigh in.
+              Speaker 1 opens the conversation by presenting the topic or situation to the group — naturally and directly, like a real question being posed to real people. Not a formal introduction. More like: "Okay, here's the situation — [describe it]. What would you actually do here?"
+
+              Then all 4 speakers weigh in from their own worldview.
 
               Each speaker must:
-              - Speak from their own worldview consistently throughout
+              - Speak from their own worldview/identity consistently throughout
               - Support their point with at least one real, specific example (a name, event, or situation)
               - Directly respond to what others say — not just deliver separate monologues
               - Use plain language — USA general audience, not academics
 
               The conversation flow should feel natural and different for every topic.
-              Do not follow a rigid round-by-round template — let the dialogue evolve based on what this specific topic calls for.
+              Do not repeat a rigid round-by-round template — let the dialogue evolve based on what the topic calls for.
               Speaker 1 closes with a brief final thought.
 
               RULES:
               ✓ English only
+              ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ 4 distinct voices — each sounds clearly different from the others
               ✓ Real specific examples — not vague general claims
               ✓ Genuine disagreement — speakers hold their positions
@@ -1283,25 +1296,26 @@ Choose whatever 4 make the most sense for THIS specific topic.`;
               Narrator: Narrator
               ${speakerBlock}
 
-              The Narrator opens by clearly laying out the situation and posing the central question — concise and direct, no fluff.
-              The Narrator then introduces the 4 speakers by name.
+              The Narrator opens by painting the situation vividly — as if dropping it right in front of the speakers. Think: "Alright, picture this — [scenario]. You're right there. What do you do?" Not a formal setup — immediate and immersive.
+              Then the Narrator introduces the 4 speakers by name: "I've got [Speaker 1], [Speaker 2], [Speaker 3], and [Speaker 4] here. Let's hear it."
 
-              Each speaker shares their genuine perspective from their own worldview.
-              The Narrator asks follow-up questions at natural points — probing the most interesting tensions that come up.
+              Each speaker shares their genuine perspective from their own worldview/identity.
+              The Narrator asks follow-up questions at natural moments — probing the most interesting tensions, not following a script.
 
               The conversation should feel organic and specific to this topic.
-              Do not follow a rigid round-by-round template — let the discussion evolve naturally based on what the topic calls for.
+              Do not follow a rigid round-by-round template — let the discussion evolve naturally.
 
               Each speaker must:
-              - Stay consistent with their worldview throughout the conversation
+              - Stay consistent with their worldview/identity throughout
               - Back every major point with a real, specific example (a name, event, or concrete situation)
-              - React to what others are saying — not just give prepared speeches
+              - React to what others say — not just give prepared speeches
               - Use plain accessible language — no unexplained jargon
 
               The Narrator closes with a brief honest observation about what the conversation revealed.
 
               RULES:
               ✓ English only
+              ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ Narrator appears at the start, at natural moments to ask questions, and at the close
               ✓ 4 distinct speaker voices — each sounds clearly different from the others
               ✓ Real specific examples for every major point — not abstract claims
@@ -1312,6 +1326,48 @@ Choose whatever 4 make the most sense for THIS specific topic.`;
               ${durFillEn}
             `;
           }
+        } else if (style === 'transcript_review') {
+          const transcriptText = contextFileContent
+            ? `\n\nTRANSCRIPT / CONTENT:\n${contextFileContent.slice(0, 15000)}`
+            : '';
+          prompt = `
+            STYLE: TRANSCRIPT REVIEW — SINGLE HOST OPINION VIDEO
+            Language: ${language}. Audience: general viewers.
+            ${durLineEn}
+
+            You are writing a YouTube-style single-host video script where ONE person:
+            1. Opens by briefly telling viewers what the source content is about (who, what show/platform, what topics were covered)
+            2. Walks through the key ideas from the content in a natural, engaging way
+            3. Closes with ONE paragraph of their own honest opinion — grounded in facts, not vague
+
+            Topic / Source info: "${topic}"
+            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+            ${transcriptText}
+
+            OPENING (2-4 sentences):
+            Start with something like: "Hey guys, [Guest/Host] was on [Show] recently talking about [topic]. He's a [brief credential] — and he covered [point 1], [point 2], [point 3], [point 4]. Let me walk you through it and then give you my take."
+            Make it feel like you just watched the video and are telling a friend about it. Natural, not formal.
+
+            CONTENT WALKTHROUGH:
+            Cover the key ideas from the transcript in a clear, engaging way.
+            Each key point should be explained in plain language.
+            Keep it flowing — no bullet lists, no headers, just natural speech.
+            If an idea is interesting, react to it briefly ("And this is the part that really hit me..." / "Now this is where it gets wild...").
+
+            CLOSING OPINION (1 paragraph):
+            One honest, specific paragraph of your own take on the topic.
+            Ground it in something real — a fact, a study, a pattern you've noticed, a personal angle.
+            No vague opinions ("I think this is really important"). Make a specific point.
+            End with a direct line to the viewer: a question, a challenge, or a clear takeaway.
+
+            FORMAT RULES:
+            ✗ NO speaker labels — no "Voiceover:", no "Host:", nothing
+            ✗ NO bullet points, NO numbered lists, NO section headings in the output
+            ✗ NO formatting marks — no **, no --, no bullet symbols
+            ✓ Just clean flowing paragraphs — exactly as a real person would speak it
+            ✓ Plain conversational language throughout
+            ${durFillEn}
+          `;
         } else if (style === 'explained_solo') {
           prompt = `
             ═══════════════════════════════════════
@@ -2697,14 +2753,25 @@ Choose whatever 4 make the most sense for THIS specific topic.`;
           }
         } else if (style === 'questioning') {
           const speakerBlock = speakerCount >= 4 && speakers.length >= 4
-            ? `Speakers: ${speakers[0]}, ${speakers[1]}, ${speakers[2]}, ${speakers[3]}`
+            ? `Speaker 1: ${speakers[0]}
+Speaker 2: ${speakers[1]}
+Speaker 3: ${speakers[2]}
+Speaker 4: ${speakers[3]}
+
+CRITICAL — Use EXACTLY these names as speaker labels throughout. Do NOT rename them.
+Each name represents its identity/worldview:
+- A religion name (Muslim, Christian, Hindu, Buddhist, Atheist) → speak from that faith's perspective, in the voice of a believer
+- An AI name (ChatGPT, Grok, Claude, Gemini) → speak as that AI system would, in its tone and style
+- A public figure name → speak in that person's known voice, views, and style
+- Any other name → represent whatever worldview or identity that name implies`
             : `Choose 4 speakers whose perspectives are most naturally contrasting for this specific topic.
 Examples (pick what fits the topic — don't copy blindly):
 - Religious/moral topic: Christian, Muslim, Buddhist, Atheist
 - AI topic: ChatGPT, Grok, Claude, Gemini
 - Finance topic: Warren Buffett, Elon Musk, Dave Ramsey, a broke 25-year-old
 - Political topic: Democrat, Republican, Libertarian, Independent voter
-Choose whatever 4 make the most sense for THIS specific topic.`;
+Choose whatever 4 make the most sense for THIS specific topic.
+Use those labels as speaker names throughout.`;
 
           if (!includeNarrator) {
             prompt = `
@@ -2716,21 +2783,23 @@ Choose whatever 4 make the most sense for THIS specific topic.`;
 
               ${speakerBlock}
 
-              Write a natural conversation where 4 speakers each share their genuine perspective on this topic.
-              Speaker 1 opens by briefly stating the situation and the central question — then all 4 weigh in.
+              Speaker 1 opens the conversation by presenting the topic or situation to the group — naturally and directly, like a real question being posed to real people. Not a formal introduction. More like: "Okay, here's the situation — [describe it]. What would you actually do here?"
+
+              Then all 4 speakers weigh in from their own worldview.
 
               Each speaker must:
-              - Speak from their own worldview consistently throughout
+              - Speak from their own worldview/identity consistently throughout
               - Support their point with at least one real, specific example (a name, event, or situation)
               - Directly respond to what others say — not just deliver separate monologues
               - Use plain language — USA general audience, not academics
 
               The conversation flow should feel natural and different for every topic.
-              Do not follow a rigid round-by-round template — let the dialogue evolve based on what this specific topic calls for.
+              Do not repeat a rigid round-by-round template — let the dialogue evolve based on what the topic calls for.
               Speaker 1 closes with a brief final thought.
 
               RULES:
               ✓ English only
+              ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ 4 distinct voices — each sounds clearly different from the others
               ✓ Real specific examples — not vague general claims
               ✓ Genuine disagreement — speakers hold their positions
@@ -2750,25 +2819,26 @@ Choose whatever 4 make the most sense for THIS specific topic.`;
               Narrator: Narrator
               ${speakerBlock}
 
-              The Narrator opens by clearly laying out the situation and posing the central question — concise and direct, no fluff.
-              The Narrator then introduces the 4 speakers by name.
+              The Narrator opens by painting the situation vividly — as if dropping it right in front of the speakers. Think: "Alright, picture this — [scenario]. You're right there. What do you do?" Not a formal setup — immediate and immersive.
+              Then the Narrator introduces the 4 speakers by name: "I've got [Speaker 1], [Speaker 2], [Speaker 3], and [Speaker 4] here. Let's hear it."
 
-              Each speaker shares their genuine perspective from their own worldview.
-              The Narrator asks follow-up questions at natural points — probing the most interesting tensions that come up.
+              Each speaker shares their genuine perspective from their own worldview/identity.
+              The Narrator asks follow-up questions at natural moments — probing the most interesting tensions, not following a script.
 
               The conversation should feel organic and specific to this topic.
-              Do not follow a rigid round-by-round template — let the discussion evolve naturally based on what the topic calls for.
+              Do not follow a rigid round-by-round template — let the discussion evolve naturally.
 
               Each speaker must:
-              - Stay consistent with their worldview throughout the conversation
+              - Stay consistent with their worldview/identity throughout
               - Back every major point with a real, specific example (a name, event, or concrete situation)
-              - React to what others are saying — not just give prepared speeches
+              - React to what others say — not just give prepared speeches
               - Use plain accessible language — no unexplained jargon
 
               The Narrator closes with a brief honest observation about what the conversation revealed.
 
               RULES:
               ✓ English only
+              ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ Narrator appears at the start, at natural moments to ask questions, and at the close
               ✓ 4 distinct speaker voices — each sounds clearly different from the others
               ✓ Real specific examples for every major point — not abstract claims
@@ -2779,6 +2849,48 @@ Choose whatever 4 make the most sense for THIS specific topic.`;
               ${durFillEn}
             `;
           }
+        } else if (style === 'transcript_review') {
+          const transcriptText = contextFileContent
+            ? `\n\nTRANSCRIPT / CONTENT:\n${contextFileContent.slice(0, 15000)}`
+            : '';
+          prompt = `
+            STYLE: TRANSCRIPT REVIEW — SINGLE HOST OPINION VIDEO
+            Language: ${language}. Audience: general viewers.
+            ${durLineEn}
+
+            You are writing a YouTube-style single-host video script where ONE person:
+            1. Opens by briefly telling viewers what the source content is about (who, what show/platform, what topics were covered)
+            2. Walks through the key ideas from the content in a natural, engaging way
+            3. Closes with ONE paragraph of their own honest opinion — grounded in facts, not vague
+
+            Topic / Source info: "${topic}"
+            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+            ${transcriptText}
+
+            OPENING (2-4 sentences):
+            Start with something like: "Hey guys, [Guest/Host] was on [Show] recently talking about [topic]. He's a [brief credential] — and he covered [point 1], [point 2], [point 3], [point 4]. Let me walk you through it and then give you my take."
+            Make it feel like you just watched the video and are telling a friend about it. Natural, not formal.
+
+            CONTENT WALKTHROUGH:
+            Cover the key ideas from the transcript in a clear, engaging way.
+            Each key point should be explained in plain language.
+            Keep it flowing — no bullet lists, no headers, just natural speech.
+            If an idea is interesting, react to it briefly ("And this is the part that really hit me..." / "Now this is where it gets wild...").
+
+            CLOSING OPINION (1 paragraph):
+            One honest, specific paragraph of your own take on the topic.
+            Ground it in something real — a fact, a study, a pattern you've noticed, a personal angle.
+            No vague opinions ("I think this is really important"). Make a specific point.
+            End with a direct line to the viewer: a question, a challenge, or a clear takeaway.
+
+            FORMAT RULES:
+            ✗ NO speaker labels — no "Voiceover:", no "Host:", nothing
+            ✗ NO bullet points, NO numbered lists, NO section headings in the output
+            ✗ NO formatting marks — no **, no --, no bullet symbols
+            ✓ Just clean flowing paragraphs — exactly as a real person would speak it
+            ✓ Plain conversational language throughout
+            ${durFillEn}
+          `;
         } else if (style === 'explained_solo') {
           prompt = `
             ═══════════════════════════════════════

@@ -35,7 +35,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview'>('gemini-3.1-flash-lite-preview');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -207,6 +207,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       ? "Book ka naam likhо (e.g. '48 Laws of Power') ya chapter (e.g. 'Atomic Habits - Chapter 1')"
                       : style === 'questioning'
                       ? "Enter any topic or situation (e.g. 'Is money the key to happiness?' or 'Which AI is actually the smartest?')"
+                      : style === 'transcript_review'
+                      ? "Video info likhо — Guest, Show, Topic (e.g. 'Dr. Huberman on Joe Rogan - Addiction')"
                       : "Enter a controversial topic (e.g., 'Is AI dangerous?')"
                   }
                   className="w-full bg-transparent text-white px-5 py-4 text-base md:text-lg placeholder:text-gray-600 focus:outline-none font-medium"
@@ -226,7 +228,16 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       🧠 Religious: Christian · Muslim · Buddhist · Atheist<br/>
                       🤖 AI: ChatGPT · Grok · Claude · Gemini<br/>
                       💰 Finance: Warren Buffett · Elon Musk · Dave Ramsey · broke 25yr old<br/>
-                      <span className="text-violet-400/60">Ya Speaker Names mein apne custom characters likho.</span>
+                      <span className="text-violet-400/60">Ya Speaker Names mein apne custom characters likho — exactly wahi names use honge.</span>
+                    </div>
+                  </div>
+                )}
+                {style === 'transcript_review' && (
+                  <div className="px-5">
+                    <div className="bg-cyan-500/8 border border-cyan-500/20 rounded-lg px-3 py-2 text-xs text-cyan-300/80">
+                      🎬 <strong>Transcript attach karo</strong> (neeche file upload se) — AI us content ka review script banayega.<br/>
+                      📝 Topic mein likho: Guest name, Show name, aur kya topic tha<br/>
+                      <span className="text-cyan-400/60">Output: intro → key points walkthrough → 1 paragraph personal opinion. No speaker tags.</span>
                     </div>
                   </div>
                 )}
@@ -239,6 +250,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
                         ? "Optional: Koi specific angle ya focus? (e.g. 'Business ke liye apply karna' ya 'Relationships pe focus karo')"
                         : style === 'questioning'
                         ? "Optional: Add any specific scenario details or constraints..."
+                        : style === 'transcript_review'
+                        ? "Optional: Koi extra context — jaise kitni videos cover karni hain, ya koi specific angle..."
                         : "Optional: Add specific details, context, or background info..."
                     }
                     rows={2}
@@ -469,7 +482,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning';
+                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
@@ -486,6 +499,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'professor_jiang') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'book_summary') { setSpeakerCount(2); setIncludeNarrator(false); }
                       if (newStyle === 'questioning') { setSpeakerCount(4); setIncludeNarrator(true); }
+                      if (newStyle === 'transcript_review') { setSpeakerCount(1); setIncludeNarrator(false); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
@@ -504,6 +518,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="professor_jiang">🎓 Prof. Jiang Xueqin</option>
                     <option value="book_summary">📚 Book Summarizer</option>
                     <option value="questioning">❓ Questioning Style</option>
+                    <option value="transcript_review">🎬 Transcript Review</option>
                   </select>
                 </div>
               </div>
