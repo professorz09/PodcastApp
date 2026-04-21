@@ -31,7 +31,6 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python flask_server.py"
-waitForPort = 8000
 
 [[workflows.workflow]]
 name = "Start application"
