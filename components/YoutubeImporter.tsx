@@ -41,6 +41,7 @@ import { splitTranscriptByTopics, TranscriptChunk } from '../services/geminiServ
 interface Props {
   onImportDone: (data: YoutubeImportData) => void;
   onAttachContext?: (content: string, fileName: string) => void;
+  onAttachToShorts?: (chunk: TranscriptChunk) => void;
   onTranscriptFetched?: (transcript: YoutubeImportData['transcript'], fullText: string, videoId: string) => void;
   onSkip: () => void;
 }
@@ -127,7 +128,7 @@ async function safeJson(res: Response): Promise<any> {
   }
 }
 
-const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTranscriptFetched, onSkip }) => {
+const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onAttachToShorts, onTranscriptFetched, onSkip }) => {
   const [flaskUrl, setFlaskUrl] = useState(DEFAULT_FLASK_URL);
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [url, setUrl] = useState(() => readSaved('url', ''));
@@ -1081,17 +1082,28 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                                 </p>
                               )}
                             </div>
-                            <button
-                              onClick={() => attachChunk(chunk, idx)}
-                              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all ${
-                                isAttached
-                                  ? 'bg-green-600/20 border-green-500/40 text-green-300'
-                                  : 'bg-blue-600/15 active:bg-blue-600/25 border-blue-500/25 text-blue-300'
-                              }`}
-                            >
-                              <FileCheck size={11} />
-                              {isAttached ? '✓ Attached' : 'Attach'}
-                            </button>
+                            <div className="shrink-0 flex flex-col gap-1.5">
+                              <button
+                                onClick={() => attachChunk(chunk, idx)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all ${
+                                  isAttached
+                                    ? 'bg-green-600/20 border-green-500/40 text-green-300'
+                                    : 'bg-blue-600/15 active:bg-blue-600/25 border-blue-500/25 text-blue-300'
+                                }`}
+                              >
+                                <FileCheck size={11} />
+                                {isAttached ? '✓ Attached' : 'Attach'}
+                              </button>
+                              {onAttachToShorts && (
+                                <button
+                                  onClick={() => onAttachToShorts(chunk)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border bg-pink-600/15 active:bg-pink-600/25 border-pink-500/25 text-pink-300 transition-all"
+                                >
+                                  <Scissors size={11} />
+                                  Shorts ↗
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1518,17 +1530,28 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                                 </p>
                               )}
                             </div>
-                            <button
-                              onClick={() => attachChunk(chunk, idx)}
-                              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all ${
-                                isAttached
-                                  ? 'bg-green-600/20 border-green-500/40 text-green-300'
-                                  : 'bg-blue-600/15 active:bg-blue-600/25 border-blue-500/25 text-blue-300'
-                              }`}
-                            >
-                              <FileCheck size={11} />
-                              {isAttached ? '✓ Attached' : 'Attach'}
-                            </button>
+                            <div className="shrink-0 flex flex-col gap-1.5">
+                              <button
+                                onClick={() => attachChunk(chunk, idx)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all ${
+                                  isAttached
+                                    ? 'bg-green-600/20 border-green-500/40 text-green-300'
+                                    : 'bg-blue-600/15 active:bg-blue-600/25 border-blue-500/25 text-blue-300'
+                                }`}
+                              >
+                                <FileCheck size={11} />
+                                {isAttached ? '✓ Attached' : 'Attach'}
+                              </button>
+                              {onAttachToShorts && (
+                                <button
+                                  onClick={() => onAttachToShorts(chunk)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border bg-pink-600/15 active:bg-pink-600/25 border-pink-500/25 text-pink-300 transition-all"
+                                >
+                                  <Scissors size={11} />
+                                  Shorts ↗
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );

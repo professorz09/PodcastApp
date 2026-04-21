@@ -10,6 +10,7 @@ import LyricsGenerator from './components/LyricsGenerator';
 import Storyboard from './components/Storyboard';
 import Shorts from './components/Shorts';
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
+import type { TranscriptChunk } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
 import { Key, ExternalLink, RotateCcw, AlertTriangle, X } from 'lucide-react';
@@ -47,6 +48,7 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [shortsContext, setShortsContext] = useState<TranscriptChunk | null>(null);
 
   // Check for API Key on mount
   useEffect(() => {
@@ -384,6 +386,10 @@ const App: React.FC = () => {
               contextFileName: fileName,
             }));
           }}
+          onAttachToShorts={(chunk) => {
+            setShortsContext(chunk);
+            setAppState(AppState.SHORTS);
+          }}
           onSkip={() => setAppState(AppState.INPUT)}
         />
       )}
@@ -458,6 +464,9 @@ const App: React.FC = () => {
       {appState === AppState.SHORTS && (
         <Shorts
           script={script}
+          youtubeData={youtubeData}
+          shortsContext={shortsContext}
+          onClearShortsContext={() => setShortsContext(null)}
           onBack={() => setAppState(AppState.STORYBOARD)}
         />
       )}

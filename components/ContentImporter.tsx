@@ -4,6 +4,7 @@ import YoutubeImporter from './YoutubeImporter';
 import InstagramImporter from './InstagramImporter';
 import RedditImporter from './RedditImporter';
 import { YoutubeImportData } from '../types';
+import type { TranscriptChunk } from '../services/geminiService';
 
 type Platform = 'youtube' | 'instagram' | 'reddit';
 
@@ -14,6 +15,7 @@ interface Props {
   onTranscriptFetched: (transcript: YoutubeImportData['transcript'], fullText: string, videoId: string) => void;
   onAttachContext: (content: string, fileName: string) => void;
   onAttachPost: (content: string, fileName: string) => void;
+  onAttachToShorts?: (chunk: TranscriptChunk) => void;
   onSkip: () => void;
 }
 
@@ -46,6 +48,7 @@ const ContentImporter: React.FC<Props> = ({
   onTranscriptFetched,
   onAttachContext,
   onAttachPost,
+  onAttachToShorts,
   onSkip,
 }) => {
   const [platform, setPlatform] = useState<Platform>(() => {
@@ -108,6 +111,7 @@ const ContentImporter: React.FC<Props> = ({
             onImportDone={onImportDone}
             onTranscriptFetched={onTranscriptFetched}
             onAttachContext={onAttachContext}
+            onAttachToShorts={onAttachToShorts}
             onSkip={onSkip}
           />
         )}

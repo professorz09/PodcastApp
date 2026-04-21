@@ -5422,3 +5422,88 @@ Requirements:
   }
   throw new Error('No image generated');
 };
+
+// ── Best Shorts Segments Finder ──────────────────────────────────────────────
+export interface ShortsSegment {
+  title: string;
+  start: number;
+  end: number;
+  description: string;
+  hook: string;
+}
+
+export const findBestShortsSegments = async (
+  transcript: { text: string; start: number; end: number }[],
+  rangeStart?: number,
+  rangeEnd?: number,
+): Promise<ShortsSegment[]> => {
+  if (!transcript.length) throw new Error('Transcript is empty');
+
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const inRange = (rangeStart !== undefined && rangeEnd !== undefined)
+    ? transcript.filter(s => s.end >= rangeStart && s.start <= rangeEnd)
+    : transcript;
+  if (!inRange.length) throw new Error('No transcript in selected range');
+
+  const lines = inRange
+    .map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`)
+    .join('\n');
+
+  const rangeNote = (rangeStart !== undefined && rangeEnd !== undefined)
+    ? `\nFocus only on the time range ${rangeStart.toFixed(1)}s to ${rangeEnd.toFixed(1)}s.`
+    : '';
+
+  const prompt = `You are an expert short-form video editor (YouTube Shorts / Instagram Reels / TikTok).
+Analyse the transcript below and find the 3 to 5 BEST segments that would make engaging Shorts.${rangeNote}
+
+Each segment must be 20-60 seconds long, have a strong hook, and contain a complete idea.
+Look for: surprising statements, emotional moments, controversial takes, valuable insights, funny lines, story climaxes.
+
+Return JSON ONLY in this exact shape (no markdown, no extra text):
+{
+  "segments": [
+    {
+      "title": "5-7 word punchy title (in transcript's language)",
+      "start": <number, seconds>,
+      "end": <number, seconds>,
+      "description": "1 sentence why this works as a Short (in transcript's language)",
+      "hook": "The opening line/hook from the transcript that pulls viewers in"
+    }
+  ]
+}
+
+Transcript with timestamps:
+${lines}`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: { responseMimeType: 'application/json' },
+  });
+
+  const text = response.text || '';
+  let parsed: { segments: ShortsSegment[] };
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('AI response was not valid JSON');
+    parsed = JSON.parse(m[0]);
+  }
+
+  if (!parsed.segments || !Array.isArray(parsed.segments)) {
+    throw new Error('AI response missing segments array');
+  }
+
+  return parsed.segments
+    .filter(s => typeof s.start === 'number' && typeof s.end === 'number' && s.end > s.start)
+    .map(s => ({
+      title: s.title || 'Untitled segment',
+      start: Math.max(0, s.start),
+      end: s.end,
+      description: s.description || '',
+      hook: s.hook || '',
+    }));
+};
