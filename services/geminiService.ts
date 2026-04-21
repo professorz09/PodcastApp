@@ -1368,6 +1368,77 @@ Use those labels as speaker names throughout.`;
             ✓ Plain conversational language throughout
             ${durFillEn}
           `;
+        } else if (style === 'summarizer_pov') {
+          const transcriptText = contextFileContent
+            ? `\n\nTRANSCRIPT / CLIP CONTENT:\n${contextFileContent.slice(0, 15000)}`
+            : '';
+          prompt = `
+            STYLE: SUMMARIZER POV — TWO-PART REACTION SCRIPT
+            Language: ${language}. Audience: general viewers.
+            ${durLineEn}
+
+            You are writing a SINGLE-VOICE script that has TWO clearly-separated parts:
+              PART 1 — INTRO (fixed format, lists every big claim made in the clip)
+              PART 2 — YOUR POV (your own analytical breakdown of each claim, one by one)
+
+            Topic / Clip info: "${topic}"
+            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+            ${transcriptText}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            PART 1 — INTRO (FIXED FORMAT — do NOT improvise the structure)
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Open with EXACTLY this template, filling in the blanks from the clip/transcript:
+
+              "In this clip, [Person 1] and [Person 2] — [brief one-line description of who they are, e.g. 'a famous comedian and actor'] — make some big claims about [overall topic / theme].
+              First, that [claim 1 — one short sentence].
+              Second, that [claim 2 — one short sentence].
+              Third, that [claim 3 — one short sentence].
+              And fourth, that [claim 4 — one short sentence].
+              Let's watch — and then I'll give my opinion."
+
+            Rules for INTRO:
+              ✓ Use the speakers'/guests' real names from the transcript (or topic line if missing)
+              ✓ List 3 to 5 claims (use only as many as the clip actually makes — do not invent)
+              ✓ Each claim is ONE short, plain sentence — no analysis yet, just neutral statement
+              ✓ End the intro EXACTLY with: "Let's watch — and then I'll give my opinion."
+              ✗ No analysis, no opinion, no facts/counter-facts in PART 1
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            PART 2 — YOUR POV (YOUR OWN ANALYSIS, claim by claim)
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Now go through the SAME claims listed in the intro, in the SAME order.
+            For EACH claim:
+              1. Briefly restate which claim you're addressing (1 short line).
+              2. Give your verdict — pick the honest one:
+                   • "actually solid / true" — if the claim genuinely holds up
+                   • "partially true" — if there's a kernel of truth but exaggerated
+                   • "misleading" — if technically not false but framed deceptively
+                   • "exaggerated / blown out of proportion" — if real but overhyped
+                   • "false / not supported by reality" — if just wrong
+              3. Explain WHY in 3-6 sentences, grounded in real facts, mechanisms, or examples.
+                 Use specific reasoning — what the technology/event actually is, what it actually does,
+                 and where the speaker stretched it. No vague hand-waving.
+              4. Optionally end the claim with a short punchy takeaway line.
+
+            Tone for PART 2:
+              ✓ Honest, calm, slightly opinionated — like a knowledgeable friend correcting hype
+              ✓ Use phrases like: "So first thing —", "Now the biggest point —",
+                "Here's the reality —", "This is actually solid", "But the truth is —"
+              ✓ Don't be afraid to AGREE when a claim holds up (don't debunk for the sake of debunking)
+              ✓ Reference real-world facts, dates, mechanisms (as of ${new Date().getFullYear()})
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            FORMAT RULES (STRICT):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✗ NO speaker labels — no "Voiceover:", no "Host:", no "Narrator:", nothing
+            ✗ NO bullet points, NO numbered lists, NO section headings in the OUTPUT
+            ✗ NO formatting marks — no **, no --, no bullet symbols
+            ✗ Do NOT label "PART 1" / "PART 2" in the output — just write them as flowing speech
+            ✓ Just clean flowing paragraphs — exactly as one person would speak it on camera
+            ✓ Natural pause between intro and POV (a paragraph break is enough)
+            ${durFillEn}
+          `;
         } else if (style === 'explained_solo') {
           prompt = `
             ═══════════════════════════════════════
@@ -2889,6 +2960,77 @@ Use those labels as speaker names throughout.`;
             ✗ NO formatting marks — no **, no --, no bullet symbols
             ✓ Just clean flowing paragraphs — exactly as a real person would speak it
             ✓ Plain conversational language throughout
+            ${durFillEn}
+          `;
+        } else if (style === 'summarizer_pov') {
+          const transcriptText = contextFileContent
+            ? `\n\nTRANSCRIPT / CLIP CONTENT:\n${contextFileContent.slice(0, 15000)}`
+            : '';
+          prompt = `
+            STYLE: SUMMARIZER POV — TWO-PART REACTION SCRIPT
+            Language: ${language}. Audience: general viewers.
+            ${durLineEn}
+
+            You are writing a SINGLE-VOICE script that has TWO clearly-separated parts:
+              PART 1 — INTRO (fixed format, lists every big claim made in the clip)
+              PART 2 — YOUR POV (your own analytical breakdown of each claim, one by one)
+
+            Topic / Clip info: "${topic}"
+            ${specificDetails ? `Extra context: ${specificDetails}` : ''}
+            ${transcriptText}
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            PART 1 — INTRO (FIXED FORMAT — do NOT improvise the structure)
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Open with EXACTLY this template, filling in the blanks from the clip/transcript:
+
+              "In this clip, [Person 1] and [Person 2] — [brief one-line description of who they are, e.g. 'a famous comedian and actor'] — make some big claims about [overall topic / theme].
+              First, that [claim 1 — one short sentence].
+              Second, that [claim 2 — one short sentence].
+              Third, that [claim 3 — one short sentence].
+              And fourth, that [claim 4 — one short sentence].
+              Let's watch — and then I'll give my opinion."
+
+            Rules for INTRO:
+              ✓ Use the speakers'/guests' real names from the transcript (or topic line if missing)
+              ✓ List 3 to 5 claims (use only as many as the clip actually makes — do not invent)
+              ✓ Each claim is ONE short, plain sentence — no analysis yet, just neutral statement
+              ✓ End the intro EXACTLY with: "Let's watch — and then I'll give my opinion."
+              ✗ No analysis, no opinion, no facts/counter-facts in PART 1
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            PART 2 — YOUR POV (YOUR OWN ANALYSIS, claim by claim)
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Now go through the SAME claims listed in the intro, in the SAME order.
+            For EACH claim:
+              1. Briefly restate which claim you're addressing (1 short line).
+              2. Give your verdict — pick the honest one:
+                   • "actually solid / true" — if the claim genuinely holds up
+                   • "partially true" — if there's a kernel of truth but exaggerated
+                   • "misleading" — if technically not false but framed deceptively
+                   • "exaggerated / blown out of proportion" — if real but overhyped
+                   • "false / not supported by reality" — if just wrong
+              3. Explain WHY in 3-6 sentences, grounded in real facts, mechanisms, or examples.
+                 Use specific reasoning — what the technology/event actually is, what it actually does,
+                 and where the speaker stretched it. No vague hand-waving.
+              4. Optionally end the claim with a short punchy takeaway line.
+
+            Tone for PART 2:
+              ✓ Honest, calm, slightly opinionated — like a knowledgeable friend correcting hype
+              ✓ Use phrases like: "So first thing —", "Now the biggest point —",
+                "Here's the reality —", "This is actually solid", "But the truth is —"
+              ✓ Don't be afraid to AGREE when a claim holds up (don't debunk for the sake of debunking)
+              ✓ Reference real-world facts, dates, mechanisms (as of ${new Date().getFullYear()})
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            FORMAT RULES (STRICT):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✗ NO speaker labels — no "Voiceover:", no "Host:", no "Narrator:", nothing
+            ✗ NO bullet points, NO numbered lists, NO section headings in the OUTPUT
+            ✗ NO formatting marks — no **, no --, no bullet symbols
+            ✗ Do NOT label "PART 1" / "PART 2" in the output — just write them as flowing speech
+            ✓ Just clean flowing paragraphs — exactly as one person would speak it on camera
+            ✓ Natural pause between intro and POV (a paragraph break is enough)
             ${durFillEn}
           `;
         } else if (style === 'explained_solo') {
