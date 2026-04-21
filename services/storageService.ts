@@ -3,6 +3,7 @@ import { AppState, DebateSegment, StoryboardScene, ThumbnailState, YoutubeImport
 
 const STORE_KEY = 'autovid_state';
 const SCENES_KEY = 'autovid_scenes';
+const SHORTS_SCENES_KEY = 'autovid_shorts_scenes';
 
 interface StoredSegment extends DebateSegment {
   audioBlob?: Blob | null;
@@ -61,6 +62,33 @@ export const loadScenes = async (
 
 export const clearScenes = async (): Promise<void> => {
   try { await del(SCENES_KEY); } catch { /* ignore */ }
+};
+
+// ── Shorts scene persistence (separate key) ────────────────────────────────────
+
+export const saveShortsScenes = async (
+  script: DebateSegment[],
+  scenes: StoryboardScene[],
+  characterGuide: string,
+): Promise<void> => {
+  try {
+    await set(SHORTS_SCENES_KEY, { scriptSignature: getScriptSignature(script), scenes, characterGuide });
+  } catch (e) { console.error('Failed to save shorts scenes', e); }
+};
+
+export const loadShortsScenes = async (
+  script: DebateSegment[],
+): Promise<{ scenes: StoryboardScene[]; characterGuide: string } | null> => {
+  try {
+    const stored = await get<StoredScenes>(SHORTS_SCENES_KEY);
+    if (!stored) return null;
+    if (stored.scriptSignature !== getScriptSignature(script)) return null;
+    return { scenes: stored.scenes, characterGuide: stored.characterGuide };
+  } catch (e) { console.error('Failed to load shorts scenes', e); return null; }
+};
+
+export const clearShortsScenes = async (): Promise<void> => {
+  try { await del(SHORTS_SCENES_KEY); } catch { /* ignore */ }
 };
 
 // ── Main state persistence ─────────────────────────────────────────────────────
