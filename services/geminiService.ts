@@ -4971,8 +4971,49 @@ export interface TranscriptChunk {
   start: number;   // seconds
   end: number;     // seconds
   text: string;
+  summary?: string; // AI-generated summary (only for Auto AI split)
 }
 
+// ── Duration-based split (pure client-side, no AI) ───────────────────────────
+export const splitTranscriptByDuration = (
+  segments: { text: string; start: number; end: number }[],
+  maxSeconds: number
+): TranscriptChunk[] => {
+  if (!segments.length) return [];
+  const chunks: TranscriptChunk[] = [];
+  let chunkStart = segments[0].start;
+  let chunkTexts: string[] = [];
+  let chunkEnd = segments[0].start;
+
+  for (const seg of segments) {
+    const wouldBe = seg.end - chunkStart;
+    if (wouldBe > maxSeconds && chunkTexts.length > 0) {
+      chunks.push({
+        title: `Segment ${chunks.length + 1}`,
+        start: chunkStart,
+        end: chunkEnd,
+        text: chunkTexts.join(' '),
+      });
+      chunkStart = seg.start;
+      chunkTexts = [seg.text];
+      chunkEnd = seg.end;
+    } else {
+      chunkTexts.push(seg.text);
+      chunkEnd = seg.end;
+    }
+  }
+  if (chunkTexts.length > 0) {
+    chunks.push({
+      title: `Segment ${chunks.length + 1}`,
+      start: chunkStart,
+      end: chunkEnd,
+      text: chunkTexts.join(' '),
+    });
+  }
+  return chunks;
+};
+
+// ── AI topic split with summaries ────────────────────────────────────────────
 export const splitTranscriptByTopics = async (
   segments: { text: string; start: number; end: number }[]
 ): Promise<TranscriptChunk[]> => {
@@ -4998,13 +5039,14 @@ RULES:
 3. Minimum chunk size: 30 seconds (don't make tiny chunks).
 4. Cover the ENTIRE transcript — no gaps, no overlaps.
 5. Give each chunk a short descriptive title (5-7 words).
+6. Write a 1-2 sentence summary of what is discussed in each chunk (in the same language as the transcript).
 
 Total duration: ${Math.floor(totalDuration / 60)}m ${Math.floor(totalDuration % 60)}s
 
 TRANSCRIPT (timestamps in [MM:SS]):
 ${timestamped}
 
-Return ONLY a JSON array. Each item: {"title": "...", "start_seconds": 0, "end_seconds": 0}
+Return ONLY a JSON array. Each item: {"title": "...", "start_seconds": 0, "end_seconds": 0, "summary": "..."}
 The first chunk's start_seconds must be 0. The last chunk's end_seconds must be ${Math.floor(totalDuration)}.`;
 
   const response = await ai.models.generateContent({
@@ -5014,7 +5056,7 @@ The first chunk's start_seconds must be 0. The last chunk's end_seconds must be 
   });
 
   const raw = response.text ?? '';
-  let splits: { title: string; start_seconds: number; end_seconds: number }[] = [];
+  let splits: { title: string; start_seconds: number; end_seconds: number; summary?: string }[] = [];
 
   try {
     splits = JSON.parse(raw);
@@ -5032,7 +5074,7 @@ The first chunk's start_seconds must be 0. The last chunk's end_seconds must be 
     const e = Math.min(totalDuration, sp.end_seconds);
     const chunkSegs = segments.filter(seg => seg.start >= s - 1 && seg.start < e + 1);
     const text = chunkSegs.map(seg => seg.text).join(' ');
-    return { title: sp.title || 'Section', start: s, end: e, text };
+    return { title: sp.title || 'Section', start: s, end: e, text, summary: sp.summary };
   });
 };
 

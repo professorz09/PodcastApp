@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { YoutubeImportData } from '../types';
 import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
-import { splitTranscriptByTopics, TranscriptChunk } from '../services/geminiService';
+import { splitTranscriptByTopics, splitTranscriptByDuration, TranscriptChunk } from '../services/geminiService';
 
 interface Props {
   onImportDone: (data: YoutubeImportData) => void;
@@ -275,11 +275,23 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
     }
   };
 
-  // ── Topic Split ───────────────────────────────────────────────────────────────
+  // ── Transcript Split ──────────────────────────────────────────────────────────
+  type SplitMode = 'shorts' | '5min' | '8min' | 'auto';
   const [splitChunks, setSplitChunks] = useState<TranscriptChunk[]>([]);
   const [splitLoading, setSplitLoading] = useState(false);
   const [splitError, setSplitError] = useState('');
+  const [splitMode, setSplitMode] = useState<SplitMode | null>(null);
   const [attachedChunkIdx, setAttachedChunkIdx] = useState<number | null>(null);
+
+  const handleDurationSplit = (mode: 'shorts' | '5min' | '8min') => {
+    if (!transcript || !transcript.length) return;
+    const maxSecs = mode === 'shorts' ? 90 : mode === '5min' ? 330 : 480;
+    setSplitError('');
+    setAttachedChunkIdx(null);
+    setSplitMode(mode);
+    const chunks = splitTranscriptByDuration(transcript, maxSecs);
+    setSplitChunks(chunks);
+  };
 
   const handleTopicSplit = async () => {
     if (!transcript || !transcript.length) return;
@@ -287,6 +299,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
     setSplitError('');
     setSplitChunks([]);
     setAttachedChunkIdx(null);
+    setSplitMode('auto');
     try {
       const chunks = await splitTranscriptByTopics(transcript);
       setSplitChunks(chunks);
@@ -1027,48 +1040,73 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
               </Section>
             )}
 
-            {/* ── TOPIC SPLIT SYSTEM (Transcript tab) ── */}
+            {/* ── TRANSCRIPT SPLIT SYSTEM (Transcript tab) ── */}
             {transcript && transcript.length > 0 && (
               <Section>
                 <div className="flex items-center gap-2">
                   <Scissors size={15} className="text-orange-400" />
-                  <span className="text-sm font-semibold text-orange-300">Topic-wise Split</span>
-                  <span className="text-[10px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">Gemini Flash</span>
+                  <span className="text-sm font-semibold text-orange-300">Transcript Split</span>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Split transcript by topic — each part under 8 min. Attach any section directly to script context.
+                  Duration-based split is instant. Auto AI analyses topics and adds a summary for each segment.
                 </p>
+
+                {/* 3 duration buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { mode: 'shorts' as const, label: 'Shorts', sub: '30–90s' },
+                    { mode: '5min' as const, label: '~5 Min', sub: '≤5.5 min' },
+                    { mode: '8min' as const, label: '~8 Min', sub: '≤8 min' },
+                  ]).map(({ mode, label, sub }) => (
+                    <button
+                      key={mode}
+                      onClick={() => handleDurationSplit(mode)}
+                      disabled={splitLoading}
+                      className={`flex flex-col items-center justify-center gap-0.5 py-3 rounded-xl text-xs font-semibold border transition-all disabled:opacity-40 ${
+                        splitMode === mode && splitChunks.length > 0
+                          ? 'bg-orange-600/25 border-orange-500/50 text-orange-200'
+                          : 'bg-white/5 border-white/8 text-gray-400 active:bg-white/10'
+                      }`}
+                    >
+                      <span className="text-sm">{label}</span>
+                      <span className="text-[10px] text-gray-600 font-normal">{sub}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Auto AI button */}
                 <button
                   onClick={handleTopicSplit}
                   disabled={splitLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm bg-orange-600/15 active:bg-orange-600/25 border border-orange-500/25 text-orange-300 disabled:opacity-40 transition-all"
+                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm border transition-all disabled:opacity-40 ${
+                    splitMode === 'auto' && splitChunks.length > 0
+                      ? 'bg-orange-600/25 border-orange-500/50 text-orange-200'
+                      : 'bg-orange-600/15 active:bg-orange-600/25 border-orange-500/25 text-orange-300'
+                  }`}
                 >
                   {splitLoading ? (
-                    <><Loader2 size={15} className="animate-spin" /> Splitting by topics…</>
+                    <><Loader2 size={15} className="animate-spin" /> Analysing topics…</>
                   ) : (
-                    <><Scissors size={15} /> Split by Topics</>
+                    <><Rows3 size={15} /> Auto AI — Topic Split with Summaries</>
                   )}
                 </button>
+
                 {splitError && (
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-2 text-red-400 text-xs">
                     <AlertCircle size={13} className="mt-0.5 shrink-0" />
                     <span>{splitError}</span>
                   </div>
                 )}
+
                 {splitChunks.length > 0 && (
                   <div className="space-y-2">
-                    {/* Numbered summary strip */}
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {splitChunks.map((chunk, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[10px] bg-orange-500/10 border border-orange-500/20 text-orange-300 px-2 py-1 rounded-lg font-mono whitespace-nowrap"
-                        >
-                          {idx + 1}. {fmtTime(chunk.start)} – {fmtTime(chunk.end)}
-                        </span>
-                      ))}
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} segments</p>
+                      {splitMode === 'auto' && <span className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full">AI Topics + Summaries</span>}
+                      {splitMode === 'shorts' && <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">Shorts (30–90s)</span>}
+                      {splitMode === '5min' && <span className="text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full">~5 Min segments</span>}
+                      {splitMode === '8min' && <span className="text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full">~8 Min segments</span>}
                     </div>
-                    <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} segments found</p>
                     {splitChunks.map((chunk, idx) => {
                       const dur = chunk.end - chunk.start;
                       const durMin = Math.floor(dur / 60);
@@ -1080,12 +1118,24 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                           className={`rounded-xl border p-3 space-y-2 transition-all ${isAttached ? 'border-green-500/40 bg-green-500/5' : 'border-white/8 bg-white/3'}`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-gray-200 leading-snug">{chunk.title}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-gray-200 leading-snug">
+                                {splitMode === 'auto' ? chunk.title : `Segment ${idx + 1}`}
+                              </p>
                               <p className="text-[10px] text-gray-600 mt-0.5">
                                 {fmtTime(chunk.start)} – {fmtTime(chunk.end)}
-                                <span className="ml-2 text-orange-400/70">{durMin}m {durSec}s</span>
+                                <span className="ml-2 text-orange-400/70">{durMin > 0 ? `${durMin}m ` : ''}{durSec}s</span>
                               </p>
+                              {splitMode === 'auto' && chunk.summary && (
+                                <p className="text-[11px] text-gray-400 leading-relaxed mt-1.5 bg-white/3 rounded-lg px-2 py-1.5 border border-white/5">
+                                  {chunk.summary}
+                                </p>
+                              )}
+                              {splitMode !== 'auto' && (
+                                <p className="text-[11px] text-gray-500 leading-relaxed mt-1 line-clamp-2">
+                                  {chunk.text.slice(0, 120)}{chunk.text.length > 120 ? '…' : ''}
+                                </p>
+                              )}
                             </div>
                             <button
                               onClick={() => attachChunk(chunk, idx)}
@@ -1096,12 +1146,9 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                               }`}
                             >
                               <FileCheck size={11} />
-                              {isAttached ? '✓ Attached' : 'Attach'}
+                              {isAttached ? '✓' : 'Attach'}
                             </button>
                           </div>
-                          <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">
-                            {chunk.text.slice(0, 140)}{chunk.text.length > 140 ? '…' : ''}
-                          </p>
                         </div>
                       );
                     })}
@@ -1473,27 +1520,54 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
               </Section>
             )}
 
-            {/* ── TOPIC SPLIT SYSTEM ── */}
+            {/* ── TRANSCRIPT SPLIT SYSTEM ── */}
             {transcript && transcript.length > 0 && (
               <Section>
                 <div className="flex items-center gap-2">
                   <Scissors size={15} className="text-orange-400" />
-                  <span className="text-sm font-semibold text-orange-300">Topic-wise Split</span>
-                  <span className="text-[10px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">Gemini Flash</span>
+                  <span className="text-sm font-semibold text-orange-300">Transcript Split</span>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Split transcript by topic — each part under 8 min. Attach any section directly to script context.
+                  Duration-based split is instant. Auto AI analyses topics and adds a summary for each segment.
                 </p>
 
+                {/* 3 duration buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { mode: 'shorts' as const, label: 'Shorts', sub: '30–90s' },
+                    { mode: '5min' as const, label: '~5 Min', sub: '≤5.5 min' },
+                    { mode: '8min' as const, label: '~8 Min', sub: '≤8 min' },
+                  ]).map(({ mode, label, sub }) => (
+                    <button
+                      key={mode}
+                      onClick={() => handleDurationSplit(mode)}
+                      disabled={splitLoading}
+                      className={`flex flex-col items-center justify-center gap-0.5 py-3 rounded-xl text-xs font-semibold border transition-all disabled:opacity-40 ${
+                        splitMode === mode && splitChunks.length > 0
+                          ? 'bg-orange-600/25 border-orange-500/50 text-orange-200'
+                          : 'bg-white/5 border-white/8 text-gray-400 active:bg-white/10'
+                      }`}
+                    >
+                      <span className="text-sm">{label}</span>
+                      <span className="text-[10px] text-gray-600 font-normal">{sub}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Auto AI button */}
                 <button
                   onClick={handleTopicSplit}
                   disabled={splitLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm bg-orange-600/15 active:bg-orange-600/25 border border-orange-500/25 text-orange-300 disabled:opacity-40 transition-all"
+                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm border transition-all disabled:opacity-40 ${
+                    splitMode === 'auto' && splitChunks.length > 0
+                      ? 'bg-orange-600/25 border-orange-500/50 text-orange-200'
+                      : 'bg-orange-600/15 active:bg-orange-600/25 border-orange-500/25 text-orange-300'
+                  }`}
                 >
                   {splitLoading ? (
-                    <><Loader2 size={15} className="animate-spin" /> Splitting by topics…</>
+                    <><Loader2 size={15} className="animate-spin" /> Analysing topics…</>
                   ) : (
-                    <><Scissors size={15} /> Split by Topics</>
+                    <><Rows3 size={15} /> Auto AI — Topic Split with Summaries</>
                   )}
                 </button>
 
@@ -1506,18 +1580,13 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
 
                 {splitChunks.length > 0 && (
                   <div className="space-y-2">
-                    {/* Numbered summary strip */}
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {splitChunks.map((chunk, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[10px] bg-orange-500/10 border border-orange-500/20 text-orange-300 px-2 py-1 rounded-lg font-mono whitespace-nowrap"
-                        >
-                          {idx + 1}. {fmtTime(chunk.start)} – {fmtTime(chunk.end)}
-                        </span>
-                      ))}
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} segments</p>
+                      {splitMode === 'auto' && <span className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full">AI Topics + Summaries</span>}
+                      {splitMode === 'shorts' && <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">Shorts (30–90s)</span>}
+                      {splitMode === '5min' && <span className="text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full">~5 Min segments</span>}
+                      {splitMode === '8min' && <span className="text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded-full">~8 Min segments</span>}
                     </div>
-                    <p className="text-[10px] text-gray-600 uppercase tracking-wider">{splitChunks.length} segments found</p>
                     {splitChunks.map((chunk, idx) => {
                       const dur = chunk.end - chunk.start;
                       const durMin = Math.floor(dur / 60);
@@ -1529,12 +1598,24 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                           className={`rounded-xl border p-3 space-y-2 transition-all ${isAttached ? 'border-green-500/40 bg-green-500/5' : 'border-white/8 bg-white/3'}`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-gray-200 leading-snug">{chunk.title}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-gray-200 leading-snug">
+                                {splitMode === 'auto' ? chunk.title : `Segment ${idx + 1}`}
+                              </p>
                               <p className="text-[10px] text-gray-600 mt-0.5">
                                 {fmtTime(chunk.start)} – {fmtTime(chunk.end)}
-                                <span className="ml-2 text-orange-400/70">{durMin}m {durSec}s</span>
+                                <span className="ml-2 text-orange-400/70">{durMin > 0 ? `${durMin}m ` : ''}{durSec}s</span>
                               </p>
+                              {splitMode === 'auto' && chunk.summary && (
+                                <p className="text-[11px] text-gray-400 leading-relaxed mt-1.5 bg-white/3 rounded-lg px-2 py-1.5 border border-white/5">
+                                  {chunk.summary}
+                                </p>
+                              )}
+                              {splitMode !== 'auto' && (
+                                <p className="text-[11px] text-gray-500 leading-relaxed mt-1 line-clamp-2">
+                                  {chunk.text.slice(0, 120)}{chunk.text.length > 120 ? '…' : ''}
+                                </p>
+                              )}
                             </div>
                             <button
                               onClick={() => attachChunk(chunk, idx)}
@@ -1545,12 +1626,9 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onTra
                               }`}
                             >
                               <FileCheck size={11} />
-                              {isAttached ? '✓ Attached' : 'Attach'}
+                              {isAttached ? '✓' : 'Attach'}
                             </button>
                           </div>
-                          <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">
-                            {chunk.text.slice(0, 140)}{chunk.text.length > 140 ? '…' : ''}
-                          </p>
                         </div>
                       );
                     })}
