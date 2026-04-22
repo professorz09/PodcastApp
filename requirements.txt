@@ -3,12 +3,3 @@ flask-cors
 yt-dlp
 youtube-transcript-api
 instaloader
-flask
-flask-cors
-instaloader
-youtube-transcript-api
-yt-dlp
-flask
-flask-cors
-instaloader
-youtube-transcript-api
