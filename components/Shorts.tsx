@@ -781,6 +781,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   const [trimEnd, setTrimEnd] = useState(0);
   const [subtitleLayers, setSubtitleLayers] = useState<SubtitleLineLayer[]>([]);
   const [showSmartClips, setShowSmartClips] = useState(true);
+  const [generatingLayerIdx, setGeneratingLayerIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const layerEditIdxRef = useRef<number | null>(null);
 
@@ -875,6 +876,22 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   };
   const handleRemoveImageFromLayer = (idx: number) => {
     setSubtitleLayers(prev => prev.map((l, i) => i === idx ? { ...l, imageDataUrl: undefined } : l));
+  };
+
+  // AI-generate an image for a subtitle line
+  const handleGenerateImageForLayer = async (idx: number) => {
+    const layer = subtitleLayers[idx];
+    if (!layer) return;
+    setGeneratingLayerIdx(idx);
+    try {
+      const dataUrl = await generateStoryboardImage(layer.text, characterGuide || undefined, '9:16');
+      setSubtitleLayers(prev => prev.map((l, i) => i === idx ? { ...l, imageDataUrl: dataUrl } : l));
+      toast.success('Image generated');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to generate image');
+    } finally {
+      setGeneratingLayerIdx(null);
+    }
   };
 
   const fmtSec = (s: number) => {
@@ -1648,13 +1665,27 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                                   </button>
                                 </div>
                               ) : (
-                                <button
-                                  onClick={() => handleAddImageToLayer(idx)}
-                                  className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-[10px] font-semibold transition-all"
-                                  title="Attach image to this subtitle"
-                                >
-                                  <ImageIcon size={10} /> Add
-                                </button>
+                                <div className="shrink-0 flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleAddImageToLayer(idx)}
+                                    disabled={generatingLayerIdx === idx}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-50 border border-blue-500/30 text-blue-300 text-[10px] font-semibold transition-all"
+                                    title="Upload image"
+                                  >
+                                    <ImageIcon size={10} /> Add
+                                  </button>
+                                  <button
+                                    onClick={() => handleGenerateImageForLayer(idx)}
+                                    disabled={generatingLayerIdx !== null}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/15 hover:bg-purple-500/25 disabled:opacity-50 border border-purple-500/30 text-purple-300 text-[10px] font-semibold transition-all"
+                                    title="AI-generate image from subtitle text"
+                                  >
+                                    {generatingLayerIdx === idx
+                                      ? <Loader2 size={10} className="animate-spin" />
+                                      : <Sparkles size={10} />}
+                                    Gen
+                                  </button>
+                                </div>
                               )}
                             </div>
                           ))}
