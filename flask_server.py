@@ -287,6 +287,8 @@ def get_transcript():
                         '--sub-langs', sub_langs,
                         '--sub-format', 'json3',
                         '--skip-download', '--no-playlist',
+                        '--no-check-certificates',
+                        '--extractor-args', 'youtube:player_client=ios',
                         *cookies_args(),
                         '-o', out_tmpl,
                         url
@@ -380,6 +382,8 @@ def get_transcript():
     try:
         meta_result = subprocess.run(
             ['yt-dlp', '--skip-download', '--no-playlist',
+             '--no-check-certificates',
+             '--extractor-args', 'youtube:player_client=ios',
              *cookies_args(),
              '--print', '%(title)s\n%(description)s', url],
             capture_output=True, text=True, timeout=20
@@ -435,6 +439,7 @@ def get_comments():
             '--write-comments',
             '--skip-download',
             '--no-playlist',
+            '--no-check-certificates',
             '--extractor-args', mc_arg,
             *cookies_args(),
             '-o', os.path.join(tmpdir, '%(id)s'),
@@ -451,6 +456,7 @@ def get_comments():
                     '--write-comments',
                     '--skip-download',
                     '--no-playlist',
+                    '--no-check-certificates',
                     *cookies_args(),
                     '-o', os.path.join(tmpdir, '%(id)s'),
                     url
@@ -524,31 +530,51 @@ def download_video():
         active_jobs[job_id] = {'job_id': job_id, 'status': 'downloading', 'progress': 0, 'speed': '', 'eta': ''}
         try:
             format_str = f'bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]/best[ext=mp4]/best'
-            cmd = [
-                'yt-dlp',
-                '-f', format_str,
-                '--merge-output-format', 'mp4',
-                '--newline',
-                '-o', output_path,
-                '--no-playlist',
-                *cookies_args(),
-                url
-            ]
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            for line in proc.stdout:
-                line = line.strip()
-                if '[download]' in line and '%' in line:
-                    m = _re.search(r'(\d+\.?\d*)%', line)
-                    speed_m = _re.search(r'at\s+([\d.]+\s*\w+/s)', line)
-                    eta_m = _re.search(r'ETA\s+([\d:]+)', line)
-                    if m:
-                        active_jobs[job_id]['progress'] = round(float(m.group(1)), 1)
-                    if speed_m:
-                        active_jobs[job_id]['speed'] = speed_m.group(1)
-                    if eta_m:
-                        active_jobs[job_id]['eta'] = eta_m.group(1)
-            proc.wait(timeout=600)
-            if proc.returncode == 0 and os.path.exists(output_path):
+
+            # Try multiple player clients to bypass SABR/bot restrictions
+            # iOS client bypasses SABR streaming; mweb as fallback; default last
+            clients_to_try = ['ios', 'mweb', None]
+            success = False
+            last_error = 'yt-dlp download failed'
+
+            for client in clients_to_try:
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+
+                extractor_args = ['--extractor-args', f'youtube:player_client={client}'] if client else []
+                cmd = [
+                    'yt-dlp',
+                    '-f', format_str,
+                    '--merge-output-format', 'mp4',
+                    '--newline',
+                    '-o', output_path,
+                    '--no-playlist',
+                    '--no-check-certificates',
+                    *extractor_args,
+                    *cookies_args(),
+                    url
+                ]
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in proc.stdout:
+                    line = line.strip()
+                    if '[download]' in line and '%' in line:
+                        m = _re.search(r'(\d+\.?\d*)%', line)
+                        speed_m = _re.search(r'at\s+([\d.]+\s*\w+/s)', line)
+                        eta_m = _re.search(r'ETA\s+([\d:]+)', line)
+                        if m:
+                            active_jobs[job_id]['progress'] = round(float(m.group(1)), 1)
+                        if speed_m:
+                            active_jobs[job_id]['speed'] = speed_m.group(1)
+                        if eta_m:
+                            active_jobs[job_id]['eta'] = eta_m.group(1)
+                    elif 'ERROR' in line:
+                        last_error = line
+                proc.wait(timeout=600)
+                if proc.returncode == 0 and os.path.exists(output_path):
+                    success = True
+                    break
+
+            if success:
                 active_jobs[job_id] = {
                     'job_id': job_id,
                     'status': 'done',
@@ -557,7 +583,7 @@ def download_video():
                     'download_url': f'/api/files/{os.path.basename(output_path)}'
                 }
             else:
-                active_jobs[job_id] = {'job_id': job_id, 'status': 'error', 'error': 'yt-dlp download failed'}
+                active_jobs[job_id] = {'job_id': job_id, 'status': 'error', 'error': last_error}
         except subprocess.TimeoutExpired:
             active_jobs[job_id] = {'job_id': job_id, 'status': 'error', 'error': 'Download timed out'}
         except Exception as e:
@@ -1346,18 +1372,30 @@ def render_short_clip():
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_path = os.path.join(tmpdir, 'raw.mp4')
 
-        # Step 1 — Download with yt-dlp
-        yt_cmd = [
+        # Step 1 — Download with yt-dlp (try iOS → mweb → default to bypass SABR)
+        base_yt_args = [
             'yt-dlp',
             *cookies_args(),
+            '--no-check-certificates',
             '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             '--merge-output-format', 'mp4',
             '-o', raw_path,
             yt_url,
         ]
-        r = subprocess.run(yt_cmd, capture_output=True, text=True, timeout=480)
-        if r.returncode != 0:
-            return jsonify({'error': f'Download failed: {r.stderr[-600:]}'}), 500
+        dl_success = False
+        last_dl_err = ''
+        for client in ['ios', 'mweb', None]:
+            if os.path.exists(raw_path):
+                os.remove(raw_path)
+            ext_args = ['--extractor-args', f'youtube:player_client={client}'] if client else []
+            r = subprocess.run(base_yt_args[:1] + ext_args + base_yt_args[1:],
+                               capture_output=True, text=True, timeout=480)
+            if r.returncode == 0 and os.path.exists(raw_path):
+                dl_success = True
+                break
+            last_dl_err = r.stderr[-600:] if r.stderr else r.stdout[-600:]
+        if not dl_success:
+            return jsonify({'error': f'Download failed: {last_dl_err}'}), 500
 
         # Step 2 — Trim
         trimmed_path = os.path.join(tmpdir, 'trimmed.mp4')
