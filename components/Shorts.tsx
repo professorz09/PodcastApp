@@ -7,7 +7,7 @@ import {
   Type, Scissors, Sparkles, Image as ImageIcon, Trash2, Youtube
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
-import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, ShortsSegment, TranscriptChunk } from '../services/geminiService';
+import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
 import { saveShortsScenes, loadShortsScenes } from '../services/storageService';
 import { toast } from './Toast';
 
@@ -773,7 +773,8 @@ const TimelineRow: React.FC<{
 const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onClearShortsContext, onBack }) => {
   // ── Smart Short Clips state ──
   const [shortsSegments, setShortsSegments] = useState<ShortsSegment[]>([]);
-  const [findingSegments, setFindingSegments] = useState(false);
+  const [findingSegments, setFindingSegments] = useState<ClipMode | null>(null);
+  const [segmentsMode, setSegmentsMode] = useState<ClipMode>('short');
   const [findError, setFindError] = useState('');
   const [selectedShort, setSelectedShort] = useState<ShortsSegment | null>(null);
   const [trimStart, setTrimStart] = useState(0);
@@ -809,30 +810,32 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     });
   }, [transcript]);
 
-  // ── Find best short segments from AI ──
-  const handleFindSegments = useCallback(async () => {
+  // ── Find best segments from AI (short or long) ──
+  const handleFindSegments = useCallback(async (mode: ClipMode) => {
     if (!transcript.length) {
       toast.error('No transcript available. Import a YouTube video first.');
       return;
     }
-    setFindingSegments(true);
+    setFindingSegments(mode);
     setFindError('');
     setShortsSegments([]);
     setSelectedShort(null);
+    setSegmentsMode(mode);
     try {
       const segs = await findBestShortsSegments(
         transcript,
         shortsContext?.start,
         shortsContext?.end,
+        mode,
       );
       if (!segs.length) throw new Error('No suitable segments found');
       setShortsSegments(segs);
-      toast.success(`Found ${segs.length} engaging clips`);
+      toast.success(`Found ${segs.length} ${mode === 'long' ? 'long discussion' : 'engaging short'} clips`);
     } catch (e: any) {
       setFindError(e.message || 'Failed to find segments');
       toast.error(e.message || 'Failed to find segments');
     } finally {
-      setFindingSegments(false);
+      setFindingSegments(null);
     }
   }, [transcript, shortsContext]);
 
@@ -1491,14 +1494,30 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                 )}
 
                 {youtubeData && (
-                  <button
-                    onClick={handleFindSegments}
-                    disabled={findingSegments || !transcript.length}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all"
-                  >
-                    {findingSegments ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                    {findingSegments ? 'Analyzing transcript…' : 'Find Best Visual Segments'}
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleFindSegments('short')}
+                      disabled={!!findingSegments || !transcript.length}
+                      className="flex flex-col items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {findingSegments === 'short' ? <Loader2 size={14} className="animate-spin" /> : <Scissors size={14} />}
+                        <span>{findingSegments === 'short' ? 'Analyzing…' : 'Smart Short Clips'}</span>
+                      </div>
+                      <span className="text-[10px] text-white/70 font-normal">20–60 sec · punchy hooks</span>
+                    </button>
+                    <button
+                      onClick={() => handleFindSegments('long')}
+                      disabled={!!findingSegments || !transcript.length}
+                      className="flex flex-col items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {findingSegments === 'long' ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />}
+                        <span>{findingSegments === 'long' ? 'Analyzing…' : 'Smart Long Clips'}</span>
+                      </div>
+                      <span className="text-[10px] text-white/70 font-normal">90 sec–6 min · full context</span>
+                    </button>
+                  </div>
                 )}
 
                 {findError && (
@@ -1528,8 +1547,13 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                                 isSelected ? 'bg-pink-500 text-white' : 'bg-white/10 text-white/70'
                               }`}>#{i + 1}</span>
                               <span className="text-[10px] text-white/50 font-mono">
-                                {fmtSec(seg.start)} – {fmtSec(seg.end)} · {Math.round(seg.end - seg.start)}s
+                                {fmtSec(seg.start)} – {fmtSec(seg.end)} · {fmtSec(seg.end - seg.start)}
                               </span>
+                              {segmentsMode === 'long' && (
+                                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                  Long
+                                </span>
+                              )}
                             </div>
                           </div>
                           <p className="text-xs text-white/85 font-medium">{seg.title}</p>
@@ -1594,7 +1618,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                         />
                       </div>
                       <div className="text-[11px] text-white/50 text-center">
-                        Final clip duration: <span className="text-white font-semibold">{Math.round(trimEnd - trimStart)}s</span>
+                        Final clip duration: <span className="text-white font-semibold">{fmtSec(trimEnd - trimStart)}</span>
                       </div>
                     </div>
 

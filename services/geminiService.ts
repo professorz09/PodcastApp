@@ -5574,10 +5574,13 @@ export interface ShortsSegment {
   hook: string;
 }
 
+export type ClipMode = 'short' | 'long';
+
 export const findBestShortsSegments = async (
   transcript: { text: string; start: number; end: number }[],
   rangeStart?: number,
   rangeEnd?: number,
+  mode: ClipMode = 'short',
 ): Promise<ShortsSegment[]> => {
   if (!transcript.length) throw new Error('Transcript is empty');
 
@@ -5597,7 +5600,35 @@ export const findBestShortsSegments = async (
     ? `\nFocus only on the time range ${rangeStart.toFixed(1)}s to ${rangeEnd.toFixed(1)}s.`
     : '';
 
-  const prompt = `You are an expert short-form video editor (YouTube Shorts / Instagram Reels / TikTok).
+  const prompt = mode === 'long'
+    ? `You are an expert long-form video editor (YouTube long-form, podcast highlights, deep-dive segments).
+Analyse the transcript below and find the 2 to 4 BEST natural LONG segments where one specific topic is discussed in FULL CONTEXT — meaning the segment includes the setup, the full back-and-forth/discussion, the examples given, and the natural conclusion of that topic.${rangeNote}
+
+Each segment MUST:
+  • Be 90 seconds to 6 minutes long (NEVER under 90s, NEVER over 6 minutes)
+  • Cover ONE coherent topic from start to natural finish — do NOT cut mid-discussion
+  • Begin where the topic is introduced (not in the middle of an unrelated point)
+  • End at a natural pause / topic shift / conclusion
+  • Contain enough context that someone who hasn't seen the rest of the video can follow it
+
+Pick segments where the discussion is genuinely valuable: deep explanations, multi-angle debates, full stories, complete teachings, layered arguments.
+
+Return JSON ONLY in this exact shape (no markdown, no extra text):
+{
+  "segments": [
+    {
+      "title": "5-9 word topic title (in transcript's language)",
+      "start": <number, seconds>,
+      "end": <number, seconds>,
+      "description": "1-2 sentences explaining what topic is fully covered in this segment (in transcript's language)",
+      "hook": "The opening line that introduces this topic in the transcript"
+    }
+  ]
+}
+
+Transcript with timestamps:
+${lines}`
+    : `You are an expert short-form video editor (YouTube Shorts / Instagram Reels / TikTok).
 Analyse the transcript below and find the 3 to 5 BEST segments that would make engaging Shorts.${rangeNote}
 
 Each segment must be 20-60 seconds long, have a strong hook, and contain a complete idea.
