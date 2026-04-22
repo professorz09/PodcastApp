@@ -861,10 +861,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     rebuildSubtitleLines(seg.start, seg.end);
     // Seek the top YouTube player to the start of this segment
     setTimeout(() => {
-      ytPlayerRef.current?.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'seekTo', args: [seg.start, true] }),
-        '*'
-      );
+      try { ytPlayerInstanceRef.current?.seekTo(seg.start, true); } catch {}
     }, 300);
   }, [rebuildSubtitleLines]);
 
@@ -968,14 +965,21 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const activeRowRef = useRef<HTMLDivElement>(null);
-  const ytPlayerRef = useRef<HTMLIFrameElement>(null);
+
+  // YouTube IFrame API (official) refs
+  const ytContainerRef = useRef<HTMLDivElement>(null);
+  const ytPlayerInstanceRef = useRef<any>(null);
   const ytReadyRef = useRef(false);
+  const ytTimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const ytCommand = useCallback((func: string, args?: unknown[]) => {
-    ytPlayerRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func, args: args ?? [] }),
-      '*'
-    );
+    const p = ytPlayerInstanceRef.current;
+    if (!p) return;
+    try {
+      if (func === 'playVideo') p.playVideo();
+      else if (func === 'pauseVideo') p.pauseVideo();
+      else if (func === 'seekTo') p.seekTo(Number(args?.[0] ?? 0), args?.[1] !== false);
+    } catch { /* ignore if player not ready */ }
   }, []);
 
   // ── Persist scenes to IndexedDB (base64 imageUrls survive refresh) ──
@@ -1116,25 +1120,80 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     }
   }, [activeImageUrl, activeSubtitleText, subtitle, scenes.length, currentSegIdx]);
 
-  // ── Sync YouTube player state → local isPlaying ──
+  // ── Official YouTube IFrame API init ──
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      try {
-        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        if (data?.event === 'onReady') { ytReadyRef.current = true; }
-        if (data?.event === 'onStateChange') {
-          // 1 = playing, 2 = paused, 0 = ended
-          if (data.info === 1) setIsPlaying(true);
-          else if (data.info === 2 || data.info === 0) setIsPlaying(false);
-        }
-        if (data?.event === 'infoDelivery' && data?.info?.currentTime != null) {
-          setPlayTime(data.info.currentTime);
-        }
-      } catch { /* ignore non-JSON messages */ }
+    if (!videoId) return;
+
+    const initPlayer = () => {
+      // Destroy old player
+      if (ytPlayerInstanceRef.current) {
+        try { ytPlayerInstanceRef.current.destroy(); } catch {}
+        ytPlayerInstanceRef.current = null;
+      }
+      if (!ytContainerRef.current) return;
+      // Fresh inner div for YT.Player to replace
+      ytContainerRef.current.innerHTML = '';
+      const div = document.createElement('div');
+      ytContainerRef.current.appendChild(div);
+
+      ytPlayerInstanceRef.current = new (window as any).YT.Player(div, {
+        videoId,
+        width: '100%',
+        height: '100%',
+        playerVars: { autoplay: 0, rel: 0, modestbranding: 1, playsinline: 1, controls: 1 },
+        events: {
+          onReady: () => { ytReadyRef.current = true; },
+          onStateChange: (e: any) => {
+            // 1=playing 2=paused 0=ended -1=unstarted 3=buffering
+            if (e.data === 1) setIsPlaying(true);
+            else if (e.data === 2 || e.data === 0) setIsPlaying(false);
+          },
+        },
+      });
     };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
+
+    if ((window as any).YT?.Player) {
+      initPlayer();
+    } else {
+      // Load script once
+      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      }
+      const prev = (window as any).onYouTubeIframeAPIReady;
+      (window as any).onYouTubeIframeAPIReady = () => {
+        if (typeof prev === 'function') prev();
+        initPlayer();
+      };
+    }
+
+    return () => {
+      if (ytTimeIntervalRef.current) clearInterval(ytTimeIntervalRef.current);
+      try { ytPlayerInstanceRef.current?.destroy(); } catch {}
+      ytPlayerInstanceRef.current = null;
+      ytReadyRef.current = false;
+    };
+  }, [videoId]);
+
+  // ── Poll YT player time: sync seekbar + enforce trimEnd boundary ──
+  useEffect(() => {
+    if (ytTimeIntervalRef.current) clearInterval(ytTimeIntervalRef.current);
+    if (!isPlaying) return;
+
+    ytTimeIntervalRef.current = setInterval(() => {
+      const p = ytPlayerInstanceRef.current;
+      if (!p?.getCurrentTime) return;
+      const t: number = p.getCurrentTime();
+      setPlayTime(t);
+      // Auto-pause at trimEnd if a segment is active
+      if (selectedShort && t >= trimEnd) {
+        p.pauseVideo();
+      }
+    }, 250);
+
+    return () => { if (ytTimeIntervalRef.current) clearInterval(ytTimeIntervalRef.current); };
+  }, [isPlaying, selectedShort, trimEnd]);
 
   // ── Audio preview helpers ──
   const stopPreviewAudio = useCallback(() => {
@@ -1549,13 +1608,9 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
           <div className="bg-[#050505] rounded-2xl overflow-hidden shadow-2xl border border-white/5 shrink-0">
             <div className="w-full aspect-video relative">
               {videoId ? (
-                <iframe
-                  ref={ytPlayerRef}
-                  className="w-full h-full"
-                  src={`https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-                  title="YouTube video player"
-                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
+                <div
+                  ref={ytContainerRef}
+                  className="absolute inset-0 [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-0"
                 />
               ) : (
                 <canvas ref={previewCanvasRef} width={960} height={540} className="w-full h-full object-contain" />
