@@ -3,7 +3,7 @@ import {
   Film, Wand2, ChevronDown, ChevronUp,
   Play, Pause, Download, Loader2, AlertCircle,
   ArrowLeft, Settings2, ImagePlus, Video, X,
-  RefreshCw, SkipBack, SkipForward, Zap,
+  RefreshCw, Zap,
   Type, Scissors, Sparkles, Image as ImageIcon, Trash2, Youtube
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
@@ -859,6 +859,13 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     setTrimStart(seg.start);
     setTrimEnd(seg.end);
     rebuildSubtitleLines(seg.start, seg.end);
+    // Seek the top YouTube player to the start of this segment
+    setTimeout(() => {
+      ytPlayerRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'seekTo', args: [seg.start, true] }),
+        '*'
+      );
+    }, 300);
   }, [rebuildSubtitleLines]);
 
   // Re-build subtitles when trim changes
@@ -1538,27 +1545,71 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-36 md:pb-28">
         <div className="flex flex-col p-3 gap-3 max-w-2xl mx-auto w-full">
 
-          {/* Video / Canvas */}
-          <div className="w-full aspect-video bg-[#050505] rounded-2xl overflow-hidden shadow-2xl border border-white/5 relative shrink-0">
-            {videoId ? (
-              <iframe
-                ref={ytPlayerRef}
-                className="w-full h-full"
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-                title="YouTube video player"
-                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <canvas ref={previewCanvasRef} width={960} height={540} className="w-full h-full object-contain" />
+          {/* Video / Canvas + inline trim controls */}
+          <div className="bg-[#050505] rounded-2xl overflow-hidden shadow-2xl border border-white/5 shrink-0">
+            <div className="w-full aspect-video relative">
+              {videoId ? (
+                <iframe
+                  ref={ytPlayerRef}
+                  className="w-full h-full"
+                  src={`https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+                  title="YouTube video player"
+                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <canvas ref={previewCanvasRef} width={960} height={540} className="w-full h-full object-contain" />
+              )}
+            </div>
+
+            {/* Trim controls — appear below video once a segment is selected */}
+            {selectedShort && (
+              <div className="px-4 pt-3 pb-4 space-y-2.5 border-t border-white/5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-semibold text-white/70">Trim Start: {fmtSec(trimStart)}</label>
+                    <button
+                      onClick={() => { setTrimStart(selectedShort.start); setTrimEnd(selectedShort.end); }}
+                      className="text-[10px] text-pink-300 hover:text-pink-200"
+                    >Reset</button>
+                  </div>
+                  <input
+                    type="range"
+                    min={selectedShort.start}
+                    max={Math.max(selectedShort.start, trimEnd - 1)}
+                    step={0.5}
+                    value={trimStart}
+                    onChange={e => {
+                      setTrimStart(Number(e.target.value));
+                      ytCommand('seekTo', [Number(e.target.value), true]);
+                    }}
+                    className="w-full accent-pink-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-white/70 block mb-1">Trim End: {fmtSec(trimEnd)}</label>
+                  <input
+                    type="range"
+                    min={Math.min(selectedShort.end, trimStart + 1)}
+                    max={selectedShort.end}
+                    step={0.5}
+                    value={trimEnd}
+                    onChange={e => {
+                      setTrimEnd(Number(e.target.value));
+                      ytCommand('seekTo', [Number(e.target.value), true]);
+                    }}
+                    className="w-full accent-pink-500"
+                  />
+                </div>
+                <div className="text-[11px] text-white/50 text-center">
+                  Final clip duration: <span className="text-white font-semibold">{fmtSec(trimEnd - trimStart)}</span>
+                </div>
+              </div>
             )}
           </div>
 
           {/* Playback controls */}
           <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-3 flex items-center gap-3">
-            <button onClick={() => videoId ? ytCommand('seekTo', [0, true]) : seekTo(0)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
-              <SkipBack size={16} />
-            </button>
             <button
               onClick={() => {
                 if (videoId) {
@@ -1571,9 +1622,6 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
               disabled={!videoId && isLoadingAudio}
               className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 disabled:opacity-50">
               {(!videoId && isLoadingAudio) ? <Loader2 size={20} className="animate-spin" /> : isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
-            </button>
-            <button onClick={() => videoId ? ytCommand('seekTo', [0, true]) : seekTo(actualTotalRef.current || totalDuration)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
-              <SkipForward size={16} />
             </button>
             <div className="flex-1 min-w-0">
               <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden cursor-pointer"
@@ -1816,115 +1864,60 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                   </div>
                 )}
 
-                {/* Selected segment preview + trim + subtitle layer */}
-                {selectedShort && videoId && (
-                  <div className="bg-black/40 border border-white/10 rounded-xl overflow-hidden">
-                    <div className="aspect-video bg-black">
-                      <iframe
-                        key={`${videoId}-${selectedShort.start}-${selectedShort.end}`}
-                        className="w-full h-full"
-                        src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(trimStart)}&end=${Math.ceil(trimEnd)}&autoplay=0&rel=0`}
-                        title="Short preview"
-                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
+                {/* Subtitle image layers (shown after segment is selected and subtitles are built) */}
+                {selectedShort && subtitleLayers.length > 0 && (
+                  <div className="bg-white/3 border border-white/8 rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5">
+                      <Type size={12} className="text-blue-300" />
+                      <span className="text-[11px] font-semibold text-white/80">Auto Subtitles · Image Layer</span>
                     </div>
-
-                    {/* Trim controls */}
-                    <div className="p-3 space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] font-semibold text-white/70">Trim Start: {fmtSec(trimStart)}</label>
-                          <button
-                            onClick={() => { setTrimStart(selectedShort.start); setTrimEnd(selectedShort.end); }}
-                            className="text-[10px] text-pink-300 hover:text-pink-200"
-                          >Reset</button>
-                        </div>
-                        <input
-                          type="range"
-                          min={selectedShort.start}
-                          max={Math.max(selectedShort.start, trimEnd - 1)}
-                          step={0.5}
-                          value={trimStart}
-                          onChange={(e) => setTrimStart(Number(e.target.value))}
-                          className="w-full accent-pink-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-white/70 block mb-1">
-                          Trim End: {fmtSec(trimEnd)}
-                        </label>
-                        <input
-                          type="range"
-                          min={Math.min(selectedShort.end, trimStart + 1)}
-                          max={selectedShort.end}
-                          step={0.5}
-                          value={trimEnd}
-                          onChange={(e) => setTrimEnd(Number(e.target.value))}
-                          className="w-full accent-pink-500"
-                        />
-                      </div>
-                      <div className="text-[11px] text-white/50 text-center">
-                        Final clip duration: <span className="text-white font-semibold">{fmtSec(trimEnd - trimStart)}</span>
-                      </div>
-                    </div>
-
-                    {/* Subtitle timeline with image layer per phrase */}
-                    {subtitleLayers.length > 0 && (
-                      <div className="border-t border-white/10 p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Type size={12} className="text-blue-300" />
-                          <span className="text-[11px] font-semibold text-white/80">Auto Subtitles · Image Layer</span>
-                        </div>
-                        <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                          {subtitleLayers.map((layer, idx) => (
-                            <div key={idx} className="flex items-center gap-2 bg-white/5 rounded-lg p-2">
-                              <span className="text-[10px] text-white/40 font-mono shrink-0 w-12 text-center">
-                                {fmtSec(layer.start)}
-                              </span>
-                              <p className="text-[11px] text-white/80 flex-1 leading-snug line-clamp-2">{layer.text}</p>
-                              {layer.imageDataUrl ? (
-                                <div className="relative shrink-0">
-                                  <img src={layer.imageDataUrl} alt="" className="w-10 h-10 rounded object-cover border border-white/20" />
-                                  <button
-                                    onClick={() => handleRemoveImageFromLayer(idx)}
-                                    className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 hover:bg-red-400"
-                                    title="Remove image"
-                                  >
-                                    <X size={8} className="text-white" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="shrink-0 flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleAddImageToLayer(idx)}
-                                    disabled={generatingLayerIdx === idx}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-50 border border-blue-500/30 text-blue-300 text-[10px] font-semibold transition-all"
-                                    title="Upload image"
-                                  >
-                                    <ImageIcon size={10} /> Add
-                                  </button>
-                                  <button
-                                    onClick={() => handleGenerateImageForLayer(idx)}
-                                    disabled={generatingLayerIdx !== null}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/15 hover:bg-purple-500/25 disabled:opacity-50 border border-purple-500/30 text-purple-300 text-[10px] font-semibold transition-all"
-                                    title="AI-generate image from subtitle text"
-                                  >
-                                    {generatingLayerIdx === idx
-                                      ? <Loader2 size={10} className="animate-spin" />
-                                      : <Sparkles size={10} />}
-                                    Gen
-                                  </button>
-                                </div>
-                              )}
+                    <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar p-2">
+                      {subtitleLayers.map((layer, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white/5 rounded-lg p-2">
+                          <span className="text-[10px] text-white/40 font-mono shrink-0 w-12 text-center">
+                            {fmtSec(layer.start)}
+                          </span>
+                          <p className="text-[11px] text-white/80 flex-1 leading-snug line-clamp-2">{layer.text}</p>
+                          {layer.imageDataUrl ? (
+                            <div className="relative shrink-0">
+                              <img src={layer.imageDataUrl} alt="" className="w-10 h-10 rounded object-cover border border-white/20" />
+                              <button
+                                onClick={() => handleRemoveImageFromLayer(idx)}
+                                className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 hover:bg-red-400"
+                                title="Remove image"
+                              >
+                                <X size={8} className="text-white" />
+                              </button>
                             </div>
-                          ))}
+                          ) : (
+                            <div className="shrink-0 flex items-center gap-1">
+                              <button
+                                onClick={() => handleAddImageToLayer(idx)}
+                                disabled={generatingLayerIdx === idx}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-50 border border-blue-500/30 text-blue-300 text-[10px] font-semibold transition-all"
+                                title="Upload image"
+                              >
+                                <ImageIcon size={10} /> Add
+                              </button>
+                              <button
+                                onClick={() => handleGenerateImageForLayer(idx)}
+                                disabled={generatingLayerIdx !== null}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/15 hover:bg-purple-500/25 disabled:opacity-50 border border-purple-500/30 text-purple-300 text-[10px] font-semibold transition-all"
+                                title="AI-generate image from subtitle text"
+                              >
+                                {generatingLayerIdx === idx
+                                  ? <Loader2 size={10} className="animate-spin" />
+                                  : <Sparkles size={10} />}
+                                Gen
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-[10px] text-white/40 mt-2 text-center">
-                          Images appear on top of the video while each subtitle is shown.
-                        </p>
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-white/30 pb-2 text-center">
+                      Images overlay on the video at each subtitle timestamp.
+                    </p>
                   </div>
                 )}
               </div>
