@@ -1360,6 +1360,8 @@ def render_short_clip():
         return jsonify({'error': 'trimStart/trimEnd must be numbers'}), 400
 
     subtitle_layers = data.get('subtitleLayers', []) or []
+    aspect_ratio = data.get('aspectRatio', '16:9')  # '9:16' for Shorts, '16:9' for Long
+    is_vertical = aspect_ratio == '9:16'
 
     if not video_id:
         return jsonify({'error': 'videoId is required'}), 400
@@ -1397,13 +1399,17 @@ def render_short_clip():
         if not dl_success:
             return jsonify({'error': f'Download failed: {last_dl_err}'}), 500
 
-        # Step 2 — Trim
+        # Step 2 — Trim + optional 9:16 conversion for Shorts
         trimmed_path = os.path.join(tmpdir, 'trimmed.mp4')
+        # For 9:16 Shorts: center-crop the 16:9 frame to 9:16, then scale to 1080×1920
+        # crop=ih*9/16:ih crops width to 9/16 of height, keeps full height, centered
+        vf_filter = 'crop=ih*9/16:ih,scale=1080:1920' if is_vertical else None
         trim_cmd = [
             'ffmpeg', '-y',
             '-ss', str(trim_start),
             '-i', raw_path,
             '-t', str(duration),
+            *(['-vf', vf_filter] if vf_filter else []),
             '-c:v', 'libx264', '-c:a', 'aac',
             '-movflags', '+faststart',
             trimmed_path,
@@ -1421,7 +1427,7 @@ def render_short_clip():
             return Response(
                 video_bytes,
                 mimetype='video/mp4',
-                headers={'Content-Disposition': 'attachment; filename="short_clip.mp4"'}
+                headers={'Content-Disposition': f'attachment; filename="{"short_9x16" if is_vertical else "long_16x9"}_clip.mp4"'}
             )
 
         # Save each image and compute time relative to clip start
@@ -1475,7 +1481,7 @@ def render_short_clip():
     return Response(
         video_bytes,
         mimetype='video/mp4',
-        headers={'Content-Disposition': 'attachment; filename="short_clip.mp4"'}
+        headers={'Content-Disposition': f'attachment; filename="{"short_9x16" if is_vertical else "long_16x9"}_clip.mp4"'}
     )
 
 

@@ -1627,6 +1627,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
           trimStart,
           trimEnd,
           subtitleLayers: imageLayersToSend,
+          aspectRatio: segmentsMode === 'short' ? '9:16' : '16:9',
         }),
       });
       if (!res.ok) {
