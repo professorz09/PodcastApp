@@ -1359,8 +1359,9 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     if (isPlaying) startPreviewAudio(t);
   }, [isPlaying, startPreviewAudio, totalDuration]);
 
-  // ── Playback ──
+  // ── Playback (canvas/audio mode only — YouTube player manages itself via ytCommand) ──
   useEffect(() => {
+    if (videoId) return; // YouTube player handles its own play/pause state
     if (isPlaying) {
       if (!mergedBufRef.current) {
         // Load then play

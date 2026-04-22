@@ -5703,7 +5703,7 @@ Rules:
 Return ONLY a valid JSON array of 4 strings. No markdown, no explanation.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.1-flash-lite-preview',
     contents: { parts: [{ text: prompt }] },
   });
 
