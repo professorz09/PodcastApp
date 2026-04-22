@@ -5680,3 +5680,81 @@ ${lines}`;
       hook: s.hook || '',
     }));
 };
+
+// ── Generate 4 viral titles for a Short segment ───────────────────────────────
+export const generateShortsTitles = async (seg: ShortsSegment): Promise<string[]> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `You are an expert viral YouTube Shorts title writer.
+Given this clip:
+Title: ${seg.title}
+Hook: ${seg.hook}
+Description: ${seg.description}
+
+Generate exactly 4 viral, punchy, curiosity-driven YouTube Shorts titles.
+Rules:
+- Maximum 60 characters each
+- English only
+- No hashtags, no emojis
+- Mix styles: question, bold claim, shocking fact, "you won't believe"
+- Each title should make someone STOP scrolling and tap
+
+Return ONLY a valid JSON array of 4 strings. No markdown, no explanation.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: { parts: [{ text: prompt }] },
+  });
+
+  const raw = (response.candidates?.[0]?.content?.parts?.[0] as any)?.text?.trim() ?? '';
+  const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  const arr = JSON.parse(cleaned);
+  if (!Array.isArray(arr)) throw new Error('Invalid titles response');
+  return arr.slice(0, 4).map(String);
+};
+
+// ── Generate thumbnail image in bold YouTube style ─────────────────────────────
+export const generateShortsThumbnail = async (seg: ShortsSegment, mainLine: string): Promise<string> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  // Split the title into 2 lines for the thumbnail box
+  const words = mainLine.split(' ');
+  const mid = Math.ceil(words.length / 2);
+  const line1 = words.slice(0, mid).join(' ').toUpperCase();
+  const line2 = words.slice(mid).join(' ').toUpperCase();
+
+  const prompt = `Create a professional YouTube thumbnail image with this EXACT layout:
+
+BACKGROUND: Pure black or very dark charcoal background. Subtle dark film grain texture.
+
+LEFT SIDE (40% of image): A dramatic photorealistic person — could be a man or woman — with a shocked, concerned, or intense facial expression. Shot from shoulders up. Dark dramatic lighting with slight edge lighting. The person is facing slightly toward the right side. Background behind person is completely black/dark.
+
+RIGHT SIDE (55% of image): A white or off-white rectangle with rough/distressed edges and grunge texture overlaid.
+Inside the white box:
+- TOP TEXT: "${line1}" — bold black Impact-style condensed uppercase font, very large, fills most of the box width
+- BOTTOM TEXT: "${line2}" — bold RED uppercase text, same Impact style but slightly smaller
+- If line2 is very short, put it inside a red filled bar with white text instead
+Text is centered inside the box. The font feels aggressive and punchy.
+
+OVERALL: High contrast, cinematic, dramatic. Looks like a top 1% viral YouTube thumbnail. 16:9 aspect ratio.
+
+Do NOT add any watermarks, do NOT add any text except what is specified above.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      imageConfig: { aspectRatio: '16:9' },
+    },
+  });
+
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if ((part as any).inlineData) {
+      const d = (part as any).inlineData;
+      return `data:${d.mimeType};base64,${d.data}`;
+    }
+  }
+  throw new Error('No thumbnail generated');
+};

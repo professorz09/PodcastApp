@@ -7,7 +7,7 @@ import {
   Type, Scissors, Sparkles, Image as ImageIcon, Trash2, Youtube
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
-import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
+import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
 import { saveShortsScenes, loadShortsScenes } from '../services/storageService';
 import { toast } from './Toast';
 
@@ -798,6 +798,13 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   const fileInputRef = useRef<HTMLInputElement>(null);
   const layerEditIdxRef = useRef<number | null>(null);
 
+  // ── Per-segment title & thumbnail state ──
+  const [segmentTitles, setSegmentTitles] = useState<Record<number, string[]>>({});
+  const [segmentTitlesLoading, setSegmentTitlesLoading] = useState<number | null>(null);
+  const [segmentThumbnails, setSegmentThumbnails] = useState<Record<number, string>>({});
+  const [segmentThumbLoading, setSegmentThumbLoading] = useState<number | null>(null);
+  const [segmentThumbTitle, setSegmentThumbTitle] = useState<Record<number, string>>({});
+
   const transcript = youtubeData?.transcript || [];
   const videoId = youtubeData?.videoId || '';
 
@@ -871,6 +878,35 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     rebuildSubtitleLines(trimStart, trimEnd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimStart, trimEnd]);
+
+  // ── Per-segment title generation ──
+  const handleGenerateTitles = useCallback(async (seg: ShortsSegment, idx: number) => {
+    setSegmentTitlesLoading(idx);
+    try {
+      const titles = await generateShortsTitles(seg);
+      setSegmentTitles(prev => ({ ...prev, [idx]: titles }));
+      // Pre-select the first title for thumbnail generation
+      setSegmentThumbTitle(prev => ({ ...prev, [idx]: titles[0] }));
+    } catch (e: any) {
+      toast.error('Title generation failed: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setSegmentTitlesLoading(null);
+    }
+  }, []);
+
+  // ── Per-segment thumbnail generation ──
+  const handleGenerateThumbnail = useCallback(async (seg: ShortsSegment, idx: number) => {
+    const title = segmentThumbTitle[idx] || seg.title;
+    setSegmentThumbLoading(idx);
+    try {
+      const url = await generateShortsThumbnail(seg, title);
+      setSegmentThumbnails(prev => ({ ...prev, [idx]: url }));
+    } catch (e: any) {
+      toast.error('Thumbnail generation failed: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setSegmentThumbLoading(null);
+    }
+  }, [segmentThumbTitle]);
 
   // Image upload for subtitle layer
   const handleAddImageToLayer = (idx: number) => {
@@ -1878,21 +1914,24 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
 
                 {/* Segment cards */}
                 {shortsSegments.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {shortsSegments.map((seg, i) => {
                       const isSelected = selectedShort?.start === seg.start && selectedShort?.end === seg.end;
+                      const titles = segmentTitles[i] || [];
+                      const thumbnail = segmentThumbnails[i] || '';
+                      const chosenTitle = segmentThumbTitle[i] || seg.title;
                       return (
-                        <button
-                          key={i}
-                          onClick={() => handleSelectShort(seg)}
-                          className={`w-full text-left rounded-xl p-3 border transition-all ${
-                            isSelected
-                              ? 'bg-pink-500/15 border-pink-500/50'
-                              : 'bg-white/5 border-white/10 hover:bg-white/10'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <div className="flex items-center gap-2">
+                        <div key={i} className={`rounded-xl border overflow-hidden transition-all ${
+                          isSelected ? 'border-pink-500/50' : 'border-white/10'
+                        }`}>
+                          {/* ── Segment header card ── */}
+                          <button
+                            onClick={() => handleSelectShort(seg)}
+                            className={`w-full text-left p-3 transition-all ${
+                              isSelected ? 'bg-pink-500/15' : 'bg-white/5 hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                 isSelected ? 'bg-pink-500 text-white' : 'bg-white/10 text-white/70'
                               }`}>#{i + 1}</span>
@@ -1905,15 +1944,83 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                                 </span>
                               )}
                             </div>
+                            <p className="text-xs text-white/85 font-medium">{seg.title}</p>
+                            {seg.hook && (
+                              <p className="text-[11px] text-pink-300/80 italic mt-1 line-clamp-1">"{seg.hook}"</p>
+                            )}
+                            {seg.description && (
+                              <p className="text-[11px] text-white/55 mt-1 line-clamp-2">{seg.description}</p>
+                            )}
+                          </button>
+
+                          {/* ── Title generation ── */}
+                          <div className="border-t border-white/8 bg-black/20 px-3 py-2.5 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Viral Titles</span>
+                              <button
+                                onClick={() => handleGenerateTitles(seg, i)}
+                                disabled={segmentTitlesLoading === i}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-500/15 hover:bg-violet-500/25 disabled:opacity-50 border border-violet-500/30 text-violet-300 text-[10px] font-semibold transition-all"
+                              >
+                                {segmentTitlesLoading === i
+                                  ? <><Loader2 size={9} className="animate-spin" /> Generating…</>
+                                  : <><Sparkles size={9} /> {titles.length ? 'Regenerate' : 'Generate 4 Titles'}</>
+                                }
+                              </button>
+                            </div>
+                            {titles.length > 0 && (
+                              <div className="space-y-1">
+                                {titles.map((t, ti) => (
+                                  <button
+                                    key={ti}
+                                    onClick={() => setSegmentThumbTitle(prev => ({ ...prev, [i]: t }))}
+                                    className={`w-full text-left text-[11px] px-2.5 py-1.5 rounded-lg border transition-all leading-snug ${
+                                      chosenTitle === t
+                                        ? 'bg-violet-500/20 border-violet-500/50 text-violet-200'
+                                        : 'bg-white/4 border-white/8 text-white/75 hover:bg-white/8'
+                                    }`}
+                                  >
+                                    {t}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <p className="text-xs text-white/85 font-medium">{seg.title}</p>
-                          {seg.hook && (
-                            <p className="text-[11px] text-pink-300/80 italic mt-1 line-clamp-1">"{seg.hook}"</p>
-                          )}
-                          {seg.description && (
-                            <p className="text-[11px] text-white/55 mt-1 line-clamp-2">{seg.description}</p>
-                          )}
-                        </button>
+
+                          {/* ── Thumbnail generation ── */}
+                          <div className="border-t border-white/8 bg-black/20 px-3 py-2.5 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Thumbnail</span>
+                              <button
+                                onClick={() => handleGenerateThumbnail(seg, i)}
+                                disabled={segmentThumbLoading === i}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-pink-500/15 hover:bg-pink-500/25 disabled:opacity-50 border border-pink-500/30 text-pink-300 text-[10px] font-semibold transition-all"
+                              >
+                                {segmentThumbLoading === i
+                                  ? <><Loader2 size={9} className="animate-spin" /> Generating…</>
+                                  : <><ImageIcon size={9} /> {thumbnail ? 'Regenerate' : 'Generate Thumbnail'}</>
+                                }
+                              </button>
+                            </div>
+                            {segmentThumbLoading !== i && (
+                              <p className="text-[10px] text-white/35 leading-snug">
+                                Using: <span className="text-white/55 italic">"{chosenTitle}"</span>
+                              </p>
+                            )}
+                            {thumbnail && (
+                              <div className="relative rounded-lg overflow-hidden border border-white/10">
+                                <img src={thumbnail} alt="Thumbnail" className="w-full object-cover rounded-lg" />
+                                <a
+                                  href={thumbnail}
+                                  download={`thumbnail-${i + 1}.png`}
+                                  className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-black/60 hover:bg-black/80 text-white text-[10px] font-semibold border border-white/20 backdrop-blur-sm"
+                                >
+                                  <Download size={9} /> Save
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
