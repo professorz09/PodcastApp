@@ -294,12 +294,12 @@ async function startServer() {
 
   // Flask proxy routes — forward YouTube/video/files API calls to Flask on port 8000
   const FLASK_URL = 'http://localhost:8000';
-  const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/health', '/api/instagram', '/api/cookies', '/api/reddit'];
+  const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/health', '/api/instagram', '/api/cookies', '/api/reddit', '/api/shorts'];
 
   app.use(flaskRoutes, async (req: any, res: any) => {
     const controller = new AbortController();
-    // 3-minute timeout for long operations (video merge, download etc.)
-    const timeoutId = setTimeout(() => controller.abort(), 180_000);
+    // 10-minute timeout for long operations (video download, trim, etc.)
+    const timeoutId = setTimeout(() => controller.abort(), 600_000);
 
     try {
       const targetUrl = `${FLASK_URL}${req.originalUrl}`;

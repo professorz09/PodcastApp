@@ -1310,6 +1310,137 @@ def reddit_comments():
         return jsonify({'error': f'Failed to fetch comments: {err}', 'error_code': 'SCRAPE_ERROR'}), 500
 
 
+@app.route('/api/shorts/render', methods=['POST'])
+def render_short_clip():
+    """
+    Download a YouTube video, trim it to the selected segment,
+    and optionally overlay subtitle images at their timestamps.
+    Body JSON:
+      videoId: str
+      trimStart: float   (seconds from start of full video)
+      trimEnd: float     (seconds from start of full video)
+      subtitleLayers: list of {start, end, text, imageDataUrl}  (optional)
+    Returns: mp4 video file
+    """
+    import base64
+    from flask import Response
+
+    data = request.get_json(force=True) or {}
+    video_id = data.get('videoId', '').strip()
+    try:
+        trim_start = float(data.get('trimStart', 0))
+        trim_end   = float(data.get('trimEnd', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'trimStart/trimEnd must be numbers'}), 400
+
+    subtitle_layers = data.get('subtitleLayers', []) or []
+
+    if not video_id:
+        return jsonify({'error': 'videoId is required'}), 400
+    if trim_end <= trim_start:
+        return jsonify({'error': 'trimEnd must be greater than trimStart'}), 400
+
+    duration = trim_end - trim_start
+    yt_url = f'https://www.youtube.com/watch?v={video_id}'
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw_path = os.path.join(tmpdir, 'raw.mp4')
+
+        # Step 1 — Download with yt-dlp
+        yt_cmd = [
+            'yt-dlp',
+            *cookies_args(),
+            '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            '--merge-output-format', 'mp4',
+            '-o', raw_path,
+            yt_url,
+        ]
+        r = subprocess.run(yt_cmd, capture_output=True, text=True, timeout=480)
+        if r.returncode != 0:
+            return jsonify({'error': f'Download failed: {r.stderr[-600:]}'}), 500
+
+        # Step 2 — Trim
+        trimmed_path = os.path.join(tmpdir, 'trimmed.mp4')
+        trim_cmd = [
+            'ffmpeg', '-y',
+            '-ss', str(trim_start),
+            '-i', raw_path,
+            '-t', str(duration),
+            '-c:v', 'libx264', '-c:a', 'aac',
+            '-movflags', '+faststart',
+            trimmed_path,
+        ]
+        r = subprocess.run(trim_cmd, capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            return jsonify({'error': f'Trim failed: {r.stderr[-600:]}'}), 500
+
+        # Step 3 — Image overlays (if any subtitle layers have images)
+        image_layers = [l for l in subtitle_layers if l.get('imageDataUrl')]
+
+        if not image_layers:
+            with open(trimmed_path, 'rb') as f:
+                video_bytes = f.read()
+            return Response(
+                video_bytes,
+                mimetype='video/mp4',
+                headers={'Content-Disposition': 'attachment; filename="short_clip.mp4"'}
+            )
+
+        # Save each image and compute time relative to clip start
+        overlay_info = []
+        for i, layer in enumerate(image_layers):
+            img_data = layer['imageDataUrl']
+            if ',' in img_data:
+                img_data = img_data.split(',', 1)[1]
+            img_bytes = base64.b64decode(img_data)
+            img_path = os.path.join(tmpdir, f'img_{i}.png')
+            with open(img_path, 'wb') as f:
+                f.write(img_bytes)
+            rel_start = max(0.0, float(layer.get('start', 0)) - trim_start)
+            rel_end   = min(duration, float(layer.get('end', duration)) - trim_start)
+            overlay_info.append({'path': img_path, 'start': rel_start, 'end': rel_end})
+
+        # Build ffmpeg filter_complex for overlays
+        ffmpeg_inputs = ['-i', trimmed_path]
+        for ov in overlay_info:
+            ffmpeg_inputs += ['-loop', '1', '-i', ov['path']]
+
+        filter_parts = []
+        last_label = '[0:v]'
+        for i, ov in enumerate(overlay_info):
+            enable = f"enable='between(t,{ov['start']:.3f},{ov['end']:.3f})'"
+            scale_label = f'[sc{i}]'
+            out_label   = f'[ov{i}]'
+            # Scale image to 25% of video width, position bottom-right with 20px padding
+            filter_parts.append(f'[{i+1}:v]scale=iw*0.25:-1{scale_label}')
+            filter_parts.append(f'{last_label}{scale_label}overlay=W-w-20:H-h-20:{enable}{out_label}')
+            last_label = out_label
+
+        final_path = os.path.join(tmpdir, 'final.mp4')
+        overlay_cmd = [
+            'ffmpeg', '-y',
+            *ffmpeg_inputs,
+            '-filter_complex', ';'.join(filter_parts),
+            '-map', last_label,
+            '-map', '0:a',
+            '-c:v', 'libx264', '-c:a', 'aac',
+            '-movflags', '+faststart',
+            final_path,
+        ]
+        r = subprocess.run(overlay_cmd, capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            return jsonify({'error': f'Overlay failed: {r.stderr[-600:]}'}), 500
+
+        with open(final_path, 'rb') as f:
+            video_bytes = f.read()
+
+    return Response(
+        video_bytes,
+        mimetype='video/mp4',
+        headers={'Content-Disposition': 'attachment; filename="short_clip.mp4"'}
+    )
+
+
 @app.route('/api/files', methods=['GET'])
 def list_files():
     """List all downloaded/edited files."""

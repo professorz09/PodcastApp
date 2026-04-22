@@ -1463,6 +1463,44 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     finally { setIsExporting(false); }
   }, [scenes, script, subtitle, hasAudio]);
 
+  const handleRenderTrimmedSegment = useCallback(async () => {
+    if (!selectedShort || !videoId) {
+      toast.error('Pehle Smart Short Clips se ek segment select karo.');
+      return;
+    }
+    setIsExporting(true);
+    setVideoBlob(null);
+    setVideoProgress({ pct: 10, msg: 'YouTube se video download ho raha hai…' });
+    try {
+      const imageLayersToSend = subtitleLayers.filter(l => l.imageDataUrl);
+      setVideoProgress({ pct: 20, msg: `Video download + trim ho raha hai (${fmtSec(trimEnd - trimStart)} clip)…` });
+      const res = await fetch('/api/shorts/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoId,
+          trimStart,
+          trimEnd,
+          subtitleLayers: imageLayersToSend,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || 'Render failed');
+      }
+      setVideoProgress({ pct: 90, msg: 'Video finalize ho raha hai…' });
+      const blob = await res.blob();
+      setVideoBlob(blob);
+      setVideoProgress(null);
+      toast.success('Trimmed clip ready! Download karo.');
+    } catch (e: any) {
+      setVideoProgress(null);
+      toast.error(e.message || 'Render failed');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [selectedShort, videoId, trimStart, trimEnd, subtitleLayers]);
+
   const handleDownload = () => {
     if (!videoBlob) return;
     const ext = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
@@ -1896,18 +1934,21 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
         </div>
       </div>
 
-      {/* ── Fixed bottom: Render button (exactly like DebateVisualizer) ── */}
+      {/* ── Fixed bottom: Render Trimmed Segment button ── */}
       <div className="fixed bottom-[60px] md:bottom-0 left-0 right-0 z-[60] p-3 bg-[#050505]/95 backdrop-blur border-t border-white/5 md:left-72">
         {isExporting && videoProgress && (
-          <div className="mb-2 h-1.5 rounded-full overflow-hidden bg-gray-800">
-            <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${videoProgress.pct}%` }} />
+          <div className="mb-2">
+            <div className="h-1.5 rounded-full overflow-hidden bg-gray-800">
+              <div className="h-full bg-pink-500 transition-all duration-500" style={{ width: `${videoProgress.pct}%` }} />
+            </div>
+            <p className="text-[10px] text-gray-500 mt-1 text-center">{videoProgress.msg}</p>
           </div>
         )}
         {videoBlob ? (
           <div className="flex gap-2">
             <button onClick={handleDownload}
               className="flex-1 py-4 bg-green-600/80 hover:bg-green-500 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-green-900/20">
-              <Download size={20} /> Download Video ({(videoBlob.size / 1024 / 1024).toFixed(1)} MB)
+              <Download size={20} /> Download Clip ({(videoBlob.size / 1024 / 1024).toFixed(1)} MB)
             </button>
             <button onClick={() => setVideoBlob(null)}
               className="w-14 py-4 bg-white/6 hover:bg-white/12 rounded-2xl flex items-center justify-center text-gray-400 transition-all">
@@ -1915,12 +1956,24 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
             </button>
           </div>
         ) : (
-          <button onClick={handleCreateVideo} disabled={isExporting || !hasAudio}
-            className="w-full py-4 bg-red-600/80 hover:bg-red-500 active:bg-red-700 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait shadow-lg shadow-red-900/20">
+          <button
+            onClick={handleRenderTrimmedSegment}
+            disabled={isExporting || !selectedShort || !videoId}
+            className="w-full py-4 bg-gradient-to-r from-pink-600/80 to-purple-600/80 hover:from-pink-500 hover:to-purple-500 active:scale-[0.98] rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-pink-900/20">
             {isExporting ? (
               <><Loader2 className="animate-spin" size={20} /> Rendering… {videoProgress?.pct ?? 0}%</>
+            ) : !selectedShort || !videoId ? (
+              <><Scissors size={20} /> Smart Short Clips se segment select karo</>
             ) : (
-              <><Video size={20} /> Render Storyboard Video</>
+              <>
+                <Scissors size={20} />
+                Render Trimmed Clip · {fmtSec(trimEnd - trimStart)}
+                {subtitleLayers.filter(l => l.imageDataUrl).length > 0 && (
+                  <span className="text-[11px] bg-white/20 px-2 py-0.5 rounded-full">
+                    +{subtitleLayers.filter(l => l.imageDataUrl).length} img
+                  </span>
+                )}
+              </>
             )}
           </button>
         )}
