@@ -961,6 +961,15 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const activeRowRef = useRef<HTMLDivElement>(null);
+  const ytPlayerRef = useRef<HTMLIFrameElement>(null);
+  const ytReadyRef = useRef(false);
+
+  const ytCommand = useCallback((func: string, args?: unknown[]) => {
+    ytPlayerRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func, args: args ?? [] }),
+      '*'
+    );
+  }, []);
 
   // ── Persist scenes to IndexedDB (base64 imageUrls survive refresh) ──
   useEffect(() => {
@@ -1099,6 +1108,26 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
       drawSubtitleOnCtx(ctx, W, H, activeSubtitleText, subtitle);
     }
   }, [activeImageUrl, activeSubtitleText, subtitle, scenes.length, currentSegIdx]);
+
+  // ── Sync YouTube player state → local isPlaying ──
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (data?.event === 'onReady') { ytReadyRef.current = true; }
+        if (data?.event === 'onStateChange') {
+          // 1 = playing, 2 = paused, 0 = ended
+          if (data.info === 1) setIsPlaying(true);
+          else if (data.info === 2 || data.info === 0) setIsPlaying(false);
+        }
+        if (data?.event === 'infoDelivery' && data?.info?.currentTime != null) {
+          setPlayTime(data.info.currentTime);
+        }
+      } catch { /* ignore non-JSON messages */ }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
 
   // ── Audio preview helpers ──
   const stopPreviewAudio = useCallback(() => {
@@ -1471,26 +1500,41 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-36 md:pb-28">
         <div className="flex flex-col p-3 gap-3 max-w-2xl mx-auto w-full">
 
-          {/* Canvas */}
+          {/* Video / Canvas */}
           <div className="w-full aspect-video bg-[#050505] rounded-2xl overflow-hidden shadow-2xl border border-white/5 relative shrink-0">
-            <canvas ref={previewCanvasRef} width={960} height={540} className="w-full h-full object-contain" />
+            {videoId ? (
+              <iframe
+                ref={ytPlayerRef}
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+                title="YouTube video player"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <canvas ref={previewCanvasRef} width={960} height={540} className="w-full h-full object-contain" />
+            )}
           </div>
 
           {/* Playback controls */}
           <div className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-3 flex items-center gap-3">
-            <button onClick={() => seekTo(0)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
+            <button onClick={() => videoId ? ytCommand('seekTo', [0, true]) : seekTo(0)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
               <SkipBack size={16} />
             </button>
             <button
               onClick={() => {
-                if (playTime >= (actualTotalRef.current || totalDuration)) seekTo(0);
-                setIsPlaying(v => !v);
+                if (videoId) {
+                  ytCommand(isPlaying ? 'pauseVideo' : 'playVideo');
+                } else {
+                  if (playTime >= (actualTotalRef.current || totalDuration)) seekTo(0);
+                  setIsPlaying(v => !v);
+                }
               }}
-              disabled={isLoadingAudio}
+              disabled={!videoId && isLoadingAudio}
               className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 disabled:opacity-50">
-              {isLoadingAudio ? <Loader2 size={20} className="animate-spin" /> : isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
+              {(!videoId && isLoadingAudio) ? <Loader2 size={20} className="animate-spin" /> : isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
             </button>
-            <button onClick={() => seekTo(actualTotalRef.current || totalDuration)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
+            <button onClick={() => videoId ? ytCommand('seekTo', [0, true]) : seekTo(actualTotalRef.current || totalDuration)} className="p-2 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-all shrink-0">
               <SkipForward size={16} />
             </button>
             <div className="flex-1 min-w-0">
