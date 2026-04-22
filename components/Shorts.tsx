@@ -7,7 +7,7 @@ import {
   Type, Scissors, Sparkles, Image as ImageIcon, Trash2, Youtube
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
-import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
+import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, ShortsContentResult, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
 import { saveShortsScenes, loadShortsScenes } from '../services/storageService';
 import { toast } from './Toast';
 
@@ -803,7 +803,12 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   const [segmentTitlesLoading, setSegmentTitlesLoading] = useState<number | null>(null);
   const [segmentThumbnails, setSegmentThumbnails] = useState<Record<number, string>>({});
   const [segmentThumbLoading, setSegmentThumbLoading] = useState<number | null>(null);
-  const [segmentThumbTitle, setSegmentThumbTitle] = useState<Record<number, string>>({});
+  // Thumbnail catchy text (separate from title — auto-generated, user-editable)
+  const [segmentThumbText, setSegmentThumbText] = useState<Record<number, string>>({});
+  // Person name per segment (user-entered, used in thumbnail)
+  const [segmentPersonName, setSegmentPersonName] = useState<Record<number, string>>({});
+  // Toggle full transcript display per segment
+  const [segmentShowTranscript, setSegmentShowTranscript] = useState<Record<number, boolean>>({});
 
   const transcript = youtubeData?.transcript || [];
   const videoId = youtubeData?.videoId || '';
@@ -879,34 +884,47 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimStart, trimEnd]);
 
-  // ── Per-segment title generation ──
+  // ── Per-segment title + thumbnail text generation (from actual transcript) ──
   const handleGenerateTitles = useCallback(async (seg: ShortsSegment, idx: number) => {
+    // Extract actual spoken transcript for this segment's timeframe
+    const segTranscript = transcript
+      .filter(t => t.end >= seg.start && t.start <= seg.end)
+      .map(t => t.text)
+      .join(' ')
+      .trim();
+
+    if (!segTranscript) {
+      toast.error('No transcript found for this segment. Import a YouTube video with captions first.');
+      return;
+    }
+
     setSegmentTitlesLoading(idx);
     try {
-      const titles = await generateShortsTitles(seg);
-      setSegmentTitles(prev => ({ ...prev, [idx]: titles }));
-      // Pre-select the first title for thumbnail generation
-      setSegmentThumbTitle(prev => ({ ...prev, [idx]: titles[0] }));
+      const result: ShortsContentResult = await generateShortsTitles(seg, segTranscript);
+      setSegmentTitles(prev => ({ ...prev, [idx]: result.titles }));
+      // Set the auto-generated thumbnail text (can be edited by user)
+      setSegmentThumbText(prev => ({ ...prev, [idx]: result.thumbnailText }));
     } catch (e: any) {
       toast.error('Title generation failed: ' + (e?.message || 'Unknown error'));
     } finally {
       setSegmentTitlesLoading(null);
     }
-  }, []);
+  }, [transcript]);
 
   // ── Per-segment thumbnail generation ──
   const handleGenerateThumbnail = useCallback(async (seg: ShortsSegment, idx: number) => {
-    const title = segmentThumbTitle[idx] || seg.title;
+    const thumbText = segmentThumbText[idx] || seg.title;
+    const personName = segmentPersonName[idx] || '';
     setSegmentThumbLoading(idx);
     try {
-      const url = await generateShortsThumbnail(seg, title);
+      const url = await generateShortsThumbnail(thumbText, personName);
       setSegmentThumbnails(prev => ({ ...prev, [idx]: url }));
     } catch (e: any) {
       toast.error('Thumbnail generation failed: ' + (e?.message || 'Unknown error'));
     } finally {
       setSegmentThumbLoading(null);
     }
-  }, [segmentThumbTitle]);
+  }, [segmentThumbText, segmentPersonName]);
 
   // Image upload for subtitle layer
   const handleAddImageToLayer = (idx: number) => {
@@ -1920,7 +1938,17 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                       const isSelected = selectedShort?.start === seg.start && selectedShort?.end === seg.end;
                       const titles = segmentTitles[i] || [];
                       const thumbnail = segmentThumbnails[i] || '';
-                      const chosenTitle = segmentThumbTitle[i] || seg.title;
+                      const thumbText = segmentThumbText[i] || '';
+                      const personName = segmentPersonName[i] || '';
+                      const showTranscript = segmentShowTranscript[i] || false;
+
+                      // Full transcript text for this segment's timeframe
+                      const segTranscriptText = transcript
+                        .filter(t => t.end >= seg.start && t.start <= seg.end)
+                        .map(t => t.text)
+                        .join(' ')
+                        .trim();
+
                       return (
                         <div key={i} className={`rounded-xl border overflow-hidden transition-all ${
                           isSelected ? 'border-pink-500/50' : 'border-white/10'
@@ -1940,21 +1968,42 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                                 {fmtSec(seg.start)} – {fmtSec(seg.end)} · {fmtSec(seg.end - seg.start)}
                               </span>
                               {segmentsMode === 'long' && (
-                                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                                  Long
-                                </span>
+                                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Long</span>
                               )}
                             </div>
-                            <p className="text-xs text-white/85 font-medium">{seg.title}</p>
+                            <p className="text-xs text-white/85 font-semibold">{seg.title}</p>
                             {seg.hook && (
                               <p className="text-[11px] text-pink-300/80 italic mt-1 line-clamp-1">"{seg.hook}"</p>
                             )}
-                            {seg.description && (
-                              <p className="text-[11px] text-white/55 mt-1 line-clamp-2">{seg.description}</p>
-                            )}
                           </button>
 
-                          {/* ── Title generation ── */}
+                          {/* ── Summary + Full Transcript ── */}
+                          <div className="border-t border-white/8 bg-black/25 px-3 py-2.5 space-y-2">
+                            {seg.description && (
+                              <div>
+                                <p className="text-[9px] font-semibold uppercase tracking-wider text-white/35 mb-1">Summary</p>
+                                <p className="text-[11px] text-white/65 leading-snug">{seg.description}</p>
+                              </div>
+                            )}
+                            {segTranscriptText && (
+                              <div>
+                                <button
+                                  onClick={() => setSegmentShowTranscript(prev => ({ ...prev, [i]: !showTranscript }))}
+                                  className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-white/35 hover:text-white/60 transition-colors mb-1"
+                                >
+                                  {showTranscript ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
+                                  Transcript ({fmtSec(seg.start)} – {fmtSec(seg.end)})
+                                </button>
+                                {showTranscript && (
+                                  <p className="text-[11px] text-white/55 leading-relaxed bg-white/3 rounded-lg p-2 border border-white/5">
+                                    {segTranscriptText}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── Viral Titles ── */}
                           <div className="border-t border-white/8 bg-black/20 px-3 py-2.5 space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Viral Titles</span>
@@ -1965,31 +2014,23 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                               >
                                 {segmentTitlesLoading === i
                                   ? <><Loader2 size={9} className="animate-spin" /> Generating…</>
-                                  : <><Sparkles size={9} /> {titles.length ? 'Regenerate' : 'Generate 4 Titles'}</>
+                                  : <><Sparkles size={9} /> {titles.length ? 'Regenerate' : 'Generate Titles'}</>
                                 }
                               </button>
                             </div>
                             {titles.length > 0 && (
                               <div className="space-y-1">
                                 {titles.map((t, ti) => (
-                                  <button
-                                    key={ti}
-                                    onClick={() => setSegmentThumbTitle(prev => ({ ...prev, [i]: t }))}
-                                    className={`w-full text-left text-[11px] px-2.5 py-1.5 rounded-lg border transition-all leading-snug ${
-                                      chosenTitle === t
-                                        ? 'bg-violet-500/20 border-violet-500/50 text-violet-200'
-                                        : 'bg-white/4 border-white/8 text-white/75 hover:bg-white/8'
-                                    }`}
-                                  >
+                                  <div key={ti} className="text-[11px] px-2.5 py-1.5 rounded-lg border bg-white/4 border-white/8 text-white/75 leading-snug select-text">
                                     {t}
-                                  </button>
+                                  </div>
                                 ))}
                               </div>
                             )}
                           </div>
 
-                          {/* ── Thumbnail generation ── */}
-                          <div className="border-t border-white/8 bg-black/20 px-3 py-2.5 space-y-2">
+                          {/* ── Thumbnail ── */}
+                          <div className="border-t border-white/8 bg-black/20 px-3 py-2.5 space-y-2.5">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Thumbnail</span>
                               <button
@@ -1999,22 +2040,46 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                               >
                                 {segmentThumbLoading === i
                                   ? <><Loader2 size={9} className="animate-spin" /> Generating…</>
-                                  : <><ImageIcon size={9} /> {thumbnail ? 'Regenerate' : 'Generate Thumbnail'}</>
+                                  : <><ImageIcon size={9} /> {thumbnail ? 'Regenerate' : 'Generate'}</>
                                 }
                               </button>
                             </div>
-                            {segmentThumbLoading !== i && (
-                              <p className="text-[10px] text-white/35 leading-snug">
-                                Using: <span className="text-white/55 italic">"{chosenTitle}"</span>
-                              </p>
-                            )}
+
+                            {/* Person name input */}
+                            <div>
+                              <label className="text-[9px] uppercase tracking-wider text-white/35 font-semibold mb-1 block">Person in thumbnail</label>
+                              <input
+                                type="text"
+                                value={personName}
+                                onChange={e => setSegmentPersonName(prev => ({ ...prev, [i]: e.target.value }))}
+                                placeholder="e.g. Elon Musk, Joe Rogan…"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white placeholder-white/25 focus:outline-none focus:border-pink-500/50 focus:bg-white/8"
+                              />
+                            </div>
+
+                            {/* Thumbnail catchy text (auto-filled from title gen, editable) */}
+                            <div>
+                              <label className="text-[9px] uppercase tracking-wider text-white/35 font-semibold mb-1 block">
+                                Catchy text on thumbnail
+                                <span className="ml-1 normal-case text-white/25">(auto-filled, you can edit)</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={thumbText}
+                                onChange={e => setSegmentThumbText(prev => ({ ...prev, [i]: e.target.value }))}
+                                placeholder="e.g. THEY LIED TO US"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white placeholder-white/25 focus:outline-none focus:border-pink-500/50 focus:bg-white/8 font-mono uppercase"
+                              />
+                              <p className="text-[9px] text-white/25 mt-1">2–5 words. This appears as bold text in the thumbnail — different from the YouTube title.</p>
+                            </div>
+
                             {thumbnail && (
                               <div className="relative rounded-lg overflow-hidden border border-white/10">
                                 <img src={thumbnail} alt="Thumbnail" className="w-full object-cover rounded-lg" />
                                 <a
                                   href={thumbnail}
                                   download={`thumbnail-${i + 1}.png`}
-                                  className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-black/60 hover:bg-black/80 text-white text-[10px] font-semibold border border-white/20 backdrop-blur-sm"
+                                  className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-black/70 hover:bg-black/90 text-white text-[10px] font-semibold border border-white/20 backdrop-blur-sm"
                                 >
                                   <Download size={9} /> Save
                                 </a>

@@ -5681,26 +5681,50 @@ ${lines}`;
     }));
 };
 
-// ── Generate 4 viral titles for a Short segment ───────────────────────────────
-export const generateShortsTitles = async (seg: ShortsSegment): Promise<string[]> => {
+// ── Generate 4 viral titles + thumbnail text from actual transcript ────────────
+export interface ShortsContentResult {
+  titles: string[];
+  thumbnailText: string; // separate punchy 2-4 word text for the thumbnail visual
+}
+
+export const generateShortsTitles = async (
+  seg: ShortsSegment,
+  transcriptText: string,
+): Promise<ShortsContentResult> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  const prompt = `You are an expert viral YouTube Shorts title writer.
-Given this clip:
+  const prompt = `You are an expert viral YouTube content strategist.
+
+Here is the ACTUAL spoken transcript from this video clip (use THIS as your source, not summaries):
+---
+${transcriptText}
+---
+
+Segment info (for context only):
 Title: ${seg.title}
-Hook: ${seg.hook}
-Description: ${seg.description}
+Duration: ${Math.round(seg.end - seg.start)}s
 
-Generate exactly 4 viral, punchy, curiosity-driven YouTube Shorts titles.
-Rules:
-- Maximum 60 characters each
-- English only
-- No hashtags, no emojis
-- Mix styles: question, bold claim, shocking fact, "you won't believe"
-- Each title should make someone STOP scrolling and tap
+Generate the following JSON object:
+{
+  "titles": [<4 viral YouTube titles based on what was ACTUALLY said in the transcript>],
+  "thumbnailText": "<2-5 word ultra-punchy visual text for the thumbnail — NOT the same as any title — shocking, bold, curiosity-driving, like 'THEY LIED TO US' or 'THIS CHANGES EVERYTHING'>"
+}
 
-Return ONLY a valid JSON array of 4 strings. No markdown, no explanation.`;
+Rules for titles:
+- Based on what was ACTUALLY spoken in the transcript above
+- Maximum 65 characters each
+- English only, no hashtags, no emojis
+- Mix: question / bold claim / shocking fact / emotional hook
+- Make someone STOP scrolling
+
+Rules for thumbnailText:
+- 2-5 words MAX, all caps style thinking
+- Must be DIFFERENT from the titles
+- Ultra short and punchy — designed to be read in 0.5 seconds
+- Based on the key revelation/shock/hook from the actual transcript
+
+Return ONLY valid JSON. No markdown, no explanation.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3.1-flash-lite-preview',
@@ -5709,38 +5733,57 @@ Return ONLY a valid JSON array of 4 strings. No markdown, no explanation.`;
 
   const raw = (response.candidates?.[0]?.content?.parts?.[0] as any)?.text?.trim() ?? '';
   const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-  const arr = JSON.parse(cleaned);
-  if (!Array.isArray(arr)) throw new Error('Invalid titles response');
-  return arr.slice(0, 4).map(String);
+  const parsed = JSON.parse(cleaned);
+  return {
+    titles: Array.isArray(parsed.titles) ? parsed.titles.slice(0, 4).map(String) : [],
+    thumbnailText: String(parsed.thumbnailText || seg.title),
+  };
 };
 
 // ── Generate thumbnail image in bold YouTube style ─────────────────────────────
-export const generateShortsThumbnail = async (seg: ShortsSegment, mainLine: string): Promise<string> => {
+export const generateShortsThumbnail = async (
+  thumbnailText: string,
+  personName: string,
+): Promise<string> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  // Split the title into 2 lines for the thumbnail box
-  const words = mainLine.split(' ');
-  const mid = Math.ceil(words.length / 2);
-  const line1 = words.slice(0, mid).join(' ').toUpperCase();
-  const line2 = words.slice(mid).join(' ').toUpperCase();
+  const words = thumbnailText.trim().split(/\s+/);
+  // Split into 2 lines — if 1-2 words keep on 1 line, else split at midpoint
+  let line1 = words.join(' ').toUpperCase();
+  let line2 = '';
+  if (words.length >= 3) {
+    const mid = Math.ceil(words.length / 2);
+    line1 = words.slice(0, mid).join(' ').toUpperCase();
+    line2 = words.slice(mid).join(' ').toUpperCase();
+  }
 
-  const prompt = `Create a professional YouTube thumbnail image with this EXACT layout:
+  const personDesc = personName.trim()
+    ? `The person on the left is ${personName}. Draw them realistically, recognizable, with their actual appearance.`
+    : `A dramatic photorealistic person — man or woman — with a shocked, concerned, or intense expression.`;
 
-BACKGROUND: Pure black or very dark charcoal background. Subtle dark film grain texture.
+  const bottomBlock = line2
+    ? `- BOTTOM TEXT: "${line2}" — bold RED uppercase, same condensed font, slightly smaller. Or place inside a solid red bar with white text if line2 is short.`
+    : `- No bottom text needed.`;
 
-LEFT SIDE (40% of image): A dramatic photorealistic person — could be a man or woman — with a shocked, concerned, or intense facial expression. Shot from shoulders up. Dark dramatic lighting with slight edge lighting. The person is facing slightly toward the right side. Background behind person is completely black/dark.
+  const prompt = `Create a professional viral YouTube thumbnail — 16:9 aspect ratio.
 
-RIGHT SIDE (55% of image): A white or off-white rectangle with rough/distressed edges and grunge texture overlaid.
-Inside the white box:
-- TOP TEXT: "${line1}" — bold black Impact-style condensed uppercase font, very large, fills most of the box width
-- BOTTOM TEXT: "${line2}" — bold RED uppercase text, same Impact style but slightly smaller
-- If line2 is very short, put it inside a red filled bar with white text instead
-Text is centered inside the box. The font feels aggressive and punchy.
+BACKGROUND: Pure black / very dark charcoal. Subtle dark film grain texture.
 
-OVERALL: High contrast, cinematic, dramatic. Looks like a top 1% viral YouTube thumbnail. 16:9 aspect ratio.
+LEFT SIDE (40% of image):
+${personDesc}
+Shot from shoulders up, facing slightly right. Dark cinematic lighting, subtle edge-light rim. Background behind them is solid black/dark. NO text over the person.
 
-Do NOT add any watermarks, do NOT add any text except what is specified above.`;
+RIGHT SIDE (55% of image):
+A white or off-white grunge/distressed rectangle (rough torn edges, light noise texture).
+Inside the box:
+- TOP TEXT: "${line1}" — huge bold black condensed Impact-style uppercase font, fills most of box width, centered.
+${bottomBlock}
+The text is dramatic, aggressive, punchy.
+
+OVERALL: High contrast, cinematic. Looks like a top 1% viral YouTube thumbnail. Photorealistic quality.
+
+STRICT: Do NOT add watermarks. Only show the person and the text box as described above.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
