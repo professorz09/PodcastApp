@@ -7,7 +7,7 @@ import {
   Type, Scissors, Sparkles, Image as ImageIcon, Trash2, Youtube
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
-import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, ShortsContentResult, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
+import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, generateShortsThumbText, ShortsContentResult, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
 import { saveShortsScenes, loadShortsScenes } from '../services/storageService';
 import { toast } from './Toast';
 
@@ -805,6 +805,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   const [segmentThumbLoading, setSegmentThumbLoading] = useState<number | null>(null);
   // Thumbnail catchy text (separate from title — auto-generated, user-editable)
   const [segmentThumbText, setSegmentThumbText] = useState<Record<number, string>>({});
+  const [segmentThumbTextLoading, setSegmentThumbTextLoading] = useState<number | null>(null);
   // Person name per segment (user-entered, used in thumbnail)
   const [segmentPersonName, setSegmentPersonName] = useState<Record<number, string>>({});
   // Toggle full transcript display per segment
@@ -925,6 +926,29 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
       setSegmentThumbLoading(null);
     }
   }, [segmentThumbText, segmentPersonName]);
+
+  // ── Generate just the catchy thumbnail text from transcript ──
+  const handleGenerateThumbText = useCallback(async (seg: ShortsSegment, idx: number) => {
+    const segTranscript = transcript
+      .filter(t => t.end >= seg.start && t.start <= seg.end)
+      .map(t => t.text)
+      .join(' ')
+      .trim();
+
+    if (!segTranscript) {
+      toast.error('No transcript found for this segment.');
+      return;
+    }
+    setSegmentThumbTextLoading(idx);
+    try {
+      const text = await generateShortsThumbText(seg, segTranscript);
+      setSegmentThumbText(prev => ({ ...prev, [idx]: text }));
+    } catch (e: any) {
+      toast.error('Catchy text generation failed: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setSegmentThumbTextLoading(null);
+    }
+  }, [transcript]);
 
   // Image upload for subtitle layer
   const handleAddImageToLayer = (idx: number) => {
@@ -2057,20 +2081,31 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                               />
                             </div>
 
-                            {/* Thumbnail catchy text (auto-filled from title gen, editable) */}
+                            {/* Thumbnail catchy text — AI generated from transcript, user-editable */}
                             <div>
-                              <label className="text-[9px] uppercase tracking-wider text-white/35 font-semibold mb-1 block">
-                                Catchy text on thumbnail
-                                <span className="ml-1 normal-case text-white/25">(auto-filled, you can edit)</span>
-                              </label>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">
+                                  Catchy text on thumbnail
+                                </label>
+                                <button
+                                  onClick={() => handleGenerateThumbText(seg, i)}
+                                  disabled={segmentThumbTextLoading === i}
+                                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-500/15 hover:bg-violet-500/25 disabled:opacity-50 border border-violet-500/30 text-violet-300 text-[9px] font-semibold transition-all"
+                                >
+                                  {segmentThumbTextLoading === i
+                                    ? <><Loader2 size={8} className="animate-spin" /> AI…</>
+                                    : <><Sparkles size={8} /> AI Generate</>
+                                  }
+                                </button>
+                              </div>
                               <input
                                 type="text"
                                 value={thumbText}
                                 onChange={e => setSegmentThumbText(prev => ({ ...prev, [i]: e.target.value }))}
-                                placeholder="e.g. THEY LIED TO US"
-                                className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white placeholder-white/25 focus:outline-none focus:border-pink-500/50 focus:bg-white/8 font-mono uppercase"
+                                placeholder="Click AI Generate, or type e.g. THEY LIED TO US"
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 focus:bg-white/8 font-mono uppercase"
                               />
-                              <p className="text-[9px] text-white/25 mt-1">2–5 words. This appears as bold text in the thumbnail — different from the YouTube title.</p>
+                              <p className="text-[9px] text-white/20 mt-1">2–5 words · appears as bold text in thumbnail · different from YouTube title</p>
                             </div>
 
                             {thumbnail && (

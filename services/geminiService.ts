@@ -5740,6 +5740,44 @@ Return ONLY valid JSON. No markdown, no explanation.`;
   };
 };
 
+// ── Generate just the catchy thumbnail text from transcript ───────────────────
+export const generateShortsThumbText = async (
+  seg: ShortsSegment,
+  transcriptText: string,
+): Promise<string> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `You are a viral YouTube thumbnail copywriter.
+
+Here is the ACTUAL spoken transcript from this video clip:
+---
+${transcriptText}
+---
+
+Segment title (context only): ${seg.title}
+
+Generate ONE ultra-short catchy phrase to display as bold visual text on a YouTube thumbnail.
+
+Rules:
+- 2 to 5 words MAX
+- ALL CAPS style thinking (you can return lowercase, it will be uppercased)
+- Based on the KEY SHOCK / HOOK / REVELATION from the actual transcript above
+- Must be DIFFERENT from the title — it's a visual punch, not a description
+- Examples: "THEY LIED TO US", "THIS CHANGES EVERYTHING", "NO ONE KNEW THIS", "THE TRUTH HURTS"
+- Make someone STOP scrolling in 0.5 seconds
+
+Return ONLY the phrase text. No quotes, no explanation, no JSON.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.1-flash-lite-preview',
+    contents: { parts: [{ text: prompt }] },
+  });
+
+  const text = (response.candidates?.[0]?.content?.parts?.[0] as any)?.text?.trim() ?? '';
+  return text.replace(/^["']|["']$/g, '').trim() || seg.title;
+};
+
 // ── Generate thumbnail image in bold YouTube style ─────────────────────────────
 export const generateShortsThumbnail = async (
   thumbnailText: string,
