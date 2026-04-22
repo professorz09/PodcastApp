@@ -9,11 +9,23 @@ Also need: ffmpeg (pkg install ffmpeg in Termux)
 
 import os
 import json
+import shutil
 import subprocess
 import tempfile
 import threading
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+
+# Detect Node.js for yt-dlp n-challenge solving (required for yt-dlp 2026+)
+_NODE_BIN = shutil.which('node') or ''
+def _js_runtime_args():
+    """Return --js-runtimes and --remote-components flags if Node.js is available."""
+    if _NODE_BIN:
+        return [
+            '--js-runtimes', f'node:{_NODE_BIN}',
+            '--remote-components', 'ejs:github',
+        ]
+    return []
 
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
@@ -288,6 +300,7 @@ def get_transcript():
                         '--sub-format', 'json3',
                         '--skip-download', '--no-playlist',
                         '--no-check-certificates',
+                        *_js_runtime_args(),
                         '--extractor-args', 'youtube:player_client=ios',
                         *cookies_args(),
                         '-o', out_tmpl,
@@ -383,6 +396,7 @@ def get_transcript():
         meta_result = subprocess.run(
             ['yt-dlp', '--skip-download', '--no-playlist',
              '--no-check-certificates',
+             *_js_runtime_args(),
              '--extractor-args', 'youtube:player_client=ios',
              *cookies_args(),
              '--print', '%(title)s\n%(description)s', url],
@@ -440,6 +454,7 @@ def get_comments():
             '--skip-download',
             '--no-playlist',
             '--no-check-certificates',
+            *_js_runtime_args(),
             '--extractor-args', mc_arg,
             *cookies_args(),
             '-o', os.path.join(tmpdir, '%(id)s'),
@@ -457,6 +472,7 @@ def get_comments():
                     '--skip-download',
                     '--no-playlist',
                     '--no-check-certificates',
+                    *_js_runtime_args(),
                     *cookies_args(),
                     '-o', os.path.join(tmpdir, '%(id)s'),
                     url
@@ -550,6 +566,7 @@ def download_video():
                     '-o', output_path,
                     '--no-playlist',
                     '--no-check-certificates',
+                    *_js_runtime_args(),
                     *extractor_args,
                     *cookies_args(),
                     url
@@ -1374,11 +1391,12 @@ def render_short_clip():
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_path = os.path.join(tmpdir, 'raw.mp4')
 
-        # Step 1 — Download with yt-dlp (try iOS → mweb → default to bypass SABR)
+        # Step 1 — Download with yt-dlp (try multiple clients to bypass SABR)
         base_yt_args = [
             'yt-dlp',
             *cookies_args(),
             '--no-check-certificates',
+            *_js_runtime_args(),
             '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             '--merge-output-format', 'mp4',
             '-o', raw_path,
@@ -1386,7 +1404,7 @@ def render_short_clip():
         ]
         dl_success = False
         last_dl_err = ''
-        for client in ['ios', 'mweb', None]:
+        for client in ['android', 'web', 'mweb', 'ios', None]:
             if os.path.exists(raw_path):
                 os.remove(raw_path)
             ext_args = ['--extractor-args', f'youtube:player_client={client}'] if client else []
