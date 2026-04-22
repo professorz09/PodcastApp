@@ -1471,249 +1471,6 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-36 md:pb-28">
         <div className="flex flex-col p-3 gap-3 max-w-2xl mx-auto w-full">
 
-          {/* ═══ Smart Short Clips ═══ */}
-          <div className="bg-gradient-to-br from-pink-950/40 via-[#0a0a0a] to-purple-950/30 border border-pink-500/20 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setShowSmartClips(s => !s)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Scissors size={16} className="text-pink-400" />
-                <h3 className="text-sm font-semibold text-white">Smart Short Clips</h3>
-                {shortsContext && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                    Context attached
-                  </span>
-                )}
-              </div>
-              {showSmartClips ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
-            </button>
-
-            {showSmartClips && (
-              <div className="px-4 pb-4 space-y-3">
-                {!youtubeData && (
-                  <div className="text-xs text-white/50 bg-white/5 rounded-lg p-3 flex items-start gap-2">
-                    <AlertCircle size={14} className="text-yellow-400 shrink-0 mt-0.5" />
-                    <span>Import a YouTube video first to use Smart Short Clips. Go to Content Importer → YouTube tab.</span>
-                  </div>
-                )}
-
-                {shortsContext && (
-                  <div className="bg-pink-500/10 border border-pink-500/30 rounded-xl p-3">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2">
-                        <Sparkles size={12} className="text-pink-300" />
-                        <span className="text-[11px] font-semibold text-pink-300">Attached chunk</span>
-                        <span className="text-[10px] text-white/50">{fmtSec(shortsContext.start)} – {fmtSec(shortsContext.end)}</span>
-                      </div>
-                      {onClearShortsContext && (
-                        <button
-                          onClick={onClearShortsContext}
-                          className="text-white/40 hover:text-white/80 transition-colors"
-                          title="Remove context"
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-white/80 font-medium">{shortsContext.title}</p>
-                    {shortsContext.summary && (
-                      <p className="text-[11px] text-white/60 mt-1 line-clamp-2">{shortsContext.summary}</p>
-                    )}
-                  </div>
-                )}
-
-                {youtubeData && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleFindSegments('short')}
-                      disabled={!!findingSegments || !transcript.length}
-                      className="flex flex-col items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        {findingSegments === 'short' ? <Loader2 size={14} className="animate-spin" /> : <Scissors size={14} />}
-                        <span>{findingSegments === 'short' ? 'Analyzing…' : 'Smart Short Clips'}</span>
-                      </div>
-                      <span className="text-[10px] text-white/70 font-normal">20–60 sec · punchy hooks</span>
-                    </button>
-                    <button
-                      onClick={() => handleFindSegments('long')}
-                      disabled={!!findingSegments || !transcript.length}
-                      className="flex flex-col items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        {findingSegments === 'long' ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />}
-                        <span>{findingSegments === 'long' ? 'Analyzing…' : 'Smart Long Clips'}</span>
-                      </div>
-                      <span className="text-[10px] text-white/70 font-normal">90 sec–6 min · full context</span>
-                    </button>
-                  </div>
-                )}
-
-                {findError && (
-                  <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg p-2 flex items-start gap-2">
-                    <AlertCircle size={12} className="shrink-0 mt-0.5" /> {findError}
-                  </div>
-                )}
-
-                {/* Segment cards */}
-                {shortsSegments.length > 0 && (
-                  <div className="space-y-2">
-                    {shortsSegments.map((seg, i) => {
-                      const isSelected = selectedShort?.start === seg.start && selectedShort?.end === seg.end;
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => handleSelectShort(seg)}
-                          className={`w-full text-left rounded-xl p-3 border transition-all ${
-                            isSelected
-                              ? 'bg-pink-500/15 border-pink-500/50'
-                              : 'bg-white/5 border-white/10 hover:bg-white/10'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                isSelected ? 'bg-pink-500 text-white' : 'bg-white/10 text-white/70'
-                              }`}>#{i + 1}</span>
-                              <span className="text-[10px] text-white/50 font-mono">
-                                {fmtSec(seg.start)} – {fmtSec(seg.end)} · {fmtSec(seg.end - seg.start)}
-                              </span>
-                              {segmentsMode === 'long' && (
-                                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                                  Long
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <p className="text-xs text-white/85 font-medium">{seg.title}</p>
-                          {seg.hook && (
-                            <p className="text-[11px] text-pink-300/80 italic mt-1 line-clamp-1">"{seg.hook}"</p>
-                          )}
-                          {seg.description && (
-                            <p className="text-[11px] text-white/55 mt-1 line-clamp-2">{seg.description}</p>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Selected segment preview + trim + subtitle layer */}
-                {selectedShort && videoId && (
-                  <div className="bg-black/40 border border-white/10 rounded-xl overflow-hidden">
-                    <div className="aspect-video bg-black">
-                      <iframe
-                        key={`${videoId}-${selectedShort.start}-${selectedShort.end}`}
-                        className="w-full h-full"
-                        src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(trimStart)}&end=${Math.ceil(trimEnd)}&autoplay=0&rel=0`}
-                        title="Short preview"
-                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-
-                    {/* Trim controls */}
-                    <div className="p-3 space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] font-semibold text-white/70">Trim Start: {fmtSec(trimStart)}</label>
-                          <button
-                            onClick={() => { setTrimStart(selectedShort.start); setTrimEnd(selectedShort.end); }}
-                            className="text-[10px] text-pink-300 hover:text-pink-200"
-                          >Reset</button>
-                        </div>
-                        <input
-                          type="range"
-                          min={selectedShort.start}
-                          max={Math.max(selectedShort.start, trimEnd - 1)}
-                          step={0.5}
-                          value={trimStart}
-                          onChange={(e) => setTrimStart(Number(e.target.value))}
-                          className="w-full accent-pink-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-white/70 block mb-1">
-                          Trim End: {fmtSec(trimEnd)}
-                        </label>
-                        <input
-                          type="range"
-                          min={Math.min(selectedShort.end, trimStart + 1)}
-                          max={selectedShort.end}
-                          step={0.5}
-                          value={trimEnd}
-                          onChange={(e) => setTrimEnd(Number(e.target.value))}
-                          className="w-full accent-pink-500"
-                        />
-                      </div>
-                      <div className="text-[11px] text-white/50 text-center">
-                        Final clip duration: <span className="text-white font-semibold">{fmtSec(trimEnd - trimStart)}</span>
-                      </div>
-                    </div>
-
-                    {/* Subtitle timeline with image layer per phrase */}
-                    {subtitleLayers.length > 0 && (
-                      <div className="border-t border-white/10 p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Type size={12} className="text-blue-300" />
-                          <span className="text-[11px] font-semibold text-white/80">Auto Subtitles · Image Layer</span>
-                        </div>
-                        <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                          {subtitleLayers.map((layer, idx) => (
-                            <div key={idx} className="flex items-center gap-2 bg-white/5 rounded-lg p-2">
-                              <span className="text-[10px] text-white/40 font-mono shrink-0 w-12 text-center">
-                                {fmtSec(layer.start)}
-                              </span>
-                              <p className="text-[11px] text-white/80 flex-1 leading-snug line-clamp-2">{layer.text}</p>
-                              {layer.imageDataUrl ? (
-                                <div className="relative shrink-0">
-                                  <img src={layer.imageDataUrl} alt="" className="w-10 h-10 rounded object-cover border border-white/20" />
-                                  <button
-                                    onClick={() => handleRemoveImageFromLayer(idx)}
-                                    className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 hover:bg-red-400"
-                                    title="Remove image"
-                                  >
-                                    <X size={8} className="text-white" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="shrink-0 flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleAddImageToLayer(idx)}
-                                    disabled={generatingLayerIdx === idx}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-50 border border-blue-500/30 text-blue-300 text-[10px] font-semibold transition-all"
-                                    title="Upload image"
-                                  >
-                                    <ImageIcon size={10} /> Add
-                                  </button>
-                                  <button
-                                    onClick={() => handleGenerateImageForLayer(idx)}
-                                    disabled={generatingLayerIdx !== null}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/15 hover:bg-purple-500/25 disabled:opacity-50 border border-purple-500/30 text-purple-300 text-[10px] font-semibold transition-all"
-                                    title="AI-generate image from subtitle text"
-                                  >
-                                    {generatingLayerIdx === idx
-                                      ? <Loader2 size={10} className="animate-spin" />
-                                      : <Sparkles size={10} />}
-                                    Gen
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-white/40 mt-2 text-center">
-                          Images appear on top of the video while each subtitle is shown.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Canvas */}
           <div className="w-full aspect-video bg-[#050505] rounded-2xl overflow-hidden shadow-2xl border border-white/5 relative shrink-0">
             <canvas ref={previewCanvasRef} width={960} height={540} className="w-full h-full object-contain" />
@@ -1978,6 +1735,249 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
                     </button>
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* ═══ Smart Short Clips ═══ */}
+          <div className="bg-gradient-to-br from-pink-950/40 via-[#0a0a0a] to-purple-950/30 border border-pink-500/20 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => setShowSmartClips(s => !s)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Scissors size={16} className="text-pink-400" />
+                <h3 className="text-sm font-semibold text-white">Smart Short Clips</h3>
+                {shortsContext && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                    Context attached
+                  </span>
+                )}
+              </div>
+              {showSmartClips ? <ChevronUp size={16} className="text-white/50" /> : <ChevronDown size={16} className="text-white/50" />}
+            </button>
+
+            {showSmartClips && (
+              <div className="px-4 pb-4 space-y-3">
+                {!youtubeData && (
+                  <div className="text-xs text-white/50 bg-white/5 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+                    <span>Import a YouTube video first to use Smart Short Clips. Go to Content Importer → YouTube tab.</span>
+                  </div>
+                )}
+
+                {shortsContext && (
+                  <div className="bg-pink-500/10 border border-pink-500/30 rounded-xl p-3">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={12} className="text-pink-300" />
+                        <span className="text-[11px] font-semibold text-pink-300">Attached chunk</span>
+                        <span className="text-[10px] text-white/50">{fmtSec(shortsContext.start)} – {fmtSec(shortsContext.end)}</span>
+                      </div>
+                      {onClearShortsContext && (
+                        <button
+                          onClick={onClearShortsContext}
+                          className="text-white/40 hover:text-white/80 transition-colors"
+                          title="Remove context"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-white/80 font-medium">{shortsContext.title}</p>
+                    {shortsContext.summary && (
+                      <p className="text-[11px] text-white/60 mt-1 line-clamp-2">{shortsContext.summary}</p>
+                    )}
+                  </div>
+                )}
+
+                {youtubeData && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleFindSegments('short')}
+                      disabled={!!findingSegments || !transcript.length}
+                      className="flex flex-col items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {findingSegments === 'short' ? <Loader2 size={14} className="animate-spin" /> : <Scissors size={14} />}
+                        <span>{findingSegments === 'short' ? 'Analyzing…' : 'Smart Short Clips'}</span>
+                      </div>
+                      <span className="text-[10px] text-white/70 font-normal">20–60 sec · punchy hooks</span>
+                    </button>
+                    <button
+                      onClick={() => handleFindSegments('long')}
+                      disabled={!!findingSegments || !transcript.length}
+                      className="flex flex-col items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {findingSegments === 'long' ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />}
+                        <span>{findingSegments === 'long' ? 'Analyzing…' : 'Smart Long Clips'}</span>
+                      </div>
+                      <span className="text-[10px] text-white/70 font-normal">90 sec–6 min · full context</span>
+                    </button>
+                  </div>
+                )}
+
+                {findError && (
+                  <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg p-2 flex items-start gap-2">
+                    <AlertCircle size={12} className="shrink-0 mt-0.5" /> {findError}
+                  </div>
+                )}
+
+                {/* Segment cards */}
+                {shortsSegments.length > 0 && (
+                  <div className="space-y-2">
+                    {shortsSegments.map((seg, i) => {
+                      const isSelected = selectedShort?.start === seg.start && selectedShort?.end === seg.end;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleSelectShort(seg)}
+                          className={`w-full text-left rounded-xl p-3 border transition-all ${
+                            isSelected
+                              ? 'bg-pink-500/15 border-pink-500/50'
+                              : 'bg-white/5 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                isSelected ? 'bg-pink-500 text-white' : 'bg-white/10 text-white/70'
+                              }`}>#{i + 1}</span>
+                              <span className="text-[10px] text-white/50 font-mono">
+                                {fmtSec(seg.start)} – {fmtSec(seg.end)} · {fmtSec(seg.end - seg.start)}
+                              </span>
+                              {segmentsMode === 'long' && (
+                                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                  Long
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs text-white/85 font-medium">{seg.title}</p>
+                          {seg.hook && (
+                            <p className="text-[11px] text-pink-300/80 italic mt-1 line-clamp-1">"{seg.hook}"</p>
+                          )}
+                          {seg.description && (
+                            <p className="text-[11px] text-white/55 mt-1 line-clamp-2">{seg.description}</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Selected segment preview + trim + subtitle layer */}
+                {selectedShort && videoId && (
+                  <div className="bg-black/40 border border-white/10 rounded-xl overflow-hidden">
+                    <div className="aspect-video bg-black">
+                      <iframe
+                        key={`${videoId}-${selectedShort.start}-${selectedShort.end}`}
+                        className="w-full h-full"
+                        src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(trimStart)}&end=${Math.ceil(trimEnd)}&autoplay=0&rel=0`}
+                        title="Short preview"
+                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+
+                    {/* Trim controls */}
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-semibold text-white/70">Trim Start: {fmtSec(trimStart)}</label>
+                          <button
+                            onClick={() => { setTrimStart(selectedShort.start); setTrimEnd(selectedShort.end); }}
+                            className="text-[10px] text-pink-300 hover:text-pink-200"
+                          >Reset</button>
+                        </div>
+                        <input
+                          type="range"
+                          min={selectedShort.start}
+                          max={Math.max(selectedShort.start, trimEnd - 1)}
+                          step={0.5}
+                          value={trimStart}
+                          onChange={(e) => setTrimStart(Number(e.target.value))}
+                          className="w-full accent-pink-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-white/70 block mb-1">
+                          Trim End: {fmtSec(trimEnd)}
+                        </label>
+                        <input
+                          type="range"
+                          min={Math.min(selectedShort.end, trimStart + 1)}
+                          max={selectedShort.end}
+                          step={0.5}
+                          value={trimEnd}
+                          onChange={(e) => setTrimEnd(Number(e.target.value))}
+                          className="w-full accent-pink-500"
+                        />
+                      </div>
+                      <div className="text-[11px] text-white/50 text-center">
+                        Final clip duration: <span className="text-white font-semibold">{fmtSec(trimEnd - trimStart)}</span>
+                      </div>
+                    </div>
+
+                    {/* Subtitle timeline with image layer per phrase */}
+                    {subtitleLayers.length > 0 && (
+                      <div className="border-t border-white/10 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Type size={12} className="text-blue-300" />
+                          <span className="text-[11px] font-semibold text-white/80">Auto Subtitles · Image Layer</span>
+                        </div>
+                        <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                          {subtitleLayers.map((layer, idx) => (
+                            <div key={idx} className="flex items-center gap-2 bg-white/5 rounded-lg p-2">
+                              <span className="text-[10px] text-white/40 font-mono shrink-0 w-12 text-center">
+                                {fmtSec(layer.start)}
+                              </span>
+                              <p className="text-[11px] text-white/80 flex-1 leading-snug line-clamp-2">{layer.text}</p>
+                              {layer.imageDataUrl ? (
+                                <div className="relative shrink-0">
+                                  <img src={layer.imageDataUrl} alt="" className="w-10 h-10 rounded object-cover border border-white/20" />
+                                  <button
+                                    onClick={() => handleRemoveImageFromLayer(idx)}
+                                    className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 hover:bg-red-400"
+                                    title="Remove image"
+                                  >
+                                    <X size={8} className="text-white" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="shrink-0 flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleAddImageToLayer(idx)}
+                                    disabled={generatingLayerIdx === idx}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-50 border border-blue-500/30 text-blue-300 text-[10px] font-semibold transition-all"
+                                    title="Upload image"
+                                  >
+                                    <ImageIcon size={10} /> Add
+                                  </button>
+                                  <button
+                                    onClick={() => handleGenerateImageForLayer(idx)}
+                                    disabled={generatingLayerIdx !== null}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-purple-500/15 hover:bg-purple-500/25 disabled:opacity-50 border border-purple-500/30 text-purple-300 text-[10px] font-semibold transition-all"
+                                    title="AI-generate image from subtitle text"
+                                  >
+                                    {generatingLayerIdx === idx
+                                      ? <Loader2 size={10} className="animate-spin" />
+                                      : <Sparkles size={10} />}
+                                    Gen
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-white/40 mt-2 text-center">
+                          Images appear on top of the video while each subtitle is shown.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
