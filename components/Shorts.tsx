@@ -539,16 +539,29 @@ async function createStoryboardVideo(
   const dest = AC.createMediaStreamDestination();
   const src = AC.createBufferSource(); src.buffer = merged; src.connect(dest);
 
-  const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ? 'video/mp4;codecs=avc1' : 'video/webm;codecs=vp9';
+  const PREFERRED_TYPES = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+    'video/mp4;codecs=avc1',
+    'video/mp4',
+  ];
+  const mimeType = PREFERRED_TYPES.find(t => MediaRecorder.isTypeSupported(t)) ?? '';
   const chunks: Blob[] = [];
+  const recorderOptions: MediaRecorderOptions = { videoBitsPerSecond: 6_000_000 };
+  if (mimeType) recorderOptions.mimeType = mimeType;
   const recorder = new MediaRecorder(
     new MediaStream([...canvas.captureStream(FPS).getVideoTracks(), ...dest.stream.getAudioTracks()]),
-    { mimeType, videoBitsPerSecond: 6_000_000 }
+    recorderOptions
   );
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
   const done = new Promise<void>(r => { recorder.onstop = () => r(); });
   recorder.start(100);
-  // Use AC.currentTime for drift-free sync — record the AC clock just before start
+  // Resume AudioContext — new instances may auto-suspend and block audio flow to MediaRecorder
+  if (AC.state === 'suspended') await AC.resume();
+  // Capture AC clock AFTER resume so elapsed time starts from the correct moment
   const acStartTime = AC.currentTime;
   src.start(0);
 
