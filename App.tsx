@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Layout from './components/Layout';
-import DebateInput from './components/DebateInput';
-import ScriptEditor from './components/ScriptEditor';
-import AudioGenerator from './components/AudioGenerator';
-import ThumbnailGenerator from './components/ThumbnailGenerator';
-import DebateVisualizer from './components/DebateVisualizer';
-import ContentImporter from './components/ContentImporter';
-import LyricsGenerator from './components/LyricsGenerator';
-import Storyboard from './components/Storyboard';
-import Shorts from './components/Shorts';
 import VideoClipImporter from './components/VideoClipImporter';
+
+// Lazy-load heavy components so initial bundle stays small
+const ContentImporter  = lazy(() => import('./components/ContentImporter'));
+const DebateInput      = lazy(() => import('./components/DebateInput'));
+const ScriptEditor     = lazy(() => import('./components/ScriptEditor'));
+const ThumbnailGenerator = lazy(() => import('./components/ThumbnailGenerator'));
+const AudioGenerator   = lazy(() => import('./components/AudioGenerator'));
+const DebateVisualizer = lazy(() => import('./components/DebateVisualizer'));
+const Storyboard       = lazy(() => import('./components/Storyboard'));
+const Shorts           = lazy(() => import('./components/Shorts'));
+const LyricsGenerator  = lazy(() => import('./components/LyricsGenerator'));
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
@@ -25,6 +27,16 @@ declare global {
     };
   }
 }
+
+const LazyFallback: React.FC = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="flex items-center gap-2.5">
+      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IMPORT);
@@ -358,6 +370,7 @@ const App: React.FC = () => {
     )}
 
     <Layout activeStep={appState} onStepChange={setAppState} onNewProject={handleNewProject}>
+      <Suspense fallback={<LazyFallback />}>
       {appState === AppState.VIDEO_CLIP_IMPORT && (
         <VideoClipImporter
           onUseTranscript={(data) => {
@@ -488,6 +501,7 @@ const App: React.FC = () => {
           initialSegments={preloadedClips.length > 0 ? preloadedClips : undefined}
         />
       )}
+      </Suspense>
     </Layout>
     </>
   );

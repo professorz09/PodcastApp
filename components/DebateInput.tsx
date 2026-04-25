@@ -2,11 +2,7 @@ import React, { useState, useRef } from 'react';
 import { toast } from './Toast';
 import { DebateConfig } from '../types';
 import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Zap, Brain, Activity, Video, BookOpen } from 'lucide-react';
-import * as pdfjsLib from 'pdfjs-dist';
 import IntroVideoMaker from './IntroVideoMaker';
-
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 interface DebateInputProps {
   onGenerate: (config: DebateConfig) => void;
@@ -120,6 +116,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
     try {
       if (file.type === 'application/pdf') {
         const arrayBuffer = await file.arrayBuffer();
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         let fullText = '';
         for (let i = 1; i <= pdf.numPages; i++) {
