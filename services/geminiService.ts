@@ -5839,3 +5839,113 @@ STRICT: Do NOT add watermarks. Only show the person and the text box as describe
   }
   throw new Error('No thumbnail generated');
 };
+
+// ── YouTube Clip Generator ────────────────────────────────────────────────────
+
+export type ClipDurationMode = 'auto' | 'under1min' | '2min' | '5min' | '8min' | '15min' | 'custom';
+export type ClipRatio = '9:16' | '16:9';
+
+export interface VideoClipGeneratorConfig {
+  ratio: ClipRatio;
+  durationMode: ClipDurationMode;
+  customDurationSeconds?: number; // used when durationMode === 'custom'
+  clipCount: number; // 1–5
+}
+
+function buildDurationConstraint(config: VideoClipGeneratorConfig): { minS: number; maxS: number; label: string } {
+  if (config.durationMode === 'custom' && config.customDurationSeconds) {
+    const t = config.customDurationSeconds;
+    return { minS: Math.max(10, t - 30), maxS: t + 30, label: `~${Math.round(t / 60)}min` };
+  }
+  const map: Record<ClipDurationMode, { minS: number; maxS: number; label: string }> = {
+    auto:      config.ratio === '9:16' ? { minS: 20, maxS: 60, label: '20–60s' } : { minS: 90, maxS: 360, label: '1.5–6min' },
+    under1min: { minS: 20, maxS: 60, label: 'under 1 min' },
+    '2min':    { minS: 60, maxS: 120, label: '1–2 min' },
+    '5min':    { minS: 120, maxS: 300, label: '2–5 min' },
+    '8min':    { minS: 300, maxS: 480, label: '5–8 min' },
+    '15min':   { minS: 480, maxS: 900, label: '8–15 min' },
+    custom:    { minS: 20, maxS: 60, label: 'custom' },
+  };
+  return map[config.durationMode];
+}
+
+export const generateVideoClipsFromTranscript = async (
+  transcript: { text: string; start: number; end: number }[],
+  config: VideoClipGeneratorConfig,
+): Promise<ShortsSegment[]> => {
+  if (!transcript.length) throw new Error('Transcript is empty');
+
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const { minS, maxS, label } = buildDurationConstraint(config);
+  const n = config.clipCount;
+  const formatHint = config.ratio === '9:16'
+    ? 'short-form vertical video (YouTube Shorts / Reels / TikTok) — punchy, high-energy, hooky'
+    : 'long-form horizontal video (YouTube full video) — informative, complete, in-depth';
+
+  const lines = transcript
+    .map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`)
+    .join('\n');
+
+  const prompt = `You are an expert video editor specialising in ${formatHint}.
+
+Analyse the transcript below and select EXACTLY ${n} clip${n > 1 ? 's' : ''} that would perform best as standalone clips.
+
+Duration rule: each clip MUST be between ${minS}s and ${maxS}s long (${label}).
+Format: ${config.ratio} — ${config.ratio === '9:16' ? 'optimise for short-form hooks, surprising moments, emotional peaks, viral potential' : 'optimise for complete ideas, full explanations, natural topic arcs'}.
+
+Selection criteria:
+- Strong opening hook (first 3 seconds must grab attention)
+- Clear, self-contained idea — a viewer with no context can follow it
+- Natural start (don't begin mid-sentence or mid-thought)
+- Natural end (conclusion, punchline, or clear topic shift)
+- No boring filler, greetings, or outros
+
+Return JSON ONLY — no markdown, no extra text:
+{
+  "segments": [
+    {
+      "title": "5-9 word punchy clip title in the transcript's language",
+      "start": <number, seconds>,
+      "end": <number, seconds>,
+      "description": "One sentence: why this clip works (in transcript's language)",
+      "hook": "Exact opening line from the transcript that starts this clip"
+    }
+  ]
+}
+
+Transcript:
+${lines}`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: { responseMimeType: 'application/json' },
+  });
+
+  const text = response.text || '';
+  let parsed: { segments: ShortsSegment[] };
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('AI response was not valid JSON');
+    parsed = JSON.parse(m[0]);
+  }
+
+  if (!parsed.segments || !Array.isArray(parsed.segments)) {
+    throw new Error('AI response missing segments array');
+  }
+
+  return parsed.segments
+    .filter(s => typeof s.start === 'number' && typeof s.end === 'number' && s.end > s.start)
+    .slice(0, config.clipCount)
+    .map(s => ({
+      title: s.title || 'Untitled clip',
+      start: Math.max(0, s.start),
+      end: s.end,
+      description: s.description || '',
+      hook: s.hook || '',
+    }));
+};

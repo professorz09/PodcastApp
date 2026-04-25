@@ -20,6 +20,7 @@ export interface VideoScene {
 }
 
 export enum AppState {
+  VIDEO_CLIP_IMPORT = 'VIDEO_CLIP_IMPORT', // Step -1 - YouTube → AI Clip Generator
   IMPORT = 'IMPORT',                   // Step 0  - Unified importer (YT / IG / Reddit, skippable)
   LYRICS = 'LYRICS',                   // Step 0b - Lyrics / Song Studio (skippable)
   // Legacy states kept for backward-compat with persisted storage

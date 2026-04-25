@@ -17,6 +17,7 @@ interface ShortsProps {
   shortsContext?: TranscriptChunk | null;
   onClearShortsContext?: () => void;
   onBack: () => void;
+  initialSegments?: ShortsSegment[];
 }
 
 interface SubtitleLineLayer {
@@ -783,9 +784,9 @@ const TimelineRow: React.FC<{
 };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onClearShortsContext, onBack }) => {
+const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onClearShortsContext, onBack, initialSegments }) => {
   // ── Smart Short Clips state ──
-  const [shortsSegments, setShortsSegments] = useState<ShortsSegment[]>([]);
+  const [shortsSegments, setShortsSegments] = useState<ShortsSegment[]>(initialSegments ?? []);
   const [findingSegments, setFindingSegments] = useState<ClipMode | null>(null);
   const [segmentsMode, setSegmentsMode] = useState<ClipMode>('short');
   const [findError, setFindError] = useState('');

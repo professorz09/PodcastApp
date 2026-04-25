@@ -373,12 +373,10 @@ async function startServer() {
       },
       appType: 'spa',
     });
-    // Force no-cache so browser always loads fresh JS after server restart
+    // Only block caching for the HTML entry point; let Vite serve JS/CSS with its own ETags
     app.use((req, res, next) => {
-      if (!req.path.startsWith('/api/')) {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
+      if (req.path === '/' || req.path === '/index.html') {
+        res.setHeader('Cache-Control', 'no-store');
       }
       next();
     });
