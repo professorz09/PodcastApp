@@ -9,8 +9,9 @@ import ContentImporter from './components/ContentImporter';
 import LyricsGenerator from './components/LyricsGenerator';
 import Storyboard from './components/Storyboard';
 import Shorts from './components/Shorts';
+import VideoClipImporter from './components/VideoClipImporter';
 import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
-import type { TranscriptChunk } from './services/geminiService';
+import type { TranscriptChunk, ShortsSegment } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
 import { Key, ExternalLink, RotateCcw, AlertTriangle, X } from 'lucide-react';
@@ -49,6 +50,7 @@ const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [shortsContext, setShortsContext] = useState<TranscriptChunk | null>(null);
+  const [preloadedClips, setPreloadedClips] = useState<ShortsSegment[]>([]);
 
   // Check for API Key on mount
   useEffect(() => {
@@ -96,7 +98,7 @@ const App: React.FC = () => {
         }
 
         const isImportState = (s: AppState) =>
-          s === AppState.IMPORT ||
+          s === AppState.IMPORT || s === AppState.VIDEO_CLIP_IMPORT ||
           s === AppState.YOUTUBE_IMPORT || s === AppState.INSTAGRAM_IMPORT || s === AppState.REDDIT_IMPORT;
 
         if (stored.script.length > 0) {
@@ -229,7 +231,8 @@ const App: React.FC = () => {
     try { sessionStorage.removeItem('ig_importer_v1'); } catch {}
     try { sessionStorage.removeItem('reddit_importer_v1'); } catch {}
     try { sessionStorage.removeItem('content_importer_platform'); } catch {}
-    setAppState(AppState.IMPORT);
+    setPreloadedClips([]);
+    setAppState(AppState.VIDEO_CLIP_IMPORT);
   };
 
   if (!hasApiKey) {
@@ -355,6 +358,20 @@ const App: React.FC = () => {
     )}
 
     <Layout activeStep={appState} onStepChange={setAppState} onNewProject={handleNewProject}>
+      {appState === AppState.VIDEO_CLIP_IMPORT && (
+        <VideoClipImporter
+          onUseTranscript={(data) => {
+            setYoutubeData(data);
+            setAppState(AppState.IMPORT);
+          }}
+          onSendToShorts={(clips, data) => {
+            setYoutubeData(data);
+            setPreloadedClips(clips);
+            setAppState(AppState.SHORTS);
+          }}
+        />
+      )}
+
       {appState === AppState.IMPORT && (
         <ContentImporter
           onImportDone={(data) => {
@@ -468,6 +485,7 @@ const App: React.FC = () => {
           shortsContext={shortsContext}
           onClearShortsContext={() => setShortsContext(null)}
           onBack={() => setAppState(AppState.STORYBOARD)}
+          initialSegments={preloadedClips.length > 0 ? preloadedClips : undefined}
         />
       )}
     </Layout>

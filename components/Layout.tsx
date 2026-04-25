@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Film,
   Smartphone,
+  Scissors,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -27,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const steps = [
+    { id: AppState.VIDEO_CLIP_IMPORT, label: 'Clips', icon: Scissors, optional: true },
     { id: AppState.IMPORT, label: 'Import', icon: FolderDown, optional: true },
     { id: AppState.INPUT, label: 'Generate', icon: Mic2 },
     { id: AppState.SCRIPT, label: 'Script', icon: FileText },
@@ -101,7 +103,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
               >
                 <step.icon size={18} className={isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-400'} />
                 <span className={`font-medium text-sm ${isActive ? 'tracking-wide' : ''}`}>
-                  {step.id === AppState.IMPORT ? 'Import Content' :
+                  {step.id === AppState.VIDEO_CLIP_IMPORT ? 'Clip Generator' :
+                   step.id === AppState.IMPORT ? 'Import Content' :
                    step.id === AppState.LYRICS ? 'Song / Lyrics' :
                    step.id === AppState.INPUT ? 'Generate' :
                    step.id === AppState.SCRIPT ? 'Script Editor' :
@@ -167,7 +170,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
                   <step.icon size={19} className={isActive ? 'text-purple-400' : ''} />
                 </div>
                 <span className={`text-[10px] font-semibold leading-none ${isActive ? 'text-white' : 'text-gray-600'}`}>
-                  {step.id === AppState.LYRICS ? 'Song' : step.label}
+                  {step.id === AppState.LYRICS ? 'Song' :
+                   step.id === AppState.VIDEO_CLIP_IMPORT ? 'Clips' :
+                   step.label}
                 </span>
               </button>
             );
