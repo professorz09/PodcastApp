@@ -208,7 +208,7 @@ const VideoClipImporter: React.FC<Props> = ({ onUseTranscript, onSendToShorts })
       const res  = await fetch('/api/youtube/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim(), quality: '720p' }),
+        body: JSON.stringify({ url: url.trim(), quality: '1080' }),
       });
       const d = await safeJson(res);
       if (!res.ok) throw new Error(d.error || 'Download start failed');

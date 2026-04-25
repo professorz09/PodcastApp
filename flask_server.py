@@ -516,7 +516,9 @@ def download_video():
     """Download YouTube video using yt-dlp."""
     data = request.json or {}
     url = data.get('url', '').strip()
-    quality = data.get('quality', '720')  # '360', '480', '720', '1080'
+    quality = data.get('quality', '1080')  # '360', '480', '720', '1080'
+    # Strip trailing 'p' if caller sent e.g. '720p' instead of '720'
+    quality = str(quality).rstrip('p').strip()
 
     if not url:
         return jsonify({'error': 'URL is required'}), 400
@@ -545,7 +547,11 @@ def download_video():
         import re as _re
         active_jobs[job_id] = {'job_id': job_id, 'status': 'downloading', 'progress': 0, 'speed': '', 'eta': ''}
         try:
-            format_str = f'bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]/best[ext=mp4]/best'
+            # Prefer VP9/AV1 if available for better quality, merge with best audio
+            format_str = (
+                f'bestvideo[height<={quality}]+bestaudio/bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]'
+                f'/best[height<={quality}]/bestvideo+bestaudio/best'
+            )
 
             # Try multiple player clients to bypass SABR/bot restrictions
             # iOS client bypasses SABR streaming; mweb as fallback; default last
@@ -562,6 +568,7 @@ def download_video():
                     'yt-dlp',
                     '-f', format_str,
                     '--merge-output-format', 'mp4',
+                    '--audio-quality', '0',       # best audio quality
                     '--newline',
                     '-o', output_path,
                     '--no-playlist',
@@ -785,7 +792,7 @@ def edit_video():
                 '-filter_complex', filter_complex,
                 '-map', map_v,
                 '-map', '[outa]',
-                '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+                '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
                 '-c:a', 'aac',
                 output_path
             ]
@@ -794,7 +801,7 @@ def edit_video():
             cmd = ['ffmpeg', '-y', '-i', input_path]
             if vf_filter:
                 cmd += ['-vf', vf_filter]
-            cmd += ['-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'copy', output_path]
+            cmd += ['-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-c:a', 'copy', output_path]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode == 0 and os.path.exists(output_path):
@@ -861,7 +868,7 @@ def merge_videos():
         cmd = [
             'ffmpeg', '-y',
             '-f', 'concat', '-safe', '0', '-i', list_path,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+            '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
             '-c:a', 'aac', '-b:a', '192k',
             '-movflags', '+faststart',
             output_path

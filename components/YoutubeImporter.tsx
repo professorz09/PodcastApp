@@ -382,7 +382,7 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onAtt
   };
 
   // ── Video Download ────────────────────────────────────────────────────────────
-  const [quality, setQuality] = useState<'360' | '480' | '720' | '1080'>(() => readSaved<'360' | '480' | '720' | '1080'>('quality', '720'));
+  const [quality, setQuality] = useState<'360' | '480' | '720' | '1080'>(() => readSaved<'360' | '480' | '720' | '1080'>('quality', '1080'));
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [downloadedFilename, setDownloadedFilename] = useState(() => readSaved('downloadedFilename', ''));
   const [downloadError, setDownloadError] = useState('');
