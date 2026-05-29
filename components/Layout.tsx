@@ -14,6 +14,7 @@ import {
   Smartphone,
   Scissors,
   ChevronRight,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -30,6 +31,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
   const steps = [
     { id: AppState.VIDEO_CLIP_IMPORT, label: 'Clip Generator', icon: Scissors, optional: true },
     { id: AppState.IMPORT,            label: 'Import Content', icon: FolderDown, optional: true },
+    { id: AppState.PHONE_STUDIO,      label: 'Phone Studio',   icon: MonitorSmartphone, optional: true },
     { id: AppState.INPUT,             label: 'Generate',       icon: Mic2 },
     { id: AppState.SCRIPT,            label: 'Script Editor',  icon: FileText },
     { id: AppState.THUMBNAIL,         label: 'Thumbnail',      icon: Image },
