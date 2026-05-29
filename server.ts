@@ -292,6 +292,35 @@ async function startServer() {
     }
   });
 
+  // ── Gemini API proxy — keeps the key server-side only ───────────────────
+  app.post('/api/gemini', async (req, res) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
+    }
+
+    const { model, contents, config: genConfig } = req.body;
+    if (!model || !contents) {
+      return res.status(400).json({ error: 'Missing model or contents in request body.' });
+    }
+
+    try {
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({ model, contents, config: genConfig });
+      res.json(response);
+    } catch (error: any) {
+      console.error('Gemini proxy error:', error);
+      res.status(500).json({ error: error.message || 'Gemini API call failed' });
+    }
+  });
+
+  // ── Gemini API key check endpoint ────────────────────────────────────────
+  app.get('/api/gemini/key-check', (_req, res) => {
+    const hasKey = !!(process.env.GEMINI_API_KEY);
+    res.json({ hasKey });
+  });
+
   // Flask proxy routes — forward YouTube/video/files API calls to Flask on port 8000
   const FLASK_URL = 'http://localhost:8000';
   const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/health', '/api/instagram', '/api/cookies', '/api/reddit', '/api/shorts'];

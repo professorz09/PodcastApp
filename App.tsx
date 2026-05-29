@@ -64,33 +64,18 @@ const App: React.FC = () => {
   const [shortsContext, setShortsContext] = useState<TranscriptChunk | null>(null);
   const [preloadedClips, setPreloadedClips] = useState<ShortsSegment[]>([]);
 
-  // Check for API Key on mount
+  // Check for API Key on mount — ask the server so the key stays server-side
   useEffect(() => {
     const checkKey = async () => {
-      // 1. Check if aistudio object exists and has a key selected
-      if (window.aistudio) {
-        const hasSelected = await window.aistudio.hasSelectedApiKey();
-        if (hasSelected) {
-          setHasApiKey(true);
-          return;
+      try {
+        const res = await fetch('/api/gemini/key-check');
+        if (res.ok) {
+          const data = await res.json();
+          setHasApiKey(!!data.hasKey);
+        } else {
+          setHasApiKey(false);
         }
-      }
-
-      // 2. Check if key is already in environment (process.env or import.meta.env)
-      const envKey = (window as any).process?.env?.API_KEY ||
-                     (window as any).process?.env?.GEMINI_API_KEY ||
-                     process.env.API_KEY || 
-                     process.env.GEMINI_API_KEY || 
-                     (import.meta as any).env?.VITE_API_KEY || 
-                     (import.meta as any).env?.VITE_GEMINI_API_KEY;
-      
-      if (envKey && envKey !== "") {
-        setHasApiKey(true);
-      } else if (!window.aistudio) {
-        // Fallback for dev environments without the aistudio object
-        // but still check if we have a key
-        setHasApiKey(!!envKey);
-      } else {
+      } catch {
         setHasApiKey(false);
       }
     };
@@ -256,29 +241,15 @@ const App: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold mb-3">API Key Required</h1>
           <p className="text-gray-400 mb-8 leading-relaxed">
-            To use the advanced features like <strong>Gemini 3.1 Flash Image</strong> generation, you need to select a Google Cloud project with billing enabled.
+            To use AI features like <strong>Gemini</strong> script and image generation, add your <code className="bg-white/5 px-1 rounded">GEMINI_API_KEY</code> to the Secrets tab in the Replit sidebar, then restart the app.
           </p>
-          
-          <button 
-            onClick={async () => {
-              if (window.aistudio) {
-                await window.aistudio.openSelectKey();
-                // Assume success and proceed
-                setHasApiKey(true);
-              }
-            }}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-purple-900/20 transition-all active:scale-[0.98] mb-6"
-          >
-            Select API Key
-          </button>
-          
           <a 
-            href="https://ai.google.dev/gemini-api/docs/billing" 
+            href="https://ai.google.dev/gemini-api/docs/api-key" 
             target="_blank" 
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-300 transition-colors"
           >
-            Learn more about billing <ExternalLink size={14} />
+            Get a Gemini API key <ExternalLink size={14} />
           </a>
         </div>
       </div>

@@ -1,28 +1,34 @@
-import { GoogleGenAI, Type, Modality, ThinkingLevel } from "@google/genai";
+import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const getApiKey = () => {
-  // Check multiple potential locations for the API key
-  // 1. window.process.env (dynamic runtime injection)
-  // 2. process.env (baked in at build time)
-  // 3. import.meta.env (Vite standard)
-  
-  const apiKey = (window as any).process?.env?.API_KEY ||
-                 (window as any).process?.env?.GEMINI_API_KEY ||
-                 process.env.API_KEY || 
-                 process.env.GEMINI_API_KEY || 
-                 (import.meta as any).env?.VITE_API_KEY ||
-                 (import.meta as any).env?.VITE_GEMINI_API_KEY ||
-                 (import.meta as any).env?.API_KEY ||
-                 (import.meta as any).env?.GEMINI_API_KEY;
-                 
-  if (!apiKey) {
-    throw new Error("Gemini API Key is missing. Please set GEMINI_API_KEY in the AI Studio Settings menu.");
+const callGemini = async (model: string, contents: any, config?: any): Promise<any> => {
+  const response = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, contents, config }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    const msg = err.error || `Gemini proxy error: ${response.status}`;
+    if (response.status === 429 || msg.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
+    }
+    throw new Error(msg);
   }
-  return apiKey;
+  return response.json();
 };
+
+const mockAi = {
+  models: {
+    generateContent: async ({ model, contents, config }: { model: string; contents: any; config?: any }) => {
+      return callGemini(model, contents, config);
+    },
+  },
+};
+
+const getAi = () => mockAi;
 
 export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang';
 
@@ -126,8 +132,7 @@ Return ONLY a valid JSON array of 4 strings. No markdown.
 };
 
 export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const variationSeed = Math.floor(Math.random() * 9999);
   const prompt = `
@@ -310,8 +315,7 @@ RULES:
 };
 
 export const generateThumbnailText = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const variationSeed = Math.floor(Math.random() * 9999);
   const prompt = `
@@ -351,8 +355,7 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
 };
 
 export const generateTitleTextPair = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<{ title: string; thumbnailText: string; description: string }[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const styleGuide = videoStyle === 'situational'
     ? `STYLE — Situational / Personal Story:
@@ -488,8 +491,7 @@ ${scriptText.slice(0, 3500)}`;
 };
 
 export const generateThumbnailInspiration = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `You are a creative YouTube thumbnail director. Read the script below and write a short, specific thumbnail art direction in 2-4 sentences.
 
@@ -524,8 +526,7 @@ Write in plain English. No bullet points. No JSON. Just a short, crisp art direc
 };
 
 export const generateNarratorPrompts = async (scriptText: string): Promise<string[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `
     Based on the following script, generate a sequence of detailed image generation prompts for the "Narrator" intro section.
@@ -573,8 +574,7 @@ export const generateNarratorPrompts = async (scriptText: string): Promise<strin
 };
 
 export const transcribeAudioBlob = async (audioBlob: Blob): Promise<TranscriptSegment[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   // Convert Blob to Base64
   const base64Audio = await blobToBase64(audioBlob);
@@ -659,8 +659,7 @@ export const generateDebateScript = async (
   youtubeUrl?: string,
   commentsFileContent?: string
 ): Promise<DebateSegment[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   let prompt = "";
   const wordsPerMinute = 150;
@@ -3974,8 +3973,7 @@ Use those labels as speaker names throughout.`;
 };
 
 export const detectSpeakers = async (topic: string, count: number = 2): Promise<string[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `
     Analyze the debate topic: "${topic}".
@@ -4026,8 +4024,7 @@ export const rewriteScriptSegment = async (
   speaker: string,
   instruction: string = "Make it more persuasive and engaging."
 ): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `
     Rewrite the following debate script segment spoken by "${speaker}".
@@ -4061,8 +4058,7 @@ export const rewriteScriptSegment = async (
 };
 
 export const generateSpeech = async (text: string, voiceName: string): Promise<{ audioUrl: string, duration: number }> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   try {
     const response = await ai.models.generateContent({
@@ -4162,21 +4158,18 @@ const fileToBase64 = (file: File): Promise<string> => {
 
 // ── Step 1: Extract style from reference image (pure inspection, no generation) ──
 const extractStyleFromImage = async (
-  ai: GoogleGenAI,
   referenceImage: { data: string; mimeType: string }
 ): Promise<string> => {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            data: referenceImage.data,
-            mimeType: referenceImage.mimeType,
-          }
-        },
-        {
-          text: `You are a visual style analyst. Inspect this YouTube thumbnail image deeply and extract ONLY its visual style — not its content, people, or topic.
+  const response = await callGemini('gemini-3-flash-preview', {
+    parts: [
+      {
+        inlineData: {
+          data: referenceImage.data,
+          mimeType: referenceImage.mimeType,
+        }
+      },
+      {
+        text: `You are a visual style analyst. Inspect this YouTube thumbnail image deeply and extract ONLY its visual style — not its content, people, or topic.
 
 Describe the following in precise detail:
 
@@ -4190,9 +4183,8 @@ Describe the following in precise detail:
 8. THUMBNAIL_STYLE_ARCHETYPE: e.g. "Mr Beast shock face", "Dark dramatic debate", "Clean minimal podcast", "Clickbait emoji", etc.
 
 Return ONLY a structured list — no commentary, no explanation. Be extremely specific about colors (use hex codes if possible), sizes, and positions.`
-        }
-      ]
-    }
+      }
+    ]
   });
 
   const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -4200,8 +4192,7 @@ Return ONLY a structured list — no commentary, no explanation. Be extremely sp
 };
 
 export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'analyzing' | 'generating') => void, videoStyle?: string, scriptText?: string): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   let professorImagePart: any = null;
 
@@ -4214,7 +4205,7 @@ export const generateThumbnail = async (title: string, hostName: string, guestNa
   if (referenceImage) {
     // Step 1: Extract style from reference image
     onStep?.('inspecting');
-    const styleAnalysis = await extractStyleFromImage(ai, referenceImage);
+    const styleAnalysis = await extractStyleFromImage(referenceImage);
 
     // Step 2: Generate using extracted style, creative content based on topic
     onStep?.('generating');
@@ -4562,8 +4553,7 @@ STYLE RULES:
 };
 
 export const generateVideoBackground = async (hostName: string, guestName: string): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `
     Create a high-quality, professional YouTube podcast background image in the style of the Joe Rogan Experience.
@@ -4607,8 +4597,7 @@ export const generateVideoBackground = async (hostName: string, guestName: strin
 };
 
 export const generateSegmentImage = async (segmentText: string, context?: string): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `
     Generate a simple illustration in the style of MS Paint that directly explains the following text segment.
@@ -4654,7 +4643,7 @@ export const generateSegmentImage = async (segmentText: string, context?: string
 };
 
 export const selectBestCommentsForIntro = async (comments: string[]): Promise<string[]> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAi();
   const sample = comments.slice(0, 150);
   const prompt = `You are selecting YouTube comments for a viral intro video.
 From the comments below, pick exactly 7 that are the most interesting, funny, controversial, or thought-provoking.
@@ -4678,7 +4667,7 @@ ${JSON.stringify(sample)}`;
 };
 
 export const generateIntroQuote = async (comments: string[]): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAi();
   const sample = comments.slice(0, 15).join('\n');
   const prompt = `Based on these YouTube comments, write ONE powerful closing quote (10-18 words) for a viral video intro.
 It should feel bold, thought-provoking, or inspiring. No quotation marks. No explanation. Just the quote.
@@ -4694,7 +4683,7 @@ ${sample}`;
 };
 
 export const translateScriptToHindi = async (segments: DebateSegment[]): Promise<string[]> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAi();
 
   const textsJson = JSON.stringify(segments.map(s => s.text));
 
@@ -4723,7 +4712,7 @@ ${textsJson}`;
 };
 
 export const generateTopicQuote = async (scriptText: string): Promise<{ quote: string; author: string; title: string }> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAi();
   const excerpt = scriptText.slice(0, 2000);
 
   const prompt = `You are a quote curator. Read this debate/podcast script excerpt and identify the core topic being discussed.
@@ -4769,7 +4758,7 @@ export const generateClipIntro = async (
   scriptText: string,
   speakers: string[]
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAi();
   const excerpt = scriptText.slice(0, 1500);
   const speakerA = speakers[0] || 'Host';
   const speakerB = speakers[1] || 'Guest';
@@ -4805,8 +4794,7 @@ const SPEAKER_STYLES = [
 ];
 
 export const generateSpeakerImage = async (speakerIndex: number, label?: string, use16x9 = false): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const style = SPEAKER_STYLES[speakerIndex % SPEAKER_STYLES.length];
 
@@ -4839,7 +4827,7 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
 };
 
 export const generateVeo3Prompt = async (comments: string[], transcript?: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAi();
   const commentSample = comments.slice(0, 20).join('\n');
   const transcriptSample = transcript ? transcript.slice(0, 1200) : '';
 
@@ -4881,8 +4869,7 @@ export const analyzeTimelineCuts = async (
   narratorSegments: { index: number; text: string }[],
   transcript: { text: string; start: number; end: number }[]
 ): Promise<TimelineCut[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   // Build compact transcript string with timestamps
   const transcriptStr = transcript
@@ -5027,8 +5014,7 @@ export const generateContextBridgeConclusion = async (
   contextContent: string,
   model: string = 'gemini-3-flash-preview',
 ): Promise<DebateSegment[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const isHindi = language === 'Hindi';
   const name = speakerName || (isHindi ? 'Analyst' : 'Analyst');
@@ -5161,8 +5147,7 @@ export const splitTranscriptByTopics = async (
 ): Promise<TranscriptChunk[]> => {
   if (!segments.length) throw new Error('Transcript is empty');
 
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const totalDuration = segments[segments.length - 1].end;
 
@@ -5236,8 +5221,7 @@ export const generateLyrics = async (params: {
   language: string;
   model: string;
 }): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const lang = params.language || 'Hindi';
 
@@ -5292,8 +5276,7 @@ export const generateSongAudio = async (
   style: string,
   lyriaModel: string = 'lyria-3-clip-preview',
 ): Promise<Blob> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   // Strip section labels for clean music prompt
   const cleanLyrics = lyrics
@@ -5345,8 +5328,7 @@ export const generateStoryboardScenes = async (
   sceneCount: number,
   model: string = 'gemini-3.1-flash-lite-preview',
 ): Promise<StoryboardScenesResult> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const hasTimestamps = segments.some(s => s.startTime != null && s.endTime != null);
   const scriptText = segments.map((s, i) => {
@@ -5429,8 +5411,7 @@ export const generateStoryboardScenesTimeBased = async (
   slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
   model: string = 'gemini-3.1-flash-lite-preview',
 ): Promise<{ prompts: string[]; characterGuide: string }> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const slotText = slots.map(s =>
     `Scene ${s.sceneNumber} [${s.startTime.toFixed(1)}s–${s.endTime.toFixed(1)}s]:\n"${s.voiceover}"`
@@ -5528,8 +5509,7 @@ export const generateStoryboardImage = async (
   characterGuide?: string,
   aspectRatio: '16:9' | '3:4' | '1:1' | '9:16' = '16:9',
 ): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const characterSection = characterGuide
     ? `\nCHARACTER CONSISTENCY — always draw the character exactly as described below. Same appearance in every scene:\n${characterGuide}\n`
@@ -5584,8 +5564,7 @@ export const findBestShortsSegments = async (
 ): Promise<ShortsSegment[]> => {
   if (!transcript.length) throw new Error('Transcript is empty');
 
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const inRange = (rangeStart !== undefined && rangeEnd !== undefined)
     ? transcript.filter(s => s.end >= rangeStart && s.start <= rangeEnd)
@@ -5691,8 +5670,7 @@ export const generateShortsTitles = async (
   seg: ShortsSegment,
   transcriptText: string,
 ): Promise<ShortsContentResult> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `You are an expert viral YouTube content strategist.
 
@@ -5745,8 +5723,7 @@ export const generateShortsThumbText = async (
   seg: ShortsSegment,
   transcriptText: string,
 ): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const prompt = `You are a viral YouTube thumbnail copywriter.
 
@@ -5783,8 +5760,7 @@ export const generateShortsThumbnail = async (
   thumbnailText: string,
   personName: string,
 ): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const words = thumbnailText.trim().split(/\s+/);
   // Split into 2 lines — if 1-2 words keep on 1 line, else split at midpoint
@@ -5875,8 +5851,7 @@ export const generateVideoClipsFromTranscript = async (
 ): Promise<ShortsSegment[]> => {
   if (!transcript.length) throw new Error('Transcript is empty');
 
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAi();
 
   const { minS, maxS, label } = buildDurationConstraint(config);
   const n = config.clipCount;
