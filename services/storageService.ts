@@ -143,8 +143,22 @@ export const loadState = async (): Promise<{ appState: AppState, script: DebateS
       return { ...rest, audioUrl } as DebateSegment;
     });
 
+    const DEPRECATED_MODELS: Record<string, string> = {
+      'gemini-2.0-flash': 'gemini-3.1-flash-lite-preview',
+      'gemini-2.0-flash-001': 'gemini-3.1-flash-lite-preview',
+      'gemini-2.0-flash-lite': 'gemini-3.1-flash-lite-preview',
+      'gemini-2.5-flash': 'gemini-3.5-flash',
+      'gemini-2.5-pro': 'gemini-3.1-pro-preview',
+      'gemini-1.5-flash': 'gemini-3.1-flash-lite-preview',
+      'gemini-1.5-pro': 'gemini-3.1-pro-preview',
+    };
+    const appState = stored.appState;
+    if (appState?.config?.model && DEPRECATED_MODELS[appState.config.model]) {
+      appState.config.model = DEPRECATED_MODELS[appState.config.model];
+    }
+
     return {
-      appState: stored.appState,
+      appState,
       script: loadedScript,
       thumbnailState: stored.thumbnailState,
       youtubeData: stored.youtubeData ?? null,

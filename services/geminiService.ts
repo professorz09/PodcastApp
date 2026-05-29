@@ -4062,7 +4062,7 @@ export const generateSpeech = async (text: string, voiceName: string): Promise<{
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-3.1-flash-tts-preview",
       contents: { parts: [{ text }] },
       config: {
         responseModalities: [Modality.AUDIO],
@@ -4569,7 +4569,7 @@ export const generateVideoBackground = async (hostName: string, guestName: strin
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3.1-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: {
         imageConfig: {
@@ -4616,7 +4616,7 @@ export const generateSegmentImage = async (segmentText: string, context?: string
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3.1-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: {
           imageConfig: {
@@ -4813,7 +4813,7 @@ No text, no watermarks. Square crop, clear face.
 Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speakerIndex + 1)}".`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3.1-flash-image',
     contents: { parts: [{ text: prompt }] },
     config: { imageConfig: { aspectRatio: use16x9 ? '16:9' : '1:1' } }
   });
@@ -5530,7 +5530,7 @@ Requirements:
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3.1-flash-image',
     contents: { parts: [{ text: fullPrompt }] },
     config: {
       imageConfig: { aspectRatio },
@@ -5630,7 +5630,7 @@ Transcript with timestamps:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: { responseMimeType: 'application/json' },
   });
@@ -5800,7 +5800,7 @@ OVERALL: High contrast, cinematic. Looks like a top 1% viral YouTube thumbnail. 
 STRICT: Do NOT add watermarks. Only show the person and the text box as described above.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3.1-flash-image',
     contents: { parts: [{ text: prompt }] },
     config: {
       imageConfig: { aspectRatio: '16:9' },
@@ -5894,7 +5894,7 @@ Transcript:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: { responseMimeType: 'application/json' },
   });

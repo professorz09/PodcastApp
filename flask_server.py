@@ -376,7 +376,7 @@ def get_transcript():
             'error': error_msg + available_hint,
             'error_code': error_code,
             'available_languages': available_langs,
-        }), 404
+        }), 200
 
     segments = [
         {
