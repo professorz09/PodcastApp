@@ -797,8 +797,14 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         });
         if (!ytRes.ok) throw new Error('YouTube transcript fetch failed');
         const ytData = await ytRes.json();
-        const rawText: string = ytData.fullText ?? ytData.transcript?.map((t: any) => t.text).join(' ') ?? '';
-        if (!rawText) throw new Error('Transcript empty mila');
+        if (ytData.error) throw new Error(ytData.error);
+        // Flask returns full_text (snake_case) and segments[]
+        const rawText: string =
+          ytData.full_text ??
+          ytData.fullText ??
+          (ytData.segments ?? ytData.transcript ?? []).map((t: any) => t.text).join(' ') ??
+          '';
+        if (!rawText.trim()) throw new Error('Is video ka transcript available nahi hai. Caption-enabled video try karo.');
 
         // Summarize + find discussion points via Gemini
         toast.info('Gemini points analyze kar raha hai…');
@@ -806,7 +812,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3.5-flash',
             contents: [{
               role: 'user',
               parts: [{ text: `You are analyzing a YouTube video transcript to find the most interesting discussion points.
@@ -870,7 +876,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-2.0-flash',
+          model: 'gemini-3.5-flash',
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         }),
       });
