@@ -861,7 +861,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">2.5 Flash</div>
+                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">3.5 Flash</div>
                     <Sparkles size={10} className={model === 'gemini-3.5-flash' ? 'text-cyan-400' : 'text-gray-600'} />
                   </div>
                   <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">Stable</div>
