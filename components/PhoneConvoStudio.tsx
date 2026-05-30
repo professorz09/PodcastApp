@@ -256,6 +256,9 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     const W = exportRes === '1080p' ? 1920 : 1280;
     const H = exportRes === '1080p' ? 1080 : 720;
     const FPS = 30;
+    const dt = 1000 / FPS;
+
+    setExporting(true); setExportProgress(0);
 
     const offscreen = document.createElement('canvas');
     offscreen.width = W; offscreen.height = H;
@@ -266,18 +269,59 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       background: { type: 'color', value: bg },
     });
 
-    const stream = offscreen.captureStream(FPS);
-    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    // ── Audio mixing ──────────────────────────────────────────────────────────
+    let audioTracks: MediaStreamTrack[] = [];
+    let audioCtx: AudioContext | null = null;
+    try {
+      audioCtx = new AudioContext();
+      const dest = audioCtx.createMediaStreamDestination();
+
+      // Pre-fetch all audio + decode first, schedule after resume
+      const pendingSources: { src: AudioBufferSourceNode; elapsedMs: number }[] = [];
+      let elapsedMs = 0;
+      for (const turn of script) {
+        if (turn.audioUrl) {
+          try {
+            const ab = await fetch(turn.audioUrl).then(r => r.arrayBuffer());
+            const buf = await audioCtx.decodeAudioData(ab);
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            src.connect(dest);
+            pendingSources.push({ src, elapsedMs });
+          } catch { /* skip bad audio */ }
+        }
+        elapsedMs += turn.durationMs;
+      }
+
+      audioTracks = dest.stream.getAudioTracks();
+
+      // Resume context first so currentTime is live, then schedule
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      const t0 = audioCtx.currentTime + 0.05; // tiny buffer before recording starts
+      for (const { src, elapsedMs: ems } of pendingSources) {
+        src.start(t0 + ems / 1000);
+      }
+    } catch { /* audio not available — video only */ }
+
+    // ── Video + combined stream ───────────────────────────────────────────────
+    const videoStream = offscreen.captureStream(FPS);
+    const combined = new MediaStream([...videoStream.getVideoTracks(), ...audioTracks]);
+
+    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+      ? 'video/webm;codecs=vp9,opus'
+      : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+
     const chunks: Blob[] = [];
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    const rec = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
     rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-    setExporting(true); setExportProgress(0);
     rec.start(100);
 
     const total = script.reduce((s, t) => s + t.durationMs, 0);
-    const dt = 1000 / FPS;
 
+    // Real-time rendering — one frame every (1000/FPS) ms so captureStream timing is correct
     await new Promise<void>(resolve => {
       let t = 0;
       const frame = () => {
@@ -286,20 +330,22 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         renderer.drawFrame();
         t += dt;
         setExportProgress(Math.min(99, Math.round((t / total) * 100)));
-        setTimeout(frame, 0);
+        setTimeout(frame, dt);
       };
       frame();
     });
 
     rec.stop();
     await new Promise<void>(res => { rec.onstop = () => res(); });
+    audioCtx?.close();
+
     const blob = new Blob(chunks, { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `phone-studio-${Date.now()}.webm`; a.click();
     URL.revokeObjectURL(url);
     setExporting(false); setExportProgress(0);
-    toast.success('Video export ho gaya!');
+    toast.success('Video export ho gaya! (audio included)');
   }, [buildState, script, bg, exportRes]);
 
   // ── No script fallback ────────────────────────────────────────────────────

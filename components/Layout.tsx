@@ -23,12 +23,13 @@ interface LayoutProps {
   activeStep: AppState;
   onStepChange: (step: AppState) => void;
   onNewProject?: () => void;
+  hiddenSteps?: AppState[];
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onNewProject }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onNewProject, hiddenSteps = [] }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const steps = [
+  const allSteps = [
     { id: AppState.IMPORT,            label: 'Import Content', icon: FolderDown, optional: true },
     { id: AppState.INPUT,             label: 'Generate',       icon: Mic2 },
     { id: AppState.SCRIPT,            label: 'Script Editor',  icon: FileText },
@@ -41,6 +42,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
     { id: AppState.LYRICS,            label: 'Song / Lyrics',  icon: Music2, optional: true },
     { id: AppState.VIDEO_CLIP_IMPORT, label: 'Clip Generator', icon: Scissors, optional: true },
   ];
+  const steps = allSteps.filter(s => !hiddenSteps.includes(s.id));
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 

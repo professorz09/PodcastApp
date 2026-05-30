@@ -373,7 +373,12 @@ const App: React.FC = () => {
       </div>
     )}
 
-    <Layout activeStep={appState} onStepChange={setAppState} onNewProject={handleNewProject}>
+    <Layout
+      activeStep={appState}
+      onStepChange={setAppState}
+      onNewProject={handleNewProject}
+      hiddenSteps={script.length > 0 && script.some(s => s.audioUrl) ? [] : [AppState.PHONE_STUDIO]}
+    >
       <Suspense fallback={<LazyFallback />}>
       {appState === AppState.VIDEO_CLIP_IMPORT && (
         <VideoClipImporter

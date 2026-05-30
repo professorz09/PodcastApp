@@ -501,12 +501,14 @@ export class CanvasRenderer {
       }
 
       const fs = sw * 0.048 * (subCfg.size ?? 1);
-      ctx.font = `500 ${fs}px -apple-system,sans-serif`;
-      ctx.textAlign = 'left';
+      ctx.font = `600 ${fs}px -apple-system,sans-serif`;
 
       const words = text.replace(/\n/g, ' ').split(' ').filter(w => w.trim());
-      const pct = Math.max(0, Math.min(1, turnProgress / 0.95));
+      if (!words.length) { ctx.textAlign = 'center'; return; }
 
+      const pct = Math.max(0, Math.min(1, turnProgress / 0.98));
+
+      // ── Calculate targetWF (fractional word index) ──
       let targetWF = 0;
       if (activeTurn?.wordTimings?.length) {
         const cur = turnProgress * (activeTurn.durationMs / 1000);
@@ -532,46 +534,64 @@ export class CanvasRenderer {
         if (target >= total) targetWF = words.length;
       }
 
-      // Word wrap
-      const lines: string[][] = [];
-      let cur: string[] = [];
-      for (const w of words) {
-        const test = cur.length ? cur.join(' ') + ' ' + w : w;
-        if (cur.length && ctx.measureText(test).width > sw * 0.88) { lines.push([...cur]); cur = [w]; }
-        else cur.push(w);
-      }
-      if (cur.length) lines.push(cur);
+      // ── ChatGPT streaming style: accumulate words, wrap, show last 2 lines ──
+      const visibleCount = Math.ceil(targetWF);              // words shown so far
+      const popProg = targetWF - Math.floor(targetWF);       // 0–1 pop-in of newest word
 
-      const lh = fs * 1.45;
-      const baseY = lines.length > 3 ? sy + sh * 0.52 : lines.length === 1 ? sy + sh * 0.68 : sy + sh * 0.62;
-      let gwi = 0;
-      const col = subCfg.textColor ?? '#ffffff';
-      const [rr, gg, bb] = [
-        parseInt(col.slice(1, 3), 16) || 255,
-        parseInt(col.slice(3, 5), 16) || 255,
-        parseInt(col.slice(5, 7), 16) || 255,
-      ];
-
-      for (let li = 0; li < lines.length; li++) {
-        const lineStr = lines[li].join(' ');
-        const lineW = ctx.measureText(lineStr).width;
-        let lx = cx - lineW / 2;
-        let prev = '';
-        for (let wi = 0; wi < lines[li].length; wi++) {
-          const word = lines[li][wi];
-          const xOff = prev ? ctx.measureText(prev + ' ').width : 0;
-          const dist = targetWF - gwi;
-          const alpha = dist > 0 ? Math.min(1, dist * 2.5) : 0;
-          if (alpha > 0.01) {
-            const ease = 1 - Math.pow(1 - alpha, 3);
-            const yOff = (1 - ease) * sw * 0.022;
-            ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha * 0.95})`;
-            ctx.fillText(word, lx + xOff, baseY + li * lh + yOff);
-          }
-          prev += (prev ? ' ' : '') + word;
-          gwi++;
+      // Word-wrap all visible words
+      const allLines: { word: string; globalIdx: number }[][] = [];
+      let curLine: { word: string; globalIdx: number }[] = [];
+      for (let i = 0; i < visibleCount && i < words.length; i++) {
+        const test = curLine.map(e => e.word).join(' ') + (curLine.length ? ' ' : '') + words[i];
+        if (curLine.length && ctx.measureText(test).width > sw * 0.86) {
+          allLines.push(curLine);
+          curLine = [{ word: words[i], globalIdx: i }];
+        } else {
+          curLine.push({ word: words[i], globalIdx: i });
         }
       }
+      if (curLine.length) allLines.push(curLine);
+
+      // Only show last 2 lines (scroll up as more text appears)
+      const MAX_LINES = 2;
+      const visLines = allLines.slice(-MAX_LINES);
+
+      const col = subCfg.textColor ?? '#ffffff';
+      const h2r = (h: string, off: number) => parseInt(h.slice(off, off + 2), 16) || 255;
+      const [rr, gg, bb] = [h2r(col, 1), h2r(col, 3), h2r(col, 5)];
+
+      const lh = fs * 1.52;
+      const totalH = lh * visLines.length;
+      const baseY = sy + sh * 0.86 - totalH;
+
+      ctx.textAlign = 'left';
+      visLines.forEach((line, li) => {
+        // Center each line
+        const lineStr = line.map(e => e.word).join(' ');
+        const lineW = ctx.measureText(lineStr).width;
+        let lx = cx - lineW / 2;
+        let prevStr = '';
+
+        line.forEach(({ word, globalIdx }) => {
+          const xOff = prevStr ? ctx.measureText(prevStr + ' ').width : 0;
+          const isNewest = globalIdx === visibleCount - 1;
+
+          if (isNewest) {
+            // Pop-in: fade + tiny slide-up
+            const ease = 1 - Math.pow(1 - popProg, 2.5);
+            const alpha = Math.max(0.05, ease);
+            const yOff = (1 - ease) * fs * 0.35;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = col;
+            ctx.fillText(word, lx + xOff, baseY + li * lh + yOff);
+            ctx.globalAlpha = 1;
+          } else {
+            ctx.fillStyle = `rgba(${rr},${gg},${bb},0.92)`;
+            ctx.fillText(word, lx + xOff, baseY + li * lh);
+          }
+          prevStr += (prevStr ? ' ' : '') + word;
+        });
+      });
       ctx.textAlign = 'center';
     }
 
