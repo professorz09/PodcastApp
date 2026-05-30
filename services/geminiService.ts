@@ -3900,21 +3900,28 @@ Use those labels as speaker names throughout.`;
     tools.push({ urlContext: {} });
   }
 
+  // Only use googleSearch grounding for models that support it without breaking text extraction
+  const supportsGrounding = model.includes('2.5') || model.includes('1.5');
+  const finalTools = supportsGrounding ? tools : [];
+
   try {
     const response = await ai.models.generateContent({
       model: model,
       contents: { parts: [{ text: prompt }] },
       config: {
-        tools,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.HIGH
-        }
+        ...(finalTools.length > 0 ? { tools: finalTools } : {}),
       }
     });
 
-    let jsonText = response.text || "";
+    // Robustly extract text — response.text fails when model uses grounding/tools
+    let jsonText = response.text ?? "";
+    if (!jsonText) {
+      // Try candidates → parts fallback
+      const parts = (response as any)?.candidates?.[0]?.content?.parts ?? [];
+      jsonText = parts.map((p: any) => p.text ?? "").join("").trim();
+    }
     jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
-    if (!jsonText) throw new Error("Gemini ne empty response diya — content safety filter ya API issue. Dobara try karo.");
+    if (!jsonText) throw new Error("Script generate nahi hua — Dobara try karo ya alag model chunein.");
     let rawSegments: any[];
 
     const tryParseScript = (raw: string): any[] => {
