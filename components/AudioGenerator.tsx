@@ -550,11 +550,13 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       let usedFallback = false;
       try {
         wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
-      } catch (cloudErr) {
+      } catch (cloudErr: any) {
         console.warn('Cloud STT unavailable, using offline proportional timing:', cloudErr);
         usedFallback = true;
         const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
         wordTimings = generateProportionalWordTimings(seg.text, duration);
+        const reason = cloudErr?.message ? cloudErr.message.slice(0, 120) : 'Google Cloud STT unavailable';
+        toast.warning(`Offline mode: approximate timings used. Reason: ${reason}`);
       }
 
       const phraseTimings = buildPhrases(wordTimings);
@@ -563,9 +565,6 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         newScript[index] = { ...newScript[index], wordTimings, phraseTimings };
         return newScript;
       });
-      if (usedFallback) {
-        toast.info('Offline mode: approximate timings applied (Google Cloud STT unavailable)');
-      }
     } catch (error) {
       console.error('Failed to sync transcript', error);
       toast.error('Failed to sync transcript: ' + (error as Error).message);
@@ -590,7 +589,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
           let wordTimings: { word: string; start: number; end: number }[];
           try {
             wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
-          } catch (cloudErr) {
+          } catch (cloudErr: any) {
             console.warn(`Segment ${i}: Cloud STT unavailable, using offline fallback`, cloudErr);
             fallbackCount++;
             const duration = seg.duration ?? await getAudioDurationFromBlob(blob);

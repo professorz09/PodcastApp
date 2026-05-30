@@ -89,7 +89,7 @@ async function startServer() {
   app.post('/api/google/speech-to-text', async (req, res) => {
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: 'GOOGLE_CLOUD_API_KEY is missing' });
+      return res.status(500).json({ error: 'GOOGLE_CLOUD_API_KEY environment variable is not set. Please add it in Secrets.' });
     }
 
     const { audioContent, languageCode = 'en-US', mimeType, sampleRate } = req.body;
@@ -97,101 +97,95 @@ async function startServer() {
       return res.status(400).json({ error: 'Missing audioContent' });
     }
 
-    let config: any = {
-        languageCode,
-        enableWordTimeOffsets: true,
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+
+    // ── Helper: call Google STT and return parsed JSON ─────────────────────
+    const callGoogleSTT = async (url: string, body: object) => {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const ct = resp.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        const txt = await resp.text();
+        throw new Error(`Google STT returned non-JSON (HTTP ${resp.status}): ${txt.slice(0, 200)}`);
+      }
+      const data = await resp.json();
+      if (!resp.ok) {
+        const msg = data.error?.message || data.error?.status || JSON.stringify(data.error) || 'Unknown Google STT error';
+        throw new Error(`Google STT error (HTTP ${resp.status}): ${msg}`);
+      }
+      return data;
     };
 
-    if (sampleRate) {
-      config.sampleRateHertz = sampleRate;
-    }
-
-    if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3') {
-        config.encoding = 'MP3';
-        if (!config.sampleRateHertz) {
-          config.sampleRateHertz = 44100; // Common for MP3, fallback if not provided
-        }
-    } else if (mimeType === 'audio/wav') {
-        config.encoding = 'LINEAR16';
-        // WAV files have headers with sample rates. 
-        // If we provide a sampleRateHertz that mismatches the header (e.g. 48000 vs 24000), Google errors.
-        // Always omit sampleRateHertz for WAV to let Google read the header.
-        delete config.sampleRateHertz;
-    }
-
     try {
-      const googleResponse = await fetch(`https://speech.googleapis.com/v1/speech:recognize?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          config,
-          audio: {
-            content: audioContent
+      // ── Try Speech-to-Text v2 first if project ID is available ───────────
+      if (projectId) {
+        console.log(`Using Google STT v2 (project: ${projectId})`);
+        const v2Url = `https://speech.googleapis.com/v2/projects/${projectId}/locations/global/recognizers/_:recognize?key=${apiKey}`;
+        const v2Body = {
+          config: {
+            autoDecodingConfig: {},
+            languageCodes: [languageCode],
+            model: 'long',
+            features: { enableWordTimeOffsets: true },
+          },
+          content: audioContent,
+        };
+        try {
+          const v2Data = await callGoogleSTT(v2Url, v2Body);
+          // v2 returns startOffset/endOffset — normalise to v1 shape for client
+          if (v2Data.results) {
+            v2Data.results.forEach((r: any) => {
+              r.alternatives?.[0]?.words?.forEach((w: any) => {
+                // v2 uses startOffset/endOffset (e.g. "1.200s"); map to startTime/endTime
+                if (w.startOffset !== undefined) w.startTime = w.startOffset;
+                if (w.endOffset !== undefined)   w.endTime   = w.endOffset;
+              });
+            });
           }
-        })
-      });
-
-      const contentType = googleResponse.headers.get('content-type');
-      let data;
-      if (contentType && contentType.includes('application/json')) {
-        data = await googleResponse.json();
-      } else {
-        const text = await googleResponse.text();
-        console.error(`Google Speech API returned non-JSON response (${googleResponse.status}):`, text);
-        throw new Error(`Google Speech API returned non-JSON response: ${text.slice(0, 100)}`);
+          return res.json(v2Data);
+        } catch (v2Err: any) {
+          console.warn('STT v2 failed, falling back to v1p1beta1:', v2Err.message);
+        }
       }
 
-      if (!googleResponse.ok) {
-        const errorMessage = data.error?.message || 'Failed to transcribe';
-        console.error(`Google Speech API Error (${googleResponse.status}):`, errorMessage);
+      // ── Fall back to v1p1beta1 (works with API key, no project ID needed) ──
+      console.log('Using Google STT v1p1beta1');
+      let config: any = {
+        languageCode,
+        enableWordTimeOffsets: true,
+        model: 'latest_long',
+        useEnhanced: true,
+      };
 
-        // Check if the error is due to audio length
-        // Catch both "Sync input too long" and "Inline audio exceeds duration limit"
-        if (googleResponse.status === 400 && (errorMessage.includes('too long') || errorMessage.includes('duration limit'))) {
-          console.log('Audio too long for sync recognition, falling back to longRunningRecognize');
-          
-          const longRunningResponse = await fetch(`https://speech.googleapis.com/v1/speech:longrunningrecognize?key=${apiKey}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              config,
-              audio: {
-                content: audioContent
-              }
-            })
-          });
+      if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3') {
+        config.encoding = 'MP3';
+        config.sampleRateHertz = sampleRate || 44100;
+      } else if (mimeType === 'audio/wav') {
+        config.encoding = 'LINEAR16';
+        // omit sampleRateHertz — let Google read WAV header
+      } else if (sampleRate) {
+        config.sampleRateHertz = sampleRate;
+      }
 
-          const lrContentType = longRunningResponse.headers.get('content-type');
-          let longRunningData;
-          if (lrContentType && lrContentType.includes('application/json')) {
-            longRunningData = await longRunningResponse.json();
-          } else {
-            const text = await longRunningResponse.text();
-            throw new Error(`Long Running Recognition returned non-JSON: ${text.slice(0, 100)}`);
-          }
-          
-          if (!longRunningResponse.ok) {
-             const lrError = longRunningData.error?.message || 'Failed to start long running recognition';
-             console.error('Long Running Recognition Error:', lrError);
-             throw new Error(lrError);
-          }
-          
-          console.log('Long running operation started:', longRunningData.name);
-          // Return the operation name so the client can poll
-          return res.json({ operationName: longRunningData.name });
-        }
+      const v1Url = `https://speech.googleapis.com/v1p1beta1/speech:recognize?key=${apiKey}`;
+      let data = await callGoogleSTT(v1Url, { config, audio: { content: audioContent } });
 
-        throw new Error(errorMessage);
+      // Handle "too long" → long-running operation
+      if (data.error?.message?.includes('too long') || data.error?.message?.includes('duration limit')) {
+        console.log('Audio too long for sync — starting longrunningrecognize');
+        const lrUrl = `https://speech.googleapis.com/v1p1beta1/speech:longrunningrecognize?key=${apiKey}`;
+        const lrData = await callGoogleSTT(lrUrl, { config, audio: { content: audioContent } });
+        console.log('Long-running operation started:', lrData.name);
+        return res.json({ operationName: lrData.name });
       }
 
       res.json(data);
     } catch (error: any) {
-      console.error('Google Speech API Error:', error);
-      res.status(500).json({ error: error.message || 'Failed to transcribe' });
+      console.error('Google Speech API Error:', error.message);
+      res.status(500).json({ error: error.message || 'Failed to transcribe audio' });
     }
   });
 
@@ -207,11 +201,11 @@ async function startServer() {
     }
 
     try {
-      let url = `https://speech.googleapis.com/v1/operations/${name}?key=${apiKey}`;
+      let url = `https://speech.googleapis.com/v1p1beta1/operations/${name}?key=${apiKey}`;
       
       // If the name is a full resource path (e.g. projects/...), use it directly
       if (String(name).includes('/')) {
-          url = `https://speech.googleapis.com/v1/${name}?key=${apiKey}`;
+          url = `https://speech.googleapis.com/v1p1beta1/${name}?key=${apiKey}`;
       }
 
       const googleResponse = await fetch(url);
