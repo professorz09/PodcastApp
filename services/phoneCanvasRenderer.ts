@@ -1,4 +1,4 @@
-export type AnimStyle = 'orb' | 'bottom-glow' | 'wave' | 'cosmic-sphere' | 'aurora';
+export type AnimStyle = 'orb' | 'bottom-glow' | 'wave' | 'cosmic-sphere' | 'aurora' | 'gemini' | 'ripple' | 'neon';
 
 export interface PhoneConfig {
   id: string;
@@ -9,6 +9,7 @@ export interface PhoneConfig {
   rotation?: number;
   showControls?: boolean;
   voiceId?: string;
+  battery?: string;
 }
 
 export interface CloudWord {
@@ -269,6 +270,22 @@ export class CanvasRenderer {
       ctx.translate(-cx, -cy);
     }
 
+    // ── Outer glow when SPEAKING ──────────────────────────────────────────
+    if (isActive) {
+      const pulse = 0.55 + Math.sin(performance.now() / 350) * 0.2;
+      ctx.shadowColor = phone.color;
+      ctx.shadowBlur = w * 0.18;
+      ctx.strokeStyle = phone.color;
+      ctx.lineWidth = w * 0.028;
+      ctx.globalAlpha = pulse;
+      ctx.beginPath();
+      ctx.roundRect(x + 1, y + 1, w - 2, h - 2, r);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+    }
+
     // Outer shadow + bezel
     ctx.shadowColor = 'rgba(0,0,0,0.7)';
     ctx.shadowBlur = 40;
@@ -306,6 +323,17 @@ export class CanvasRenderer {
 
     ctx.restore();
 
+    // ── Dim overlay when LISTENING (someone else is speaking) ────────────
+    if (hasActive && !isActive) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x + b, y + b, w - b * 2, h - b * 2, r * 0.88);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      ctx.fillRect(x, y, w, h);
+      ctx.restore();
+    }
+
     // Glass glare
     ctx.globalAlpha = 0.03;
     ctx.fillStyle = '#fff';
@@ -321,11 +349,8 @@ export class CanvasRenderer {
     const btnH = h * 0.07;
     const btnW = w * 0.025;
     ctx.fillStyle = btnColor;
-    // Volume up
     ctx.beginPath(); ctx.roundRect(x - btnW, y + h * 0.21, btnW, btnH, 2); ctx.fill();
-    // Volume down
     ctx.beginPath(); ctx.roundRect(x - btnW, y + h * 0.3, btnW, btnH * 0.8, 2); ctx.fill();
-    // Power
     ctx.beginPath(); ctx.roundRect(x + w, y + h * 0.25, btnW, btnH * 1.1, 2); ctx.fill();
 
     ctx.restore();
@@ -357,7 +382,8 @@ export class CanvasRenderer {
     ctx.fillText(`${fH}:${fM}`, sx + sw * 0.07, sy + sw * 0.1);
 
     ctx.textAlign = 'right';
-    ctx.fillText(this.state.deviceBattery || '95%', sx + sw * 0.93, sy + sw * 0.1);
+    // ── Per-phone battery (fallback to global setting) ─────────────────
+    ctx.fillText(phone.battery ?? this.state.deviceBattery ?? '95%', sx + sw * 0.93, sy + sw * 0.1);
 
     // Phone name
     ctx.textAlign = 'center';
@@ -365,14 +391,31 @@ export class CanvasRenderer {
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.fillText(phone.name, cx, sy + sh * 0.12);
 
-    // Speaking / Listening status
+    // ── Speaking / Listening status with animated indicator ──────────────
     ctx.font = `600 ${sw * 0.038}px -apple-system,sans-serif`;
+    const dotY  = sy + sh * 0.17 - sw * 0.016;
+    const textX = cx + sw * 0.028;
     if (isActive) {
+      // Pulsing colored dot
+      const dotPulse = 0.7 + Math.sin(performance.now() / 220) * 0.3;
       ctx.fillStyle = phone.color;
-      ctx.fillText('Speaking…', cx, sy + sh * 0.17);
+      ctx.shadowColor = phone.color;
+      ctx.shadowBlur = sw * 0.04 * dotPulse;
+      ctx.globalAlpha = dotPulse;
+      ctx.beginPath(); ctx.arc(cx - sw * 0.11, dotY, sw * 0.016, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+      ctx.fillStyle = phone.color;
+      ctx.textAlign = 'left';
+      ctx.fillText('Speaking', textX - sw * 0.11, sy + sh * 0.17);
+      ctx.textAlign = 'center';
     } else if (hasActive) {
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillText('Listening…', cx, sy + sh * 0.17);
+      // Small subtle dot (static, dim)
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.beginPath(); ctx.arc(cx - sw * 0.09, dotY, sw * 0.01, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.textAlign = 'left';
+      ctx.fillText('Listening', textX - sw * 0.09, sy + sh * 0.17);
+      ctx.textAlign = 'center';
     } else {
       ctx.fillStyle = 'rgba(255,255,255,0.18)';
       ctx.fillText('Connected', cx, sy + sh * 0.17);
@@ -479,6 +522,108 @@ export class CanvasRenderer {
         ctx.fillStyle = ag;
         ctx.globalAlpha = 0.38 + 0.38 * volt;
         ctx.fillRect(sx, sy, sw, sh);
+      }
+      ctx.restore();
+
+    } else if (phone.style === 'gemini') {
+      // ── Gemini-style: large gradient sphere + ripple rings when speaking ─
+      const t = performance.now() / 1200;
+      const baseR  = sw * 0.22;
+      const radius = isActive ? baseR + volt * sw * 0.1 : baseR * 0.75;
+
+      // Expanding ripple rings (only when speaking)
+      if (isActive) {
+        for (let i = 0; i < 3; i++) {
+          const phase = ((t * 0.7 + i * 0.33) % 1);
+          const rR    = radius * (1 + phase * 1.4);
+          ctx.strokeStyle = phone.color;
+          ctx.lineWidth   = sw * 0.006 * (1 - phase * 0.8);
+          ctx.globalAlpha = (1 - phase) * 0.45 * volt;
+          ctx.beginPath(); ctx.arc(cx, cy, rR, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // Main sphere — radial gradient with highlight
+      const sg = ctx.createRadialGradient(
+        cx - radius * 0.28, cy - radius * 0.28, radius * 0.05,
+        cx, cy, radius
+      );
+      sg.addColorStop(0, '#ffffff');
+      sg.addColorStop(0.18, phone.color);
+      sg.addColorStop(0.65, phone.color + 'cc');
+      sg.addColorStop(1,    phone.color + '18');
+      ctx.globalAlpha = isActive ? 1 : 0.6;
+      ctx.shadowColor = phone.color;
+      ctx.shadowBlur  = radius * (isActive ? 0.7 * volt : 0.15);
+      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = sg; ctx.fill();
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+
+      // Subtle inner glare
+      const glare = ctx.createRadialGradient(cx - radius * 0.3, cy - radius * 0.3, 0, cx - radius * 0.3, cy - radius * 0.3, radius * 0.45);
+      glare.addColorStop(0, 'rgba(255,255,255,0.35)');
+      glare.addColorStop(1, 'transparent');
+      ctx.fillStyle = glare; ctx.globalAlpha = isActive ? 1 : 0.5;
+      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+
+    } else if (phone.style === 'ripple') {
+      // ── Ripple: concentric expanding rings from center dot ────────────────
+      const t = performance.now() / 700;
+      const dotR  = sw * 0.04 * (0.85 + volt * 0.3);
+      const maxR  = sw * (0.3 + volt * 0.1);
+
+      // Center dot
+      ctx.fillStyle  = phone.color;
+      ctx.shadowColor = phone.color;
+      ctx.shadowBlur  = dotR * 1.8 * (isActive ? volt : 0.2);
+      ctx.globalAlpha = isActive ? 1 : 0.45;
+      ctx.beginPath(); ctx.arc(cx, cy, dotR, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.globalAlpha = 1;
+
+      // Rings
+      for (let i = 0; i < 4; i++) {
+        const phase = isActive ? ((t + i * 0.25) % 1) : 0;
+        const rR    = dotR + (maxR - dotR) * (isActive ? phase : i * 0.22);
+        const alpha = isActive ? (1 - phase) * 0.55 * volt : 0.06 - i * 0.012;
+        if (alpha <= 0) continue;
+        ctx.strokeStyle = phone.color;
+        ctx.lineWidth   = sw * 0.014 * (isActive ? (1 - phase * 0.6) : 0.5);
+        ctx.globalAlpha = alpha;
+        ctx.beginPath(); ctx.arc(cx, cy, rR, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+    } else if (phone.style === 'neon') {
+      // ── Neon: vertical equalizer bars with glow ───────────────────────────
+      const t    = performance.now() / 140;
+      const bars = 9;
+      const bw   = sw * 0.028;
+      const gap  = sw * 0.072;
+      const maxH = sh * 0.26;
+      const startBX = cx - (bars - 1) * gap / 2;
+
+      ctx.save();
+      ctx.shadowColor = phone.color;
+
+      for (let i = 0; i < bars; i++) {
+        const bx = startBX + i * gap;
+        const h  = isActive
+          ? bw * 0.6 + Math.abs(Math.sin(t + i * 0.65)) * maxH * volt
+          : bw * 0.5;
+        const alpha = isActive ? 0.65 + Math.abs(Math.sin(t * 0.5 + i)) * 0.35 : 0.18;
+        ctx.shadowBlur = isActive ? bw * 2.5 * volt : 0;
+
+        const bg = ctx.createLinearGradient(bx, cy - h / 2, bx, cy + h / 2);
+        bg.addColorStop(0,   phone.color + '60');
+        bg.addColorStop(0.5, phone.color);
+        bg.addColorStop(1,   phone.color + '60');
+        ctx.fillStyle  = bg;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.roundRect(bx - bw / 2, cy - h / 2, bw, h, bw * 0.4);
+        ctx.fill();
       }
       ctx.restore();
     }

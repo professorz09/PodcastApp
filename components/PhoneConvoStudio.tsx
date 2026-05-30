@@ -13,11 +13,14 @@ import { DebateSegment } from '../types';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ANIM_STYLES: { value: AnimStyle; label: string; desc: string }[] = [
-  { value: 'orb',          label: 'Orb',          desc: 'Glowing sphere' },
-  { value: 'cosmic-sphere',label: 'Cosmic Sphere', desc: 'Nebula clouds' },
+  { value: 'gemini',       label: 'Gemini',        desc: 'Sphere + ripple rings' },
+  { value: 'ripple',       label: 'Ripple',        desc: 'Expanding rings' },
+  { value: 'neon',         label: 'Neon Bars',     desc: 'Glowing equalizer' },
+  { value: 'orb',          label: 'Orb',           desc: 'Glowing sphere' },
+  { value: 'cosmic-sphere',label: 'Cosmic',        desc: 'Nebula clouds' },
   { value: 'aurora',       label: 'Aurora',        desc: 'Northern lights' },
-  { value: 'wave',         label: 'Wave Bars',     desc: 'Audio bars' },
-  { value: 'bottom-glow',  label: 'Bottom Glow',   desc: 'Glow + blobs' },
+  { value: 'wave',         label: 'Wave',          desc: 'Audio bars' },
+  { value: 'bottom-glow',  label: 'Bottom Glow',   desc: 'Glow blobs' },
 ];
 
 const PRESET_COLORS = [
@@ -48,11 +51,13 @@ const BG_OPTIONS = [
 const speakerToPhoneId = (speaker: string) =>
   `p_${speaker.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}`;
 
+const DEFAULT_BATTERIES = ['87%', '73%', '91%', '65%', '82%', '58%'];
+
 const buildPhonesFromSpeakers = (
   speakers: string[],
   existing: PhoneConfig[]
 ): PhoneConfig[] => {
-  const styles: AnimStyle[] = ['cosmic-sphere', 'aurora', 'orb', 'wave', 'bottom-glow'];
+  const styles: AnimStyle[] = ['gemini', 'ripple', 'cosmic-sphere', 'aurora', 'neon', 'orb', 'wave', 'bottom-glow'];
   return speakers.map((spk, i) => {
     const existingPhone = existing.find(p => p.id === speakerToPhoneId(spk));
     if (existingPhone) return existingPhone;
@@ -64,6 +69,7 @@ const buildPhonesFromSpeakers = (
       screenColor: PRESET_COLORS[i % PRESET_COLORS.length].screen,
       rotation: [-4, 5, -3, 4][i % 4],
       showControls: true,
+      battery: DEFAULT_BATTERIES[i % DEFAULT_BATTERIES.length],
     };
   });
 };
@@ -716,6 +722,19 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
                           onChange={e => updatePhone(phone.id, { rotation: +e.target.value })}
                           style={{ width: '100%', accentColor: phone.color }}
                         />
+                      </div>
+
+                      {/* Battery */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Battery</span>
+                          <input
+                            value={phone.battery ?? '87%'}
+                            onChange={e => updatePhone(phone.id, { battery: e.target.value })}
+                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', width: 52, textAlign: 'center', padding: '2px 4px' }}
+                            placeholder="87%"
+                          />
+                        </div>
                       </div>
 
                       {/* Call controls toggle */}
