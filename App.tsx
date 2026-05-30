@@ -404,7 +404,7 @@ const App: React.FC = () => {
       )}
 
       {appState === AppState.PHONE_STUDIO && (
-        <PhoneConvoStudio />
+        <PhoneConvoStudio mainScript={script} />
       )}
 
       {appState === AppState.INPUT && (
