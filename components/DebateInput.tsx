@@ -29,7 +29,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [specificDetails, setSpecificDetails] = useState('');
   const [customScript, setCustomScript] = useState('');
   const [includeNarrator, setIncludeNarrator] = useState(false);
-  const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview'>('gemini-3.1-flash-lite-preview');
+  const [model, setModel] = useState<'gemini-3-flash-preview' | 'gemini-3.1-pro-preview' | 'gemini-3.5-flash'>('gemini-3.5-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
   const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
@@ -853,18 +853,18 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">Fast</div>
                 </button>
                 <button
-                  onClick={() => setModel('gemini-3.1-flash-lite-preview')}
+                  onClick={() => setModel('gemini-3.5-flash')}
                   className={`p-2.5 rounded-lg border text-left transition-all flex flex-col gap-0.5 group ${
-                    model === 'gemini-3.1-flash-lite-preview'
+                    model === 'gemini-3.5-flash'
                       ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400'
                       : 'bg-[#111111] border-transparent text-gray-400 hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">3.1 Lite</div>
-                    <Sparkles size={10} className={model === 'gemini-3.1-flash-lite-preview' ? 'text-cyan-400' : 'text-gray-600'} />
+                    <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">2.5 Flash</div>
+                    <Sparkles size={10} className={model === 'gemini-3.5-flash' ? 'text-cyan-400' : 'text-gray-600'} />
                   </div>
-                  <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">New</div>
+                  <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">Stable</div>
                 </button>
                 <button
                   onClick={() => setModel('gemini-3.1-pro-preview')}

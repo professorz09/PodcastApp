@@ -146,7 +146,7 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-3.5-flash',
       contents: prompt,
       config: {
         temperature: 1.2,
@@ -329,7 +329,7 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-3.5-flash',
       contents: prompt,
       config: {
         temperature: 1.2,
@@ -470,7 +470,7 @@ ${scriptText.slice(0, 3500)}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-3.5-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { responseMimeType: 'application/json', temperature: 1.2 },
     });
@@ -650,7 +650,7 @@ export const generateDebateScript = async (
   includeNarrator: boolean,
   customScript?: string,
   contextFileContent?: string,
-  model: string = 'gemini-3.1-flash-lite-preview',
+  model: string = 'gemini-3.5-flash',
   language: string = 'English',
   style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' = 'debate',
   speakerCount: number = 2,
@@ -4341,7 +4341,7 @@ KEY VISUAL RULES:
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite-preview',
+          model: 'gemini-3.5-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -5327,7 +5327,7 @@ export interface StoryboardScenesResult {
 export const generateStoryboardScenes = async (
   segments: { speaker: string; text: string; duration?: number; startTime?: number; endTime?: number }[],
   sceneCount: number,
-  model: string = 'gemini-3.1-flash-lite-preview',
+  model: string = 'gemini-3.5-flash',
 ): Promise<StoryboardScenesResult> => {
   const ai = getAi();
 
@@ -5410,7 +5410,7 @@ Do not add any explanation outside the JSON.
 // AI only generates image prompts (no segmentIndices decision needed)
 export const generateStoryboardScenesTimeBased = async (
   slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
-  model: string = 'gemini-3.1-flash-lite-preview',
+  model: string = 'gemini-3.5-flash',
 ): Promise<{ prompts: string[]; characterGuide: string }> => {
   const ai = getAi();
 
@@ -5706,7 +5706,7 @@ Rules for thumbnailText:
 Return ONLY valid JSON. No markdown, no explanation.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-flash-lite-preview',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
   });
 
@@ -5748,7 +5748,7 @@ Rules:
 Return ONLY the phrase text. No quotes, no explanation, no JSON.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-flash-lite-preview',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
   });
 
@@ -5937,7 +5937,7 @@ export const generatePhoneStudioScript = async (
   duration: number,
   description?: string,
   contextFileContent?: string,
-  model: string = 'gemini-3.1-flash-lite-preview',
+  model: string = 'gemini-3.5-flash',
   language: string = 'English',
   includeNarrator: boolean = false,
 ): Promise<DebateSegment[]> => {
