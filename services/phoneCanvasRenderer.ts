@@ -487,131 +487,111 @@ export class CanvasRenderer {
     ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 
-    // ── Subtitles ─────────────────────────────────────────────────────────
+    // ── Subtitles — phrase mode ────────────────────────────────────────────
     const subCfg = this.state.subtitleConfig ?? { enabled: true, size: 1, background: 'dark', textColor: '#fff' };
     if (isActive && text && subCfg.enabled) {
       const bgType = subCfg.background ?? 'dark';
       if (bgType !== 'none') {
-        const tg = ctx.createLinearGradient(0, sy + sh * 0.4, 0, sy + sh);
+        const tg = ctx.createLinearGradient(0, sy + sh * 0.55, 0, sy + sh);
         tg.addColorStop(0, 'transparent');
-        tg.addColorStop(0.4, bgType === 'light' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.6)');
-        tg.addColorStop(1, bgType === 'light' ? 'rgba(255,255,255,0.88)' : 'rgba(0,0,0,0.92)');
+        tg.addColorStop(0.45, bgType === 'light' ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.65)');
+        tg.addColorStop(1,    bgType === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.94)');
         ctx.fillStyle = tg;
-        ctx.fillRect(sx, sy + sh * 0.4, sw, sh * 0.6);
+        ctx.fillRect(sx, sy + sh * 0.55, sw, sh * 0.45);
       }
 
-      const fs = sw * 0.048 * (subCfg.size ?? 1);
-      ctx.font = `600 ${fs}px -apple-system,sans-serif`;
+      const fs = sw * 0.052 * (subCfg.size ?? 1);
+      ctx.font = `700 ${fs}px -apple-system,sans-serif`;
 
-      const words = text.replace(/\n/g, ' ').split(' ').filter(w => w.trim());
-      if (!words.length) { ctx.textAlign = 'center'; return; }
+      const allWords = text.replace(/\n/g, ' ').split(/\s+/).filter(w => w);
+      if (!allWords.length) { ctx.textAlign = 'center'; return; }
 
-      const pct = Math.max(0, Math.min(1, turnProgress / 0.98));
+      // ── Split text into fixed phrases of CHUNK_SIZE words ──────────────
+      const CHUNK = 4;
+      const phrases: string[][] = [];
+      for (let i = 0; i < allWords.length; i += CHUNK)
+        phrases.push(allWords.slice(i, i + CHUNK));
 
-      // ── Calculate targetWF (fractional word index) ──
-      let targetWF = 0;
+      // ── Determine current global word index + pop-in progress ──────────
       const wtArr = activeTurn?.wordTimings;
-      const useTimings = wtArr && wtArr.length > 0 && Math.abs(wtArr.length - words.length) <= 2;
+      const useTimings = !!(wtArr && wtArr.length > 0 && Math.abs(wtArr.length - allWords.length) <= 3);
+
+      let globalWordIdx = 0;   // index of the word currently appearing (0-based)
+      let popProg       = 1.0; // 0–1 pop-in of that word
 
       if (useTimings) {
         const cur = turnProgress * (activeTurn!.durationMs / 1000);
-        // Find which word we're currently on
         let found = false;
         for (let i = 0; i < wtArr!.length; i++) {
           const wt = wtArr![i];
           if (cur < wt.startTime) {
-            // Before this word starts — targetWF is i (i words done)
-            targetWF = i;
-            found = true;
-            break;
+            globalWordIdx = Math.max(0, i - 1); popProg = 1.0; found = true; break;
           }
-          if (cur >= wt.startTime && cur <= wt.endTime) {
-            // Inside this word — fractional progress within it
+          if (cur <= wt.endTime) {
             const wd = wt.endTime - wt.startTime;
-            targetWF = i + (wd > 1e-4 ? (cur - wt.startTime) / wd : 1);
-            found = true;
+            globalWordIdx = i;
+            popProg = wd > 1e-4 ? (cur - wt.startTime) / wd : 1;
+            found = true; break;
+          }
+          globalWordIdx = i; popProg = 1.0;
+        }
+        if (!found) { globalWordIdx = wtArr!.length - 1; popProg = 1.0; }
+      } else {
+        const pct = Math.max(0, Math.min(0.999, turnProgress / 0.98));
+        const weights = allWords.map(w => w.length + 2);
+        const total   = weights.reduce((a, b) => a + b, 0) || 1;
+        const target  = pct * total;
+        let acc = 0;
+        for (let i = 0; i < allWords.length; i++) {
+          if (target < acc + weights[i]) {
+            globalWordIdx = i;
+            popProg = (target - acc) / weights[i];
             break;
           }
-          // Past this word — it's fully done
-          targetWF = i + 1;
-        }
-        if (!found) targetWF = wtArr!.length;
-      } else {
-        // Weight-based estimation (proportional to char length)
-        const weights = words.map(w => w.length + 2);
-        const total = weights.reduce((a, b) => a + b, 0) || 1;
-        const target = pct * total;
-        let acc = 0;
-        for (let i = 0; i < words.length; i++) {
-          if (target <= acc + weights[i]) { targetWF = i + (target - acc) / weights[i]; break; }
           acc += weights[i];
-        }
-        if (target >= total) targetWF = words.length;
-      }
-
-      // Cap so we never show more words than exist
-      targetWF = Math.min(targetWF, words.length);
-
-      // ── ChatGPT streaming style: accumulate words, wrap, show last 2 lines ──
-      const visibleCount = Math.ceil(targetWF);              // words shown so far
-      // Fix: when targetWF is exact integer, newest word is FULLY visible (not 0%)
-      const floored = Math.floor(targetWF);
-      const popProg = floored < targetWF ? targetWF - floored : 1.0;
-
-      // Word-wrap all visible words
-      const allLines: { word: string; globalIdx: number }[][] = [];
-      let curLine: { word: string; globalIdx: number }[] = [];
-      for (let i = 0; i < visibleCount && i < words.length; i++) {
-        const test = curLine.map(e => e.word).join(' ') + (curLine.length ? ' ' : '') + words[i];
-        if (curLine.length && ctx.measureText(test).width > sw * 0.86) {
-          allLines.push(curLine);
-          curLine = [{ word: words[i], globalIdx: i }];
-        } else {
-          curLine.push({ word: words[i], globalIdx: i });
+          globalWordIdx = i; popProg = 1.0;
         }
       }
-      if (curLine.length) allLines.push(curLine);
 
-      // Only show last 2 lines (scroll up as more text appears)
-      const MAX_LINES = 2;
-      const visLines = allLines.slice(-MAX_LINES);
+      // ── Which phrase is active + how many words of it are visible ──────
+      const activePhraseIdx  = Math.min(Math.floor(globalWordIdx / CHUNK), phrases.length - 1);
+      const phraseStartWord  = activePhraseIdx * CHUNK;
+      // +1 because globalWordIdx is the word currently popping in
+      const wordsVisibleInPhrase = Math.min(globalWordIdx - phraseStartWord + 1, phrases[activePhraseIdx].length);
 
+      const phrase = phrases[activePhraseIdx];
+
+      // ── Colour helpers ────────────────────────────────────────────────
       const col = subCfg.textColor ?? '#ffffff';
-      const h2r = (h: string, off: number) => parseInt(h.slice(off, off + 2), 16) || 255;
-      const [rr, gg, bb] = [h2r(col, 1), h2r(col, 3), h2r(col, 5)];
+      const hx  = (s: string, o: number) => parseInt(s.slice(o, o + 2), 16) || 255;
+      const [rr, gg, bb] = [hx(col, 1), hx(col, 3), hx(col, 5)];
 
-      const lh = fs * 1.52;
-      const totalH = lh * visLines.length;
-      const baseY = sy + sh * 0.86 - totalH;
+      // ── Draw words of the active phrase ───────────────────────────────
+      // Anchor x so full phrase is centered (fixed — no text shift as words appear)
+      const fullW = ctx.measureText(phrase.join(' ')).width;
+      const lx    = cx - fullW / 2;
+      const baseY = sy + sh * 0.875;
 
       ctx.textAlign = 'left';
-      visLines.forEach((line, li) => {
-        // Center each line
-        const lineStr = line.map(e => e.word).join(' ');
-        const lineW = ctx.measureText(lineStr).width;
-        let lx = cx - lineW / 2;
-        let prevStr = '';
+      let prevStr = '';
+      for (let i = 0; i < wordsVisibleInPhrase; i++) {
+        const word     = phrase[i];
+        const xOff     = prevStr ? ctx.measureText(prevStr + ' ').width : 0;
+        const isNewest = i === wordsVisibleInPhrase - 1;
 
-        line.forEach(({ word, globalIdx }) => {
-          const xOff = prevStr ? ctx.measureText(prevStr + ' ').width : 0;
-          const isNewest = globalIdx === visibleCount - 1;
-
-          if (isNewest) {
-            // Pop-in: fade + tiny slide-up
-            const ease = 1 - Math.pow(1 - popProg, 2.5);
-            const alpha = Math.max(0.05, ease);
-            const yOff = (1 - ease) * fs * 0.35;
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = col;
-            ctx.fillText(word, lx + xOff, baseY + li * lh + yOff);
-            ctx.globalAlpha = 1;
-          } else {
-            ctx.fillStyle = `rgba(${rr},${gg},${bb},0.92)`;
-            ctx.fillText(word, lx + xOff, baseY + li * lh);
-          }
-          prevStr += (prevStr ? ' ' : '') + word;
-        });
-      });
+        if (isNewest) {
+          const ease = 1 - Math.pow(1 - Math.max(0.02, popProg), 2.5);
+          const yOff  = (1 - ease) * fs * 0.38;
+          ctx.globalAlpha = Math.max(0.06, ease);
+          ctx.fillStyle   = col;
+          ctx.fillText(word, lx + xOff, baseY + yOff);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = `rgba(${rr},${gg},${bb},0.95)`;
+          ctx.fillText(word, lx + xOff, baseY);
+        }
+        prevStr += (prevStr ? ' ' : '') + word;
+      }
       ctx.textAlign = 'center';
     }
 

@@ -6,6 +6,7 @@ import {
   MonitorSmartphone,
 } from 'lucide-react';
 import { CanvasRenderer, PhoneConfig, ScriptTurn, StudioState, AnimStyle } from '../services/phoneCanvasRenderer';
+import { renderVideoOffline } from '../services/videoRenderer';
 import { toast } from './Toast';
 import { DebateSegment } from '../types';
 
@@ -119,7 +120,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   // Export
   const [exporting, setExporting]       = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [exportRes, setExportRes]       = useState<'720p' | '1080p'>('720p');
+  const [exportStatus, setExportStatus] = useState('');
 
   const totalDuration = script.reduce((a, b) => a + b.durationMs, 0);
 
@@ -269,100 +270,85 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
 
   const handleExport = useCallback(async () => {
     if (!script.length) { toast.error('Script empty hai'); return; }
-    const W = exportRes === '1080p' ? 1920 : 1280;
-    const H = exportRes === '1080p' ? 1080 : 720;
-    const FPS = 30;
-    const dt = 1000 / FPS;
 
-    setExporting(true); setExportProgress(0);
+    if (!('VideoEncoder' in window)) {
+      toast.error('Yeh browser WebCodecs support nahi karta. Chrome ya Edge use karo.');
+      return;
+    }
 
-    const offscreen = document.createElement('canvas');
-    offscreen.width = W; offscreen.height = H;
+    const W = 1920, H = 1080, FPS = 30;
+    const totalMs = script.reduce((s, t) => s + t.durationMs, 0);
+    const totalSec = totalMs / 1000;
 
-    const state = buildState();
-    const renderer = new CanvasRenderer(offscreen, {
-      ...state,
-      background: { type: 'color', value: bg },
-    });
+    setExporting(true); setExportProgress(0); setExportStatus('Audio decode ho raha hai…');
 
-    // ── Audio mixing ──────────────────────────────────────────────────────────
-    let audioTracks: MediaStreamTrack[] = [];
-    let audioCtx: AudioContext | null = null;
     try {
-      audioCtx = new AudioContext();
-      const dest = audioCtx.createMediaStreamDestination();
-
-      // Pre-fetch all audio + decode first, schedule after resume
-      const pendingSources: { src: AudioBufferSourceNode; elapsedMs: number }[] = [];
-      let elapsedMs = 0;
-      for (const turn of script) {
-        if (turn.audioUrl) {
-          try {
-            const ab = await fetch(turn.audioUrl).then(r => r.arrayBuffer());
-            const buf = await audioCtx.decodeAudioData(ab);
-            const src = audioCtx.createBufferSource();
-            src.buffer = buf;
-            src.connect(dest);
-            pendingSources.push({ src, elapsedMs });
-          } catch { /* skip bad audio */ }
+      // ── 1. Decode all audio and mix into one Float32Array ─────────────────
+      const actx = new AudioContext();
+      const decoded = await Promise.all(
+        script.map(t =>
+          t.audioUrl
+            ? fetch(t.audioUrl).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).catch(() => null)
+            : Promise.resolve(null)
+        )
+      );
+      const sampleRate = decoded.find(Boolean)?.sampleRate ?? 24000;
+      const totalSamples = Math.ceil(totalSec * sampleRate);
+      const mixed = new Float32Array(totalSamples);
+      let offsetMs = 0;
+      decoded.forEach((buf, i) => {
+        if (buf) {
+          const startSample = Math.floor(offsetMs / 1000 * sampleRate);
+          const ch = buf.getChannelData(0);
+          for (let j = 0; j < ch.length && startSample + j < totalSamples; j++)
+            mixed[startSample + j] += ch[j];
         }
-        elapsedMs += turn.durationMs;
-      }
+        offsetMs += script[i].durationMs;
+      });
+      await actx.close();
 
-      audioTracks = dest.stream.getAudioTracks();
+      // ── 2. Create offscreen renderer at 1080p ─────────────────────────────
+      setExportStatus('Video render ho raha hai…');
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = W; exportCanvas.height = H;
+      const state = buildState();
+      const exportRenderer = new CanvasRenderer(exportCanvas, state);
 
-      // Resume context first so currentTime is live, then schedule
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      const t0 = audioCtx.currentTime + 0.05; // tiny buffer before recording starts
-      for (const { src, elapsedMs: ems } of pendingSources) {
-        src.start(t0 + ems / 1000);
-      }
-    } catch { /* audio not available — video only */ }
+      // ── 3. Offline render via WebCodecs (mp4-muxer) — much faster ─────────
+      const blob = await renderVideoOffline({
+        canvas: exportCanvas,
+        audioChannels: [mixed],
+        sampleRate,
+        duration: totalSec,
+        fps: FPS,
+        bitrate: 8_000_000,
+        width: W,
+        height: H,
+        renderCallback: (_time, _level, _vid, offCtx) => {
+          exportRenderer.currentTime = _time * 1000;
+          exportRenderer.drawFrame();
+          offCtx.drawImage(exportCanvas, 0, 0, W, H);
+        },
+        onProgress: p => {
+          setExportProgress(Math.round(p * 100));
+        },
+      });
 
-    // ── Video + combined stream ───────────────────────────────────────────────
-    const videoStream = offscreen.captureStream(FPS);
-    const combined = new MediaStream([...videoStream.getVideoTracks(), ...audioTracks]);
+      if (!blob) throw new Error('Render empty return hua');
 
-    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
-
-    const chunks: Blob[] = [];
-    const rec = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
-    rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-    rec.start(100);
-
-    const total = script.reduce((s, t) => s + t.durationMs, 0);
-
-    // Real-time rendering — one frame every (1000/FPS) ms so captureStream timing is correct
-    await new Promise<void>(resolve => {
-      let t = 0;
-      const frame = () => {
-        if (t > total + 200) { resolve(); return; }
-        renderer.currentTime = Math.min(t, total - 1);
-        renderer.drawFrame();
-        t += dt;
-        setExportProgress(Math.min(99, Math.round((t / total) * 100)));
-        setTimeout(frame, dt);
-      };
-      frame();
-    });
-
-    rec.stop();
-    await new Promise<void>(res => { rec.onstop = () => res(); });
-    audioCtx?.close();
-
-    const blob = new Blob(chunks, { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `phone-studio-${Date.now()}.webm`; a.click();
-    URL.revokeObjectURL(url);
-    setExporting(false); setExportProgress(0);
-    toast.success('Video export ho gaya! (audio included)');
-  }, [buildState, script, bg, exportRes]);
+      // ── 4. Download ───────────────────────────────────────────────────────
+      const url = URL.createObjectURL(blob as Blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `phone-studio-${Date.now()}.mp4`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success('✓ 1080p MP4 download ho gaya!');
+    } catch (err: any) {
+      console.error('Export error:', err);
+      toast.error(`Export failed: ${err.message}`);
+    } finally {
+      setExporting(false); setExportProgress(0); setExportStatus('');
+    }
+  }, [buildState, script]);
 
   // ── No script fallback ────────────────────────────────────────────────────
 
@@ -816,68 +802,63 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         {/* ════ EXPORT TAB ════ */}
         {tab === 'export' && (
           <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 12 }}>Export Settings</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Resolution (16:9)</div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                {(['720p', '1080p'] as const).map(r => (
-                  <button
-                    key={r}
-                    onClick={() => setExportRes(r)}
-                    style={{
-                      flex: 1, padding: '9px 4px', borderRadius: 10, fontSize: 12, fontWeight: 600,
-                      border: `1px solid ${exportRes === r ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
-                      background: exportRes === r ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
-                      color: exportRes === r ? '#fff' : 'rgba(255,255,255,0.5)',
-                      cursor: 'pointer', fontFamily: 'inherit',
-                    }}
-                  >
-                    {r} {r === '720p' ? '· 1280×720' : '· 1920×1080'}
-                  </button>
-                ))}
-              </div>
 
+            {/* Info card */}
+            <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>Export — 1080p MP4</div>
               {[
-                `Format: WebM (VP9)`,
+                `Format: MP4 (H.264 · AAC)  ·  1920×1080`,
+                `Quality: 8 Mbps High Bitrate`,
                 `Duration: ${fmtTime(totalDuration)}`,
-                `${phones.length} phones · ${script.length} turns`,
-                `Audio: ${script.filter(t => t.audioUrl).length}/${script.length} turns`,
+                `${phones.length} phone${phones.length > 1 ? 's' : ''} · ${script.length} turns`,
+                `Audio: ${script.filter(t => t.audioUrl).length}/${script.length} turns ready`,
               ].map(t => (
-                <div key={t} style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', display: 'flex', gap: 6, marginBottom: 3 }}>
+                <div key={t} style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 6, marginBottom: 4 }}>
                   <span style={{ color: '#ef4444' }}>•</span> {t}
                 </div>
               ))}
             </div>
 
-            {exporting ? (
+            {/* Progress bar (only while exporting) */}
+            {exporting && (
               <div style={{ borderRadius: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.07)', padding: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-                  <span style={{ color: '#fca5a5', fontWeight: 700 }}>Rendering…</span>
-                  <span style={{ color: '#ef4444', fontFamily: 'monospace' }}>{exportProgress}%</span>
+                  <span style={{ color: '#fca5a5', fontWeight: 700 }}>{exportStatus || 'Rendering…'}</span>
+                  <span style={{ color: '#ef4444', fontFamily: 'monospace', fontWeight: 700 }}>{exportProgress}%</span>
                 </div>
-                <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 4, width: `${exportProgress}%`, background: '#ef4444', transition: 'none' }} />
+                <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 6, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 6, width: `${exportProgress}%`,
+                    background: 'linear-gradient(90deg,#ef4444,#f97316)',
+                    transition: 'width 0.3s ease',
+                  }} />
                 </div>
-                <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Frames render ho rahe hain…</div>
+                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
+                  Faster than real-time · WebCodecs offline render
+                </div>
               </div>
-            ) : (
-              <button
-                onClick={handleExport}
-                disabled={!script.length}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: 14,
-                  background: script.length ? '#ef4444' : 'rgba(255,255,255,0.05)',
-                  border: 'none', color: '#fff', fontWeight: 800, fontSize: 14,
-                  cursor: script.length ? 'pointer' : 'default',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  fontFamily: 'inherit', opacity: script.length ? 1 : 0.4,
-                  boxShadow: script.length ? '0 8px 24px rgba(239,68,68,0.3)' : 'none',
-                  letterSpacing: '0.06em',
-                }}
-              >
-                <Download size={17} /> RENDER VIDEO ({exportRes})
-              </button>
             )}
+
+            {/* Single export button */}
+            <button
+              onClick={handleExport}
+              disabled={exporting || !script.length}
+              style={{
+                width: '100%', padding: '15px', borderRadius: 14,
+                background: (!script.length || exporting) ? 'rgba(255,255,255,0.05)' : '#ef4444',
+                border: 'none', color: '#fff', fontWeight: 800, fontSize: 15,
+                cursor: (!script.length || exporting) ? 'default' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                fontFamily: 'inherit', opacity: (!script.length || exporting) ? 0.4 : 1,
+                boxShadow: (!script.length || exporting) ? 'none' : '0 8px 28px rgba(239,68,68,0.35)',
+                letterSpacing: '0.06em', transition: 'all 0.2s',
+              }}
+            >
+              {exporting
+                ? <><Loader2 size={17} style={{ animation: 'spin 1s linear infinite' }} /> Rendering {exportProgress}%…</>
+                : <><Download size={17} /> EXPORT 1080p MP4</>
+              }
+            </button>
           </div>
         )}
 
