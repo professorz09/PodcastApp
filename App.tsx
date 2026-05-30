@@ -155,6 +155,7 @@ const App: React.FC = () => {
           config.contextFileContent,
           config.model,
           config.language,
+          config.includeNarrator,
         );
         setScript(generatedScript);
         setAppState(AppState.PHONE_STUDIO);

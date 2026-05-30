@@ -50,6 +50,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [phoneConvoStyle, setPhoneConvoStyle] = useState<PhoneConvoStyle>('experts');
   const [phoneDescription, setPhoneDescription] = useState('');
   const [useImportTranscript, setUseImportTranscript] = useState(false);
+  const [phoneNarrator, setPhoneNarrator] = useState(false);
   const phoneFileInputRef = useRef<HTMLInputElement>(null);
   const [phoneFileName, setPhoneFileName] = useState<string | undefined>();
   const [phoneFileContent, setPhoneFileContent] = useState<string | undefined>();
@@ -114,7 +115,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
         topic: topic.trim() || 'AI Discussion',
         specificDetails: `PHONE_STYLE:${phoneConvoStyle}\n---\n${phoneDescription}`,
         duration,
-        includeNarrator: false,
+        includeNarrator: phoneNarrator,
         contextFileContent: phoneCtx,
         model,
         language,
@@ -647,6 +648,21 @@ const DebateInput: React.FC<DebateInputProps> = ({
                           <span className="text-[9px] text-gray-500">{opt.desc}</span>
                         </button>
                       ))}
+                    </div>
+                    {/* Narrator toggle — phone mode only */}
+                    <div className="mt-2 pt-2 border-t border-white/5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider">Narrator / Question Cards</div>
+                          <div className="text-[9px] text-gray-500 mt-0.5">White screen pe question aayega, phir speakers discuss karenge</div>
+                        </div>
+                        <button
+                          onClick={() => setPhoneNarrator(p => !p)}
+                          className={`relative w-9 h-5 rounded-full transition-all shrink-0 ${phoneNarrator ? 'bg-purple-600' : 'bg-white/10'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${phoneNarrator ? 'translate-x-4' : ''}`} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (

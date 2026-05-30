@@ -24,6 +24,7 @@ export interface ScriptTurn {
   text: string;
   audioUrl?: string;
   wordTimings?: CloudWord[];
+  isNarrator?: boolean;
 }
 
 export interface StudioState {
@@ -126,7 +127,6 @@ export class CanvasRenderer {
     ctx.fillRect(0, 0, w, h);
 
     const phones = state.phones;
-    if (!phones.length) return;
 
     // Active turn
     let elapsed = 0;
@@ -140,6 +140,14 @@ export class CanvasRenderer {
       }
       elapsed += turn.durationMs;
     }
+
+    // ── Narrator card — full-screen white slide ───────────────────────────
+    if (activeTurn?.isNarrator) {
+      this.drawNarratorCard(w, h, activeTurn.text, turnProgress);
+      return;
+    }
+
+    if (!phones.length) return;
 
     // Layout
     const phoneAspect = 9 / 19.5;
@@ -163,6 +171,86 @@ export class CanvasRenderer {
       const isActive = activeTurn?.phoneId === phone.id;
       this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn);
     });
+  }
+
+  private drawNarratorCard(w: number, h: number, text: string, progress: number) {
+    const { ctx } = this;
+
+    // Fade in/out
+    const fadeIn  = Math.min(1, progress / 0.12);
+    const fadeOut = progress > 0.88 ? Math.max(0, (1 - progress) / 0.12) : 1;
+    const alpha = fadeIn * fadeOut;
+
+    // White card
+    const cardW = w * 0.78;
+    const cardH = h * 0.42;
+    const cx = w / 2, cy = h / 2;
+    const rx = cx - cardW / 2, ry = cy - cardH / 2;
+    const corner = Math.min(cardW, cardH) * 0.07;
+
+    ctx.globalAlpha = alpha;
+
+    // Drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 48;
+    ctx.shadowOffsetY = 16;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, cardW, cardH, corner);
+    ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.shadowOffsetY = 0;
+
+    // Subtle top accent bar
+    const accentH = cardH * 0.012;
+    const accentGrad = ctx.createLinearGradient(rx, ry, rx + cardW, ry);
+    accentGrad.addColorStop(0, '#7c3aed');
+    accentGrad.addColorStop(1, '#ec4899');
+    ctx.fillStyle = accentGrad;
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, cardW, accentH, [corner, corner, 0, 0]);
+    ctx.fill();
+
+    // Question label
+    ctx.fillStyle = '#9333ea';
+    ctx.font = `700 ${w * 0.022}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '0.1em';
+    ctx.fillText('QUESTION', cx, ry + cardH * 0.24);
+    ctx.letterSpacing = '0';
+
+    // Divider line
+    ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(rx + cardW * 0.12, ry + cardH * 0.35);
+    ctx.lineTo(rx + cardW * 0.88, ry + cardH * 0.35);
+    ctx.stroke();
+
+    // Main question text — word wrap
+    const fs = w * 0.042;
+    ctx.font = `700 ${fs}px -apple-system,sans-serif`;
+    ctx.fillStyle = '#111111';
+
+    const maxW = cardW * 0.84;
+    const words = text.split(' ').filter(Boolean);
+    const lines: string[] = [];
+    let cur = '';
+    for (const word of words) {
+      const test = cur ? cur + ' ' + word : word;
+      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = word; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+
+    const lh = fs * 1.45;
+    const textBlockH = lh * lines.length;
+    const textStartY = ry + cardH * 0.45 + (cardH * 0.45 - textBlockH) / 2 + fs;
+    lines.forEach((line, i) => {
+      ctx.fillText(line, cx, textStartY + i * lh);
+    });
+
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
   }
 
   private drawPhone(

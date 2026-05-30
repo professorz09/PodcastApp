@@ -5938,6 +5938,7 @@ export const generatePhoneStudioScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.1-flash-lite-preview',
   language: string = 'English',
+  includeNarrator: boolean = false,
 ): Promise<DebateSegment[]> => {
   const targetWords = duration * 150;
   const isHindi = language.toLowerCase() === 'hindi';
@@ -5971,6 +5972,29 @@ export const generatePhoneStudioScript = async (
       ? `${speakers[0]} and another AI agent`
       : 'Agent A and Agent B';
 
+  const narratorInstructions = includeNarrator
+    ? (isHindi
+        ? `
+NARRATOR FORMAT (IMPORTANT):
+- Script को ${Math.max(2, Math.round(duration / 1.5))} sections में बाँटो।
+- हर section की शुरुआत एक NARRATOR segment से करो जिसमें speaker = "NARRATOR" हो।
+- NARRATOR का text एक SHORT, punchy question या topic statement हो (max 10 words), जैसे:
+  "क्या AI सच में jobs ले लेगी?" या "ChatGPT vs Gemini: कौन ज़्यादा smart?"
+- NARRATOR के बाद speakers उस question पर 4-6 turns discuss करें।
+- Format: NARRATOR → speakers discuss → NARRATOR (next question) → speakers discuss → ...
+`
+        : `
+NARRATOR FORMAT (IMPORTANT):
+- Divide the script into ${Math.max(2, Math.round(duration / 1.5))} sections.
+- Start each section with a NARRATOR segment where speaker = "NARRATOR".
+- NARRATOR text must be a SHORT punchy question or topic statement (max 10 words), e.g.:
+  "Will AI really replace human jobs?" or "ChatGPT vs Gemini: Who's actually smarter?"
+- After each NARRATOR, speakers discuss that question for 4-6 turns.
+- Pattern: NARRATOR → speakers discuss → NARRATOR (next question) → speakers discuss → ...
+`
+      )
+    : '';
+
   const prompt = isHindi ? `
 तुम एक phone conversation script बना रहे हो जिसमें AI agents आपस में बात कर रहे हैं।
 
@@ -5979,18 +6003,19 @@ Topic: "${topic}"
 ${contextSection ? `\n${contextSection}\n` : ''}
 Conversation Style: ${styleGuides[phoneConvoStyle]}
 Target Duration: ${duration} minutes (~${targetWords} words total)
-
+${narratorInstructions}
 एक natural, engaging conversation generate करो जहाँ agents एक दूसरे के points पर react करें।
 बातचीत podcast जैसी होनी चाहिए — agents एक दूसरे को interrupt करें, agree/disagree करें, examples दें।
 
 ONLY valid JSON array return करो, no markdown:
 [
   {"speaker": "AgentName", "text": "dialogue text here"},
+  ${includeNarrator ? '{"speaker": "NARRATOR", "text": "Short question here?"},' : ''}
   ...
 ]
 
 Rules:
-- Har turn 2-4 sentences का हो
+- Har turn 2-4 sentences का हो (NARRATOR को छोड़कर — वो max 10 words)
 - Agents एक दूसरे के नाम लें और points reference करें
 - ${styleGuides[phoneConvoStyle]}
 - Total length ~${targetWords} words
@@ -6003,18 +6028,19 @@ Topic: "${topic}"
 ${contextSection ? `\n${contextSection}\n` : ''}
 Conversation Style: ${styleGuides[phoneConvoStyle]}
 Target Duration: ${duration} minutes (~${targetWords} words total)
-
+${narratorInstructions}
 Generate a natural, engaging conversation where agents react to each other's points.
 It should feel like a podcast — agents interrupt each other, agree/disagree, give examples.
 
 Return ONLY a valid JSON array, no markdown:
 [
   {"speaker": "AgentName", "text": "dialogue text here"},
+  ${includeNarrator ? '{"speaker": "NARRATOR", "text": "Short question here?"},' : ''}
   ...
 ]
 
 Rules:
-- Each turn 2-4 sentences
+- Each turn 2-4 sentences (NARRATOR turns are max 10 words — short questions only)
 - Agents reference each other by name and build on points
 - ${styleGuides[phoneConvoStyle]}
 - Total length ~${targetWords} words

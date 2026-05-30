@@ -127,24 +127,34 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   useEffect(() => {
     if (!mainScript.length) return;
 
-    const uniqueSpeakers = Array.from(new Set<string>(mainScript.map(s => s.speaker)));
+    // Exclude NARRATOR from phone list
+    const uniqueSpeakers = Array.from(
+      new Set<string>(mainScript.map(s => s.speaker).filter(sp => sp !== 'NARRATOR'))
+    );
 
     setPhones(prev => buildPhonesFromSpeakers(uniqueSpeakers, prev));
 
-    const turns: ScriptTurn[] = mainScript.map(seg => ({
-      id: seg.id,
-      phoneId: speakerToPhoneId(seg.speaker),
-      text: seg.text,
-      durationMs: seg.duration
-        ? Math.round(seg.duration * 1000)
-        : Math.max(2500, seg.text.length * 75),
-      audioUrl: seg.audioUrl,
-      wordTimings: seg.wordTimings
-        ? seg.wordTimings.map(wt => ({ word: wt.word, startTime: wt.start, endTime: wt.end }))
-        : seg.audioUrl
-          ? estimateWordTimings(seg.text, seg.duration ?? seg.text.length * 0.075)
-          : undefined,
-    }));
+    const turns: ScriptTurn[] = mainScript.map(seg => {
+      const isNarrator = seg.speaker === 'NARRATOR';
+      return {
+        id: seg.id,
+        phoneId: isNarrator ? 'narrator' : speakerToPhoneId(seg.speaker),
+        text: seg.text,
+        isNarrator,
+        // Narrator cards get a fixed 4-second display time
+        durationMs: isNarrator
+          ? 4000
+          : seg.duration
+            ? Math.round(seg.duration * 1000)
+            : Math.max(2500, seg.text.length * 75),
+        audioUrl: isNarrator ? undefined : seg.audioUrl,
+        wordTimings: isNarrator ? undefined : (seg.wordTimings
+          ? seg.wordTimings.map(wt => ({ word: wt.word, startTime: wt.start, endTime: wt.end }))
+          : seg.audioUrl
+            ? estimateWordTimings(seg.text, seg.duration ?? seg.text.length * 0.075)
+            : undefined),
+      };
+    });
     setScript(turns);
   }, [mainScript]);
 
