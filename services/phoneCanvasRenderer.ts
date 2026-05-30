@@ -558,8 +558,8 @@ export class CanvasRenderer {
       // Total lines height
       const totalTextH = visLineGroups.length * lh;
 
-      // Bottom anchor — leave 4% gap from phone bottom
-      const bottomY = sy + sh * 0.96;
+      // Bottom anchor — sit just above the call controls (which are at sh*0.925)
+      const bottomY = sy + sh * 0.895;
       const topTextY = bottomY - totalTextH;
 
       // ── Background gradient clipped to phone screen ────────────────────
