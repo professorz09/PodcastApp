@@ -116,6 +116,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
 
   // Audio playback
   const audioCtxRef    = useRef<AudioContext | null>(null);
+  // Track every scheduled BufferSourceNode so we can stop them immediately
+  const audioSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   // Pre-fetched raw ArrayBuffer cache (keyed by URL) so play starts instantly
   const audioCacheRef  = useRef<Map<string, ArrayBuffer>>(new Map());
 
@@ -182,7 +184,14 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     if (!canvasRef.current) return;
     const r = new CanvasRenderer(canvasRef.current, buildState());
     r.onTimeUpdate = t => setCurrentTime(t);
-    r.onComplete   = () => setIsPlaying(false);
+    r.onComplete   = () => {
+      setIsPlaying(false);
+      // Stop all scheduled sources when video naturally ends
+      audioSourcesRef.current.forEach(s => { try { s.stop(0); } catch {} });
+      audioSourcesRef.current = [];
+      audioCtxRef.current?.close();
+      audioCtxRef.current = null;
+    };
     rendererRef.current = r;
     r.drawFrame();
   }, []);
@@ -209,15 +218,22 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const togglePlay = async () => {
     const r = rendererRef.current;
     if (!r) return;
+    // ── Helper: kill all audio immediately ──────────────────────────────────
+    const killAudio = () => {
+      audioSourcesRef.current.forEach(s => { try { s.stop(0); } catch {} });
+      audioSourcesRef.current = [];
+      audioCtxRef.current?.close();
+      audioCtxRef.current = null;
+    };
+
     if (isPlaying) {
       r.stop();
       setIsPlaying(false);
-      audioCtxRef.current?.close();
-      audioCtxRef.current = null;
+      killAudio();
       return;
     }
 
-    if (audioCtxRef.current) { audioCtxRef.current.close(); audioCtxRef.current = null; }
+    killAudio(); // also kill any stale audio before starting fresh
     const actx = new AudioContext();
     audioCtxRef.current = actx;
 
@@ -257,6 +273,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       src.buffer = buf;
       src.connect(actx.destination);
       src.start(scheduleAtSec, audioOffsetSec);
+      audioSourcesRef.current.push(src); // track so we can stop instantly
     });
 
     r.play();
