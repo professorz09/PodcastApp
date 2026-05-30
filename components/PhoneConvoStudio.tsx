@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Plus, Trash2, Play, Pause, RotateCcw, Download,
-  Smartphone, ChevronDown, ChevronUp, X, Check,
-  Settings, Palette, FileText, Video, GripVertical,
-  Square, Circle
+  Plus, Trash2, Play, Pause, Square, Download,
+  Smartphone, X, Check, Palette, FileText, Video,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { toast } from './Toast';
 
@@ -29,33 +28,54 @@ interface ScriptLine {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ORB_COLORS: Record<OrbColor, { inner: string; mid: string; outer: string; glow: string; css: string }> = {
-  blue:   { inner: '#93c5fd', mid: '#3b82f6', outer: '#1e3a8a', glow: 'rgba(59,130,246,0.7)',   css: 'blue'   },
-  green:  { inner: '#86efac', mid: '#22c55e', outer: '#14532d', glow: 'rgba(34,197,94,0.7)',    css: 'green'  },
-  red:    { inner: '#fca5a5', mid: '#ef4444', outer: '#7f1d1d', glow: 'rgba(239,68,68,0.7)',    css: 'red'    },
-  purple: { inner: '#d8b4fe', mid: '#a855f7', outer: '#4a1d96', glow: 'rgba(168,85,247,0.7)',   css: 'purple' },
-  orange: { inner: '#fdba74', mid: '#f97316', outer: '#7c2d12', glow: 'rgba(249,115,22,0.7)',   css: 'orange' },
-  cyan:   { inner: '#a5f3fc', mid: '#06b6d4', outer: '#164e63', glow: 'rgba(6,182,212,0.7)',    css: 'cyan'   },
-  pink:   { inner: '#f9a8d4', mid: '#ec4899', outer: '#831843', glow: 'rgba(236,72,153,0.7)',   css: 'pink'   },
-  white:  { inner: '#ffffff', mid: '#e2e8f0', outer: '#64748b', glow: 'rgba(226,232,240,0.5)',  css: 'white'  },
+const ORB_COLORS: Record<OrbColor, { inner: string; mid: string; outer: string; glow: string }> = {
+  blue:   { inner: '#bfdbfe', mid: '#3b82f6', outer: '#1e3a8a', glow: 'rgba(59,130,246,0.8)'   },
+  green:  { inner: '#bbf7d0', mid: '#22c55e', outer: '#14532d', glow: 'rgba(34,197,94,0.8)'    },
+  red:    { inner: '#fecaca', mid: '#ef4444', outer: '#7f1d1d', glow: 'rgba(239,68,68,0.8)'    },
+  purple: { inner: '#e9d5ff', mid: '#a855f7', outer: '#4a1d96', glow: 'rgba(168,85,247,0.8)'   },
+  orange: { inner: '#fed7aa', mid: '#f97316', outer: '#7c2d12', glow: 'rgba(249,115,22,0.8)'   },
+  cyan:   { inner: '#cffafe', mid: '#06b6d4', outer: '#164e63', glow: 'rgba(6,182,212,0.8)'    },
+  pink:   { inner: '#fbcfe8', mid: '#ec4899', outer: '#831843', glow: 'rgba(236,72,153,0.8)'   },
+  white:  { inner: '#ffffff', mid: '#cbd5e1', outer: '#475569', glow: 'rgba(203,213,225,0.6)'  },
 };
 
-const BG_PRESETS: Record<BgPreset, { label: string; value: string; preview: string }> = {
-  'dark-room':   { label: 'Dark Room',       value: '#080808',         preview: '#080808' },
-  'midnight':    { label: 'Midnight',        value: '#03030f',         preview: '#03030f' },
-  'studio':      { label: 'Studio Gray',     value: '#181818',         preview: '#181818' },
-  'grad-dark':   { label: 'Deep Space',      value: 'linear-gradient(135deg,#0a0a0a 0%,#111827 50%,#0a0a0a 100%)', preview: '#111827' },
-  'grad-purple': { label: 'Purple Haze',     value: 'linear-gradient(135deg,#0f0014 0%,#1e0040 50%,#0f000a 100%)', preview: '#1e0040' },
-  'grad-blue':   { label: 'Ocean Deep',      value: 'linear-gradient(135deg,#00050f 0%,#0c1a3a 50%,#000508 100%)', preview: '#0c1a3a' },
-  'white':       { label: 'Clean White',     value: '#f1f5f9',         preview: '#f1f5f9' },
-  'wood':        { label: 'Wooden Table',    value: 'linear-gradient(180deg,#3d2b1f 0%,#5c3d2a 30%,#4a3020 60%,#3d2b1f 100%)', preview: '#4a3020' },
+const BG_PRESETS: Record<BgPreset, { label: string; css: string; preview: string }> = {
+  'dark-room':   { label: 'Dark Room',    css: '#080808',    preview: '#080808' },
+  'midnight':    { label: 'Midnight',     css: '#03020f',    preview: '#03020f' },
+  'studio':      { label: 'Studio',       css: '#141414',    preview: '#141414' },
+  'grad-dark':   { label: 'Deep Space',   css: 'linear-gradient(160deg,#0a0a12 0%,#12172a 50%,#0a0a12 100%)', preview: '#12172a' },
+  'grad-purple': { label: 'Purple Haze',  css: 'linear-gradient(160deg,#0d0010 0%,#200050 50%,#0a0010 100%)', preview: '#200050' },
+  'grad-blue':   { label: 'Ocean Deep',   css: 'linear-gradient(160deg,#000510 0%,#0c1e40 50%,#000810 100%)', preview: '#0c1e40' },
+  'white':       { label: 'Clean White',  css: '#f0f4f8',    preview: '#f0f4f8' },
+  'wood':        { label: 'Wood Table',   css: 'linear-gradient(180deg,#3d2b1f 0%,#5c3d2a 40%,#4a3020 70%,#3a2a1a 100%)', preview: '#4a3020' },
 };
 
-const PHONE_STYLES: Record<PhoneStyle, { label: string; bodyBg: string; border: string; screenBg: string; statusColor: string }> = {
-  'android-dark':  { label: 'Android Dark',  bodyBg: '#0e0e0e', border: '#1f1f1f', screenBg: '#000000', statusColor: '#ffffff' },
-  'android-light': { label: 'Android Light', bodyBg: '#e8e8e8', border: '#cccccc', screenBg: '#f5f5f5', statusColor: '#000000' },
-  'iphone-black':  { label: 'iPhone Black',  bodyBg: '#111111', border: '#2a2a2a', screenBg: '#000000', statusColor: '#ffffff' },
-  'iphone-white':  { label: 'iPhone White',  bodyBg: '#f0f0f0', border: '#d4d4d4', screenBg: '#ffffff', statusColor: '#000000' },
+const PHONE_STYLES: Record<PhoneStyle, {
+  label: string;
+  body: string;
+  bodyGrad: string;
+  edge: string;
+  screenBg: string;
+  statusColor: string;
+  isIphone: boolean;
+  isDark: boolean;
+}> = {
+  'android-dark': {
+    label: 'Android Dark', body: '#111111', bodyGrad: 'linear-gradient(145deg,#1a1a1a,#0a0a0a)',
+    edge: '#2a2a2a', screenBg: '#000000', statusColor: '#ffffff', isIphone: false, isDark: true,
+  },
+  'android-light': {
+    label: 'Android Light', body: '#e8e8e8', bodyGrad: 'linear-gradient(145deg,#f0f0f0,#d8d8d8)',
+    edge: '#c0c0c0', screenBg: '#f8f8f8', statusColor: '#111111', isIphone: false, isDark: false,
+  },
+  'iphone-black': {
+    label: 'iPhone Black', body: '#0f0f0f', bodyGrad: 'linear-gradient(145deg,#1c1c1e,#0a0a0a)',
+    edge: '#2c2c2e', screenBg: '#000000', statusColor: '#ffffff', isIphone: true, isDark: true,
+  },
+  'iphone-white': {
+    label: 'iPhone White', body: '#f2f2f7', bodyGrad: 'linear-gradient(145deg,#ffffff,#e5e5ea)',
+    edge: '#d1d1d6', screenBg: '#ffffff', statusColor: '#111111', isIphone: true, isDark: false,
+  },
 };
 
 const DEFAULT_DEVICES: Device[] = [
@@ -64,87 +84,94 @@ const DEFAULT_DEVICES: Device[] = [
 ];
 
 const DEFAULT_SCRIPT: ScriptLine[] = [
-  { id: 'line-1', deviceId: 'dev-1', text: 'Hello! How can I help you today?', duration: 3 },
-  { id: 'line-2', deviceId: 'dev-2', text: 'Hi there! I can answer that question.', duration: 4 },
-  { id: 'line-3', deviceId: 'dev-1', text: 'That\'s a great point. Let me think about that.', duration: 4 },
-  { id: 'line-4', deviceId: 'dev-2', text: 'Sure! Here\'s what I know about this topic.', duration: 5 },
+  { id: 'sl-1', deviceId: 'dev-1', text: 'Hello! How can I help you today?', duration: 3 },
+  { id: 'sl-2', deviceId: 'dev-2', text: "Hi! I'm happy to help. What's on your mind?", duration: 4 },
+  { id: 'sl-3', deviceId: 'dev-1', text: "That's a great point. Let me think about that.", duration: 4 },
+  { id: 'sl-4', deviceId: 'dev-2', text: "Sure! Here's what I know about this topic in detail.", duration: 5 },
 ];
 
 // ─── OrbDisplay ───────────────────────────────────────────────────────────────
 
 interface OrbProps {
   color: OrbColor;
-  isActive: boolean;
   ampRef: React.MutableRefObject<number>;
-  deviceId: string;
 }
 
-const OrbDisplay: React.FC<OrbProps> = ({ color, isActive, ampRef, deviceId }) => {
-  const orbRef = useRef<HTMLDivElement>(null);
+const OrbDisplay = React.memo<OrbProps>(({ color, ampRef }) => {
+  const coreRef = useRef<HTMLDivElement>(null);
+  const midRef  = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
+  const rafRef  = useRef<number>(0);
   const c = ORB_COLORS[color];
 
   useEffect(() => {
-    const animate = () => {
-      const amp = ampRef.current;
-      if (orbRef.current) {
-        const scale = 0.55 + 0.45 * amp;
-        orbRef.current.style.transform = `scale(${scale})`;
-        orbRef.current.style.opacity = String(0.5 + 0.5 * amp);
+    const tick = () => {
+      const a = ampRef.current;
+      if (coreRef.current) {
+        const s = 0.48 + 0.52 * a;
+        coreRef.current.style.transform = `scale(${s})`;
+        coreRef.current.style.opacity   = String(0.55 + 0.45 * a);
+      }
+      if (midRef.current) {
+        const s = 0.55 + 0.6 * a;
+        midRef.current.style.transform  = `scale(${s})`;
+        midRef.current.style.opacity    = String(0.25 + 0.5 * a);
       }
       if (glowRef.current) {
-        const glowScale = 0.6 + 0.6 * amp;
-        glowRef.current.style.transform = `scale(${glowScale})`;
-        glowRef.current.style.opacity = String(0.3 + 0.5 * amp);
+        const s = 0.4 + 0.85 * a;
+        glowRef.current.style.transform = `scale(${s})`;
+        glowRef.current.style.opacity   = String(0.15 + 0.55 * a);
       }
-      rafRef.current = requestAnimationFrame(animate);
+      rafRef.current = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(animate);
+    rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, [ampRef]);
 
+  const style: React.CSSProperties = {
+    position: 'absolute', top: '50%', left: '50%',
+    transform: 'translate(-50%,-50%) scale(0)',
+    width: '80%', height: '80%',
+    borderRadius: '50%',
+    willChange: 'transform, opacity',
+    transformOrigin: 'center',
+  };
+
   return (
-    <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-      {/* Outer ambient glow */}
-      <div
-        ref={glowRef}
-        className="absolute rounded-full"
-        style={{
-          width: '85%',
-          height: '85%',
-          background: `radial-gradient(circle, ${c.glow} 0%, transparent 70%)`,
-          filter: 'blur(16px)',
-          transition: 'none',
-        }}
-      />
-      {/* Main orb */}
-      <div
-        ref={orbRef}
-        className="absolute rounded-full"
-        style={{
-          width: '65%',
-          height: '65%',
-          background: `radial-gradient(circle at 35% 30%, ${c.inner}, ${c.mid} 50%, ${c.outer})`,
-          boxShadow: `0 0 40px 10px ${c.glow}, inset 0 0 20px rgba(255,255,255,0.15)`,
-          transition: 'none',
-        }}
-      />
-      {/* Specular highlight */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: '22%',
-          height: '22%',
-          top: '22%',
-          left: '32%',
-          background: 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }}
-      />
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+      {/* Ambient glow */}
+      <div ref={glowRef} style={{
+        ...style,
+        background: `radial-gradient(circle, ${c.glow} 0%, transparent 70%)`,
+        filter: 'blur(12px)',
+        width: '110%', height: '110%',
+        top: '50%', left: '50%',
+      }} />
+      {/* Mid halo */}
+      <div ref={midRef} style={{
+        ...style,
+        background: `radial-gradient(circle, ${c.mid}aa 0%, ${c.mid}40 50%, transparent 75%)`,
+        filter: 'blur(6px)',
+        width: '95%', height: '95%',
+      }} />
+      {/* Core orb */}
+      <div ref={coreRef} style={{
+        ...style,
+        width: '68%', height: '68%',
+        background: `radial-gradient(circle at 38% 32%, ${c.inner} 0%, ${c.mid} 45%, ${c.outer}cc 100%)`,
+        boxShadow: `0 0 30px 8px ${c.glow}, inset 0 2px 8px rgba(255,255,255,0.25)`,
+      }}>
+        {/* Specular highlight */}
+        <div style={{
+          position: 'absolute', top: '14%', left: '22%',
+          width: '28%', height: '28%',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.65) 0%, transparent 70%)',
+        }} />
+      </div>
     </div>
   );
-};
+});
 
 // ─── PhoneFrame ───────────────────────────────────────────────────────────────
 
@@ -155,159 +182,288 @@ interface PhoneFrameProps {
   subtitle?: string;
   showSubtitles: boolean;
   showName: boolean;
-  style?: React.CSSProperties;
 }
 
-const PhoneFrame: React.FC<PhoneFrameProps> = ({
-  device, isActive, ampRef, subtitle, showSubtitles, showName, style
+const PhoneFrame = React.memo<PhoneFrameProps>(({
+  device, isActive, ampRef, subtitle, showSubtitles, showName,
 }) => {
   const ps = PHONE_STYLES[device.phoneStyle];
-  const isLight = device.phoneStyle.includes('light') || device.phoneStyle.includes('white');
-  const isIphone = device.phoneStyle.includes('iphone');
+  const c  = ORB_COLORS[device.orbColor];
+
+  const btnColor = ps.isDark
+    ? 'linear-gradient(180deg,#2a2a2a,#1a1a1a)'
+    : 'linear-gradient(180deg,#e0e0e0,#c8c8c8)';
+  const btnShadow = ps.isDark
+    ? '-1px 0 4px rgba(0,0,0,0.8), inset 1px 0 1px rgba(255,255,255,0.05)'
+    : '-1px 0 4px rgba(0,0,0,0.2), inset 1px 0 1px rgba(255,255,255,0.5)';
+  const btnShadowR = ps.isDark
+    ? '1px 0 4px rgba(0,0,0,0.8), inset -1px 0 1px rgba(255,255,255,0.05)'
+    : '1px 0 4px rgba(0,0,0,0.2), inset -1px 0 1px rgba(255,255,255,0.5)';
 
   return (
-    <div className="flex flex-col items-center gap-2" style={style}>
-      {/* Phone body */}
-      <div
-        className="relative rounded-[14%] shadow-2xl"
-        style={{
-          width: '100%',
-          paddingBottom: '210%',
-          background: ps.bodyBg,
-          border: `2px solid ${ps.border}`,
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+      {/* Phone wrapper — takes remaining height */}
+      <div style={{ flex: 1, width: '100%', position: 'relative', minHeight: 0 }}>
+
+        {/* ── Left buttons (volume) ─── */}
+        {/* Volume Up */}
+        <div style={{
+          position: 'absolute', left: '-7%', top: '18%',
+          width: '7%', height: '9%',
+          background: btnColor, borderRadius: '3px 0 0 3px',
+          boxShadow: btnShadow, zIndex: 1,
+        }} />
+        {/* Volume Down */}
+        <div style={{
+          position: 'absolute', left: '-7%', top: '29%',
+          width: '7%', height: '7%',
+          background: btnColor, borderRadius: '3px 0 0 3px',
+          boxShadow: btnShadow, zIndex: 1,
+        }} />
+        {/* iPhone: silent/mute toggle; Android: skip */}
+        {ps.isIphone && (
+          <div style={{
+            position: 'absolute', left: '-7%', top: '10%',
+            width: '6%', height: '4%',
+            background: btnColor, borderRadius: '3px 0 0 3px',
+            boxShadow: btnShadow, zIndex: 1,
+          }} />
+        )}
+
+        {/* ── Right button (power) ─── */}
+        <div style={{
+          position: 'absolute', right: '-7%', top: '24%',
+          width: '7%', height: ps.isIphone ? '10%' : '8%',
+          background: btnColor, borderRadius: '0 3px 3px 0',
+          boxShadow: btnShadowR, zIndex: 1,
+        }} />
+
+        {/* ── Phone body ─── */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: ps.bodyGrad,
+          borderRadius: '12%',
+          border: `1.5px solid ${ps.edge}`,
           boxShadow: isActive
-            ? `0 0 30px 6px ${ORB_COLORS[device.orbColor].glow}, 0 20px 60px rgba(0,0,0,0.5)`
-            : '0 20px 60px rgba(0,0,0,0.5)',
-          transition: 'box-shadow 0.3s ease',
-        }}
-      >
-        <div className="absolute inset-[3%] rounded-[12%] overflow-hidden" style={{ background: ps.screenBg }}>
-          {/* Status bar */}
-          <div
-            className="absolute top-0 left-0 right-0 flex items-center justify-between px-3 z-10"
-            style={{ height: '8%', color: ps.statusColor }}
-          >
-            <span className="text-[0.55em] font-semibold opacity-80">9:41</span>
-            <span className="text-[0.55em] font-semibold opacity-80">95%</span>
-          </div>
+            ? `0 0 0 1px ${c.mid}44, 0 0 40px 12px ${c.glow}, 0 20px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.12)`
+            : `0 20px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09)`,
+          transition: 'box-shadow 0.45s ease',
+          zIndex: 2,
+        }}>
 
-          {/* iPhone notch / Android pill */}
-          {isIphone ? (
-            <div
-              className="absolute left-1/2 -translate-x-1/2 rounded-full z-20"
-              style={{ top: '1.5%', width: '30%', height: '3.5%', background: ps.bodyBg }}
-            />
-          ) : (
-            <div
-              className="absolute left-1/2 -translate-x-1/2 rounded-full z-20"
-              style={{ top: '1%', width: '8%', height: '2.5%', background: ps.bodyBg }}
-            />
-          )}
+          {/* Screen inset */}
+          <div style={{
+            position: 'absolute',
+            top: '2%', left: '3%', right: '3%', bottom: '2%',
+            background: ps.screenBg,
+            borderRadius: '10.5%',
+            overflow: 'hidden',
+          }}>
 
-          {/* Model label */}
-          <div
-            className="absolute top-[12%] left-0 right-0 flex items-center justify-center z-10"
-          >
-            <span
-              className="text-[0.65em] font-medium opacity-50"
-              style={{ color: ps.statusColor }}
-            >
-              {device.name}
-            </span>
-          </div>
+            {/* Status bar */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0,
+              height: '7%', display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', padding: '0 9%', zIndex: 5,
+            }}>
+              <span style={{ color: ps.statusColor, fontSize: '0.52em', fontWeight: 700, opacity: 0.75 }}>
+                9:41
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4%' }}>
+                {/* Signal dots */}
+                {[1, 2, 3].map(i => (
+                  <div key={i} style={{
+                    width: '5%', height: `${40 + i * 20}%`,
+                    background: ps.statusColor, opacity: 0.7,
+                    borderRadius: '1px', minWidth: 2, minHeight: 4,
+                    alignSelf: 'flex-end',
+                  }} />
+                ))}
+                {/* Battery */}
+                <div style={{
+                  width: '16%', height: '45%',
+                  border: `1.5px solid ${ps.statusColor}`, borderRadius: '2px',
+                  opacity: 0.7, position: 'relative', marginLeft: '4%', minWidth: 12, minHeight: 7,
+                }}>
+                  <div style={{
+                    position: 'absolute', inset: '2px', right: '20%',
+                    background: ps.statusColor, borderRadius: '1px',
+                  }} />
+                  <div style={{
+                    position: 'absolute', right: '-3px', top: '25%', bottom: '25%',
+                    width: '2px', background: ps.statusColor, borderRadius: '0 1px 1px 0',
+                  }} />
+                </div>
+              </div>
+            </div>
 
-          {/* Orb area */}
-          <div className="absolute" style={{ top: '18%', left: '5%', right: '5%', bottom: '22%' }}>
-            <OrbDisplay
-              color={device.orbColor}
-              isActive={isActive}
-              ampRef={ampRef}
-              deviceId={device.id}
-            />
-          </div>
+            {/* Camera cutout */}
+            {ps.isIphone ? (
+              /* Dynamic Island pill */
+              <div style={{
+                position: 'absolute', top: '2.5%', left: '50%', transform: 'translateX(-50%)',
+                width: '30%', height: '4.5%',
+                background: '#000', borderRadius: '50px', zIndex: 6,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.8)',
+              }}>
+                {/* Camera dot inside pill */}
+                <div style={{
+                  position: 'absolute', right: '18%', top: '50%', transform: 'translateY(-50%)',
+                  width: '22%', height: '70%', borderRadius: '50%',
+                  background: '#1a1a1a',
+                  boxShadow: 'inset 0 0 3px rgba(0,100,255,0.3)',
+                }} />
+              </div>
+            ) : (
+              /* Android punch-hole */
+              <div style={{
+                position: 'absolute', top: '2.2%', left: '50%', transform: 'translateX(-50%)',
+                width: '8%', height: '4%',
+                background: ps.body, borderRadius: '50%', zIndex: 6,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.6)',
+              }} />
+            )}
 
-          {/* Subtitle text */}
-          {showSubtitles && subtitle && isActive && (
-            <div
-              className="absolute bottom-[16%] left-[6%] right-[6%] text-center z-10"
-              style={{ color: ps.statusColor }}
-            >
-              <span className="text-[0.6em] font-medium leading-tight opacity-90 line-clamp-2">
-                {subtitle}
+            {/* App name / model label */}
+            <div style={{
+              position: 'absolute', top: '12%', left: 0, right: 0,
+              textAlign: 'center', zIndex: 4,
+            }}>
+              <span style={{
+                color: ps.statusColor, opacity: 0.42,
+                fontSize: '0.6em', fontWeight: 600, letterSpacing: '0.05em',
+              }}>
+                {device.name}
               </span>
             </div>
-          )}
 
-          {/* Bottom bar */}
-          <div className="absolute bottom-[2%] left-0 right-0 flex items-center justify-center gap-[12%] z-10">
-            <div
-              className="rounded-full opacity-50"
-              style={{ width: '8%', paddingBottom: '8%', background: ps.statusColor }}
-            />
-            <div
-              className="rounded-full"
-              style={{ width: '22%', height: '3px', background: ps.statusColor, opacity: 0.3 }}
-            />
-            <div
-              className="rounded-full opacity-40"
-              style={{
-                width: '8%',
-                paddingBottom: '8%',
-                border: `1.5px solid ${ps.statusColor}`,
-              }}
-            />
+            {/* Orb */}
+            <div style={{ position: 'absolute', top: '18%', left: '6%', right: '6%', bottom: '22%' }}>
+              <OrbDisplay color={device.orbColor} ampRef={ampRef} />
+            </div>
+
+            {/* Subtitle */}
+            {showSubtitles && subtitle && isActive && (
+              <div style={{
+                position: 'absolute', bottom: '18%', left: '7%', right: '7%',
+                textAlign: 'center', zIndex: 5,
+              }}>
+                <span style={{
+                  color: ps.statusColor, opacity: 0.88,
+                  fontSize: '0.55em', fontWeight: 500, lineHeight: 1.35,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical' as any,
+                  overflow: 'hidden',
+                }}>
+                  {subtitle}
+                </span>
+              </div>
+            )}
+
+            {/* Call control icons (mic + end call) */}
+            <div style={{
+              position: 'absolute', bottom: '7.5%', left: 0, right: 0,
+              display: 'flex', justifyContent: 'center', gap: '16%',
+              alignItems: 'center', zIndex: 4,
+            }}>
+              {/* Mute icon */}
+              <div style={{
+                width: '11%', aspectRatio: '1', borderRadius: '50%',
+                background: ps.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{
+                  width: '40%', height: '55%',
+                  borderRadius: '50px',
+                  background: ps.statusColor, opacity: 0.5,
+                }} />
+              </div>
+              {/* End call (red circle with X) */}
+              <div style={{
+                width: '12%', aspectRatio: '1', borderRadius: '50%',
+                background: '#ef4444cc',
+                boxShadow: '0 2px 8px rgba(239,68,68,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{
+                  width: '50%', height: '3px',
+                  background: '#fff', borderRadius: '2px',
+                }} />
+              </div>
+            </div>
+
+            {/* Home indicator bar */}
+            <div style={{
+              position: 'absolute', bottom: '2.5%', left: '50%',
+              transform: 'translateX(-50%)',
+              width: '30%', height: '1.5%',
+              background: ps.statusColor, opacity: 0.22,
+              borderRadius: '50px',
+            }} />
           </div>
+
+          {/* Glass sheen over entire phone face */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            borderRadius: '12%',
+            background: 'linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.015) 40%, transparent 60%)',
+            pointerEvents: 'none', zIndex: 10,
+          }} />
         </div>
       </div>
 
       {/* Device name label below phone */}
       {showName && (
-        <div
-          className="text-xs font-semibold tracking-wide px-3 py-1 rounded-full"
-          style={{
-            background: isActive ? `${ORB_COLORS[device.orbColor].glow}` : 'rgba(255,255,255,0.06)',
-            color: isActive ? '#fff' : 'rgba(255,255,255,0.45)',
-            transition: 'all 0.3s ease',
-          }}
-        >
+        <div style={{
+          marginTop: '6%',
+          padding: '2.5% 9%',
+          borderRadius: '50px',
+          background: isActive ? c.glow.replace('0.8)', '0.18)') : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${isActive ? c.mid + '60' : 'rgba(255,255,255,0.06)'}`,
+          color: isActive ? '#fff' : 'rgba(255,255,255,0.38)',
+          fontSize: '0.72em',
+          fontWeight: 600,
+          letterSpacing: '0.06em',
+          transition: 'all 0.35s ease',
+          whiteSpace: 'nowrap',
+          textAlign: 'center',
+        }}>
           {device.name}
         </div>
       )}
     </div>
   );
-};
+});
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const PhoneConvoStudio: React.FC = () => {
-  const [devices, setDevices] = useState<Device[]>(DEFAULT_DEVICES);
-  const [script, setScript] = useState<ScriptLine[]>(DEFAULT_SCRIPT);
-  const [bgPreset, setBgPreset] = useState<BgPreset>('dark-room');
+  const [devices, setDevices]         = useState<Device[]>(DEFAULT_DEVICES);
+  const [script, setScript]           = useState<ScriptLine[]>(DEFAULT_SCRIPT);
+  const [bgPreset, setBgPreset]       = useState<BgPreset>('dark-room');
   const [showSubtitles, setShowSubtitles] = useState(true);
-  const [showNames, setShowNames] = useState(true);
-  const [activeTab, setActiveTab] = useState<'script' | 'devices' | 'background' | 'export'>('script');
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [showNames, setShowNames]     = useState(true);
+  const [activeTab, setActiveTab]     = useState<'script' | 'devices' | 'background' | 'export'>('script');
+  const [isPlaying, setIsPlaying]     = useState(false);
   const [currentSegIdx, setCurrentSegIdx] = useState(0);
   const [segmentElapsed, setSegmentElapsed] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [exportResolution, setExportResolution] = useState<'720p' | '1080p'>('720p');
+  const [exportRes, setExportRes]     = useState<'720p' | '1080p'>('720p');
 
-  // Per-device amplitude refs (updated in RAF loop, avoid React re-renders)
+  // Per-device amplitude refs
   const ampRefs = useRef<Record<string, React.MutableRefObject<number>>>({});
-
-  const getAmpRef = useCallback((deviceId: string) => {
-    if (!ampRefs.current[deviceId]) {
-      ampRefs.current[deviceId] = { current: 0.1 };
-    }
-    return ampRefs.current[deviceId];
+  const getAmpRef = useCallback((id: string) => {
+    if (!ampRefs.current[id]) ampRefs.current[id] = { current: 0.08 };
+    return ampRefs.current[id];
   }, []);
 
-  // Playback state refs
-  const playStartRef = useRef<number>(0);
-  const playOffsetRef = useRef<number>(0);
-  const rafRef = useRef<number>(0);
+  // Playback
   const isPlayingRef = useRef(false);
+  const playStartRef = useRef(0);
+  const playOffsetRef = useRef(0);
   const scriptRef = useRef(script);
   const devicesRef = useRef(devices);
   useEffect(() => { scriptRef.current = script; }, [script]);
@@ -315,53 +471,44 @@ const PhoneConvoStudio: React.FC = () => {
 
   const totalDuration = script.reduce((s, l) => s + l.duration, 0);
 
-  // Amplitude simulation engine
-  const ampTimeRefs = useRef<Record<string, number>>({});
+  // Amplitude engine
+  const ampPhaseRefs = useRef<Record<string, number>>({});
 
-  const computeAmplitude = useCallback((deviceId: string, isActive: boolean, elapsed: number): number => {
-    if (!ampTimeRefs.current[deviceId]) ampTimeRefs.current[deviceId] = 0;
-    ampTimeRefs.current[deviceId] += 0.016;
-    const t = ampTimeRefs.current[deviceId];
-
-    if (isActive) {
-      // Speech-like: fast irregular pulsing
-      const a = 0.45 + 0.35 * Math.abs(Math.sin(t * 8.5 + Math.sin(t * 3.1) * 1.5));
-      const b = 0.1 * Math.sin(t * 17.3);
-      const c = 0.08 * Math.sin(t * 5.7 + 1.2);
-      return Math.min(1, Math.max(0, a + b + c));
-    } else {
-      // Idle: slow breathing
-      return 0.08 + 0.05 * Math.sin(t * 1.2 + parseFloat(deviceId.split('-')[1] || '0') * 1.5);
+  const calcAmp = useCallback((id: string, active: boolean, phaseInc: number) => {
+    if (!ampPhaseRefs.current[id]) ampPhaseRefs.current[id] = Math.random() * Math.PI * 2;
+    ampPhaseRefs.current[id] += phaseInc;
+    const p = ampPhaseRefs.current[id];
+    if (active) {
+      // Speech-like: fast multi-frequency pulsing
+      return Math.min(1, Math.max(0,
+        0.42 + 0.38 * Math.abs(Math.sin(p * 8.2 + Math.sin(p * 2.9) * 1.8))
+              + 0.12 * Math.sin(p * 17.1)
+              + 0.08 * Math.sin(p * 5.3)
+      ));
     }
+    // Idle: gentle breathing
+    return 0.06 + 0.04 * Math.sin(p * 1.1);
   }, []);
 
-  // Main RAF loop for amplitude updates + playback progress
+  // Master RAF loop
   useEffect(() => {
-    let lastTime = performance.now();
+    let lastT = performance.now();
+    let rafId = 0;
 
     const tick = (now: number) => {
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
+      const dt = Math.min((now - lastT) / 1000, 0.05);
+      lastT = now;
 
       if (isPlayingRef.current) {
         const elapsed = playOffsetRef.current + (now - playStartRef.current) / 1000;
-
-        // Find current segment
-        let cumulative = 0;
-        let segIdx = -1;
-        let segOff = 0;
-        const sc = scriptRef.current;
-        for (let i = 0; i < sc.length; i++) {
-          if (elapsed < cumulative + sc[i].duration) {
-            segIdx = i;
-            segOff = elapsed - cumulative;
-            break;
+        let cum = 0, segIdx = -1, segOff = 0;
+        for (let i = 0; i < scriptRef.current.length; i++) {
+          if (elapsed < cum + scriptRef.current[i].duration) {
+            segIdx = i; segOff = elapsed - cum; break;
           }
-          cumulative += sc[i].duration;
+          cum += scriptRef.current[i].duration;
         }
-
         if (segIdx === -1) {
-          // Done
           isPlayingRef.current = false;
           setIsPlaying(false);
           setCurrentSegIdx(0);
@@ -370,31 +517,24 @@ const PhoneConvoStudio: React.FC = () => {
         } else {
           setCurrentSegIdx(segIdx);
           setSegmentElapsed(segOff);
-
-          // Update amplitudes for all devices
-          const activeDeviceId = sc[segIdx]?.deviceId;
+          const activeId = scriptRef.current[segIdx].deviceId;
           devicesRef.current.forEach(d => {
-            const ampRef = getAmpRef(d.id);
-            ampRef.current = computeAmplitude(d.id, d.id === activeDeviceId, segOff);
+            getAmpRef(d.id).current = calcAmp(d.id, d.id === activeId, dt * 60);
           });
         }
       } else {
-        // Idle breathing for all devices
         devicesRef.current.forEach(d => {
-          const ampRef = getAmpRef(d.id);
-          ampRef.current = computeAmplitude(d.id, false, 0);
+          getAmpRef(d.id).current = calcAmp(d.id, false, dt * 60 * 0.9);
         });
       }
-
-      rafRef.current = requestAnimationFrame(tick);
+      rafId = requestAnimationFrame(tick);
     };
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [computeAmplitude, getAmpRef]);
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [calcAmp, getAmpRef]);
 
   const handlePlay = () => {
-    if (script.length === 0) return;
+    if (!script.length) return;
     playStartRef.current = performance.now();
     playOffsetRef.current = 0;
     isPlayingRef.current = true;
@@ -402,14 +542,11 @@ const PhoneConvoStudio: React.FC = () => {
     setCurrentSegIdx(0);
     setSegmentElapsed(0);
   };
-
   const handlePause = () => {
-    const elapsed = playOffsetRef.current + (performance.now() - playStartRef.current) / 1000;
-    playOffsetRef.current = elapsed;
+    playOffsetRef.current += (performance.now() - playStartRef.current) / 1000;
     isPlayingRef.current = false;
     setIsPlaying(false);
   };
-
   const handleStop = () => {
     isPlayingRef.current = false;
     setIsPlaying(false);
@@ -418,366 +555,259 @@ const PhoneConvoStudio: React.FC = () => {
     playOffsetRef.current = 0;
   };
 
-  // ─── Script helpers ─────────────────────────────────────────────────────────
+  // Script helpers
+  const addLine = () => setScript(p => [...p, {
+    id: `sl-${Date.now()}`,
+    deviceId: devices[0]?.id || '',
+    text: '', duration: 3,
+  }]);
+  const updateLine = (id: string, ch: Partial<ScriptLine>) =>
+    setScript(p => p.map(l => l.id === id ? { ...l, ...ch } : l));
+  const deleteLine = (id: string) =>
+    setScript(p => p.filter(l => l.id !== id));
 
-  const addLine = () => {
-    const newLine: ScriptLine = {
-      id: `line-${Date.now()}`,
-      deviceId: devices[0]?.id || '',
-      text: '',
-      duration: 3,
-    };
-    setScript(prev => [...prev, newLine]);
-  };
-
-  const updateLine = (id: string, changes: Partial<ScriptLine>) => {
-    setScript(prev => prev.map(l => l.id === id ? { ...l, ...changes } : l));
-  };
-
-  const deleteLine = (id: string) => {
-    setScript(prev => prev.filter(l => l.id !== id));
-  };
-
-  // ─── Device helpers ──────────────────────────────────────────────────────────
-
+  // Device helpers
   const addDevice = () => {
     if (devices.length >= 4) { toast.warning('Maximum 4 devices'); return; }
-    const colors: OrbColor[] = ['blue', 'green', 'red', 'purple', 'orange', 'cyan', 'pink', 'white'];
-    const styles: PhoneStyle[] = ['android-dark', 'iphone-black', 'android-light', 'iphone-white'];
-    const idx = devices.length;
-    setDevices(prev => [...prev, {
+    const cols: OrbColor[] = ['green', 'red', 'purple', 'orange', 'cyan', 'pink'];
+    const sts: PhoneStyle[] = ['android-dark', 'iphone-black', 'android-light', 'iphone-white'];
+    const i = devices.length;
+    setDevices(p => [...p, {
       id: `dev-${Date.now()}`,
-      name: `Device ${prev.length + 1}`,
-      orbColor: colors[idx % colors.length],
-      phoneStyle: styles[idx % styles.length],
+      name: `Device ${p.length + 1}`,
+      orbColor: cols[i % cols.length],
+      phoneStyle: sts[i % sts.length],
     }]);
   };
-
-  const updateDevice = (id: string, changes: Partial<Device>) => {
-    setDevices(prev => prev.map(d => d.id === id ? { ...d, ...changes } : d));
-  };
-
+  const updateDevice = (id: string, ch: Partial<Device>) =>
+    setDevices(p => p.map(d => d.id === id ? { ...d, ...ch } : d));
   const removeDevice = (id: string) => {
     if (devices.length <= 1) { toast.warning('Need at least 1 device'); return; }
-    setDevices(prev => prev.filter(d => d.id !== id));
-    setScript(prev => prev.filter(l => l.deviceId !== id));
+    setDevices(p => p.filter(d => d.id !== id));
+    setScript(p => p.filter(l => l.deviceId !== id));
   };
 
-  // ─── Canvas export ───────────────────────────────────────────────────────────
+  // Progress
+  const elapsed = script.slice(0, currentSegIdx).reduce((s, l) => s + l.duration, 0) + segmentElapsed;
+  const progressPct = totalDuration > 0 ? Math.min(100, (elapsed / totalDuration) * 100) : 0;
+  const currentSeg = script[currentSegIdx];
 
-  const exportCanvasRef = useRef<HTMLCanvasElement>(null);
+  // Phone sizing: height % of the 16:9 container, based on device count
+  const phoneHeightPct = devices.length <= 1 ? 90 : devices.length === 2 ? 84 : devices.length === 3 ? 78 : 72;
 
-  const drawFrameToCanvas = useCallback((
-    ctx: CanvasRenderingContext2D,
-    W: number,
-    H: number,
-    devices: Device[],
-    activeDeviceId: string,
-    subtitle: string,
-    showSubs: boolean,
-    showNms: boolean,
-    bgPreset: BgPreset,
-    frameTime: number,
-  ) => {
-    // Background
-    const bgVal = BG_PRESETS[bgPreset].value;
-    if (bgVal.startsWith('linear-gradient')) {
-      // Parse and apply gradient
-      const grad = ctx.createLinearGradient(0, 0, W, H);
-      if (bgPreset === 'grad-purple') {
-        grad.addColorStop(0, '#0f0014');
-        grad.addColorStop(0.5, '#1e0040');
-        grad.addColorStop(1, '#0f000a');
-      } else if (bgPreset === 'grad-blue') {
-        grad.addColorStop(0, '#00050f');
-        grad.addColorStop(0.5, '#0c1a3a');
-        grad.addColorStop(1, '#000508');
-      } else if (bgPreset === 'wood') {
-        grad.addColorStop(0, '#3d2b1f');
-        grad.addColorStop(0.3, '#5c3d2a');
-        grad.addColorStop(0.6, '#4a3020');
-        grad.addColorStop(1, '#3d2b1f');
-      } else {
-        grad.addColorStop(0, '#0a0a0a');
-        grad.addColorStop(0.5, '#111827');
-        grad.addColorStop(1, '#0a0a0a');
-      }
-      ctx.fillStyle = grad;
-    } else {
-      ctx.fillStyle = bgVal;
-    }
-    ctx.fillRect(0, 0, W, H);
-
-    const n = devices.length;
-    const phoneH = H * 0.72;
-    const phoneW = phoneH * 0.48;
-    const gap = W * 0.04;
-    const totalW = n * phoneW + (n - 1) * gap;
-    const startX = (W - totalW) / 2;
-    const phoneY = (H - phoneH) / 2 - (showNms ? H * 0.03 : 0);
-
-    devices.forEach((device, i) => {
-      const px = startX + i * (phoneW + gap);
-      const isActive = device.id === activeDeviceId;
-      const ps = PHONE_STYLES[device.phoneStyle];
-      const c = ORB_COLORS[device.orbColor];
-
-      // Compute amplitude
-      let amp: number;
-      if (isActive) {
-        amp = 0.45 + 0.35 * Math.abs(Math.sin(frameTime * 8.5 + Math.sin(frameTime * 3.1) * 1.5))
-             + 0.1 * Math.sin(frameTime * 17.3);
-        amp = Math.min(1, Math.max(0, amp));
-      } else {
-        amp = 0.08 + 0.05 * Math.sin(frameTime * 1.2 + i * 1.5);
-      }
-
-      // Phone glow when active
-      if (isActive) {
-        ctx.save();
-        ctx.shadowColor = c.glow;
-        ctx.shadowBlur = 30;
-      }
-
-      // Phone body (rounded rect)
-      const r = phoneW * 0.08;
-      ctx.beginPath();
-      ctx.moveTo(px + r, phoneY);
-      ctx.lineTo(px + phoneW - r, phoneY);
-      ctx.quadraticCurveTo(px + phoneW, phoneY, px + phoneW, phoneY + r);
-      ctx.lineTo(px + phoneW, phoneY + phoneH - r);
-      ctx.quadraticCurveTo(px + phoneW, phoneY + phoneH, px + phoneW - r, phoneY + phoneH);
-      ctx.lineTo(px + r, phoneY + phoneH);
-      ctx.quadraticCurveTo(px, phoneY + phoneH, px, phoneY + phoneH - r);
-      ctx.lineTo(px, phoneY + r);
-      ctx.quadraticCurveTo(px, phoneY, px + r, phoneY);
-      ctx.closePath();
-      ctx.fillStyle = ps.bodyBg;
-      ctx.fill();
-      ctx.strokeStyle = ps.border;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      if (isActive) ctx.restore();
-
-      // Screen
-      const sp = phoneW * 0.04;
-      const sx = px + sp, sy = phoneY + phoneH * 0.05;
-      const sw = phoneW - sp * 2, sh = phoneH * 0.87;
-      const sr = r * 0.8;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(sx + sr, sy);
-      ctx.lineTo(sx + sw - sr, sy);
-      ctx.quadraticCurveTo(sx + sw, sy, sx + sw, sy + sr);
-      ctx.lineTo(sx + sw, sy + sh - sr);
-      ctx.quadraticCurveTo(sx + sw, sy + sh, sx + sw - sr, sy + sh);
-      ctx.lineTo(sx + sr, sy + sh);
-      ctx.quadraticCurveTo(sx, sy + sh, sx, sy + sh - sr);
-      ctx.lineTo(sx, sy + sr);
-      ctx.quadraticCurveTo(sx, sy, sx + sr, sy);
-      ctx.closePath();
-      ctx.fillStyle = ps.screenBg;
-      ctx.fill();
-      ctx.clip();
-
-      // Orb
-      const orbCX = sx + sw / 2;
-      const orbCY = sy + sh * 0.48;
-      const maxR = sw * 0.33;
-      const orbR = maxR * (0.5 + 0.5 * amp);
-
-      // Outer glow
-      const glowGrad = ctx.createRadialGradient(orbCX, orbCY, 0, orbCX, orbCY, orbR * 2.8);
-      glowGrad.addColorStop(0, c.glow.replace(')', `,${amp * 0.5})`).replace('rgba(', 'rgba('));
-      glowGrad.addColorStop(0, c.glow);
-      glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glowGrad;
-      ctx.globalAlpha = amp * 0.7;
-      ctx.beginPath();
-      ctx.arc(orbCX, orbCY, orbR * 2.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Main orb
-      const orbGrad = ctx.createRadialGradient(
-        orbCX - orbR * 0.2, orbCY - orbR * 0.2, 0,
-        orbCX, orbCY, orbR
-      );
-      orbGrad.addColorStop(0, c.inner);
-      orbGrad.addColorStop(0.5, c.mid);
-      orbGrad.addColorStop(1, c.outer + '80');
-      ctx.globalAlpha = 0.5 + 0.5 * amp;
-      ctx.fillStyle = orbGrad;
-      ctx.beginPath();
-      ctx.arc(orbCX, orbCY, orbR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Specular
-      const specR = orbR * 0.28;
-      const specGrad = ctx.createRadialGradient(
-        orbCX - orbR * 0.3, orbCY - orbR * 0.3, 0,
-        orbCX - orbR * 0.3, orbCY - orbR * 0.3, specR
-      );
-      specGrad.addColorStop(0, 'rgba(255,255,255,0.55)');
-      specGrad.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = specGrad;
-      ctx.beginPath();
-      ctx.arc(orbCX - orbR * 0.3, orbCY - orbR * 0.3, specR, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Model name on screen
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = ps.statusColor;
-      ctx.font = `${Math.round(sw * 0.09)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(device.name, orbCX, sy + sh * 0.14);
-      ctx.globalAlpha = 1;
-
-      // Subtitle on screen
-      if (showSubs && subtitle && isActive) {
-        ctx.fillStyle = ps.statusColor;
-        ctx.font = `${Math.round(sw * 0.08)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.globalAlpha = 0.9;
-        const maxW = sw * 0.88;
-        const words = subtitle.split(' ');
-        let line = '', lines: string[] = [];
-        words.forEach(w => {
-          const test = line ? line + ' ' + w : w;
-          if (ctx.measureText(test).width > maxW) { lines.push(line); line = w; }
-          else line = test;
-        });
-        if (line) lines.push(line);
-        lines.slice(-2).forEach((ln, li) => {
-          ctx.fillText(ln, orbCX, sy + sh * 0.82 + li * sw * 0.1);
-        });
-        ctx.globalAlpha = 1;
-      }
-
-      ctx.restore();
-
-      // Device name label below phone
-      if (showNms) {
-        ctx.font = `bold ${Math.round(phoneW * 0.1)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255,255,255,0.4)';
-        ctx.fillText(device.name, px + phoneW / 2, phoneY + phoneH + phoneH * 0.07);
-      }
-    });
-  }, []);
+  // ─── Export ─────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
-    if (script.length === 0) { toast.error('Script is empty'); return; }
-    if (devices.length === 0) { toast.error('No devices'); return; }
-
+    if (!script.length) { toast.error('Script is empty'); return; }
+    const W = exportRes === '1080p' ? 1920 : 1280;
+    const H = exportRes === '1080p' ? 1080 : 720;
     const FPS = 30;
-    const W = exportResolution === '1080p' ? 1920 : 1280;
-    const H = exportResolution === '1080p' ? 1080 : 720;
 
     const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d')!;
-
     const stream = canvas.captureStream(FPS);
     const chunks: Blob[] = [];
+    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : 'video/webm';
+    setIsExporting(true); setExportProgress(0);
+    rec.start(100);
 
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-    setIsExporting(true);
-    setExportProgress(0);
-    recorder.start(100);
-
-    let t = 0;
     const totalT = script.reduce((s, l) => s + l.duration, 0);
     const dt = 1 / FPS;
+    const localAmpPhase: Record<string, number> = {};
+    const getAmpCanvas = (id: string, active: boolean): number => {
+      if (!localAmpPhase[id]) localAmpPhase[id] = Math.random() * Math.PI * 2;
+      localAmpPhase[id] += active ? 0.5 : 0.055;
+      const p = localAmpPhase[id];
+      return active
+        ? Math.min(1, 0.42 + 0.38 * Math.abs(Math.sin(p * 8.2 + Math.sin(p * 2.9) * 1.8)) + 0.12 * Math.sin(p * 17.1))
+        : 0.06 + 0.04 * Math.sin(p * 1.1);
+    };
 
-    let cumulative = 0;
-    let segIdx = 0;
-    let segOff = 0;
-    const getActiveDevice = (time: number) => {
-      let cum = 0;
-      for (let i = 0; i < script.length; i++) {
-        if (time < cum + script[i].duration) return { id: script[i].deviceId, text: script[i].text, segOff: time - cum };
-        cum += script[i].duration;
+    const drawScene = (t: number) => {
+      const bg = BG_PRESETS[bgPreset];
+      if (bg.css.startsWith('linear-gradient')) {
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        if (bgPreset === 'grad-purple') { g.addColorStop(0,'#0d0010'); g.addColorStop(0.5,'#200050'); g.addColorStop(1,'#0a0010'); }
+        else if (bgPreset === 'grad-blue') { g.addColorStop(0,'#000510'); g.addColorStop(0.5,'#0c1e40'); g.addColorStop(1,'#000810'); }
+        else if (bgPreset === 'wood') { g.addColorStop(0,'#3d2b1f'); g.addColorStop(0.4,'#5c3d2a'); g.addColorStop(0.7,'#4a3020'); g.addColorStop(1,'#3a2a1a'); }
+        else { g.addColorStop(0,'#0a0a12'); g.addColorStop(0.5,'#12172a'); g.addColorStop(1,'#0a0a12'); }
+        ctx.fillStyle = g;
+      } else { ctx.fillStyle = bg.css; }
+      ctx.fillRect(0, 0, W, H);
+
+      // Find active segment
+      let cum = 0, activeId = '', subText = '';
+      for (const seg of script) {
+        if (t < cum + seg.duration) { activeId = seg.deviceId; subText = seg.text; break; }
+        cum += seg.duration;
       }
-      return { id: '', text: '', segOff: 0 };
+
+      const n = devices.length;
+      const pH = H * (phoneHeightPct / 100);
+      const pW = pH * 0.475;
+      const totalPW = n * pW + (n - 1) * pW * 0.15;
+      let startX = (W - totalPW) / 2;
+      const pY = (H - pH) / 2;
+
+      devices.forEach(dev => {
+        const isAct = dev.id === activeId;
+        const amp = getAmpCanvas(dev.id, isAct);
+        const ps2 = PHONE_STYLES[dev.phoneStyle];
+        const c2 = ORB_COLORS[dev.orbColor];
+        const r = pW * 0.12;
+
+        const roundedRect = (x: number, y: number, w: number, h: number, rad: number) => {
+          ctx.beginPath();
+          ctx.moveTo(x+rad,y); ctx.lineTo(x+w-rad,y); ctx.quadraticCurveTo(x+w,y,x+w,y+rad);
+          ctx.lineTo(x+w,y+h-rad); ctx.quadraticCurveTo(x+w,y+h,x+w-rad,y+h);
+          ctx.lineTo(x+rad,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-rad);
+          ctx.lineTo(x,y+rad); ctx.quadraticCurveTo(x,y,x+rad,y); ctx.closePath();
+        };
+
+        // Phone glow
+        if (isAct) {
+          ctx.save(); ctx.shadowColor = c2.glow; ctx.shadowBlur = 40;
+        }
+
+        // Body
+        roundedRect(startX, pY, pW, pH, r);
+        const bg2 = ctx.createLinearGradient(startX, pY, startX+pW, pY+pH);
+        if (ps2.isDark) { bg2.addColorStop(0,'#1a1a1a'); bg2.addColorStop(1,'#0a0a0a'); }
+        else { bg2.addColorStop(0,'#f0f0f0'); bg2.addColorStop(1,'#d8d8d8'); }
+        ctx.fillStyle = bg2; ctx.fill();
+        ctx.strokeStyle = ps2.edge; ctx.lineWidth = 1.5; ctx.stroke();
+        if (isAct) ctx.restore();
+
+        // Screen
+        const sp = pW*0.03, st = pH*0.02, sw2 = pW-sp*2, sh2 = pH*0.96;
+        ctx.save();
+        roundedRect(startX+sp, pY+st, sw2, sh2, r*0.88);
+        ctx.fillStyle = ps2.screenBg; ctx.fill(); ctx.clip();
+
+        // Orb glow
+        const orbX = startX+sp+sw2/2, orbY = pY+st+sh2*0.47;
+        const orbR = (sw2*0.34) * (0.5 + 0.5*amp);
+        const glowG = ctx.createRadialGradient(orbX,orbY,0,orbX,orbY,orbR*3);
+        glowG.addColorStop(0, c2.glow); glowG.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.globalAlpha = amp*0.65; ctx.fillStyle=glowG;
+        ctx.beginPath(); ctx.arc(orbX,orbY,orbR*3,0,Math.PI*2); ctx.fill();
+
+        // Core orb
+        const orbG = ctx.createRadialGradient(orbX-orbR*0.2,orbY-orbR*0.2,0,orbX,orbY,orbR);
+        orbG.addColorStop(0,c2.inner); orbG.addColorStop(0.5,c2.mid); orbG.addColorStop(1,c2.outer+'99');
+        ctx.globalAlpha = 0.55+0.45*amp; ctx.fillStyle=orbG;
+        ctx.beginPath(); ctx.arc(orbX,orbY,orbR,0,Math.PI*2); ctx.fill();
+
+        // Specular
+        const sR=orbR*0.26;
+        const sG=ctx.createRadialGradient(orbX-orbR*0.3,orbY-orbR*0.3,0,orbX-orbR*0.3,orbY-orbR*0.3,sR);
+        sG.addColorStop(0,'rgba(255,255,255,0.6)'); sG.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=sG; ctx.beginPath(); ctx.arc(orbX-orbR*0.3,orbY-orbR*0.3,sR,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=1;
+
+        // Label
+        ctx.font=`600 ${Math.round(sw2*0.08)}px system-ui`; ctx.textAlign='center';
+        ctx.fillStyle=ps2.statusColor; ctx.globalAlpha=0.38;
+        ctx.fillText(dev.name, orbX, pY+st+sh2*0.14); ctx.globalAlpha=1;
+
+        // Subtitle
+        if (showSubtitles && isAct && subText) {
+          ctx.font=`500 ${Math.round(sw2*0.073)}px system-ui`; ctx.fillStyle=ps2.statusColor; ctx.globalAlpha=0.88;
+          const maxW2=sw2*0.86;
+          const words=subText.split(' '); let line='', lines2: string[]=[];
+          words.forEach(w => { const test=line?line+' '+w:w; if(ctx.measureText(test).width>maxW2){lines2.push(line);line=w;}else line=test; });
+          if(line)lines2.push(line);
+          lines2.slice(-2).forEach((ln,li)=>{ ctx.fillText(ln, orbX, pY+st+sh2*0.82+li*sw2*0.09); });
+          ctx.globalAlpha=1;
+        }
+        ctx.restore();
+
+        startX += pW + pW*0.15;
+      });
+
+      // Device labels
+      if (showNames) {
+        let lx = (W - (n*pW + (n-1)*pW*0.15)) / 2;
+        devices.forEach(dev => {
+          const isAct = dev.id === activeId;
+          const c2 = ORB_COLORS[dev.orbColor];
+          ctx.font = `600 ${Math.round(pW*0.09)}px system-ui`; ctx.textAlign='center';
+          ctx.fillStyle = isAct ? '#ffffff' : 'rgba(255,255,255,0.35)';
+          ctx.fillText(dev.name, lx+pW/2, pY+pH+pH*0.06);
+          lx += pW + pW*0.15;
+        });
+      }
     };
 
     await new Promise<void>(resolve => {
-      const renderFrame = () => {
-        if (t > totalT + 0.5) { resolve(); return; }
-        const { id: activeId, text, segOff: so } = getActiveDevice(Math.min(t, totalT - 0.001));
-        drawFrameToCanvas(ctx, W, H, devices, activeId, text, showSubtitles, showNames, bgPreset, t);
+      let t = 0;
+      const frame = () => {
+        if (t > totalT+0.3) { resolve(); return; }
+        drawScene(Math.min(t, totalT-0.001));
         t += dt;
-        setExportProgress(Math.min(99, Math.round((t / totalT) * 100)));
-        setTimeout(renderFrame, 0);
+        setExportProgress(Math.min(99, Math.round(t/totalT*100)));
+        setTimeout(frame, 0);
       };
-      renderFrame();
+      frame();
     });
 
-    recorder.stop();
-    await new Promise<void>(res => { recorder.onstop = () => res(); });
-
-    const blob = new Blob(chunks, { type: mimeType });
+    rec.stop();
+    await new Promise<void>(res => { rec.onstop = () => res(); });
+    const blob = new Blob(chunks, { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `phone-convo-${Date.now()}.webm`;
-    a.click();
+    a.href=url; a.download=`phone-studio-${Date.now()}.webm`; a.click();
     URL.revokeObjectURL(url);
-
-    setIsExporting(false);
-    setExportProgress(0);
+    setIsExporting(false); setExportProgress(0);
     toast.success('Video exported!');
-  }, [script, devices, showSubtitles, showNames, bgPreset, exportResolution, drawFrameToCanvas]);
+  }, [script, devices, bgPreset, showSubtitles, showNames, exportRes, phoneHeightPct]);
 
-  // Current segment info
-  const currentSeg = script[currentSegIdx];
-  const progressPct = totalDuration > 0
-    ? Math.min(100, (script.slice(0, currentSegIdx).reduce((s, l) => s + l.duration, 0) + segmentElapsed) / totalDuration * 100)
-    : 0;
-
-  // ─── Render ────────────────────────────────────────────────────────────────
-
-  const bgStyle: React.CSSProperties = {
-    background: BG_PRESETS[bgPreset].value,
-  };
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-[#050505] text-white overflow-hidden">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#050505', color: '#fff', overflow: 'hidden' }}>
 
-      {/* Preview Area */}
-      <div
-        className="relative flex-shrink-0 overflow-hidden"
-        style={{ ...bgStyle, aspectRatio: '16/9', maxHeight: '45vh', minHeight: '180px' }}
-      >
-        {/* Phone frames */}
-        <div className="absolute inset-0 flex items-center justify-center gap-4 px-6 py-4">
+      {/* ── 16:9 Preview ── */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        paddingBottom: '56.25%',
+        flexShrink: 0,
+        background: BG_PRESETS[bgPreset].css,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: `${devices.length > 2 ? 2 : 3}%`,
+          padding: '3% 10%',
+        }}>
           {devices.map(device => {
             const isActive = isPlaying && currentSeg?.deviceId === device.id;
-            const subtitle = isActive ? currentSeg?.text : undefined;
             return (
               <div
                 key={device.id}
-                className="flex-1 flex items-center justify-center"
-                style={{ maxWidth: `${Math.min(160, 400 / devices.length)}px` }}
+                style={{
+                  height: `${phoneHeightPct}%`,
+                  aspectRatio: '9 / 20',
+                  flexShrink: 0,
+                  // font-size scales with phone height for em-based child sizes
+                  fontSize: 'clamp(7px, 1.15vw, 16px)',
+                }}
               >
                 <PhoneFrame
                   device={device}
                   isActive={isActive}
                   ampRef={getAmpRef(device.id)}
-                  subtitle={subtitle}
+                  subtitle={isActive ? currentSeg?.text : undefined}
                   showSubtitles={showSubtitles}
                   showName={showNames}
-                  style={{ width: '100%' }}
                 />
               </div>
             );
@@ -785,102 +815,106 @@ const PhoneConvoStudio: React.FC = () => {
         </div>
       </div>
 
-      {/* Playback Controls */}
-      <div className="flex-shrink-0 px-4 py-2 border-b border-white/[0.06] bg-[#080808]">
+      {/* ── Playback Controls ── */}
+      <div style={{ flexShrink: 0, padding: '8px 12px 6px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#080808' }}>
         {/* Progress bar */}
-        <div className="h-1 bg-white/[0.06] rounded-full mb-2 overflow-hidden">
-          <div
-            className="h-full rounded-full transition-none"
-            style={{
-              width: `${progressPct}%`,
-              background: 'linear-gradient(90deg, #a855f7, #3b82f6)',
-            }}
-          />
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.07)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 4, transition: 'none',
+            width: `${progressPct}%`,
+            background: 'linear-gradient(90deg,#a855f7,#3b82f6)',
+          }} />
         </div>
-
-        <div className="flex items-center gap-3">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             onClick={isPlaying ? handlePause : handlePlay}
-            disabled={script.length === 0}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all active:scale-95 disabled:opacity-30"
+            disabled={!script.length}
+            style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.1)',
+              border: 'none', color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+              opacity: script.length ? 1 : 0.3,
+            }}
           >
-            {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+            {isPlaying ? <Pause size={15} /> : <Play size={15} style={{ marginLeft: 2 }} />}
           </button>
           <button
             onClick={handleStop}
-            className="w-7 h-7 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center transition-all active:scale-95"
+            style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.06)',
+              border: 'none', color: '#aaa', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
           >
             <Square size={12} />
           </button>
-          <div className="flex-1 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+
+          {/* Timeline chips */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
             {script.map((line, idx) => {
               const dev = devices.find(d => d.id === line.deviceId);
-              const isCurrentLine = isPlaying && idx === currentSegIdx;
+              const active = isPlaying && idx === currentSegIdx;
               const c = dev ? ORB_COLORS[dev.orbColor] : null;
               return (
-                <div
-                  key={line.id}
-                  className="flex-shrink-0 flex flex-col items-center gap-0.5 cursor-pointer group"
-                  onClick={() => {
-                    if (!isPlaying) {
-                      setCurrentSegIdx(idx);
-                      setSegmentElapsed(0);
-                    }
-                  }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all"
-                    style={{
-                      background: isCurrentLine && c ? `${c.glow}` : 'rgba(255,255,255,0.06)',
-                      border: isCurrentLine && c ? `1.5px solid ${c.mid}` : '1.5px solid transparent',
-                      color: isCurrentLine ? '#fff' : 'rgba(255,255,255,0.5)',
-                    }}
-                  >
+                <div key={line.id} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: active && c ? c.glow.replace('0.8)', '0.25)') : 'rgba(255,255,255,0.07)',
+                    border: `1.5px solid ${active && c ? c.mid : 'transparent'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: active ? '#fff' : 'rgba(255,255,255,0.5)',
+                    fontWeight: 700, fontSize: 12,
+                    transition: 'all 0.2s',
+                  }}>
                     {dev?.name?.[0] ?? '?'}
                   </div>
-                  <span className="text-[9px] text-gray-600">{line.duration}s</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{line.duration}s</span>
                 </div>
               );
             })}
           </div>
-          <span className="text-[11px] text-gray-600 shrink-0">
-            {totalDuration}s total
-          </span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{totalDuration}s</span>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex-shrink-0 flex border-b border-white/[0.06] bg-[#080808]">
+      {/* ── Tabs ── */}
+      <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#080808' }}>
         {([
-          { id: 'script',     label: 'Script',     icon: FileText },
-          { id: 'devices',    label: 'Devices',    icon: Smartphone },
-          { id: 'background', label: 'Background', icon: Palette },
-          { id: 'export',     label: 'Export',     icon: Video },
+          { id: 'script', label: 'Script', Icon: FileText },
+          { id: 'devices', label: 'Devices', Icon: Smartphone },
+          { id: 'background', label: 'Background', Icon: Palette },
+          { id: 'export', label: 'Export', Icon: Video },
         ] as const).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-all border-b-2 ${
-              activeTab === tab.id
-                ? 'border-purple-500 text-white'
-                : 'border-transparent text-gray-600 hover:text-gray-400'
-            }`}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 5, padding: '10px 4px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              borderBottom: `2px solid ${activeTab === tab.id ? '#a855f7' : 'transparent'}`,
+              color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.4)',
+              fontSize: 12, fontWeight: 500, transition: 'all 0.15s',
+            }}
           >
-            <tab.icon size={13} />
-            <span className="hidden sm:inline">{tab.label}</span>
+            <tab.Icon size={13} />
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      {/* ── Tab Content ── */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
 
-        {/* ── Script Tab ─────────────────────────────────────────────────── */}
+        {/* Script */}
         {activeTab === 'script' && (
-          <div className="p-3 space-y-2">
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {script.length === 0 && (
-              <div className="text-center py-8 text-gray-600 text-sm">
-                No script lines yet. Add one below.
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
+                No lines yet — add one below.
               </div>
             )}
             {script.map((line, idx) => {
@@ -888,152 +922,197 @@ const PhoneConvoStudio: React.FC = () => {
               const c = dev ? ORB_COLORS[dev.orbColor] : null;
               const isCurrentLine = isPlaying && idx === currentSegIdx;
               return (
-                <div
-                  key={line.id}
-                  className="rounded-xl overflow-hidden border transition-all"
-                  style={{
-                    borderColor: isCurrentLine && c ? c.mid + '60' : 'rgba(255,255,255,0.07)',
-                    background: isCurrentLine && c ? `${c.glow.replace('0.7)', '0.06)')}` : 'rgba(255,255,255,0.03)',
-                  }}
-                >
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.05]">
-                    {/* Device picker */}
+                <div key={line.id} style={{
+                  borderRadius: 12,
+                  border: `1px solid ${isCurrentLine && c ? c.mid + '50' : 'rgba(255,255,255,0.07)'}`,
+                  background: isCurrentLine && c ? c.glow.replace('0.8)', '0.06)') : 'rgba(255,255,255,0.025)',
+                  overflow: 'hidden', transition: 'border-color 0.2s',
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  }}>
+                    {/* Color dot */}
+                    {c && <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.mid, flexShrink: 0 }} />}
                     <select
                       value={line.deviceId}
                       onChange={e => updateLine(line.id, { deviceId: e.target.value })}
-                      className="bg-transparent text-xs font-semibold border-none outline-none cursor-pointer"
-                      style={{ color: c ? c.inner : '#fff', maxWidth: '120px' }}
+                      style={{
+                        background: 'transparent', border: 'none', outline: 'none',
+                        color: c ? c.inner : '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        maxWidth: 120,
+                      }}
                     >
-                      {devices.map(d => (
-                        <option key={d.id} value={d.id} style={{ background: '#111', color: '#fff' }}>
-                          {d.name}
-                        </option>
-                      ))}
+                      {devices.map(d => <option key={d.id} value={d.id} style={{ background: '#111', color: '#fff' }}>{d.name}</option>)}
                     </select>
-                    <div className="flex-1" />
-                    {/* Duration */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-gray-600">Duration:</span>
-                      <input
-                        type="number"
-                        value={line.duration}
-                        min={1}
-                        max={30}
-                        onChange={e => updateLine(line.id, { duration: Math.max(1, Number(e.target.value)) })}
-                        className="w-10 bg-white/[0.06] rounded px-1.5 py-0.5 text-xs text-center text-white border border-white/10 outline-none"
-                      />
-                      <span className="text-[10px] text-gray-600">s</span>
-                    </div>
+                    <div style={{ flex: 1 }} />
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Duration:</span>
+                    <input
+                      type="number" value={line.duration} min={1} max={30}
+                      onChange={e => updateLine(line.id, { duration: Math.max(1, +e.target.value) })}
+                      style={{
+                        width: 38, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 6, padding: '2px 6px', color: '#fff', fontSize: 12, textAlign: 'center',
+                        outline: 'none',
+                      }}
+                    />
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>s</span>
                     <button
                       onClick={() => deleteLine(line.id)}
-                      className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'rgba(255,255,255,0.3)', padding: 4, borderRadius: 6,
+                        display: 'flex', alignItems: 'center',
+                      }}
+                    ><Trash2 size={13} /></button>
                   </div>
                   <textarea
                     value={line.text}
                     onChange={e => updateLine(line.id, { text: e.target.value })}
-                    placeholder="Enter dialogue..."
+                    placeholder="Enter dialogue here..."
                     rows={2}
-                    className="w-full bg-transparent px-3 py-2 text-sm text-gray-200 placeholder-gray-700 resize-none outline-none"
+                    style={{
+                      width: '100%', background: 'transparent', border: 'none', outline: 'none',
+                      color: '#e0e0e0', fontSize: 13, padding: '8px 10px', resize: 'none',
+                      fontFamily: 'inherit', lineHeight: 1.45,
+                      boxSizing: 'border-box',
+                    }}
                   />
                 </div>
               );
             })}
             <button
               onClick={addLine}
-              className="w-full py-3 rounded-xl border border-dashed border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 text-gray-600 hover:text-gray-400 text-sm font-medium flex items-center justify-center gap-2 transition-all"
+              style={{
+                width: '100%', padding: '12px', borderRadius: 12,
+                border: '1px dashed rgba(255,255,255,0.1)', background: 'none',
+                color: 'rgba(255,255,255,0.35)', fontSize: 13, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                fontFamily: 'inherit',
+              }}
             >
               <Plus size={15} /> Add Line
             </button>
           </div>
         )}
 
-        {/* ── Devices Tab ────────────────────────────────────────────────── */}
+        {/* Devices */}
         {activeTab === 'devices' && (
-          <div className="p-3 space-y-3">
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {/* Toggles */}
-            <div className="flex items-center gap-3 pb-2 border-b border-white/[0.06]">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div
-                  onClick={() => setShowSubtitles(p => !p)}
-                  className={`w-9 h-5 rounded-full transition-all relative ${showSubtitles ? 'bg-purple-600' : 'bg-white/10'}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${showSubtitles ? 'left-4' : 'left-0.5'}`} />
-                </div>
-                <span className="text-xs text-gray-400">Subtitles</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div
-                  onClick={() => setShowNames(p => !p)}
-                  className={`w-9 h-5 rounded-full transition-all relative ${showNames ? 'bg-purple-600' : 'bg-white/10'}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${showNames ? 'left-4' : 'left-0.5'}`} />
-                </div>
-                <span className="text-xs text-gray-400">Names</span>
-              </label>
+            <div style={{
+              display: 'flex', gap: 12, paddingBottom: 10,
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              {[
+                { label: 'Subtitles', val: showSubtitles, toggle: () => setShowSubtitles(p => !p) },
+                { label: 'Names', val: showNames, toggle: () => setShowNames(p => !p) },
+              ].map(item => (
+                <label key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <div
+                    onClick={item.toggle}
+                    style={{
+                      width: 36, height: 20, borderRadius: 50, position: 'relative',
+                      background: item.val ? '#a855f7' : 'rgba(255,255,255,0.1)',
+                      transition: 'background 0.2s', cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                      left: item.val ? 18 : 2,
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{item.label}</span>
+                </label>
+              ))}
             </div>
 
-            {devices.map(device => (
-              <div key={device.id} className="bg-white/[0.03] rounded-xl border border-white/[0.07] overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.05]">
-                  <input
-                    value={device.name}
-                    onChange={e => updateDevice(device.id, { name: e.target.value })}
-                    className="flex-1 bg-transparent text-sm font-semibold text-white outline-none border-none placeholder-gray-600"
-                    placeholder="Device name"
-                  />
-                  <button
-                    onClick={() => removeDevice(device.id)}
-                    className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-                <div className="p-3 grid grid-cols-2 gap-3">
-                  {/* Phone Style */}
-                  <div>
-                    <label className="text-[10px] text-gray-600 uppercase tracking-wider block mb-1.5">Phone Style</label>
-                    <select
-                      value={device.phoneStyle}
-                      onChange={e => updateDevice(device.id, { phoneStyle: e.target.value as PhoneStyle })}
-                      className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
-                    >
-                      {Object.entries(PHONE_STYLES).map(([key, val]) => (
-                        <option key={key} value={key} style={{ background: '#111' }}>{val.label}</option>
-                      ))}
-                    </select>
+            {devices.map(device => {
+              const ps = PHONE_STYLES[device.phoneStyle];
+              return (
+                <div key={device.id} style={{
+                  borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.025)', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  }}>
+                    <div style={{
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: ORB_COLORS[device.orbColor].mid, flexShrink: 0,
+                    }} />
+                    <input
+                      value={device.name}
+                      onChange={e => updateDevice(device.id, { name: e.target.value })}
+                      style={{
+                        flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                        color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                      }}
+                      placeholder="Device name"
+                    />
+                    <button
+                      onClick={() => removeDevice(device.id)}
+                      style={{
+                        background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+                        cursor: 'pointer', padding: 4, borderRadius: 6, display: 'flex',
+                      }}
+                    ><X size={13} /></button>
                   </div>
-                  {/* Orb Color */}
-                  <div>
-                    <label className="text-[10px] text-gray-600 uppercase tracking-wider block mb-1.5">Orb Color</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(Object.keys(ORB_COLORS) as OrbColor[]).map(colorKey => (
-                        <button
-                          key={colorKey}
-                          onClick={() => updateDevice(device.id, { orbColor: colorKey })}
-                          className="w-6 h-6 rounded-full transition-all"
-                          style={{
-                            background: ORB_COLORS[colorKey].mid,
-                            boxShadow: device.orbColor === colorKey
-                              ? `0 0 0 2px #fff, 0 0 0 3px ${ORB_COLORS[colorKey].mid}`
-                              : 'none',
-                            transform: device.orbColor === colorKey ? 'scale(1.1)' : 'scale(1)',
-                          }}
-                          title={colorKey}
-                        />
-                      ))}
+                  <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Phone Style</div>
+                      <select
+                        value={device.phoneStyle}
+                        onChange={e => updateDevice(device.id, { phoneStyle: e.target.value as PhoneStyle })}
+                        style={{
+                          width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: 12,
+                          outline: 'none', fontFamily: 'inherit',
+                        }}
+                      >
+                        {Object.entries(PHONE_STYLES).map(([k, v]) => (
+                          <option key={k} value={k} style={{ background: '#111' }}>{v.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Orb Color</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {(Object.keys(ORB_COLORS) as OrbColor[]).map(k => (
+                          <div
+                            key={k}
+                            onClick={() => updateDevice(device.id, { orbColor: k })}
+                            style={{
+                              width: 22, height: 22, borderRadius: '50%', cursor: 'pointer',
+                              background: ORB_COLORS[k].mid,
+                              boxShadow: device.orbColor === k
+                                ? `0 0 0 2px #050505, 0 0 0 3.5px ${ORB_COLORS[k].mid}`
+                                : 'none',
+                              transform: device.orbColor === k ? 'scale(1.15)' : 'scale(1)',
+                              transition: 'all 0.15s',
+                            }}
+                            title={k}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {devices.length < 4 && (
               <button
                 onClick={addDevice}
-                className="w-full py-3 rounded-xl border border-dashed border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 text-gray-600 hover:text-gray-400 text-sm font-medium flex items-center justify-center gap-2 transition-all"
+                style={{
+                  width: '100%', padding: 12, borderRadius: 12,
+                  border: '1px dashed rgba(255,255,255,0.1)', background: 'none',
+                  color: 'rgba(255,255,255,0.35)', fontSize: 13, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  fontFamily: 'inherit',
+                }}
               >
                 <Plus size={15} /> Add Device ({devices.length}/4)
               </button>
@@ -1041,86 +1120,116 @@ const PhoneConvoStudio: React.FC = () => {
           </div>
         )}
 
-        {/* ── Background Tab ─────────────────────────────────────────────── */}
+        {/* Background */}
         {activeTab === 'background' && (
-          <div className="p-3">
-            <div className="grid grid-cols-2 gap-2">
+          <div style={{ padding: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {(Object.entries(BG_PRESETS) as [BgPreset, typeof BG_PRESETS[BgPreset]][]).map(([key, val]) => (
-                <button
+                <div
                   key={key}
                   onClick={() => setBgPreset(key)}
-                  className="relative rounded-xl overflow-hidden border-2 transition-all active:scale-95 aspect-video"
                   style={{
-                    borderColor: bgPreset === key ? '#a855f7' : 'rgba(255,255,255,0.07)',
-                    background: val.value,
+                    position: 'relative', borderRadius: 12, overflow: 'hidden',
+                    aspectRatio: '16/9', cursor: 'pointer',
+                    background: val.css,
+                    border: `2px solid ${bgPreset === key ? '#a855f7' : 'rgba(255,255,255,0.07)'}`,
+                    transition: 'border-color 0.15s',
                   }}
                 >
                   {bgPreset === key && (
-                    <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                    <div style={{
+                      position: 'absolute', top: 6, right: 6,
+                      width: 18, height: 18, borderRadius: '50%', background: '#a855f7',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
                       <Check size={11} />
                     </div>
                   )}
-                  <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
-                    <span className="text-xs font-medium text-white">{val.label}</span>
+                  <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    padding: '6px 8px',
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{val.label}</span>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ── Export Tab ─────────────────────────────────────────────────── */}
+        {/* Export */}
         {activeTab === 'export' && (
-          <div className="p-4 space-y-4">
-            <div className="bg-white/[0.03] rounded-xl border border-white/[0.07] p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-white">Export Settings</h3>
-              <div>
-                <label className="text-[11px] text-gray-500 uppercase tracking-wider block mb-2">Resolution</label>
-                <div className="flex gap-2">
-                  {(['720p', '1080p'] as const).map(res => (
-                    <button
-                      key={res}
-                      onClick={() => setExportResolution(res)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
-                        exportResolution === res
-                          ? 'bg-purple-600/20 border-purple-500 text-white'
-                          : 'bg-white/[0.04] border-white/10 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {res} {res === '720p' ? '(1280×720)' : '(1920×1080)'}
-                    </button>
-                  ))}
-                </div>
+          <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{
+              borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.025)', padding: 14,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 12 }}>Export Settings</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Resolution (16:9)</div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                {(['720p', '1080p'] as const).map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setExportRes(r)}
+                    style={{
+                      flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 12,
+                      border: `1px solid ${exportRes === r ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
+                      background: exportRes === r ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.04)',
+                      color: exportRes === r ? '#fff' : 'rgba(255,255,255,0.5)',
+                      cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+                    }}
+                  >
+                    {r} {r === '720p' ? '· 1280×720' : '· 1920×1080'}
+                  </button>
+                ))}
               </div>
-              <div className="text-xs text-gray-600 space-y-1">
-                <p>• Format: WebM (plays in all browsers)</p>
-                <p>• Duration: {totalDuration}s total</p>
-                <p>• {devices.length} device{devices.length > 1 ? 's' : ''}, {script.length} lines</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[
+                  `Format: WebM (VP9)`,
+                  `Duration: ${totalDuration}s`,
+                  `${devices.length} device${devices.length > 1 ? 's' : ''}, ${script.length} script lines`,
+                ].map(t => (
+                  <div key={t} style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: '#a855f7' }}>•</span> {t}
+                  </div>
+                ))}
               </div>
             </div>
 
             {isExporting ? (
-              <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-purple-300 font-medium">Exporting video…</span>
-                  <span className="text-purple-400">{exportProgress}%</span>
+              <div style={{
+                borderRadius: 14, border: '1px solid rgba(168,85,247,0.2)',
+                background: 'rgba(168,85,247,0.08)', padding: 14,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                  <span style={{ color: '#c084fc', fontWeight: 600 }}>Exporting…</span>
+                  <span style={{ color: '#a855f7' }}>{exportProgress}%</span>
                 </div>
-                <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-purple-600 to-blue-500 transition-none"
-                    style={{ width: `${exportProgress}%` }}
-                  />
+                <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 4,
+                    width: `${exportProgress}%`,
+                    background: 'linear-gradient(90deg,#a855f7,#3b82f6)', transition: 'none',
+                  }} />
                 </div>
-                <p className="text-xs text-gray-500">Rendering frames to canvas…</p>
+                <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Rendering frames to canvas…</div>
               </div>
             ) : (
               <button
                 onClick={handleExport}
-                disabled={script.length === 0}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 shadow-lg shadow-purple-900/30"
+                disabled={!script.length}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: 14,
+                  background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+                  border: 'none', color: '#fff', fontWeight: 700, fontSize: 14,
+                  cursor: script.length ? 'pointer' : 'default',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  fontFamily: 'inherit', opacity: script.length ? 1 : 0.4,
+                  boxShadow: '0 8px 24px rgba(124,58,237,0.3)',
+                }}
               >
-                <Download size={16} />
-                Export Video ({exportResolution})
+                <Download size={17} /> Export Video ({exportRes})
               </button>
             )}
           </div>
