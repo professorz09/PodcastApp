@@ -115,7 +115,9 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [currentTime, setCurrentTime] = useState(0);
 
   // Audio playback
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioCtxRef    = useRef<AudioContext | null>(null);
+  // Pre-fetched raw ArrayBuffer cache (keyed by URL) so play starts instantly
+  const audioCacheRef  = useRef<Map<string, ArrayBuffer>>(new Map());
 
   // Export
   const [exporting, setExporting]       = useState(false);
@@ -190,6 +192,18 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     rendererRef.current?.updateState(buildState());
   }, [buildState]);
 
+  // ── Pre-fetch audio into cache whenever script changes ────────────────────
+  useEffect(() => {
+    const urls = script.map(t => t.audioUrl).filter((u): u is string => !!u);
+    urls.forEach(url => {
+      if (audioCacheRef.current.has(url)) return; // already cached
+      fetch(url)
+        .then(r => r.arrayBuffer())
+        .then(ab => { audioCacheRef.current.set(url, ab); })
+        .catch(() => {});
+    });
+  }, [script]);
+
   // ── Playback ──────────────────────────────────────────────────────────────
 
   const togglePlay = async () => {
@@ -210,11 +224,16 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     // Capture seek position BEFORE async fetch
     const startMs = r.currentTime;
 
+    // Use pre-fetched cache → decode only (no network wait) → instant start
     const buffers = await Promise.all(
-      script.map(t => t.audioUrl
-        ? fetch(t.audioUrl).then(res => res.arrayBuffer()).then(b => actx.decodeAudioData(b)).catch(() => null)
-        : Promise.resolve(null)
-      )
+      script.map(t => {
+        if (!t.audioUrl) return Promise.resolve(null);
+        const cached = audioCacheRef.current.get(t.audioUrl);
+        const abPromise = cached
+          ? Promise.resolve(cached.slice(0)) // slice = copy (decodeAudioData transfers/detaches)
+          : fetch(t.audioUrl).then(res => res.arrayBuffer());
+        return abPromise.then(ab => actx.decodeAudioData(ab)).catch(() => null);
+      })
     );
     if (audioCtxRef.current !== actx) return; // cancelled
 
@@ -462,13 +481,16 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
             return (
               <button
                 key={item.id}
-                onClick={() => seek(item.start)}
+                onClick={() => { if (!isPlaying) seek(item.start); }}
+                disabled={isPlaying}
                 style={{
                   flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  width: 44, padding: '5px 4px', borderRadius: 10, cursor: 'pointer',
+                  width: 44, padding: '5px 4px', borderRadius: 10,
+                  cursor: isPlaying ? 'default' : 'pointer',
                   border: `1px solid ${active ? item.color + '70' : 'rgba(255,255,255,0.05)'}`,
                   background: active ? item.color + '18' : 'rgba(255,255,255,0.03)',
                   position: 'relative', transition: 'all 0.15s',
+                  opacity: isPlaying && !active ? 0.4 : 1,
                 }}
               >
                 {active && <div style={{ position: 'absolute', top: -2, right: -2, width: 7, height: 7, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />}
