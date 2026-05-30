@@ -31,11 +31,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
   const steps = [
     { id: AppState.VIDEO_CLIP_IMPORT, label: 'Clip Generator', icon: Scissors, optional: true },
     { id: AppState.IMPORT,            label: 'Import Content', icon: FolderDown, optional: true },
-    { id: AppState.PHONE_STUDIO,      label: 'Phone Studio',   icon: MonitorSmartphone, optional: true },
     { id: AppState.INPUT,             label: 'Generate',       icon: Mic2 },
     { id: AppState.SCRIPT,            label: 'Script Editor',  icon: FileText },
     { id: AppState.THUMBNAIL,         label: 'Thumbnail',      icon: Image },
     { id: AppState.AUDIO,             label: 'Voice Gen',      icon: Wand2 },
+    { id: AppState.PHONE_STUDIO,      label: 'Phone Studio',   icon: MonitorSmartphone, optional: true },
     { id: AppState.VISUALIZER,        label: 'Video',          icon: Video },
     { id: AppState.STORYBOARD,        label: 'Storyboard',     icon: Film },
     { id: AppState.SHORTS,            label: 'Shorts',         icon: Smartphone },
