@@ -151,38 +151,61 @@ async function startServer() {
         }
       }
 
-      // ── Fall back to v1p1beta1 (works with API key, no project ID needed) ──
-      console.log('Using Google STT v1p1beta1');
-      let config: any = {
-        languageCode,
-        enableWordTimeOffsets: true,
-        model: 'latest_long',
-        useEnhanced: true,
+      // ── Try v1p1beta1, then fall back to plain v1 ───────────────────────
+      const buildConfig = (enhanced: boolean) => {
+        const cfg: any = { languageCode, enableWordTimeOffsets: true };
+        if (enhanced) { cfg.model = 'latest_long'; cfg.useEnhanced = true; }
+        if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3') {
+          cfg.encoding = 'MP3'; cfg.sampleRateHertz = sampleRate || 44100;
+        } else if (mimeType === 'audio/wav') {
+          cfg.encoding = 'LINEAR16'; // omit sampleRateHertz — let Google read WAV header
+        } else if (sampleRate) {
+          cfg.sampleRateHertz = sampleRate;
+        }
+        return cfg;
       };
 
-      if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3') {
-        config.encoding = 'MP3';
-        config.sampleRateHertz = sampleRate || 44100;
-      } else if (mimeType === 'audio/wav') {
-        config.encoding = 'LINEAR16';
-        // omit sampleRateHertz — let Google read WAV header
-      } else if (sampleRate) {
-        config.sampleRateHertz = sampleRate;
+      const versions = [
+        { label: 'v1p1beta1', base: 'https://speech.googleapis.com/v1p1beta1', enhanced: true  },
+        { label: 'v1',        base: 'https://speech.googleapis.com/v1',        enhanced: false },
+      ];
+
+      let lastErr: Error | null = null;
+      for (const ver of versions) {
+        try {
+          console.log(`Trying Google STT ${ver.label}`);
+          const config = buildConfig(ver.enhanced);
+          const url = `${ver.base}/speech:recognize?key=${apiKey}`;
+          const data = await callGoogleSTT(url, { config, audio: { content: audioContent } });
+
+          // Handle "too long" → long-running
+          if (data.error?.message?.includes('too long') || data.error?.message?.includes('duration limit')) {
+            const lrUrl = `${ver.base}/speech:longrunningrecognize?key=${apiKey}`;
+            const lrData = await callGoogleSTT(lrUrl, { config, audio: { content: audioContent } });
+            console.log('Long-running operation started:', lrData.name);
+            return res.json({ operationName: lrData.name });
+          }
+
+          return res.json(data);
+        } catch (verErr: any) {
+          console.warn(`STT ${ver.label} failed:`, verErr.message);
+          lastErr = verErr;
+          // If it's a key-restriction or API-disabled error, no point retrying other versions
+          if (verErr.message?.includes('disabled') || verErr.message?.includes('blocked')) break;
+        }
       }
 
-      const v1Url = `https://speech.googleapis.com/v1p1beta1/speech:recognize?key=${apiKey}`;
-      let data = await callGoogleSTT(v1Url, { config, audio: { content: audioContent } });
-
-      // Handle "too long" → long-running operation
-      if (data.error?.message?.includes('too long') || data.error?.message?.includes('duration limit')) {
-        console.log('Audio too long for sync — starting longrunningrecognize');
-        const lrUrl = `https://speech.googleapis.com/v1p1beta1/speech:longrunningrecognize?key=${apiKey}`;
-        const lrData = await callGoogleSTT(lrUrl, { config, audio: { content: audioContent } });
-        console.log('Long-running operation started:', lrData.name);
-        return res.json({ operationName: lrData.name });
+      // Build a helpful error with fix instructions
+      const rawMsg = lastErr?.message || 'Failed to transcribe audio';
+      let helpMsg = rawMsg;
+      if (rawMsg.includes('blocked') || rawMsg.includes('API restrictions')) {
+        helpMsg = `${rawMsg} — Fix: Go to console.cloud.google.com/apis/credentials → edit your API key → API restrictions → add "Cloud Speech-to-Text API"`;
+      } else if (rawMsg.includes('disabled') || rawMsg.includes('has not been used')) {
+        helpMsg = `${rawMsg} — Fix: Go to console.developers.google.com/apis/api/speech.googleapis.com/overview and click Enable`;
+      } else if (rawMsg.includes('billing') || rawMsg.includes('quota')) {
+        helpMsg = `${rawMsg} — Fix: Enable billing for your Google Cloud project at console.cloud.google.com/billing`;
       }
-
-      res.json(data);
+      throw new Error(helpMsg);
     } catch (error: any) {
       console.error('Google Speech API Error:', error.message);
       res.status(500).json({ error: error.message || 'Failed to transcribe audio' });
