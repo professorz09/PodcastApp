@@ -157,8 +157,10 @@ const App: React.FC = () => {
           config.language,
           config.includeNarrator,
         );
+        if (!generatedScript.length) throw new Error('Phone Studio: Script generate nahi hua — dobara try karo.');
         setScript(generatedScript);
-        setAppState(AppState.PHONE_STUDIO);
+        setScriptStyle('phone_studio');
+        setAppState(AppState.SCRIPT);
         return;
       }
 
@@ -203,6 +205,7 @@ const App: React.FC = () => {
           config.speakerNames, config.specificDetails, config.youtubeUrl,
           config.commentsFileContent
         );
+        if (!generatedScript.length) throw new Error('Script generate nahi hua — Gemini ne empty response diya. Dobara try karo ya alag topic use karo.');
         setScript(generatedScript);
       }
       // Clear stale thumbnail titles/combos whenever a new script is generated

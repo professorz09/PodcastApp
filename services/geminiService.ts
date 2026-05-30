@@ -3912,8 +3912,9 @@ Use those labels as speaker names throughout.`;
       }
     });
 
-    let jsonText = response.text || "[]";
+    let jsonText = response.text || "";
     jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+    if (!jsonText) throw new Error("Gemini ne empty response diya — content safety filter ya API issue. Dobara try karo.");
     let rawSegments: any[];
 
     const tryParseScript = (raw: string): any[] => {
