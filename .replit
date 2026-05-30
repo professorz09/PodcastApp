@@ -61,3 +61,10 @@ externalPort = 3000
 deploymentTarget = "vm"
 run = ["bash", "start.sh"]
 build = ["npm", "run", "build"]
+
+[userenv]
+
+[userenv.shared]
+CLAUDE_CODE_USE_FOUNDRY = "1"
+ANTHROPIC_FOUNDRY_BASE_URL = "https://claudeopus67-resource.services.ai.azure.com/anthropic"
+ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-4-7"
