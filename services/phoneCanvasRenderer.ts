@@ -36,6 +36,7 @@ export interface StudioState {
   deviceScale?: number;
   startTime?: string;
   deviceBattery?: string;
+  bgImageUrl?: string;
   subtitleConfig?: {
     enabled: boolean;
     size: number;
@@ -57,6 +58,7 @@ export class CanvasRenderer {
   private wallStart = 0;
 
   private voiceIntensities: Record<string, number> = {};
+  private bgImageCache: Map<string, HTMLImageElement> = new Map();
 
   public onTimeUpdate?: (t: number) => void;
   public onComplete?: () => void;
@@ -115,17 +117,36 @@ export class CanvasRenderer {
     const { ctx, canvas, state, currentTime } = this;
     const w = canvas.width, h = canvas.height;
 
-    // Background
-    const bgVal = state.background.value || '#0f172a';
-    if (bgVal.startsWith('linear:')) {
-      const colors = bgVal.substring(7).split(',');
-      const grad = ctx.createLinearGradient(0, 0, w, h);
-      colors.forEach((c, i) => grad.addColorStop(i / Math.max(1, colors.length - 1), c.trim()));
-      ctx.fillStyle = grad;
+    // ── Background ────────────────────────────────────────────────────────
+    if (state.bgImageUrl) {
+      let img = this.bgImageCache.get(state.bgImageUrl);
+      if (!img) {
+        const newImg = new Image();
+        newImg.crossOrigin = 'anonymous';
+        newImg.onload = () => {
+          this.bgImageCache.set(state.bgImageUrl!, newImg);
+          if (!this.playing) this.drawFrame();
+        };
+        newImg.src = state.bgImageUrl;
+        ctx.fillStyle = '#111'; ctx.fillRect(0, 0, w, h);
+      } else {
+        // Cover fit — fill canvas preserving aspect ratio
+        const scl = Math.max(w / img.width, h / img.height);
+        const dw = img.width * scl, dh = img.height * scl;
+        ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+      }
     } else {
-      ctx.fillStyle = bgVal;
+      const bgVal = state.background.value || '#0f172a';
+      if (bgVal.startsWith('linear:')) {
+        const colors = bgVal.substring(7).split(',');
+        const grad = ctx.createLinearGradient(0, 0, w, h);
+        colors.forEach((c, i) => grad.addColorStop(i / Math.max(1, colors.length - 1), c.trim()));
+        ctx.fillStyle = grad;
+      } else {
+        ctx.fillStyle = bgVal;
+      }
+      ctx.fillRect(0, 0, w, h);
     }
-    ctx.fillRect(0, 0, w, h);
 
     const phones = state.phones;
 
@@ -272,7 +293,7 @@ export class CanvasRenderer {
 
     // ── Outer glow when SPEAKING ──────────────────────────────────────────
     if (isActive) {
-      const pulse = 0.55 + Math.sin(performance.now() / 350) * 0.2;
+      const pulse = 0.55 + Math.sin(this.currentTime / 350) * 0.2;
       ctx.shadowColor = phone.color;
       ctx.shadowBlur = w * 0.18;
       ctx.strokeStyle = phone.color;
@@ -398,7 +419,7 @@ export class CanvasRenderer {
     const textX = cx + sw * 0.028;
     if (isActive) {
       // Pulsing colored dot
-      const dotPulse = 0.7 + Math.sin(performance.now() / 220) * 0.3;
+      const dotPulse = 0.7 + Math.sin(this.currentTime / 220) * 0.3;
       ctx.fillStyle = phone.color;
       ctx.shadowColor = phone.color;
       ctx.shadowBlur = sw * 0.04 * dotPulse;
@@ -425,12 +446,12 @@ export class CanvasRenderer {
     // Voice intensity (smoothed)
     let volt = this.voiceIntensities[phone.id] ?? 0;
     if (isActive) {
-      const t = performance.now() / 150;
+      const t = this.currentTime / 150;
       const raw = (Math.sin(t) + Math.sin(t * 1.5 + 2) + Math.random() * 0.5) / 2.5;
       const target = Math.max(0.3, Math.min(1.2, 0.5 + raw * 0.5));
       volt += (target - volt) * 0.22;
     } else if (hasActive) {
-      const t = performance.now() / 1000;
+      const t = this.currentTime / 1000;
       volt += (0.07 + Math.sin(t) * 0.035 - volt) * 0.1;
     } else {
       volt += (0 - volt) * 0.08;
@@ -460,7 +481,7 @@ export class CanvasRenderer {
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.rect(sx, cy - sh * 0.2, sw, sh * 0.7); ctx.fill();
 
-      const t = performance.now() / 1000;
+      const t = this.currentTime / 1000;
       ctx.fillStyle = phone.color;
       ctx.globalAlpha = 0.35 * volt;
       for (let i = 0; i < 3; i++) {
@@ -472,7 +493,7 @@ export class CanvasRenderer {
       ctx.globalAlpha = 1;
 
     } else if (phone.style === 'wave') {
-      const t = performance.now() / 200;
+      const t = this.currentTime / 200;
       ctx.strokeStyle = phone.color;
       ctx.lineWidth = sw * 0.032;
       ctx.lineCap = 'round';
@@ -486,7 +507,7 @@ export class CanvasRenderer {
       }
 
     } else if (phone.style === 'cosmic-sphere') {
-      const t = performance.now() / 1000;
+      const t = this.currentTime / 1000;
       const radius = sw * 0.27 + volt * sw * 0.13;
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
@@ -512,7 +533,7 @@ export class CanvasRenderer {
       ctx.restore();
 
     } else if (phone.style === 'aurora') {
-      const t = performance.now() / 1500;
+      const t = this.currentTime / 1500;
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       for (let i = 0; i < 4; i++) {
@@ -528,7 +549,7 @@ export class CanvasRenderer {
 
     } else if (phone.style === 'gemini') {
       // ── Gemini-style: large gradient sphere + ripple rings when speaking ─
-      const t = performance.now() / 1200;
+      const t = this.currentTime / 1200;
       const baseR  = sw * 0.22;
       const radius = isActive ? baseR + volt * sw * 0.1 : baseR * 0.75;
 
@@ -571,7 +592,7 @@ export class CanvasRenderer {
 
     } else if (phone.style === 'ripple') {
       // ── Ripple: concentric expanding rings from center dot ────────────────
-      const t = performance.now() / 700;
+      const t = this.currentTime / 700;
       const dotR  = sw * 0.04 * (0.85 + volt * 0.3);
       const maxR  = sw * (0.3 + volt * 0.1);
 
@@ -598,7 +619,7 @@ export class CanvasRenderer {
 
     } else if (phone.style === 'neon') {
       // ── Neon: vertical equalizer bars with glow ───────────────────────────
-      const t    = performance.now() / 140;
+      const t    = this.currentTime / 140;
       const bars = 9;
       const bw   = sw * 0.028;
       const gap  = sw * 0.072;

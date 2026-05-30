@@ -70,7 +70,7 @@ export const renderVideoOffline = async (
       target: new ArrayBufferTarget(),
       video: { codec: 'avc', width, height },
       audio: { codec: 'aac', sampleRate, numberOfChannels: audioChannels.length },
-      fastStart: false
+      fastStart: 'in-memory'
     });
   }
 

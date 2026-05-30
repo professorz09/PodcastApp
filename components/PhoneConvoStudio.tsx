@@ -57,7 +57,7 @@ const buildPhonesFromSpeakers = (
   speakers: string[],
   existing: PhoneConfig[]
 ): PhoneConfig[] => {
-  const styles: AnimStyle[] = ['gemini', 'ripple', 'cosmic-sphere', 'aurora', 'neon', 'orb', 'wave', 'bottom-glow'];
+  const styles: AnimStyle[] = ['aurora', 'gemini', 'ripple', 'cosmic-sphere', 'neon', 'orb', 'wave', 'bottom-glow'];
   return speakers.map((spk, i) => {
     const existingPhone = existing.find(p => p.id === speakerToPhoneId(spk));
     if (existingPhone) return existingPhone;
@@ -104,7 +104,8 @@ interface Props {
 const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [phones, setPhones]   = useState<PhoneConfig[]>([]);
   const [script, setScript]   = useState<ScriptTurn[]>([]);
-  const [bg, setBg]           = useState('linear:#0a0a12,#12172a');
+  const [bg, setBg]           = useState('#f0f4f8');
+  const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
   const [subtitleBg, setSubtitleBg]           = useState<'dark' | 'light' | 'none'>('dark');
   const [subtitleSize, setSubtitleSize]       = useState(1.0);
@@ -174,6 +175,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     phones,
     script,
     background: { type: 'color', value: bg },
+    bgImageUrl: bgImageUrl ?? undefined,
     deviceSpacing: spacing,
     deviceScale: scale,
     startTime,
@@ -183,7 +185,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       background: subtitleBg,
       textColor: '#ffffff',
     },
-  }), [phones, script, bg, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize]);
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -763,31 +765,70 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
 
             {/* ── Background sub-tab ── */}
             {visualSub === 'background' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {BG_OPTIONS.map(opt => {
-                  const sel = bg === opt.value;
-                  const preview = opt.value.startsWith('linear:')
-                    ? 'linear-gradient(135deg,' + opt.value.slice(7) + ')'
-                    : opt.value;
-                  return (
-                    <div
-                      key={opt.value}
-                      onClick={() => setBg(opt.value)}
-                      style={{
-                        aspectRatio: '16/9', borderRadius: 10, cursor: 'pointer',
-                        background: preview,
-                        border: `2px solid ${sel ? '#ef4444' : 'rgba(255,255,255,0.06)'}`,
-                        position: 'relative', overflow: 'hidden',
-                        transition: 'border-color 0.15s',
-                      }}
-                    >
-                      {sel && <div style={{ position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={11} /></div>}
-                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '5px 7px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{opt.label}</span>
-                      </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                {/* Custom image upload */}
+                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px' }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Custom Image</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                    <div style={{
+                      flex: 1, padding: '8px 12px', borderRadius: 8, border: `1.5px dashed ${bgImageUrl ? '#ef4444' : 'rgba(255,255,255,0.18)'}`,
+                      background: bgImageUrl ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.04)',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      <span style={{ fontSize: 16 }}>🖼️</span>
+                      <span style={{ fontSize: 12, color: bgImageUrl ? '#fca5a5' : 'rgba(255,255,255,0.45)' }}>
+                        {bgImageUrl ? 'Custom image set ✓' : 'Upload background image'}
+                      </span>
                     </div>
-                  );
-                })}
+                    <input
+                      type="file" accept="image/*" style={{ display: 'none' }}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const url = URL.createObjectURL(file);
+                        setBgImageUrl(url);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {bgImageUrl && (
+                    <button
+                      onClick={() => setBgImageUrl(null)}
+                      style={{ marginTop: 6, width: '100%', padding: '5px', borderRadius: 7, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      Remove image
+                    </button>
+                  )}
+                </div>
+
+                {/* Preset colors */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {BG_OPTIONS.map(opt => {
+                    const sel = !bgImageUrl && bg === opt.value;
+                    const preview = opt.value.startsWith('linear:')
+                      ? 'linear-gradient(135deg,' + opt.value.slice(7) + ')'
+                      : opt.value;
+                    return (
+                      <div
+                        key={opt.value}
+                        onClick={() => { setBgImageUrl(null); setBg(opt.value); }}
+                        style={{
+                          aspectRatio: '16/9', borderRadius: 10, cursor: 'pointer',
+                          background: preview,
+                          border: `2px solid ${sel ? '#ef4444' : 'rgba(255,255,255,0.06)'}`,
+                          position: 'relative', overflow: 'hidden',
+                          transition: 'border-color 0.15s',
+                        }}
+                      >
+                        {sel && <div style={{ position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={11} /></div>}
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '5px 7px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{opt.label}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
