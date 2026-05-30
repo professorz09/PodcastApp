@@ -551,51 +551,58 @@ export class CanvasRenderer {
       }
       if (curW.length) lines.push({ text: curW.join(' '), words: [...curW] });
 
-      // ── Find which line is currently active ───────────────────────────
-      // Count total words per line to know which line targetWordFloat falls in
-      let wordCount = 0;
-      let activeLineIdx = lines.length - 1;
-      for (let i = 0; i < lines.length; i++) {
-        const lineEnd = wordCount + lines[i].words.length;
-        if (targetWordFloat < lineEnd) { activeLineIdx = i; break; }
-        wordCount += lines[i].words.length;
+      // ── Group wrapped lines into phrase groups of ≤2 lines ───────────
+      const phraseGroups: { text: string; words: string[] }[][] = [];
+      for (let i = 0; i < lines.length; i += 2)
+        phraseGroups.push(lines.slice(i, i + 2));
+
+      // Find which phrase group the current word falls in
+      let globalStart = 0;
+      let activeGroupIdx = phraseGroups.length - 1;
+      for (let g = 0; g < phraseGroups.length; g++) {
+        const groupWords = phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
+        if (targetWordFloat < globalStart + groupWords) { activeGroupIdx = g; break; }
+        globalStart += groupWords;
       }
 
-      // Only show the ACTIVE line (single line, disappears when next starts)
-      const lh = fontSize * 1.4;
-      const ty = sy + sh * 0.68; // fixed single-line position
+      // globalStart now = index of first word in active group
+      // recalculate properly
+      globalStart = 0;
+      for (let g = 0; g < activeGroupIdx; g++)
+        globalStart += phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
+
+      const activeGroup = phraseGroups[activeGroupIdx] || [];
+      const lh          = fontSize * 1.4;
+
+      // Y: center the group vertically in the lower area
+      const groupH  = activeGroup.length * lh;
+      const ty      = sy + sh * 0.68 - groupH / 2; // 1 line → sh*0.68, 2 lines → a bit higher
 
       const col = subCfg.textColor ?? '#ffffff';
       const rr  = parseInt(col.slice(1, 3), 16) || 255;
       const gg  = parseInt(col.slice(3, 5), 16) || 255;
       const bb  = parseInt(col.slice(5, 7), 16) || 255;
 
-      const activeLine = lines[activeLineIdx];
-      if (activeLine) {
-        // How many words of this line have been "spoken"
-        // globalWordIdx of first word in activeLine
-        let lineStartWordIdx = 0;
-        for (let i = 0; i < activeLineIdx; i++) lineStartWordIdx += lines[i].words.length;
-
-        const lineW   = ctx.measureText(activeLine.text).width;
+      let wordIdxInGroup = globalStart;
+      activeGroup.forEach((line, li) => {
+        const lineW   = ctx.measureText(line.text).width;
         const startTx = cx - lineW / 2;
         let prevText  = '';
 
-        activeLine.words.forEach((w, j) => {
-          const globalIdx = lineStartWordIdx + j;
-          const dist      = targetWordFloat - globalIdx;
-          const alpha     = dist > 0 ? Math.min(1.0, dist * 2.5) : 0;
-
+        line.words.forEach(w => {
+          const dist  = targetWordFloat - wordIdxInGroup;
+          const alpha = dist > 0 ? Math.min(1.0, dist * 2.5) : 0;
           if (alpha > 0.01) {
             const ease    = 1 - Math.pow(1 - alpha, 3);
             const yOffset = (1 - ease) * (sw * 0.02);
             const xOff   = prevText ? ctx.measureText(prevText + ' ').width : 0;
             ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha * 0.95})`;
-            ctx.fillText(w, startTx + xOff, ty + yOffset);
+            ctx.fillText(w, startTx + xOff, ty + li * lh + yOffset);
           }
           prevText += (prevText ? ' ' : '') + w;
+          wordIdxInGroup++;
         });
-      }
+      });
       ctx.textAlign = 'center';
     }
 
