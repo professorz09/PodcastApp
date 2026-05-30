@@ -13,8 +13,8 @@ const Storyboard       = lazy(() => import('./components/Storyboard'));
 const Shorts           = lazy(() => import('./components/Shorts'));
 const LyricsGenerator  = lazy(() => import('./components/LyricsGenerator'));
 const PhoneConvoStudio = lazy(() => import('./components/PhoneConvoStudio'));
-import { generateDebateScript, generateContextBridgeConclusion } from './services/geminiService';
-import type { TranscriptChunk, ShortsSegment } from './services/geminiService';
+import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript } from './services/geminiService';
+import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
 import { Key, ExternalLink, RotateCcw, AlertTriangle, X } from 'lucide-react';
@@ -134,6 +134,34 @@ const App: React.FC = () => {
   const handleGenerateScript = async (config: DebateConfig) => {
     setIsLoading(true);
     try {
+      // ── Phone Studio path ─────────────────────────────────────────────────
+      if (config.style === 'phone_studio') {
+        const phoneStyleMatch = config.specificDetails?.match(/^PHONE_STYLE:(\w+)/);
+        const phoneConvoStyle = ((phoneStyleMatch?.[1]) || 'experts') as PhoneConvoStyle;
+        const phoneDescription = config.specificDetails?.replace(/^PHONE_STYLE:\w+\n---\n?/, '') || '';
+
+        const speakers = (config.speakerNames && config.speakerNames.length >= 2)
+          ? config.speakerNames
+          : config.speakerCount === 3
+            ? ['ChatGPT', 'Gemini', 'Claude']
+            : ['ChatGPT', 'Gemini'];
+
+        const generatedScript = await generatePhoneStudioScript(
+          config.topic || 'AI Discussion',
+          phoneConvoStyle,
+          speakers,
+          config.duration,
+          phoneDescription || undefined,
+          config.contextFileContent,
+          config.model,
+          config.language,
+        );
+        setScript(generatedScript);
+        setAppState(AppState.PHONE_STUDIO);
+        return;
+      }
+
+      // ── Regular debate/video path ─────────────────────────────────────────
       const isContextBridge = config.style === 'context_bridge';
 
       // For context_bridge: run main script + conclusion in parallel

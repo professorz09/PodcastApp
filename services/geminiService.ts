@@ -5924,3 +5924,121 @@ ${lines}`;
       hook: s.hook || '',
     }));
 };
+
+// ─── Phone Studio Script Generator ───────────────────────────────────────────
+
+export type PhoneConvoStyle = 'experts' | 'detailed' | 'funny' | 'sarcastic' | 'debate';
+
+export const generatePhoneStudioScript = async (
+  topic: string,
+  phoneConvoStyle: PhoneConvoStyle,
+  speakers: string[],
+  duration: number,
+  description?: string,
+  contextFileContent?: string,
+  model: string = 'gemini-3.1-flash-lite-preview',
+  language: string = 'English',
+): Promise<DebateSegment[]> => {
+  const targetWords = duration * 150;
+  const isHindi = language.toLowerCase() === 'hindi';
+
+  const styleGuides: Record<PhoneConvoStyle, string> = {
+    experts: isHindi
+      ? 'Expert aur analytical tone. Dono agents deeply knowledgeable hain. Technical terms use karo. Data aur facts cite karo. Ek doosre ki baatein seriously lete hain.'
+      : 'Expert and analytical tone. Both agents are deeply knowledgeable. Use technical terms. Cite data and facts. Take each other\'s points seriously.',
+    detailed: isHindi
+      ? 'Thorough aur methodical. Har point ko detail mein explain karo. Step-by-step breakdown. Koi bhi angle miss mat karo.'
+      : 'Thorough and methodical. Explain each point in detail. Step-by-step breakdown. Cover every angle.',
+    funny: isHindi
+      ? 'Humorous aur witty tone. Jokes aur analogies use karo. Light-hearted banter. Funny examples dena. Entertainment bhi, information bhi.'
+      : 'Humorous and witty tone. Use jokes and analogies. Light-hearted banter. Funny examples. Entertaining yet informative.',
+    sarcastic: isHindi
+      ? 'Sarcastic aur edgy tone. Snarky comments. Backhanded compliments. Eye-roll worthy observations. But still informative.'
+      : 'Sarcastic and edgy tone. Snarky comments. Backhanded compliments. Eye-roll worthy observations. Still informative.',
+    debate: isHindi
+      ? 'Argumentative tone. Dono agents disagree karte hain. Challenge karo ek doosre ko. Strong opposing views rakhna. Heated but logical.'
+      : 'Argumentative tone. Agents actively disagree. Challenge each other. Strong opposing views. Heated but logical.',
+  };
+
+  const contextSection = [
+    description && `${isHindi ? 'विवरण' : 'Description'}: ${description}`,
+    contextFileContent && `${isHindi ? 'संदर्भ सामग्री' : 'Reference Material'}:\n${contextFileContent.slice(0, 4000)}`,
+  ].filter(Boolean).join('\n\n');
+
+  const speakerList = speakers.length >= 2
+    ? speakers.join(', ')
+    : speakers.length === 1
+      ? `${speakers[0]} and another AI agent`
+      : 'Agent A and Agent B';
+
+  const prompt = isHindi ? `
+तुम एक phone conversation script बना रहे हो जिसमें AI agents आपस में बात कर रहे हैं।
+
+Speakers: ${speakerList}
+Topic: "${topic}"
+${contextSection ? `\n${contextSection}\n` : ''}
+Conversation Style: ${styleGuides[phoneConvoStyle]}
+Target Duration: ${duration} minutes (~${targetWords} words total)
+
+एक natural, engaging conversation generate करो जहाँ agents एक दूसरे के points पर react करें।
+बातचीत podcast जैसी होनी चाहिए — agents एक दूसरे को interrupt करें, agree/disagree करें, examples दें।
+
+ONLY valid JSON array return करो, no markdown:
+[
+  {"speaker": "AgentName", "text": "dialogue text here"},
+  ...
+]
+
+Rules:
+- Har turn 2-4 sentences का हो
+- Agents एक दूसरे के नाम लें और points reference करें
+- ${styleGuides[phoneConvoStyle]}
+- Total length ~${targetWords} words
+- At least ${Math.max(6, duration * 3)} turns generate करो
+` : `
+You are creating a phone conversation script between AI agents chatting with each other.
+
+Speakers: ${speakerList}
+Topic: "${topic}"
+${contextSection ? `\n${contextSection}\n` : ''}
+Conversation Style: ${styleGuides[phoneConvoStyle]}
+Target Duration: ${duration} minutes (~${targetWords} words total)
+
+Generate a natural, engaging conversation where agents react to each other's points.
+It should feel like a podcast — agents interrupt each other, agree/disagree, give examples.
+
+Return ONLY a valid JSON array, no markdown:
+[
+  {"speaker": "AgentName", "text": "dialogue text here"},
+  ...
+]
+
+Rules:
+- Each turn 2-4 sentences
+- Agents reference each other by name and build on points
+- ${styleGuides[phoneConvoStyle]}
+- Total length ~${targetWords} words
+- Generate at least ${Math.max(6, duration * 3)} turns
+`;
+
+  const data = await callGemini(model, [{ role: 'user', parts: [{ text: prompt }] }]);
+  const raw: string = data.text ?? data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const jsonStr = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+  let parsed: { speaker: string; text: string }[];
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    const m = jsonStr.match(/\[[\s\S]*\]/);
+    if (!m) throw new Error('Phone Studio: AI response was not valid JSON');
+    parsed = JSON.parse(m[0]);
+  }
+
+  if (!Array.isArray(parsed)) throw new Error('Phone Studio: Expected JSON array');
+
+  return parsed.map((item, i) => ({
+    id: `phone-${Date.now()}-${i}`,
+    speaker: item.speaker || speakers[i % speakers.length] || 'Agent',
+    text: item.text || '',
+  }));
+};

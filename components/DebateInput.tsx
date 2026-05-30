@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { toast } from './Toast';
 import { DebateConfig } from '../types';
-import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Zap, Brain, Activity, Video, BookOpen } from 'lucide-react';
+import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Zap, Brain, Activity, Video, BookOpen, Smartphone, Link2 } from 'lucide-react';
+import type { PhoneConvoStyle } from '../services/geminiService';
 import IntroVideoMaker from './IntroVideoMaker';
 
 interface DebateInputProps {
@@ -22,7 +23,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   initialCommentsFileName,
 }) => {
   const [showIntroMaker, setShowIntroMaker] = useState(false);
-  const [mode, setMode] = useState<'topic' | 'script' | 'youtube'>('topic');
+  const [mode, setMode] = useState<'topic' | 'script' | 'youtube' | 'phone'>('topic');
   const [topic, setTopic] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [specificDetails, setSpecificDetails] = useState('');
@@ -45,6 +46,15 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
   const [speakerNames, setSpeakerNames] = useState<string[]>(['', '', '', '']);
 
+  // ── Phone Studio state ──────────────────────────────────────────────────────
+  const [phoneConvoStyle, setPhoneConvoStyle] = useState<PhoneConvoStyle>('experts');
+  const [phoneDescription, setPhoneDescription] = useState('');
+  const [useImportTranscript, setUseImportTranscript] = useState(false);
+  const phoneFileInputRef = useRef<HTMLInputElement>(null);
+  const [phoneFileName, setPhoneFileName] = useState<string | undefined>();
+  const [phoneFileContent, setPhoneFileContent] = useState<string | undefined>();
+  const [isReadingPhoneFile, setIsReadingPhoneFile] = useState(false);
+
   const languages = [
     'English',
     'Hindi'
@@ -52,7 +62,70 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
   const durationOptions = [1, 2, 3, 5, 8, 10, 15, 20, 25, 30, 40, 50];
 
+  const handlePhoneFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhoneFileName(file.name);
+    setIsReadingPhoneFile(true);
+    try {
+      if (file.type === 'application/pdf') {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const tc = await page.getTextContent();
+          fullText += tc.items.map((item: any) => item.str).join(' ') + '\n';
+        }
+        setPhoneFileContent(fullText);
+      } else {
+        setPhoneFileContent(await file.text());
+      }
+    } catch {
+      toast.error('File read nahi hua');
+      setPhoneFileName(undefined);
+    } finally {
+      setIsReadingPhoneFile(false);
+    }
+  };
+
+  const clearPhoneFile = () => {
+    setPhoneFileName(undefined);
+    setPhoneFileContent(undefined);
+    if (phoneFileInputRef.current) phoneFileInputRef.current.value = '';
+  };
+
   const handleSubmit = async () => {
+    // ── Phone Studio mode ──────────────────────────────────────────────────
+    if (mode === 'phone') {
+      const phoneCtx = [
+        useImportTranscript ? (initialContextContent || '') : '',
+        phoneFileContent || '',
+      ].filter(Boolean).join('\n\n---\n\n') || undefined;
+
+      if (!topic.trim() && !phoneDescription.trim() && !phoneCtx) {
+        toast.warning('Topic, context ya file zaroor daalein');
+        return;
+      }
+      const activePhoneSpeakers = speakerNames.slice(0, speakerCount).map(n => n.trim()).filter(Boolean);
+      onGenerate({
+        topic: topic.trim() || 'AI Discussion',
+        specificDetails: `PHONE_STYLE:${phoneConvoStyle}\n---\n${phoneDescription}`,
+        duration,
+        includeNarrator: false,
+        contextFileContent: phoneCtx,
+        model,
+        language,
+        style: 'phone_studio',
+        speakerCount,
+        speakerNames: activePhoneSpeakers.length >= 2 ? activePhoneSpeakers : undefined,
+      });
+      return;
+    }
+
+    // ── Regular modes ─────────────────────────────────────────────────────
     // Filter out empty names or use defaults if needed, but we want auto-detect if empty
     // We pass the names that are filled in.
     const activeNames = speakerNames.slice(0, speakerCount).map(n => n.trim()).filter(n => n);
@@ -186,6 +259,17 @@ const DebateInput: React.FC<DebateInputProps> = ({
             <Activity size={16} className={mode === 'youtube' ? 'text-purple-400' : ''} />
             YouTube Link
           </button>
+          <button
+            onClick={() => { setMode('phone'); setSpeakerCount(2); }}
+            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
+              mode === 'phone' 
+                ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 text-white shadow-md ring-1 ring-purple-500/30' 
+                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+            }`}
+          >
+            <Smartphone size={16} className={mode === 'phone' ? 'text-purple-400' : ''} />
+            Phone Studio
+          </button>
         </div>
       </div>
 
@@ -265,6 +349,70 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 rows={6}
                 className="w-full bg-transparent text-white px-5 py-4 text-sm placeholder:text-gray-600 focus:outline-none resize-none custom-scrollbar font-mono leading-relaxed"
               />
+            ) : mode === 'phone' ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="Conversation topic (e.g. 'AI ka future', 'Cryptocurrency worth it hai?')"
+                  className="w-full bg-transparent text-white px-5 py-4 text-base md:text-lg placeholder:text-gray-600 focus:outline-none font-medium"
+                />
+                <div className="px-5 pb-4 space-y-3">
+                  <textarea
+                    value={phoneDescription}
+                    onChange={(e) => setPhoneDescription(e.target.value)}
+                    placeholder="Context ya description — kya discuss karein? Podcast ki main baatein, key arguments, facts jo cover karni hain..."
+                    rows={3}
+                    className="w-full bg-[#111111] border border-white/5 rounded-lg px-3 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-purple-500/50 resize-none"
+                  />
+                  {/* Context file for phone mode */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      ref={phoneFileInputRef}
+                      onChange={handlePhoneFileUpload}
+                      accept=".txt,.pdf,.md,.csv"
+                      className="hidden"
+                    />
+                    {phoneFileName ? (
+                      <div className="flex items-center gap-2 flex-1 bg-purple-500/10 border border-purple-500/30 rounded-lg px-3 py-1.5">
+                        <FileCheck size={12} className="text-purple-400 shrink-0" />
+                        <span className="text-[11px] text-purple-300 truncate flex-1">{phoneFileName}</span>
+                        <button onClick={clearPhoneFile} className="text-gray-500 hover:text-red-400 shrink-0">
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => phoneFileInputRef.current?.click()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-white/15 text-gray-500 hover:text-gray-300 hover:border-white/25 text-[11px] transition-all"
+                      >
+                        {isReadingPhoneFile ? (
+                          <><div className="w-3 h-3 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" /> Reading...</>
+                        ) : (
+                          <><Upload size={11} /> Attach Context File (PDF, TXT, MD)</>
+                        )}
+                      </button>
+                    )}
+                    {/* Use Import Transcript button */}
+                    {initialContextContent && (
+                      <button
+                        onClick={() => setUseImportTranscript(p => !p)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all shrink-0 ${
+                          useImportTranscript
+                            ? 'border-green-500/40 bg-green-500/10 text-green-300'
+                            : 'border-white/10 text-gray-500 hover:text-gray-300 hover:border-white/20'
+                        }`}
+                        title="Import section se jo transcript/context aaya hai usse use karo"
+                      >
+                        <Link2 size={11} />
+                        {useImportTranscript ? '✓ Transcript Attached' : 'Use Import Transcript'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="space-y-2">
                 <input
@@ -285,7 +433,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
             <div className="px-4 py-2 border-t border-white/5 flex justify-between items-center bg-[#050505]/50 backdrop-blur-sm">
                <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1.5">
                  <Sparkles size={10} className="text-purple-500" />
-                 {mode === 'topic' ? `${topic.length} chars` : mode === 'script' ? `${customScript.split(' ').length} words` : 'YouTube Mode'}
+                 {mode === 'topic' ? `${topic.length} chars` : mode === 'script' ? `${customScript.split(' ').length} words` : mode === 'phone' ? `📱 Phone Studio · ${phoneConvoStyle}` : 'YouTube Mode'}
                </div>
             </div>
           </div>
@@ -471,7 +619,37 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   </select>
                 </div>
 
-                {/* Style */}
+                {/* Style — hidden for phone mode */}
+                {mode === 'phone' ? (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
+                      <Sparkles size={12} className="text-pink-400" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider">Conversation Style</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1">
+                      {([ 
+                        { id: 'experts', label: '🧠 Experts', desc: 'Knowledgeable, factual' },
+                        { id: 'detailed', label: '📖 Detailed', desc: 'In-depth analysis' },
+                        { id: 'funny', label: '😂 Funny', desc: 'Humorous & entertaining' },
+                        { id: 'sarcastic', label: '😏 Sarcastic', desc: 'Witty & sarcastic' },
+                        { id: 'debate', label: '⚔️ Debate', desc: 'Opposing views' },
+                      ] as { id: PhoneConvoStyle; label: string; desc: string }[]).map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setPhoneConvoStyle(opt.id)}
+                          className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-left transition-all ${
+                            phoneConvoStyle === opt.id
+                              ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
+                              : 'bg-[#111111] border-white/5 text-gray-400 hover:border-white/15 hover:text-gray-200'
+                          }`}
+                        >
+                          <span className="text-[11px] font-semibold">{opt.label}</span>
+                          <span className="text-[9px] text-gray-500">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
                     <Sparkles size={12} className="text-pink-400" />
@@ -521,6 +699,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="summarizer_pov">🎯 Summarizer POV</option>
                   </select>
                 </div>
+                )}
               </div>
 
               {/* Joe Rogan Experience — guest picker */}
@@ -693,8 +872,14 @@ const DebateInput: React.FC<DebateInputProps> = ({
         {/* Generate Button */}
         <button
           onClick={handleSubmit}
-          disabled={isLoading || (mode === 'topic' && !topic && !contextFileContent) || (mode === 'script' && !customScript) || (mode === 'youtube' && !youtubeUrl)}
-          className="w-full mt-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-gray-800 disabled:to-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 rounded-[16px] shadow-lg shadow-purple-900/20 transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-3 text-base group relative overflow-hidden"
+          disabled={
+            isLoading
+            || (mode === 'topic' && !topic && !contextFileContent)
+            || (mode === 'script' && !customScript)
+            || (mode === 'youtube' && !youtubeUrl)
+            || (mode === 'phone' && !topic.trim() && !phoneDescription.trim() && !phoneFileContent && !useImportTranscript)
+          }
+          className={`w-full mt-2 bg-gradient-to-r ${mode === 'phone' ? 'from-purple-700 to-pink-700 hover:from-purple-600 hover:to-pink-600' : 'from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500'} disabled:from-gray-800 disabled:to-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 rounded-[16px] shadow-lg shadow-purple-900/20 transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-3 text-base group relative overflow-hidden`}
         >
           <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           {isLoading ? (
@@ -704,7 +889,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
             </>
           ) : (
             <>
-              <span>{mode === 'script' ? 'Process Script' : 'Generate Video'}</span>
+              {mode === 'phone' && <Smartphone size={18} />}
+              <span>{mode === 'script' ? 'Process Script' : mode === 'phone' ? 'Generate Phone Script' : 'Generate Video'}</span>
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </>
           )}
