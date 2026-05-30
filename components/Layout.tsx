@@ -29,7 +29,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const steps = [
-    { id: AppState.VIDEO_CLIP_IMPORT, label: 'Clip Generator', icon: Scissors, optional: true },
     { id: AppState.IMPORT,            label: 'Import Content', icon: FolderDown, optional: true },
     { id: AppState.INPUT,             label: 'Generate',       icon: Mic2 },
     { id: AppState.SCRIPT,            label: 'Script Editor',  icon: FileText },
@@ -40,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
     { id: AppState.STORYBOARD,        label: 'Storyboard',     icon: Film },
     { id: AppState.SHORTS,            label: 'Shorts',         icon: Smartphone },
     { id: AppState.LYRICS,            label: 'Song / Lyrics',  icon: Music2, optional: true },
+    { id: AppState.VIDEO_CLIP_IMPORT, label: 'Clip Generator', icon: Scissors, optional: true },
   ];
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
