@@ -68,3 +68,6 @@ build = ["npm", "run", "build"]
 CLAUDE_CODE_USE_FOUNDRY = "1"
 ANTHROPIC_FOUNDRY_BASE_URL = "https://claudeopus67-resource.services.ai.azure.com/anthropic"
 ANTHROPIC_DEFAULT_OPUS_MODEL = "claude-opus-4-7"
+ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-opus-4-7"
+ANTHROPIC_DEFAULT_HAIKU_MODEL = "claude-opus-4-7"
+CLAUDE_MODEL = "claude-opus-4-7"
