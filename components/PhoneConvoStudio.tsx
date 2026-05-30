@@ -62,6 +62,69 @@ const BG_OPTIONS = [
   { value: '#f0f4f8', label: 'Light' },
 ];
 
+// ─── Conversation Styles ──────────────────────────────────────────────────────
+
+const CONVO_STYLES: {
+  id: string; emoji: string; label: string; desc: string; prompt: string;
+}[] = [
+  {
+    id: 'podcast',
+    emoji: '🎙️',
+    label: 'Podcast',
+    desc: 'Joe Rogan style — curious, casual, deep dives',
+    prompt: `Joe Rogan style casual podcast. Use phrases like "wait wait wait", "that's crazy", "what do you mean by that", "let me ask you something". Curious, open-minded. Long tangents welcome. Natural interruptions. Very conversational — as if recorded live. Mix serious points with casual banter.`,
+  },
+  {
+    id: 'roast',
+    emoji: '🔥',
+    label: 'Roast',
+    desc: 'Savage burns, comedy burns, witty comebacks',
+    prompt: `Comedy roast style. Each response should contain a subtle or not-so-subtle burn/jab at the other's point. Witty, sharp, sarcastic. Think: "Oh wow, groundbreaking insight from someone who…", "That's a bold take from the AI that…". Keep it funny not mean. Each speaker tries to one-up the other with sharper jokes while still making valid points.`,
+  },
+  {
+    id: 'sarcastic',
+    emoji: '😏',
+    label: 'Sarcastic',
+    desc: 'Dripping sarcasm, eye-rolls, deadpan humour',
+    prompt: `Heavy sarcasm and deadpan humour throughout. Lots of "Oh sure, because THAT makes total sense", "Right, and I'm sure that worked out great", "Wow, never heard that one before". One AI is genuinely trying to make good points, the other responds with increasing sarcasm. Eventually they both become sarcastic together. Dry British-style humour.`,
+  },
+  {
+    id: 'factual',
+    emoji: '🧠',
+    label: 'Factual Deep',
+    desc: 'Concepts explained simply — like explaining to a friend',
+    prompt: `Educational but conversational. Break down complex concepts using simple analogies and real-world examples. Think "okay so imagine you're at a grocery store and…", "it's basically like when…", "the crazy thing is most people don't realize that…". Deep but accessible. Both AIs build on each other's explanations. No jargon without explanation. By the end, a 12-year-old should understand it.`,
+  },
+  {
+    id: 'devils_advocate',
+    emoji: '😈',
+    label: "Devil's Advocate",
+    desc: 'One defends a claim, other destroys it ruthlessly',
+    prompt: `One AI (first speaker) is FULLY defending the topic/claim — strongly, with conviction. The other AI (second speaker) is playing devil's advocate — finding every flaw, counterexample, and logical gap in the argument. It's not a balanced debate — the second speaker is specifically trying to dismantle the first's argument. First speaker has to keep defending. Make both sides compelling.`,
+  },
+  {
+    id: 'hot_takes',
+    emoji: '🌶️',
+    label: 'Hot Takes',
+    desc: 'Controversial opinions, Twitter-drama energy',
+    prompt: `Hot takes energy. Both AIs dropping controversial, provocative opinions about the topic. Think Twitter discourse, podcast clips that go viral. "Unpopular opinion but…", "I'm going to get cancelled for this but…", "Nobody wants to admit it but…". Opinions should be spicy but defensible. The other AI reacts with "WAIT. You can't just say that", "Okay that's actually kind of true though". High energy.`,
+  },
+  {
+    id: 'factcheck',
+    emoji: '📋',
+    label: 'Fact-Check',
+    desc: 'Breaking down myths, wrong claims, misconceptions',
+    prompt: `One AI presents common misconceptions or popular claims about the topic. The other fact-checks them in real time — "Actually that's not quite right because…", "That's partially true but the part people miss is…", "The study that everyone cites actually said something different…". Educational myth-busting format. Both are curious, not combative. End goal: truth.`,
+  },
+  {
+    id: 'react',
+    emoji: '🎬',
+    label: 'React & Review',
+    desc: 'Reacting strongly with opinions, like a reaction video',
+    prompt: `Reaction video energy. Both AIs are reacting to the topic as if seeing it for the first time. Strong first reactions — "Oh this is actually wild", "Wait hold on", "I did NOT expect that". Mix of hype, genuine interest, and criticism. One is more positive/hyped, the other is more skeptical/critical. Like two friends watching something together and giving live commentary.`,
+  },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const speakerToPhoneId = (speaker: string) =>
@@ -114,6 +177,266 @@ const fmtTime = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
+// ─── ScriptGeneratorPanel ─────────────────────────────────────────────────────
+
+interface GenPanelProps {
+  genStep: 1 | 2; setGenStep: (s: 1 | 2) => void;
+  genStyle: string; setGenStyle: (s: string) => void;
+  genTopic: string; setGenTopic: (s: string) => void;
+  genYtMode: boolean; setGenYtMode: (b: boolean) => void;
+  genYtUrl: string; setGenYtUrl: (s: string) => void;
+  genTurns: number; setGenTurns: (n: number) => void;
+  phones: PhoneConfig[];
+  generating: boolean;
+  onGenerate: () => void;
+}
+
+const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
+  genStep, setGenStep, genStyle, setGenStyle,
+  genTopic, setGenTopic, genYtMode, setGenYtMode,
+  genYtUrl, setGenYtUrl, genTurns, setGenTurns,
+  phones, generating, onGenerate,
+}) => {
+  const sel = CONVO_STYLES.find(s => s.id === genStyle)!;
+
+  return (
+    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {/* ── Step indicator ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {([1, 2] as const).map(n => (
+          <React.Fragment key={n}>
+            <button
+              onClick={() => setGenStep(n)}
+              style={{
+                width: 28, height: 28, borderRadius: '50%', border: 'none',
+                background: genStep === n ? '#ef4444' : 'rgba(255,255,255,0.08)',
+                color: genStep === n ? '#fff' : 'rgba(255,255,255,0.4)',
+                fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+            >{n}</button>
+            <span style={{ fontSize: 11, color: genStep === n ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: genStep === n ? 700 : 400 }}>
+              {n === 1 ? 'Style choose karo' : 'Topic / Source'}
+            </span>
+            {n < 2 && <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* ── Step 1: Style selection ── */}
+      {genStep === 1 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>
+            Conversation style select karo:
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {CONVO_STYLES.map(style => {
+              const isSel = genStyle === style.id;
+              return (
+                <button
+                  key={style.id}
+                  onClick={() => setGenStyle(style.id)}
+                  style={{
+                    textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                    border: `1.5px solid ${isSel ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
+                    background: isSel ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.025)',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    transition: 'all 0.12s', fontFamily: 'inherit',
+                  }}
+                >
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>{style.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: isSel ? '#fff' : 'rgba(255,255,255,0.7)' }}>
+                      {style.label}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                      {style.desc}
+                    </div>
+                  </div>
+                  {isSel && <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Check size={11} />
+                  </div>}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setGenStep(2)}
+            style={{
+              marginTop: 4, padding: '11px', borderRadius: 12, border: 'none',
+              background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 800,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Next: Topic Set Karo →
+          </button>
+        </div>
+      )}
+
+      {/* ── Step 2: Topic + YouTube ── */}
+      {genStep === 2 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* Selected style badge */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10,
+            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+          }}>
+            <span style={{ fontSize: 18 }}>{sel.emoji}</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>{sel.label}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{sel.desc}</div>
+            </div>
+            <button
+              onClick={() => setGenStep(1)}
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}
+            >Change</button>
+          </div>
+
+          {/* Speakers display */}
+          {phones.length >= 2 && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              {phones.slice(0, 2).map(p => (
+                <div key={p.id} style={{
+                  flex: 1, padding: '7px 10px', borderRadius: 8,
+                  background: p.color + '14', border: `1px solid ${p.color}30`,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{p.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* YouTube toggle */}
+          <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <button
+              onClick={() => setGenYtMode(!genYtMode)}
+              style={{
+                width: '100%', padding: '10px 12px', background: genYtMode ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)',
+                border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'inherit', borderBottom: genYtMode ? '1px solid rgba(239,68,68,0.2)' : 'none',
+              }}
+            >
+              <span style={{ fontSize: 18 }}>▶️</span>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: genYtMode ? '#fca5a5' : 'rgba(255,255,255,0.7)' }}>
+                  YouTube Video se Generate
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                  Gemini transcript analyze karke discussion points nikaalega
+                </div>
+              </div>
+              <div style={{
+                width: 36, height: 20, borderRadius: 50, position: 'relative',
+                background: genYtMode ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s',
+              }}>
+                <div style={{
+                  position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%',
+                  background: '#fff', transition: 'left 0.2s', left: genYtMode ? 18 : 2,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                }} />
+              </div>
+            </button>
+            {genYtMode && (
+              <div style={{ padding: '10px 12px' }}>
+                <input
+                  value={genYtUrl}
+                  onChange={e => setGenYtUrl(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=..."
+                  style={{
+                    width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Topic input */}
+          {!genYtMode && (
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Topic / Question
+              </div>
+              <textarea
+                value={genTopic}
+                onChange={e => setGenTopic(e.target.value)}
+                placeholder={`e.g. "Is social media making people less intelligent?" or "AI jobs lega ya nayi jobs create karega?"`}
+                rows={3}
+                style={{
+                  width: '100%', padding: '10px 12px', borderRadius: 10, boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                  resize: 'vertical', lineHeight: 1.5,
+                }}
+              />
+            </div>
+          )}
+          {genYtMode && (
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Extra Focus (optional)
+              </div>
+              <input
+                value={genTopic}
+                onChange={e => setGenTopic(e.target.value)}
+                placeholder="e.g. Focus on claims about diet, or the part about AI"
+                style={{
+                  width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Turns count */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Conversation Length
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{genTurns} turns (~{Math.round(genTurns * 12)}s)</span>
+            </div>
+            <input
+              type="range" min={6} max={24} step={2} value={genTurns}
+              onChange={e => setGenTurns(+e.target.value)}
+              style={{ width: '100%', accentColor: '#ef4444' }}
+            />
+          </div>
+
+          {/* Generate button */}
+          <button
+            onClick={onGenerate}
+            disabled={generating || (!genTopic.trim() && !genYtMode) || (genYtMode && !genYtUrl.trim())}
+            style={{
+              padding: '13px', borderRadius: 12, border: 'none',
+              background: generating ? 'rgba(239,68,68,0.3)' : '#ef4444',
+              color: '#fff', fontSize: 14, fontWeight: 800,
+              cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              opacity: (!genTopic.trim() && !genYtMode) || (genYtMode && !genYtUrl.trim()) ? 0.4 : 1,
+            }}
+          >
+            {generating ? (
+              <>
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                Generate ho raha hai…
+              </>
+            ) : (
+              <>✨ Script Generate Karo</>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -133,13 +456,23 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
-  const [tab, setTab] = useState<'visual' | 'export'>('visual');
+  const [tab, setTab] = useState<'visual' | 'script' | 'export'>('visual');
   const [visualSub, setVisualSub] = useState<'phones' | 'background' | 'subtitle'>('phones');
+
+  // Script generator state
+  const [genStyle, setGenStyle] = useState('podcast');
+  const [genTopic, setGenTopic] = useState('');
+  const [genYtMode, setGenYtMode] = useState(false);
+  const [genYtUrl, setGenYtUrl]   = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [genStep, setGenStep] = useState<1 | 2>(1);
+  const [genTurns, setGenTurns] = useState(14);
 
   // Canvas + renderer
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const [isPlaying, setIsPlaying]   = useState(false);
+  const isPlayingRef = useRef(false);
   const [currentTime, setCurrentTime] = useState(0);
 
   // Audio playback
@@ -242,45 +575,41 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     });
   }, [script]);
 
-  // ── Playback ──────────────────────────────────────────────────────────────
+  // ── Keep isPlayingRef in sync (for use inside async callbacks) ───────────
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
-  const togglePlay = async () => {
-    const r = rendererRef.current;
-    if (!r) return;
-    // ── Helper: kill all audio immediately ──────────────────────────────────
-    const killAudio = () => {
-      audioSourcesRef.current.forEach(s => { try { s.stop(0); } catch {} });
-      audioSourcesRef.current = [];
-      audioCtxRef.current?.close();
+  // ── Shared audio kill helper ───────────────────────────────────────────────
+  const killAudio = useCallback(() => {
+    audioSourcesRef.current.forEach(s => { try { s.stop(0); } catch {} });
+    audioSourcesRef.current = [];
+    if (audioCtxRef.current) {
+      try { audioCtxRef.current.close(); } catch {}
       audioCtxRef.current = null;
-    };
-
-    if (isPlaying) {
-      r.stop();
-      setIsPlaying(false);
-      killAudio();
-      return;
     }
+  }, []);
 
-    killAudio(); // also kill any stale audio before starting fresh
+  // ── Schedule audio from a given timeline position ─────────────────────────
+  // Creates a fresh AudioContext, decodes all audio (from cache), and
+  // schedules each turn at the correct offset. Returns the new context.
+  const scheduleAudioFrom = useCallback(async (startMs: number): Promise<AudioContext | null> => {
+    killAudio();
+    if (!script.some(t => t.audioUrl)) return null;
+
     const actx = new AudioContext();
     audioCtxRef.current = actx;
 
-    // Capture seek position BEFORE async fetch
-    const startMs = r.currentTime;
-
-    // Use pre-fetched cache → decode only (no network wait) → instant start
     const buffers = await Promise.all(
       script.map(t => {
         if (!t.audioUrl) return Promise.resolve(null);
         const cached = audioCacheRef.current.get(t.audioUrl);
         const abPromise = cached
-          ? Promise.resolve(cached.slice(0)) // slice = copy (decodeAudioData transfers/detaches)
+          ? Promise.resolve(cached.slice(0))
           : fetch(t.audioUrl).then(res => res.arrayBuffer());
         return abPromise.then(ab => actx.decodeAudioData(ab)).catch(() => null);
       })
     );
-    if (audioCtxRef.current !== actx) return; // cancelled
+    // Cancelled by another call
+    if (audioCtxRef.current !== actx) return null;
 
     let elapsed = 0;
     buffers.forEach((buf, i) => {
@@ -289,30 +618,56 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       elapsed = turnEndMs;
 
       if (!buf) return;
-      if (turnEndMs <= startMs) return; // turn already passed — skip
+      if (turnEndMs <= startMs) return; // turn already passed
 
-      // How far into this audio buffer to start (if we seeked mid-turn)
       const audioOffsetSec = Math.max(0, (startMs - turnStartMs) / 1000);
-      // When to play it relative to AudioContext start
       const scheduleAtSec  = actx.currentTime + Math.max(0, (turnStartMs - startMs) / 1000);
 
-      if (audioOffsetSec >= buf.duration) return; // nothing left to play
+      if (audioOffsetSec >= buf.duration) return;
 
       const src = actx.createBufferSource();
       src.buffer = buf;
       src.connect(actx.destination);
       src.start(scheduleAtSec, audioOffsetSec);
-      audioSourcesRef.current.push(src); // track so we can stop instantly
+      audioSourcesRef.current.push(src);
     });
 
+    return actx;
+  }, [script, killAudio]);
+
+  // ── Playback ──────────────────────────────────────────────────────────────
+
+  const togglePlay = async () => {
+    const r = rendererRef.current;
+    if (!r) return;
+
+    if (isPlayingRef.current) {
+      r.stop();
+      setIsPlaying(false);
+      killAudio();
+      return;
+    }
+
+    const startMs = r.currentTime;
     r.play();
     setIsPlaying(true);
+    await scheduleAudioFrom(startMs);
   };
 
+  // Visual-only seek (called continuously while dragging)
   const seek = (ms: number) => {
     rendererRef.current?.seek(ms);
     setCurrentTime(ms);
   };
+
+  // Full seek: update visual + restart audio from new position (called on mouse-up)
+  const seekWithAudio = useCallback((ms: number) => {
+    rendererRef.current?.seek(ms);
+    setCurrentTime(ms);
+    if (isPlayingRef.current) {
+      scheduleAudioFrom(ms);
+    }
+  }, [scheduleAudioFrom]);
 
   // ── Phone helpers ─────────────────────────────────────────────────────────
 
@@ -415,27 +770,177 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     }
   }, [buildState, script]);
 
-  // ── No script fallback ────────────────────────────────────────────────────
+  // ── Script Generator ──────────────────────────────────────────────────────
 
-  if (!mainScript.length) {
+  const handleGenerate = useCallback(async () => {
+    const style = CONVO_STYLES.find(s => s.id === genStyle) ?? CONVO_STYLES[0];
+    const speaker1 = phones[0]?.name ?? 'ChatGPT';
+    const speaker2 = phones[1]?.name ?? 'Gemini';
+
+    if (!genTopic.trim() && !genYtMode) {
+      toast.error('Topic ya YouTube URL dalo pehle');
+      return;
+    }
+
+    setGenerating(true);
+
+    try {
+      let topicContext = genTopic.trim();
+
+      // ── YouTube mode: fetch transcript → summarize with Gemini ─────────────
+      if (genYtMode && genYtUrl.trim()) {
+        toast.info('YouTube transcript fetch ho raha hai…');
+        const ytRes = await fetch('/api/youtube/transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: genYtUrl.trim(), language: 'auto' }),
+        });
+        if (!ytRes.ok) throw new Error('YouTube transcript fetch failed');
+        const ytData = await ytRes.json();
+        const rawText: string = ytData.fullText ?? ytData.transcript?.map((t: any) => t.text).join(' ') ?? '';
+        if (!rawText) throw new Error('Transcript empty mila');
+
+        // Summarize + find discussion points via Gemini
+        toast.info('Gemini points analyze kar raha hai…');
+        const analyzeRes = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-2.0-flash',
+            contents: [{
+              role: 'user',
+              parts: [{ text: `You are analyzing a YouTube video transcript to find the most interesting discussion points.
+
+TRANSCRIPT (first 8000 chars):
+${rawText.slice(0, 8000)}
+
+Your task:
+1. Find 4-6 specific claims, arguments, or moments in this video that would make great discussion points — especially:
+   - Controversial or debatable claims
+   - Factual statements that could be questioned
+   - Interesting concepts worth exploring deeper
+   - Surprising or counterintuitive ideas
+   - Moments where the host says something strong or provocative
+
+2. Also write a 2-3 sentence summary of the video's main topic.
+
+Return JSON only:
+{
+  "topic": "2-3 sentence summary",
+  "points": ["point 1", "point 2", "point 3", "point 4"]
+}` }],
+            }],
+          }),
+        });
+        const analyzeJson = await analyzeRes.json();
+        const analyzeText = analyzeJson.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        const match = analyzeText.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          topicContext = `Based on this YouTube video:\n${parsed.topic}\n\nKey discussion points to explore:\n${(parsed.points as string[]).map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
+        } else {
+          topicContext = rawText.slice(0, 1500);
+        }
+      }
+
+      // ── Generate conversation script via Gemini ────────────────────────────
+      toast.info('Script generate ho raha hai…');
+      const prompt = `You are writing a script for a phone conversation video between two AI assistants: "${speaker1}" and "${speaker2}".
+
+TOPIC/CONTEXT:
+${topicContext}
+
+CONVERSATION STYLE:
+${style.prompt}
+
+RULES:
+1. Generate exactly ${genTurns} turns total, alternating between speakers (start with ${speaker1}).
+2. Each turn: 2-4 natural sentences. No bullet points. No headers.
+3. Each turn should feel like actual spoken dialogue — contractions, casual language, reactions.
+4. Avoid "In conclusion" or formal summaries — keep the conversation flowing.
+5. Make it engaging for YouTube viewers — hooks, surprising statements, moments of disagreement.
+
+Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
+[
+  {"speaker": "${speaker1}", "text": "..."},
+  {"speaker": "${speaker2}", "text": "..."}
+]`;
+
+      const genRes = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.0-flash',
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        }),
+      });
+      if (!genRes.ok) throw new Error(`Gemini error: ${genRes.status}`);
+      const genJson = await genRes.json();
+      const rawText2 = genJson.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      const arrMatch = rawText2.match(/\[[\s\S]*\]/);
+      if (!arrMatch) throw new Error('Gemini se valid JSON nahi aaya');
+
+      const turns: { speaker: string; text: string }[] = JSON.parse(arrMatch[0]);
+      if (!turns.length) throw new Error('Script turns empty hain');
+
+      // Build ScriptTurn[] from parsed turns
+      const newPhones = phones.length >= 2 ? phones : (() => {
+        const p1 = AI_MODEL_PRESETS.find(m => m.label === speaker1) ?? AI_MODEL_PRESETS[0];
+        const p2 = AI_MODEL_PRESETS.find(m => m.label === speaker2) ?? AI_MODEL_PRESETS[1];
+        return [
+          { id: 'p_ChatGPT', name: p1.label, style: p1.style, color: p1.color, screenColor: p1.screen, rotation: -4, showControls: true, battery: '87%' },
+          { id: 'p_Gemini', name: p2.label, style: p2.style, color: p2.color, screenColor: p2.screen, rotation: 5, showControls: true, battery: '73%' },
+        ];
+      })();
+
+      if (phones.length < 2) setPhones(newPhones);
+
+      const newScript: ScriptTurn[] = turns.map((t, i) => {
+        const matchPhone = newPhones.find(p => p.name === t.speaker) ?? newPhones[i % newPhones.length];
+        const estDur = Math.max(3000, t.text.length * 72);
+        return {
+          id: `gen_${i}_${Date.now()}`,
+          phoneId: matchPhone.id,
+          text: t.text,
+          isNarrator: false,
+          durationMs: estDur,
+          audioUrl: undefined,
+          wordTimings: estimateWordTimings(t.text, estDur / 1000),
+        };
+      });
+
+      setScript(newScript);
+      setTab('visual');
+      toast.success(`✓ ${newScript.length} turns generate ho gaye!`);
+
+    } catch (err: any) {
+      console.error('Generate error:', err);
+      toast.error(`Generate failed: ${err.message}`);
+    } finally {
+      setGenerating(false);
+    }
+  }, [genStyle, genTopic, genYtMode, genYtUrl, genTurns, phones]);
+
+  // ── No script fallback → show generator ───────────────────────────────────
+
+  if (!mainScript.length && !script.length) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100%', background: '#050507', color: '#e0e0e0', padding: 32, textAlign: 'center', gap: 16,
-      }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: 20, background: 'rgba(239,68,68,0.12)',
-          border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <MonitorSmartphone size={28} color="#ef4444" />
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#050507', color: '#e0e0e0', fontFamily: 'inherit' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <MonitorSmartphone size={18} color="#ef4444" />
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Phone Studio — Script Generator</span>
         </div>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Script nahi mila</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, maxWidth: 320 }}>
-            Pehle main flow mein <strong style={{ color: 'rgba(255,255,255,0.7)' }}>Script → Audio</strong> steps complete karein.
-            Jab audio generate ho jaaye, Phone Studio us script aur audio ko automatically use karega.
-          </div>
-        </div>
+        <ScriptGeneratorPanel
+          genStep={genStep} setGenStep={setGenStep}
+          genStyle={genStyle} setGenStyle={setGenStyle}
+          genTopic={genTopic} setGenTopic={setGenTopic}
+          genYtMode={genYtMode} setGenYtMode={setGenYtMode}
+          genYtUrl={genYtUrl} setGenYtUrl={setGenYtUrl}
+          genTurns={genTurns} setGenTurns={setGenTurns}
+          phones={phones}
+          generating={generating}
+          onGenerate={handleGenerate}
+        />
       </div>
     );
   }
@@ -511,6 +1016,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
             <input
               type="range" min={0} max={totalDuration || 1} value={currentTime}
               onChange={e => seek(+e.target.value)}
+              onMouseUp={e => seekWithAudio(+(e.target as HTMLInputElement).value)}
+              onTouchEnd={e => seekWithAudio(+(e.currentTarget as HTMLInputElement).value)}
               style={{ width: '100%', accentColor: '#ef4444', cursor: 'pointer', height: 3 }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
@@ -527,16 +1034,15 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
             return (
               <button
                 key={item.id}
-                onClick={() => { if (!isPlaying) seek(item.start); }}
-                disabled={isPlaying}
+                onClick={() => seekWithAudio(item.start)}
                 style={{
                   flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
                   width: 44, padding: '5px 4px', borderRadius: 10,
-                  cursor: isPlaying ? 'default' : 'pointer',
+                  cursor: 'pointer',
                   border: `1px solid ${active ? item.color + '70' : 'rgba(255,255,255,0.05)'}`,
                   background: active ? item.color + '18' : 'rgba(255,255,255,0.03)',
                   position: 'relative', transition: 'all 0.15s',
-                  opacity: isPlaying && !active ? 0.4 : 1,
+                  opacity: active ? 1 : 0.6,
                 }}
               >
                 {active && <div style={{ position: 'absolute', top: -2, right: -2, width: 7, height: 7, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />}
@@ -565,6 +1071,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080809' }}>
         {([
           { id: 'visual', label: 'Settings', icon: '⚙️' },
+          { id: 'script', label: 'Generate', icon: '✨' },
           { id: 'export', label: 'Export',   icon: '📤' },
         ] as const).map(t => (
           <button
@@ -585,6 +1092,21 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
 
       {/* ── Tab Content ── */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
+
+        {/* ════ GENERATE / SCRIPT TAB ════ */}
+        {tab === 'script' && (
+          <ScriptGeneratorPanel
+            genStep={genStep} setGenStep={setGenStep}
+            genStyle={genStyle} setGenStyle={setGenStyle}
+            genTopic={genTopic} setGenTopic={setGenTopic}
+            genYtMode={genYtMode} setGenYtMode={setGenYtMode}
+            genYtUrl={genYtUrl} setGenYtUrl={setGenYtUrl}
+            genTurns={genTurns} setGenTurns={setGenTurns}
+            phones={phones}
+            generating={generating}
+            onGenerate={handleGenerate}
+          />
+        )}
 
         {/* ════ SETTINGS / VISUAL TAB ════ */}
         {tab === 'visual' && (
