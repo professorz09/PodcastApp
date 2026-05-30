@@ -323,13 +323,14 @@ export class CanvasRenderer {
 
     ctx.restore();
 
-    // ── Dim overlay when LISTENING (someone else is speaking) ────────────
+    // ── Subtle vignette when LISTENING — phone stays alive, just slightly quieter
     if (hasActive && !isActive) {
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(x + b, y + b, w - b * 2, h - b * 2, r * 0.88);
       ctx.clip();
-      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      // Very light overlay — just reduces brightness a tiny bit, phone stays visible
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
       ctx.fillRect(x, y, w, h);
       ctx.restore();
     }
@@ -751,22 +752,58 @@ export class CanvasRenderer {
       ctx.textAlign = 'center';
     }
 
-    // ── Bottom call controls ──────────────────────────────────────────────
+    // ── Bottom call controls (mic · dots · X) ────────────────────────────
     if (phone.showControls !== false) {
-      const by = sy + sh * 0.925;
-      // Video icon bg
-      ctx.fillStyle = 'rgba(255,255,255,0.09)';
-      ctx.beginPath(); ctx.arc(cx - sw * 0.25, by, sw * 0.065, 0, Math.PI * 2); ctx.fill();
-      // Mic icon bg
-      ctx.beginPath(); ctx.arc(cx, by, sw * 0.065, 0, Math.PI * 2); ctx.fill();
-      // End call (red)
-      ctx.fillStyle = 'rgba(239,68,68,0.85)';
-      ctx.beginPath(); ctx.arc(cx + sw * 0.25, by, sw * 0.065, 0, Math.PI * 2); ctx.fill();
-      // End call X
-      ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-      ctx.lineWidth = sw * 0.012;
-      ctx.lineCap = 'round';
-      const ex = cx + sw * 0.25, d = sw * 0.022;
+      const by  = sy + sh * 0.925;
+      const cr  = sw * 0.065; // circle radius
+      const ic  = 'rgba(255,255,255,0.9)';
+      const bgC = 'rgba(255,255,255,0.1)';
+
+      // ── Circle helper ─────────────────────────────────────────────────
+      const drawCircleBg = (bx: number, fill: string) => {
+        ctx.fillStyle = fill;
+        ctx.beginPath(); ctx.arc(bx, by, cr, 0, Math.PI * 2); ctx.fill();
+      };
+
+      // ① Mic button ─────────────────────────────────────────────────────
+      const mx = cx - sw * 0.25;
+      drawCircleBg(mx, bgC);
+      ctx.strokeStyle = ic; ctx.lineWidth = sw * 0.013; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.fillStyle = ic;
+      const mh = cr * 0.52, mw = cr * 0.32;
+      // Mic capsule
+      ctx.beginPath();
+      ctx.roundRect(mx - mw, by - mh, mw * 2, mh * 1.55, mw);
+      ctx.fill();
+      // Stand arc
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(mx, by + mh * 0.18, mw * 1.45, 0, Math.PI);
+      ctx.stroke();
+      // Stand line
+      ctx.beginPath();
+      ctx.moveTo(mx, by + mh * 0.18 + mw * 1.45);
+      ctx.lineTo(mx, by + mh * 0.72);
+      ctx.stroke();
+      // Base line
+      ctx.beginPath();
+      ctx.moveTo(mx - mw * 1.2, by + mh * 0.72);
+      ctx.lineTo(mx + mw * 1.2, by + mh * 0.72);
+      ctx.stroke();
+
+      // ② Three-dots button ──────────────────────────────────────────────
+      drawCircleBg(cx, bgC);
+      ctx.fillStyle = ic;
+      const dr = cr * 0.13;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath(); ctx.arc(cx + i * cr * 0.36, by, dr, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ③ End-call (red X) ───────────────────────────────────────────────
+      const ex = cx + sw * 0.25;
+      drawCircleBg(ex, 'rgba(239,68,68,0.9)');
+      ctx.strokeStyle = ic; ctx.lineWidth = sw * 0.014; ctx.lineCap = 'round';
+      const d = cr * 0.38;
       ctx.beginPath(); ctx.moveTo(ex - d, by - d); ctx.lineTo(ex + d, by + d); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(ex + d, by - d); ctx.lineTo(ex - d, by + d); ctx.stroke();
     }
