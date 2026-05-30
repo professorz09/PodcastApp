@@ -551,43 +551,50 @@ export class CanvasRenderer {
       }
       if (curW.length) lines.push({ text: curW.join(' '), words: [...curW] });
 
-      // ── Y anchor (matches MobileTalk exactly) ─────────────────────────
-      const lh = fontSize * 1.4;
-      let ty = sy + sh * 0.62;
-      if (lines.length > 3)    ty = sy + sh * 0.52;
-      else if (lines.length === 1) ty = sy + sh * 0.68;
+      // ── Find which line is currently active ───────────────────────────
+      // Count total words per line to know which line targetWordFloat falls in
+      let wordCount = 0;
+      let activeLineIdx = lines.length - 1;
+      for (let i = 0; i < lines.length; i++) {
+        const lineEnd = wordCount + lines[i].words.length;
+        if (targetWordFloat < lineEnd) { activeLineIdx = i; break; }
+        wordCount += lines[i].words.length;
+      }
 
-      // ── Draw each word with fade-in animation ─────────────────────────
+      // Only show the ACTIVE line (single line, disappears when next starts)
+      const lh = fontSize * 1.4;
+      const ty = sy + sh * 0.68; // fixed single-line position
+
       const col = subCfg.textColor ?? '#ffffff';
       const rr  = parseInt(col.slice(1, 3), 16) || 255;
       const gg  = parseInt(col.slice(3, 5), 16) || 255;
       const bb  = parseInt(col.slice(5, 7), 16) || 255;
 
-      let globalWordIdx = 0;
-      for (let i = 0; i < lines.length; i++) {
-        const line     = lines[i];
-        const lineW    = ctx.measureText(line.text).width;
-        const startTx  = cx - lineW / 2;
-        let prevText   = '';
+      const activeLine = lines[activeLineIdx];
+      if (activeLine) {
+        // How many words of this line have been "spoken"
+        // globalWordIdx of first word in activeLine
+        let lineStartWordIdx = 0;
+        for (let i = 0; i < activeLineIdx; i++) lineStartWordIdx += lines[i].words.length;
 
-        for (let j = 0; j < line.words.length; j++) {
-          const w    = line.words[j];
-          const xOff = prevText ? ctx.measureText(prevText + ' ').width : 0;
-          const tx   = startTx + xOff;
+        const lineW   = ctx.measureText(activeLine.text).width;
+        const startTx = cx - lineW / 2;
+        let prevText  = '';
 
-          const dist  = targetWordFloat - globalWordIdx;
-          const alpha = dist > 0 ? Math.min(1.0, dist * 2.5) : 0;
+        activeLine.words.forEach((w, j) => {
+          const globalIdx = lineStartWordIdx + j;
+          const dist      = targetWordFloat - globalIdx;
+          const alpha     = dist > 0 ? Math.min(1.0, dist * 2.5) : 0;
 
           if (alpha > 0.01) {
             const ease    = 1 - Math.pow(1 - alpha, 3);
             const yOffset = (1 - ease) * (sw * 0.02);
+            const xOff   = prevText ? ctx.measureText(prevText + ' ').width : 0;
             ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha * 0.95})`;
-            ctx.fillText(w, tx, ty + i * lh + yOffset);
+            ctx.fillText(w, startTx + xOff, ty + yOffset);
           }
-
           prevText += (prevText ? ' ' : '') + w;
-          globalWordIdx++;
-        }
+        });
       }
       ctx.textAlign = 'center';
     }
