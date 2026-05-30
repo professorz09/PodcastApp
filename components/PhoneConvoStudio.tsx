@@ -12,6 +12,22 @@ import { DebateSegment } from '../types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// ─── AI Model Presets ─────────────────────────────────────────────────────────
+
+const AI_MODEL_PRESETS: {
+  id: string; label: string; emoji: string;
+  color: string; screen: string; style: AnimStyle;
+}[] = [
+  { id: 'chatgpt',   label: 'ChatGPT',   emoji: '🤖', color: '#10a37f', screen: '#010f0a', style: 'aurora'        },
+  { id: 'gemini',    label: 'Gemini',    emoji: '✨', color: '#4285F4', screen: '#080c18', style: 'gemini'        },
+  { id: 'claude',    label: 'Claude',    emoji: '🧠', color: '#d97706', screen: '#130a01', style: 'cosmic-sphere' },
+  { id: 'grok',      label: 'Grok',      emoji: '⚡', color: '#e5e5e5', screen: '#111111', style: 'ripple'        },
+  { id: 'deepseek',  label: 'DeepSeek',  emoji: '🔮', color: '#3b82f6', screen: '#04081a', style: 'wave'          },
+  { id: 'llama',     label: 'Llama',     emoji: '🦙', color: '#f97316', screen: '#130800', style: 'orb'           },
+  { id: 'perplexity',label: 'Perplexity',emoji: '🔍', color: '#20b2aa', screen: '#021210', style: 'neon'          },
+  { id: 'custom',    label: 'Custom',    emoji: '👤', color: '#a855f7', screen: '#0d0618', style: 'aurora'        },
+];
+
 const ANIM_STYLES: { value: AnimStyle; label: string; desc: string }[] = [
   { value: 'gemini',       label: 'Gemini',        desc: 'Sphere + ripple rings' },
   { value: 'ripple',       label: 'Ripple',        desc: 'Expanding rings' },
@@ -53,20 +69,25 @@ const speakerToPhoneId = (speaker: string) =>
 
 const DEFAULT_BATTERIES = ['87%', '73%', '91%', '65%', '82%', '58%'];
 
+// Default model assignments per speaker index
+const DEFAULT_MODELS = ['chatgpt', 'gemini', 'claude', 'grok', 'deepseek', 'llama'];
+
 const buildPhonesFromSpeakers = (
   speakers: string[],
   existing: PhoneConfig[]
 ): PhoneConfig[] => {
-  const styles: AnimStyle[] = ['aurora', 'gemini', 'ripple', 'cosmic-sphere', 'neon', 'orb', 'wave', 'bottom-glow'];
   return speakers.map((spk, i) => {
     const existingPhone = existing.find(p => p.id === speakerToPhoneId(spk));
     if (existingPhone) return existingPhone;
+    // Pick default model preset
+    const preset = AI_MODEL_PRESETS.find(m => m.id === DEFAULT_MODELS[i % DEFAULT_MODELS.length])
+                   ?? AI_MODEL_PRESETS[0];
     return {
       id: speakerToPhoneId(spk),
-      name: spk,
-      style: styles[i % styles.length],
-      color: PRESET_COLORS[i % PRESET_COLORS.length].color,
-      screenColor: PRESET_COLORS[i % PRESET_COLORS.length].screen,
+      name: preset.label,
+      style: preset.style,
+      color: preset.color,
+      screenColor: preset.screen,
       rotation: [-4, 5, -3, 4][i % 4],
       showControls: true,
       battery: DEFAULT_BATTERIES[i % DEFAULT_BATTERIES.length],
@@ -645,8 +666,45 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
                 </div>
 
                 {/* Phone cards (one per speaker) */}
-                {phones.map((phone) => (
-                  <div key={phone.id} style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
+                {phones.map((phone) => {
+                  const activeModel = AI_MODEL_PRESETS.find(m => m.label === phone.name) ?? null;
+                  return (
+                  <div key={phone.id} style={{ borderRadius: 14, border: `1px solid ${phone.color}28`, background: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
+
+                    {/* ── Model Selector Bar ── */}
+                    <div style={{ padding: '8px 12px', background: phone.color + '12', borderBottom: `1px solid ${phone.color}20` }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>AI Model</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                        {AI_MODEL_PRESETS.map(model => {
+                          const sel = activeModel?.id === model.id;
+                          return (
+                            <button
+                              key={model.id}
+                              onClick={() => updatePhone(phone.id, {
+                                name: model.label,
+                                color: model.color,
+                                screenColor: model.screen,
+                                style: model.style,
+                              })}
+                              style={{
+                                padding: '4px 9px', borderRadius: 20,
+                                border: `1px solid ${sel ? model.color : 'rgba(255,255,255,0.1)'}`,
+                                background: sel ? model.color + '30' : 'rgba(255,255,255,0.04)',
+                                color: sel ? '#fff' : 'rgba(255,255,255,0.45)',
+                                fontSize: 11, fontWeight: sel ? 700 : 500,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                transition: 'all 0.12s',
+                              }}
+                            >
+                              <span style={{ fontSize: 13 }}>{model.emoji}</span>
+                              {model.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <div style={{ width: 10, height: 10, borderRadius: '50%', background: phone.color, flexShrink: 0 }} />
                       <input
@@ -759,7 +817,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
                       </label>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
