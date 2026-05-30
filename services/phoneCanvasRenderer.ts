@@ -510,21 +510,36 @@ export class CanvasRenderer {
 
       // ── Calculate targetWF (fractional word index) ──
       let targetWF = 0;
-      if (activeTurn?.wordTimings?.length) {
-        const cur = turnProgress * (activeTurn.durationMs / 1000);
-        for (let i = 0; i < activeTurn.wordTimings.length; i++) {
-          const wt = activeTurn.wordTimings[i];
-          if (cur < wt.startTime) break;
-          if (cur >= wt.startTime && cur <= wt.endTime) {
-            const wd = wt.endTime - wt.startTime;
-            targetWF = i + (wd > 0 ? (cur - wt.startTime) / wd : 1);
+      const wtArr = activeTurn?.wordTimings;
+      const useTimings = wtArr && wtArr.length > 0 && Math.abs(wtArr.length - words.length) <= 2;
+
+      if (useTimings) {
+        const cur = turnProgress * (activeTurn!.durationMs / 1000);
+        // Find which word we're currently on
+        let found = false;
+        for (let i = 0; i < wtArr!.length; i++) {
+          const wt = wtArr![i];
+          if (cur < wt.startTime) {
+            // Before this word starts — targetWF is i (i words done)
+            targetWF = i;
+            found = true;
             break;
           }
+          if (cur >= wt.startTime && cur <= wt.endTime) {
+            // Inside this word — fractional progress within it
+            const wd = wt.endTime - wt.startTime;
+            targetWF = i + (wd > 1e-4 ? (cur - wt.startTime) / wd : 1);
+            found = true;
+            break;
+          }
+          // Past this word — it's fully done
           targetWF = i + 1;
         }
+        if (!found) targetWF = wtArr!.length;
       } else {
+        // Weight-based estimation (proportional to char length)
         const weights = words.map(w => w.length + 2);
-        const total = weights.reduce((a, b) => a + b, 0);
+        const total = weights.reduce((a, b) => a + b, 0) || 1;
         const target = pct * total;
         let acc = 0;
         for (let i = 0; i < words.length; i++) {
@@ -534,9 +549,14 @@ export class CanvasRenderer {
         if (target >= total) targetWF = words.length;
       }
 
+      // Cap so we never show more words than exist
+      targetWF = Math.min(targetWF, words.length);
+
       // ── ChatGPT streaming style: accumulate words, wrap, show last 2 lines ──
       const visibleCount = Math.ceil(targetWF);              // words shown so far
-      const popProg = targetWF - Math.floor(targetWF);       // 0–1 pop-in of newest word
+      // Fix: when targetWF is exact integer, newest word is FULLY visible (not 0%)
+      const floored = Math.floor(targetWF);
+      const popProg = floored < targetWF ? targetWF - floored : 1.0;
 
       // Word-wrap all visible words
       const allLines: { word: string; globalIdx: number }[][] = [];

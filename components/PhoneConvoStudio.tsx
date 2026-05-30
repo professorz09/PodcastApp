@@ -100,6 +100,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [bg, setBg]           = useState('linear:#0a0a12,#12172a');
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
   const [subtitleBg, setSubtitleBg]           = useState<'dark' | 'light' | 'none'>('dark');
+  const [subtitleSize, setSubtitleSize]       = useState(1.0);
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
@@ -167,11 +168,11 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     startTime,
     subtitleConfig: {
       enabled: subtitleEnabled,
-      size: 1,
+      size: subtitleSize,
       background: subtitleBg,
       textColor: '#ffffff',
     },
-  }), [phones, script, bg, spacing, scale, startTime, subtitleEnabled, subtitleBg]);
+  }), [phones, script, bg, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -198,33 +199,48 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       setIsPlaying(false);
       audioCtxRef.current?.close();
       audioCtxRef.current = null;
-    } else {
-      if (audioCtxRef.current) audioCtxRef.current.close();
-      const actx = new AudioContext();
-      audioCtxRef.current = actx;
-
-      const buffers = await Promise.all(
-        script.map(t => t.audioUrl
-          ? fetch(t.audioUrl).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).catch(() => null)
-          : Promise.resolve(null)
-        )
-      );
-      if (audioCtxRef.current !== actx) return;
-
-      let elapsed = 0;
-      buffers.forEach((buf, i) => {
-        if (buf) {
-          const src = actx.createBufferSource();
-          src.buffer = buf;
-          src.connect(actx.destination);
-          src.start(actx.currentTime + elapsed / 1000);
-        }
-        elapsed += script[i].durationMs;
-      });
-
-      r.play();
-      setIsPlaying(true);
+      return;
     }
+
+    if (audioCtxRef.current) { audioCtxRef.current.close(); audioCtxRef.current = null; }
+    const actx = new AudioContext();
+    audioCtxRef.current = actx;
+
+    // Capture seek position BEFORE async fetch
+    const startMs = r.currentTime;
+
+    const buffers = await Promise.all(
+      script.map(t => t.audioUrl
+        ? fetch(t.audioUrl).then(res => res.arrayBuffer()).then(b => actx.decodeAudioData(b)).catch(() => null)
+        : Promise.resolve(null)
+      )
+    );
+    if (audioCtxRef.current !== actx) return; // cancelled
+
+    let elapsed = 0;
+    buffers.forEach((buf, i) => {
+      const turnStartMs = elapsed;
+      const turnEndMs   = elapsed + script[i].durationMs;
+      elapsed = turnEndMs;
+
+      if (!buf) return;
+      if (turnEndMs <= startMs) return; // turn already passed — skip
+
+      // How far into this audio buffer to start (if we seeked mid-turn)
+      const audioOffsetSec = Math.max(0, (startMs - turnStartMs) / 1000);
+      // When to play it relative to AudioContext start
+      const scheduleAtSec  = actx.currentTime + Math.max(0, (turnStartMs - startMs) / 1000);
+
+      if (audioOffsetSec >= buf.duration) return; // nothing left to play
+
+      const src = actx.createBufferSource();
+      src.buffer = buf;
+      src.connect(actx.destination);
+      src.start(scheduleAtSec, audioOffsetSec);
+    });
+
+    r.play();
+    setIsPlaying(true);
   };
 
   const seek = (ms: number) => {
@@ -734,6 +750,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
             {/* ── Subtitle sub-tab ── */}
             {visualSub === 'subtitle' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                {/* Enable toggle */}
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.025)', cursor: 'pointer' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Show Subtitles</span>
                   <div
@@ -747,6 +765,24 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
                   </div>
                 </label>
 
+                {/* Size slider */}
+                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.025)', padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Font Size</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>{subtitleSize.toFixed(1)}×</span>
+                  </div>
+                  <input
+                    type="range" min={0.5} max={2.0} step={0.05} value={subtitleSize}
+                    onChange={e => setSubtitleSize(+e.target.value)}
+                    style={{ width: '100%', accentColor: '#ef4444' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>0.5×</span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>2.0×</span>
+                  </div>
+                </div>
+
+                {/* Background style */}
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.025)', padding: 12 }}>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Background Style</div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -766,6 +802,11 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Sync info */}
+                <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+                  <span style={{ color: '#86efac', fontWeight: 700 }}>Word-by-word mode:</span> Subtitles ek-ek word karke aate hain — naturally, jaise typing. Sync ki hui files (STT) use hoti hain agar available ho, warna weight estimate.
                 </div>
               </div>
             )}
