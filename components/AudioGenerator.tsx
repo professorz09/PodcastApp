@@ -723,7 +723,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       <div className="md:hidden bg-[#0b0b0b] border-b border-white/5 px-3 py-2 flex items-center gap-2 overflow-x-auto scrollbar-hide shrink-0">
         {/* Engine */}
         <button onClick={() => setTtsProvider('google')} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${ttsProvider === 'google' ? 'bg-purple-600/20 border border-purple-500/40 text-purple-300' : 'text-gray-500 border border-white/5 hover:bg-white/5'}`}>
-          <Globe size={13} /> Gemini
+          <Globe size={13} /> Gemini 3.1
         </button>
         <button onClick={() => setTtsProvider('chirp3hd')} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${ttsProvider === 'chirp3hd' ? 'bg-cyan-600/20 border border-cyan-500/40 text-cyan-300' : 'text-gray-500 border border-white/5 hover:bg-white/5'}`}>
           <Mic2 size={13} /> Chirp HD
@@ -763,7 +763,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
             }`}
           >
             <Globe size={15} />
-            Gemini 2.5
+            Gemini 3.1
           </button>
           <button
             onClick={() => setTtsProvider('chirp3hd')}
