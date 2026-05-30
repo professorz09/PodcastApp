@@ -487,135 +487,108 @@ export class CanvasRenderer {
     ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 
-    // ── Subtitles — phrase mode (clipped inside phone screen) ────────────
+    // ── Subtitles (MobileTalk style) ──────────────────────────────────────
     const subCfg = this.state.subtitleConfig ?? { enabled: true, size: 1, background: 'dark', textColor: '#fff' };
     if (isActive && text && subCfg.enabled) {
 
-      // Font size: relative to phone screen width, capped so it never overflows
-      const fs = Math.min(sw * 0.042, sh * 0.038) * (subCfg.size ?? 1);
-      ctx.font = `700 ${fs}px -apple-system,sans-serif`;
-      const lh = fs * 1.45;
-      const maxLineW = sw * 0.88; // max text width per line
-
-      const allWords = text.replace(/\n/g, ' ').split(/\s+/).filter(w => w);
-      if (!allWords.length) { ctx.textAlign = 'center'; return; }
-
-      // ── Determine current global word index + pop-in progress ──────────
-      const wtArr = activeTurn?.wordTimings;
-      const useTimings = !!(wtArr && wtArr.length > 0 && Math.abs(wtArr.length - allWords.length) <= 3);
-
-      let globalWordIdx = 0;
-      let popProg       = 1.0;
-
-      if (useTimings) {
-        const cur = turnProgress * (activeTurn!.durationMs / 1000);
-        let found = false;
-        for (let i = 0; i < wtArr!.length; i++) {
-          const wt = wtArr![i];
-          if (cur < wt.startTime)  { globalWordIdx = Math.max(0, i - 1); popProg = 1.0; found = true; break; }
-          if (cur <= wt.endTime)   { const wd = wt.endTime - wt.startTime; globalWordIdx = i; popProg = wd > 1e-4 ? (cur - wt.startTime) / wd : 1; found = true; break; }
-          globalWordIdx = i; popProg = 1.0;
-        }
-        if (!found) { globalWordIdx = wtArr!.length - 1; popProg = 1.0; }
-      } else {
-        const pct = Math.max(0, Math.min(0.999, turnProgress / 0.98));
-        const weights = allWords.map(w => w.length + 2);
-        const total   = weights.reduce((a, b) => a + b, 0) || 1;
-        const target  = pct * total;
-        let acc = 0;
-        for (let i = 0; i < allWords.length; i++) {
-          if (target < acc + weights[i]) { globalWordIdx = i; popProg = (target - acc) / weights[i]; break; }
-          acc += weights[i]; globalWordIdx = i; popProg = 1.0;
-        }
-      }
-
-      // ── Build phrase by wrapping words from globalWordIdx backwards ─────
-      // Find phrase boundary: group words into lines (wrap at maxLineW).
-      // Show the last 1–2 lines that contain globalWordIdx.
-      const lineGroups: { word: string; idx: number }[][] = [];
-      let curLine: { word: string; idx: number }[] = [];
-      let curLineW = 0;
-      for (let i = 0; i < allWords.length; i++) {
-        const ww = ctx.measureText((curLine.length ? ' ' : '') + allWords[i]).width;
-        if (curLine.length > 0 && curLineW + ww > maxLineW) {
-          lineGroups.push(curLine);
-          curLine = [{ word: allWords[i], idx: i }];
-          curLineW = ctx.measureText(allWords[i]).width;
-        } else {
-          curLine.push({ word: allWords[i], idx: i });
-          curLineW += ww;
-        }
-      }
-      if (curLine.length) lineGroups.push(curLine);
-
-      // Which line group contains globalWordIdx?
-      const activeLineGroupIdx = lineGroups.findIndex(g => g.some(e => e.idx >= globalWordIdx)) ;
-      const safeActiveLineIdx  = activeLineGroupIdx < 0 ? lineGroups.length - 1 : activeLineGroupIdx;
-
-      // Show up to 2 lines: current + previous (if exists)
-      const visLineGroups = lineGroups.slice(Math.max(0, safeActiveLineIdx - 1), safeActiveLineIdx + 1);
-
-      // Total lines height
-      const totalTextH = visLineGroups.length * lh;
-
-      // Bottom anchor — sit just above the call controls (which are at sh*0.925)
-      const bottomY = sy + sh * 0.895;
-      const topTextY = bottomY - totalTextH;
-
-      // ── Background gradient clipped to phone screen ────────────────────
-      ctx.save();
-      // Clip to phone screen so nothing bleeds outside
-      ctx.beginPath();
-      ctx.rect(sx, sy, sw, sh);
-      ctx.clip();
-
+      // ── Background gradient ──────────────────────────────────────────
       const bgType = subCfg.background ?? 'dark';
       if (bgType !== 'none') {
-        const gradTop = Math.max(sy, topTextY - fs * 1.2);
-        const tg = ctx.createLinearGradient(0, gradTop, 0, sy + sh);
+        const tg = ctx.createLinearGradient(0, sy + sh * 0.4, 0, sy + sh * 1.0);
         tg.addColorStop(0, 'transparent');
-        tg.addColorStop(0.4, bgType === 'light' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.7)');
-        tg.addColorStop(1,   bgType === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.94)');
+        if (bgType === 'light') {
+          tg.addColorStop(0.4, 'rgba(255,255,255,0.4)');
+          tg.addColorStop(1,   'rgba(255,255,255,0.85)');
+        } else {
+          tg.addColorStop(0.4, 'rgba(0,0,0,0.6)');
+          tg.addColorStop(1,   'rgba(0,0,0,0.9)');
+        }
         ctx.fillStyle = tg;
-        ctx.fillRect(sx, gradTop, sw, sy + sh - gradTop);
+        ctx.fillRect(sx, sy + sh * 0.4, sw, sh * 0.6);
       }
 
-      // ── Draw each visible line ────────────────────────────────────────
-      const col = subCfg.textColor ?? '#ffffff';
-      const hx  = (s: string, o: number) => parseInt(s.slice(o, o + 2), 16) || 255;
-      const [rr, gg, bb] = [hx(col, 1), hx(col, 3), hx(col, 5)];
-
+      const fontSize = sw * 0.045 * (subCfg.size ?? 1);
+      ctx.font = `500 ${fontSize}px sans-serif`;
       ctx.textAlign = 'left';
-      visLineGroups.forEach((lineGroup, li) => {
-        const lineY    = topTextY + li * lh + fs; // baseline
-        const lineStr  = lineGroup.map(e => e.word).join(' ');
-        const lineW    = ctx.measureText(lineStr).width;
-        const lx       = sx + (sw - lineW) / 2; // centered within phone
 
-        let prevStr = '';
-        lineGroup.forEach(({ word, idx }) => {
-          const xOff     = prevStr ? ctx.measureText(prevStr + ' ').width : 0;
-          const isActive = idx <= globalWordIdx;
-          const isNewest = idx === globalWordIdx;
+      const words = text.replace(/\n/g, ' ').split(' ').filter(w => w.trim() !== '');
+      const pct   = Math.max(0, Math.min(1, turnProgress / 0.95));
 
-          if (!isActive) return; // word not reached yet
+      // ── targetWordFloat — how many words are "done" (fractional) ──────
+      let targetWordFloat = 0;
+      const wtArr = activeTurn?.wordTimings;
+      if (wtArr && wtArr.length > 0) {
+        const cur = turnProgress * (activeTurn!.durationMs / 1000);
+        for (let i = 0; i < wtArr.length; i++) {
+          const wt = wtArr[i];
+          if (cur < wt.startTime) { break; }
+          else if (cur <= wt.endTime) {
+            const wd = wt.endTime - wt.startTime;
+            targetWordFloat = i + (wd > 0 ? (cur - wt.startTime) / wd : 1);
+            break;
+          } else { targetWordFloat = i + 1; }
+        }
+      } else {
+        const ww  = words.map(w => w.length + 2);
+        const tot = ww.reduce((a, b) => a + b, 0) || 1;
+        const tgt = pct * tot;
+        let acc = 0;
+        for (let i = 0; i < words.length; i++) {
+          if (tgt <= acc + ww[i]) { targetWordFloat = i + (tgt - acc) / ww[i]; break; }
+          acc += ww[i];
+        }
+        if (tgt >= tot) targetWordFloat = words.length;
+      }
 
-          if (isNewest) {
-            const ease = 1 - Math.pow(1 - Math.max(0.02, popProg), 2.5);
-            const yOff  = (1 - ease) * fs * 0.35;
-            ctx.globalAlpha = Math.max(0.06, ease);
-            ctx.fillStyle   = col;
-            ctx.fillText(word, lx + xOff, lineY + yOff);
-            ctx.globalAlpha = 1;
-          } else {
-            ctx.fillStyle = `rgba(${rr},${gg},${bb},0.95)`;
-            ctx.fillText(word, lx + xOff, lineY);
+      // ── Word-wrap all text into lines ─────────────────────────────────
+      const lines: { text: string; words: string[] }[] = [];
+      let curW: string[] = [];
+      for (const w of words) {
+        const test = curW.length ? curW.join(' ') + ' ' + w : w;
+        if (curW.length && ctx.measureText(test).width > sw * 0.85) {
+          lines.push({ text: curW.join(' '), words: [...curW] }); curW = [w];
+        } else { curW.push(w); }
+      }
+      if (curW.length) lines.push({ text: curW.join(' '), words: [...curW] });
+
+      // ── Y anchor (matches MobileTalk exactly) ─────────────────────────
+      const lh = fontSize * 1.4;
+      let ty = sy + sh * 0.62;
+      if (lines.length > 3)    ty = sy + sh * 0.52;
+      else if (lines.length === 1) ty = sy + sh * 0.68;
+
+      // ── Draw each word with fade-in animation ─────────────────────────
+      const col = subCfg.textColor ?? '#ffffff';
+      const rr  = parseInt(col.slice(1, 3), 16) || 255;
+      const gg  = parseInt(col.slice(3, 5), 16) || 255;
+      const bb  = parseInt(col.slice(5, 7), 16) || 255;
+
+      let globalWordIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const line     = lines[i];
+        const lineW    = ctx.measureText(line.text).width;
+        const startTx  = cx - lineW / 2;
+        let prevText   = '';
+
+        for (let j = 0; j < line.words.length; j++) {
+          const w    = line.words[j];
+          const xOff = prevText ? ctx.measureText(prevText + ' ').width : 0;
+          const tx   = startTx + xOff;
+
+          const dist  = targetWordFloat - globalWordIdx;
+          const alpha = dist > 0 ? Math.min(1.0, dist * 2.5) : 0;
+
+          if (alpha > 0.01) {
+            const ease    = 1 - Math.pow(1 - alpha, 3);
+            const yOffset = (1 - ease) * (sw * 0.02);
+            ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha * 0.95})`;
+            ctx.fillText(w, tx, ty + i * lh + yOffset);
           }
-          prevStr += (prevStr ? ' ' : '') + word;
-        });
-      });
 
-      ctx.restore(); // remove clip
+          prevText += (prevText ? ' ' : '') + w;
+          globalWordIdx++;
+        }
+      }
       ctx.textAlign = 'center';
     }
 
