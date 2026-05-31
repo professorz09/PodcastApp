@@ -452,7 +452,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
   const [subtitleBg, setSubtitleBg]           = useState<'dark' | 'light' | 'none'>('dark');
-  const [subtitleSize, setSubtitleSize]       = useState(1.0);
+  const [subtitleSize, setSubtitleSize]       = useState(1.6);
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
