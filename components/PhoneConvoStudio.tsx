@@ -503,23 +503,24 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
 
     const turns: ScriptTurn[] = mainScript.map(seg => {
       const isNarrator = seg.speaker === 'NARRATOR';
+      const wt = seg.wordTimings;
+      // Priority: real STT timings → audio.duration → text estimate (last resort)
+      const realDurMs = wt?.length
+        ? Math.round(wt[wt.length - 1].end * 1000)   // last word's end = actual audio length
+        : seg.duration
+          ? Math.round(seg.duration * 1000)           // from HTML Audio element
+          : null;
       return {
         id: seg.id,
         phoneId: isNarrator ? 'narrator' : speakerToPhoneId(seg.speaker),
         text: seg.text,
         isNarrator,
-        // Narrator cards get a fixed 4-second display time
-        durationMs: isNarrator
-          ? 4000
-          : seg.duration
-            ? Math.round(seg.duration * 1000)
-            : Math.max(2500, seg.text.length * 75),
+        durationMs: isNarrator ? 4000 : (realDurMs ?? Math.max(2500, seg.text.length * 75)),
         audioUrl: isNarrator ? undefined : seg.audioUrl,
-        wordTimings: isNarrator ? undefined : (seg.wordTimings
-          ? seg.wordTimings.map(wt => ({ word: wt.word, startTime: wt.start, endTime: wt.end }))
-          : seg.audioUrl
-            ? estimateWordTimings(seg.text, seg.duration ?? seg.text.length * 0.075)
-            : undefined),
+        // Use real STT timings directly — no estimation when real data exists
+        wordTimings: isNarrator ? undefined : (wt?.length
+          ? wt.map(w => ({ word: w.word, startTime: w.start, endTime: w.end }))
+          : undefined),
       };
     });
     setScript(turns);
