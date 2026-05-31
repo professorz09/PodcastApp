@@ -136,9 +136,12 @@ const App: React.FC = () => {
     try {
       // ── Phone Studio path ─────────────────────────────────────────────────
       if (config.style === 'phone_studio') {
-        const phoneStyleMatch = config.specificDetails?.match(/^PHONE_STYLE:(\w+)/);
-        const phoneConvoStyle = ((phoneStyleMatch?.[1]) || 'experts') as PhoneConvoStyle;
-        const phoneDescription = config.specificDetails?.replace(/^PHONE_STYLE:\w+\n---\n?/, '') || '';
+        const details = config.specificDetails ?? '';
+        const phoneStyleMatch = details.match(/^PHONE_STYLE:(\w+)/);
+        const phoneConvoStyle = ((phoneStyleMatch?.[1]) || 'podcast') as PhoneConvoStyle;
+        const phoneYtUrlMatch = details.match(/PHONE_YT_URL:(.+)/);
+        const phoneYtUrl = phoneYtUrlMatch?.[1]?.trim() ?? '';
+        const phoneDescription = details.replace(/^PHONE_STYLE:\w+\n/, '').replace(/PHONE_YT_URL:.+\n/, '').replace(/^---\n?/, '') || '';
 
         const speakers = (config.speakerNames && config.speakerNames.length >= 2)
           ? config.speakerNames
@@ -146,13 +149,59 @@ const App: React.FC = () => {
             ? ['ChatGPT', 'Gemini', 'Claude']
             : ['ChatGPT', 'Gemini'];
 
+        // ── YouTube mode: fetch transcript → analyze with Gemini ─────────────
+        let ytContext: string | undefined;
+        if (phoneYtUrl) {
+          toast.info('YouTube transcript fetch ho raha hai…');
+          const ytRes = await fetch('/api/youtube/transcript', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: phoneYtUrl, language: 'auto' }),
+          });
+          if (!ytRes.ok) throw new Error('YouTube transcript fetch failed');
+          const ytData = await ytRes.json();
+          if (ytData.error) throw new Error(ytData.error);
+          const rawText: string =
+            ytData.full_text ?? ytData.fullText ??
+            (ytData.segments ?? ytData.transcript ?? []).map((t: any) => t.text).join(' ') ?? '';
+          if (!rawText.trim()) throw new Error('Is video ka transcript available nahi hai.');
+
+          toast.info('Gemini analyze kar raha hai…');
+          const analyzeRes = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'gemini-3.5-flash',
+              contents: [{ role: 'user', parts: [{ text: `Analyze this YouTube transcript and extract key discussion points.
+
+TRANSCRIPT (first 8000 chars):
+${rawText.slice(0, 8000)}
+
+Return JSON only:
+{
+  "topic": "2-3 sentence summary of the video",
+  "points": ["point 1", "point 2", "point 3", "point 4"]
+}` }] }],
+            }),
+          });
+          const analyzeJson = await analyzeRes.json();
+          const analyzeText = analyzeJson.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          const match = analyzeText.match(/\{[\s\S]*\}/);
+          if (match) {
+            const parsed = JSON.parse(match[0]);
+            ytContext = `Based on this YouTube video:\n${parsed.topic}\n\nKey discussion points:\n${(parsed.points as string[]).map((p: string, i: number) => `${i + 1}. ${p}`).join('\n')}`;
+          } else {
+            ytContext = rawText.slice(0, 2000);
+          }
+        }
+
         const generatedScript = await generatePhoneStudioScript(
           config.topic || 'AI Discussion',
           phoneConvoStyle,
           speakers,
           config.duration,
           phoneDescription || undefined,
-          config.contextFileContent,
+          ytContext || config.contextFileContent,
           config.model,
           config.language,
           config.includeNarrator,

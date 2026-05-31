@@ -51,6 +51,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [phoneDescription, setPhoneDescription] = useState('');
   const [useImportTranscript, setUseImportTranscript] = useState(false);
   const [phoneNarrator, setPhoneNarrator] = useState(false);
+  const [phoneYtMode, setPhoneYtMode] = useState(false);
+  const [phoneYtUrl, setPhoneYtUrl] = useState('');
   const phoneFileInputRef = useRef<HTMLInputElement>(null);
   const [phoneFileName, setPhoneFileName] = useState<string | undefined>();
   const [phoneFileContent, setPhoneFileContent] = useState<string | undefined>();
@@ -106,14 +108,18 @@ const DebateInput: React.FC<DebateInputProps> = ({
         phoneFileContent || '',
       ].filter(Boolean).join('\n\n---\n\n') || undefined;
 
-      if (!topic.trim() && !phoneDescription.trim() && !phoneCtx) {
-        toast.warning('Topic, context ya file zaroor daalein');
+      if (!topic.trim() && !phoneDescription.trim() && !phoneCtx && !(phoneYtMode && phoneYtUrl.trim())) {
+        toast.warning('Topic, YouTube URL, context ya file zaroor daalein');
+        return;
+      }
+      if (phoneYtMode && !phoneYtUrl.trim()) {
+        toast.warning('YouTube URL daalein');
         return;
       }
       const activePhoneSpeakers = speakerNames.slice(0, speakerCount).map(n => n.trim()).filter(Boolean);
       onGenerate({
         topic: topic.trim() || 'AI Discussion',
-        specificDetails: `PHONE_STYLE:${phoneConvoStyle}\n---\n${phoneDescription}`,
+        specificDetails: `PHONE_STYLE:${phoneConvoStyle}\n${phoneYtMode && phoneYtUrl.trim() ? `PHONE_YT_URL:${phoneYtUrl.trim()}\n` : ''}---\n${phoneDescription}`,
         duration,
         includeNarrator: phoneNarrator,
         contextFileContent: phoneCtx,
@@ -352,19 +358,54 @@ const DebateInput: React.FC<DebateInputProps> = ({
               />
             ) : mode === 'phone' ? (
               <div className="space-y-2">
-                <input
-                  type="text"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Conversation topic (e.g. 'AI ka future', 'Cryptocurrency worth it hai?')"
-                  className="w-full bg-transparent text-white px-5 py-4 text-base md:text-lg placeholder:text-gray-600 focus:outline-none font-medium"
-                />
+                {/* YouTube toggle */}
+                <div
+                  className={`flex items-center gap-3 px-5 py-3 cursor-pointer border-b transition-colors ${phoneYtMode ? 'border-red-500/20 bg-red-500/5' : 'border-white/5 hover:bg-white/[0.02]'}`}
+                  onClick={() => setPhoneYtMode(p => !p)}
+                >
+                  <span className="text-lg">▶️</span>
+                  <div className="flex-1">
+                    <div className={`text-sm font-semibold ${phoneYtMode ? 'text-red-300' : 'text-gray-300'}`}>YouTube se Generate</div>
+                    <div className="text-[11px] text-gray-500">Transcript extract → Gemini analyze → Script banega</div>
+                  </div>
+                  <div className={`relative w-9 h-5 rounded-full transition-all shrink-0 ${phoneYtMode ? 'bg-red-500' : 'bg-white/10'}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${phoneYtMode ? 'translate-x-4' : ''}`} />
+                  </div>
+                </div>
+                {phoneYtMode ? (
+                  <div className="px-5 pb-2 space-y-2">
+                    <input
+                      type="text"
+                      value={phoneYtUrl}
+                      onChange={(e) => setPhoneYtUrl(e.target.value)}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="w-full bg-[#111111] border border-white/5 rounded-lg px-3 py-2.5 text-sm text-white focus:border-red-500/50 focus:outline-none placeholder:text-gray-600"
+                    />
+                    <input
+                      type="text"
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                      placeholder="Extra focus (optional) — e.g. 'Focus on AI claims only'"
+                      className="w-full bg-transparent text-white px-0 py-1 text-sm placeholder:text-gray-600 focus:outline-none"
+                    />
+                  </div>
+                ) : (
+                <div className="px-5 pt-1">
+                  <input
+                    type="text"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="Conversation topic (e.g. 'AI ka future', 'Cryptocurrency worth it hai?')"
+                    className="w-full bg-transparent text-white py-3 text-base md:text-lg placeholder:text-gray-600 focus:outline-none font-medium"
+                  />
+                </div>
+                )}
                 <div className="px-5 pb-4 space-y-3">
                   <textarea
                     value={phoneDescription}
                     onChange={(e) => setPhoneDescription(e.target.value)}
-                    placeholder="Context ya description — kya discuss karein? Podcast ki main baatein, key arguments, facts jo cover karni hain..."
-                    rows={3}
+                    placeholder="Context ya description — kya discuss karein?"
+                    rows={2}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-3 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-purple-500/50 resize-none"
                   />
                   {/* Context file for phone mode */}
