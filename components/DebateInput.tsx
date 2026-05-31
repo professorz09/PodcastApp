@@ -937,7 +937,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
             || (mode === 'topic' && !topic && !contextFileContent)
             || (mode === 'script' && !customScript)
             || (mode === 'youtube' && !youtubeUrl)
-            || (mode === 'phone' && !topic.trim() && !phoneDescription.trim() && !phoneFileContent && !useImportTranscript)
+            || (mode === 'phone' && !topic.trim() && !phoneDescription.trim() && !phoneFileContent && !useImportTranscript && !(phoneYtMode && phoneYtUrl.trim()))
           }
           className={`w-full mt-2 bg-gradient-to-r ${mode === 'phone' ? 'from-purple-700 to-pink-700 hover:from-purple-600 hover:to-pink-600' : 'from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500'} disabled:from-gray-800 disabled:to-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 rounded-[16px] shadow-lg shadow-purple-900/20 transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-3 text-base group relative overflow-hidden`}
         >
