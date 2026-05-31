@@ -456,49 +456,60 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${phoneSegmentPicker ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-white/[0.03] border border-white/5 hover:bg-white/[0.05]'}`}
                       onClick={() => { setPhoneSegmentPicker(p => !p); setPhoneSegments([]); setPhoneSelectedSegs(new Set()); }}
                     >
-                      <Scissors size={14} className={phoneSegmentPicker ? 'text-purple-400' : 'text-gray-500'} />
+                      <Scissors size={13} className={phoneSegmentPicker ? 'text-purple-400' : 'text-gray-500'} />
                       <div className="flex-1">
                         <div className={`text-xs font-semibold ${phoneSegmentPicker ? 'text-purple-300' : 'text-gray-400'}`}>Segment Picker</div>
-                        <div className="text-[10px] text-gray-600">Poora podcast analyze ho → specific part chunno (max 2)</div>
+                        <div className="text-[10px] text-gray-600">Ek specific hissa chunno (max 2)</div>
                       </div>
                       <div className={`relative w-8 h-4 rounded-full transition-all shrink-0 ${phoneSegmentPicker ? 'bg-purple-500' : 'bg-white/10'}`}>
                         <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${phoneSegmentPicker ? 'translate-x-4' : ''}`} />
                       </div>
                     </div>
 
-                    {/* Segment Picker — analyze button + cards */}
+                    {/* Segment Picker panel */}
                     {phoneSegmentPicker && (
-                      <div className="space-y-2 pt-1">
+                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+                        {/* Analyze button / loading */}
                         <button
                           onClick={analyzeSegments}
                           disabled={phoneSegmentsLoading || !phoneYtUrl.trim()}
-                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-purple-600/20 border border-purple-500/30 text-purple-300 text-xs font-semibold hover:bg-purple-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+                            border-b border-white/[0.06]
+                            text-purple-300 hover:bg-purple-500/10"
                         >
                           {phoneSegmentsLoading
-                            ? <><Loader2 size={13} className="animate-spin" /> Analyzing transcript…</>
-                            : <><Scissors size={13} /> Podcast ko segments mein todein</>}
+                            ? <><Loader2 size={12} className="animate-spin" />Analyzing…</>
+                            : <><Scissors size={12} />{phoneSegments.length ? 'Re-analyze' : 'Topics nikalo'}</>}
                         </button>
 
+                        {/* Segment cards */}
                         {phoneSegments.length > 0 && (
-                          <div className="space-y-1.5">
-                            <div className="text-[10px] text-gray-500 px-1">
-                              {phoneSelectedSegs.size}/2 selected — click to select/deselect
+                          <div>
+                            <div className="px-3 py-1.5 flex items-center justify-between">
+                              <span className="text-[10px] text-gray-600">Select 1–2 segments</span>
+                              <span className={`text-[10px] font-semibold ${phoneSelectedSegs.size === 2 ? 'text-purple-400' : 'text-gray-500'}`}>
+                                {phoneSelectedSegs.size}/2
+                              </span>
                             </div>
                             {phoneSegments.map((seg, i) => {
                               const selected = phoneSelectedSegs.has(i);
+                              const blocked = !selected && phoneSelectedSegs.size >= 2;
                               return (
                                 <div
                                   key={i}
-                                  onClick={() => toggleSeg(i)}
-                                  className={`flex items-start gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer border transition-all ${selected ? 'bg-purple-500/15 border-purple-500/40' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05]'}`}
+                                  onClick={() => !blocked && toggleSeg(i)}
+                                  className={`flex items-start gap-2.5 px-3 py-2.5 border-t border-white/[0.04] transition-colors
+                                    ${selected ? 'bg-purple-500/10' : blocked ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer hover:bg-white/[0.03]'}`}
                                 >
-                                  <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${selected ? 'bg-purple-500 border-purple-500' : 'border-white/20'}`}>
-                                    {selected && <svg width="9" height="9" viewBox="0 0 9 9"><path d="M1.5 4.5l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>}
+                                  {/* Checkbox */}
+                                  <div className={`mt-0.5 w-3.5 h-3.5 rounded-sm border shrink-0 flex items-center justify-center transition-colors
+                                    ${selected ? 'bg-purple-500 border-purple-500' : 'border-white/20'}`}>
+                                    {selected && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3.5" stroke="white" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <div className={`text-xs font-semibold leading-snug ${selected ? 'text-purple-200' : 'text-gray-300'}`}>{seg.title}</div>
-                                    <div className="text-[10px] text-gray-500 mt-0.5">{fmtSec(seg.start)} – {fmtSec(seg.end)}</div>
-                                    {seg.summary && <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-2">{seg.summary}</div>}
+                                    <div className={`text-xs font-medium leading-snug ${selected ? 'text-white' : 'text-gray-300'}`}>{seg.title}</div>
+                                    <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{fmtSec(seg.start)} – {fmtSec(seg.end)}</div>
+                                    {seg.summary && <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{seg.summary}</div>}
                                   </div>
                                 </div>
                               );

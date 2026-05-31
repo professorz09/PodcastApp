@@ -5185,20 +5185,18 @@ Return ONLY a JSON array. Each item: {"title": "...", "start_seconds": 0, "end_s
 The first chunk's start_seconds must be 0. The last chunk's end_seconds must be ${Math.floor(totalDuration)}.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     contents: prompt,
-    config: { responseMimeType: 'application/json' },
   });
 
   const raw = response.text ?? '';
   let splits: { title: string; start_seconds: number; end_seconds: number; summary?: string }[] = [];
 
   try {
-    splits = JSON.parse(raw);
-  } catch {
     const m = raw.match(/\[[\s\S]*\]/);
-    if (!m) throw new Error('Gemini returned invalid JSON for topic split');
-    splits = JSON.parse(m[0]);
+    splits = JSON.parse(m ? m[0] : raw);
+  } catch {
+    throw new Error('Segment analysis failed — try again');
   }
 
   if (!Array.isArray(splits) || !splits.length) throw new Error('No splits returned');
