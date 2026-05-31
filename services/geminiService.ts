@@ -6018,6 +6018,94 @@ ${lines}`;
 
 // ─── Phone Studio Script Generator ───────────────────────────────────────────
 
+// ── YouTube-style Chapter Generator ───────────────────────────────────────────
+
+export interface ScriptChapter {
+  startMs: number;   // chapter start in ms
+  endMs: number;     // chapter end in ms (next chapter's start or total)
+  title: string;     // short topic title (3-6 words)
+}
+
+export const generateScriptChapters = async (
+  turns: { text: string; speaker: string; durationMs: number }[],
+  language: 'hindi' | 'english' = 'english',
+): Promise<ScriptChapter[]> => {
+  if (!turns.length) return [];
+  const ai = getAi();
+
+  // Build a condensed script with cumulative timestamps
+  let ms = 0;
+  const lines = turns.map((t, i) => {
+    const sec = Math.floor(ms / 1000);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    const ts = `${m}:${String(s).padStart(2, '0')}`;
+    const entry = `[${ts}] ${t.speaker}: ${t.text.replace(/\n/g, ' ').slice(0, 80)}`;
+    ms += t.durationMs;
+    return entry;
+  }).join('\n');
+
+  const totalSec = Math.floor(ms / 1000);
+  const totalMin = Math.floor(totalSec / 60);
+
+  const prompt = `You are a YouTube video editor. Analyse the script below and create ${totalMin < 3 ? '3-4' : totalMin < 8 ? '4-6' : '5-8'} topic-based chapters for a YouTube description.
+
+Rules:
+- Each chapter covers ONE clear topic/theme discussed in that time range
+- Chapter title: 2-5 words, punchy, in ${language === 'hindi' ? 'Hindi (Hinglish ok)' : 'English'}
+- First chapter MUST start at 0:00
+- Chapters cover the FULL video — last chapter ends at ${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}
+- Group multiple speaker turns under ONE chapter if they discuss the same topic
+- NO generic titles like "Introduction" — make them specific to what is actually discussed
+
+Return JSON ONLY:
+{
+  "chapters": [
+    { "startTimestamp": "0:00", "title": "Chapter topic here" },
+    { "startTimestamp": "2:15", "title": "Next topic" }
+  ]
+}
+
+Script:
+${lines}`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.5-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: { responseMimeType: 'application/json' },
+  });
+
+  const text = response.text || '';
+  let parsed: { chapters: { startTimestamp: string; title: string }[] };
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    const m = stripped.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Chapter AI response was not valid JSON');
+    parsed = JSON.parse(m[0]);
+  }
+
+  if (!parsed?.chapters || !Array.isArray(parsed.chapters)) {
+    throw new Error('Invalid chapters response');
+  }
+
+  // Convert "M:SS" timestamps back to ms
+  const totalMs = turns.reduce((a, t) => a + t.durationMs, 0);
+  const chaps = parsed.chapters.map(c => {
+    const parts = c.startTimestamp.split(':').map(Number);
+    const sec = parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return { startMs: sec * 1000, title: c.title };
+  }).sort((a, b) => a.startMs - b.startMs);
+
+  // Attach endMs
+  return chaps.map((c, i) => ({
+    startMs: c.startMs,
+    endMs: i + 1 < chaps.length ? chaps[i + 1].startMs : totalMs,
+    title: c.title,
+  }));
+};
+
 export type PhoneConvoStyle = 'podcast' | 'roast' | 'sarcastic' | 'factual' | 'devils_advocate' | 'hot_takes' | 'factcheck' | 'react' | 'experts' | 'detailed' | 'funny' | 'debate' | 'debate_sarcasm' | 'fight' | 'romantic' | 'celebrity_call' | 'ground_search' | 'explain_examples' | 'explain_funny' | 'explain_deep';
 
 export const generatePhoneStudioScript = async (

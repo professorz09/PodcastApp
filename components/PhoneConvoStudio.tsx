@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { CanvasRenderer, PhoneConfig, ScriptTurn, StudioState, AnimStyle } from '../services/phoneCanvasRenderer';
 import { renderVideoOffline } from '../services/videoRenderer';
+import { generateScriptChapters } from '../services/geminiService';
 import { toast } from './Toast';
 import { DebateSegment } from '../types';
 
@@ -565,6 +566,10 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const audioSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   // Pre-fetched raw ArrayBuffer cache (keyed by URL) so play starts instantly
   const audioCacheRef  = useRef<Map<string, ArrayBuffer>>(new Map());
+
+  // Chapters
+  const [chapters, setChapters] = useState<{ startMs: number; endMs: number; title: string }[]>([]);
+  const [chaptersGenerating, setChaptersGenerating] = useState(false);
 
   // Export
   const [exporting, setExporting]       = useState(false);
@@ -1662,69 +1667,111 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   );
                 })()}
 
-                {/* ── Timestamps / Chapters ── */}
+                {/* ── YouTube Chapters ── */}
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>⏱ Timestamps / Chapters</div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 2 }}>YouTube description mein paste karo</div>
-                    </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>⏱ YouTube Chapters</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>AI topic-based chapters — YouTube description mein paste karo</div>
+
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                     <button
-                      onClick={() => {
-                        if (!script.length) return;
-                        let ms = 0;
-                        const lines: string[] = [];
-                        script.forEach(turn => {
-                          const totalSec = Math.floor(ms / 1000);
-                          const m = Math.floor(totalSec / 60);
-                          const s = totalSec % 60;
-                          const ts = `${m}:${String(s).padStart(2, '0')}`;
-                          const phone = phones.find(p => p.id === turn.phoneId);
-                          const speaker = phone?.name ?? turn.phoneId;
-                          // First 6 words of the turn as chapter title
-                          const preview = turn.text.replace(/\n/g, ' ').split(' ').slice(0, 6).join(' ');
-                          lines.push(`${ts} ${speaker}: ${preview}…`);
-                          ms += turn.durationMs;
-                        });
-                        const text = lines.join('\n');
-                        navigator.clipboard.writeText(text).then(() => toast.success('✓ Timestamps copy ho gaye!')).catch(() => toast.error('Copy failed'));
+                      onClick={async () => {
+                        if (!script.length || chaptersGenerating) return;
+                        setChaptersGenerating(true);
+                        try {
+                          const turns = script.map(t => {
+                            const phone = phones.find(p => p.id === t.phoneId);
+                            return { text: t.text, speaker: phone?.name ?? t.phoneId, durationMs: t.durationMs };
+                          });
+                          const result = await generateScriptChapters(turns);
+                          setChapters(result);
+                          toast.success(`✓ ${result.length} chapters generate ho gaye!`);
+                        } catch (e: any) {
+                          toast.error(`Chapters error: ${e.message}`);
+                        } finally {
+                          setChaptersGenerating(false);
+                        }
                       }}
+                      disabled={!script.length || chaptersGenerating}
                       style={{
-                        padding: '6px 12px', borderRadius: 8, border: 'none',
-                        background: script.length ? '#7c3aed' : 'rgba(255,255,255,0.06)',
-                        color: script.length ? '#fff' : 'rgba(255,255,255,0.3)',
-                        fontSize: 11, fontWeight: 700, cursor: script.length ? 'pointer' : 'default',
-                        fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none',
+                        background: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#7c3aed,#6d28d9)',
+                        color: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.3)' : '#fff',
+                        fontSize: 11, fontWeight: 700, cursor: (!script.length || chaptersGenerating) ? 'default' : 'pointer',
+                        fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                       }}
                     >
-                      📋 Copy
+                      {chaptersGenerating
+                        ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                        : '✨ Generate Chapters'}
                     </button>
+                    {chapters.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const fmt = (ms: number) => {
+                            const s = Math.floor(ms / 1000);
+                            const m = Math.floor(s / 60);
+                            const sec = s % 60;
+                            return `(${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')})`;
+                          };
+                          const text = chapters.map(c => `${fmt(c.startMs)} ${c.title}`).join('\n');
+                          navigator.clipboard.writeText(text)
+                            .then(() => toast.success('✓ Chapters copy ho gaye!'))
+                            .catch(() => toast.error('Copy failed'));
+                        }}
+                        style={{
+                          padding: '7px 12px', borderRadius: 8,
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          background: '#1e293b', color: '#94a3b8',
+                          fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                        } as React.CSSProperties}
+                      >
+                        📋 Copy
+                      </button>
+                    )}
                   </div>
-                  {script.length > 0 ? (
-                    <div style={{ maxHeight: 120, overflowY: 'auto', background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '6px 8px' }}>
-                      {(() => {
-                        let ms = 0;
-                        return script.map((turn, i) => {
-                          const totalSec = Math.floor(ms / 1000);
-                          const m = Math.floor(totalSec / 60);
-                          const s = totalSec % 60;
-                          const ts = `${m}:${String(s).padStart(2, '0')}`;
-                          const phone = phones.find(p => p.id === turn.phoneId);
-                          const speaker = phone?.name ?? turn.phoneId;
-                          const preview = turn.text.replace(/\n/g, ' ').split(' ').slice(0, 5).join(' ');
-                          ms += turn.durationMs;
-                          return (
-                            <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.5)', padding: '2px 0', fontFamily: 'monospace' }}>
-                              <span style={{ color: '#a78bfa', flexShrink: 0 }}>{ts}</span>
-                              <span style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{speaker}:</span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}…</span>
+
+                  {/* Chapter list */}
+                  {chapters.length > 0 ? (
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden' }}>
+                      {chapters.map((ch, i) => {
+                        const fmtMs = (ms: number) => {
+                          const s = Math.floor(ms / 1000);
+                          const m = Math.floor(s / 60);
+                          const sec = s % 60;
+                          return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+                        };
+                        return (
+                          <div key={i} style={{
+                            display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                            borderBottom: i < chapters.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                          }}>
+                            {/* Time range badge */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                              <span style={{ color: '#818cf8', fontFamily: 'monospace', fontSize: 11, fontWeight: 700 }}>
+                                ({fmtMs(ch.startMs)})
+                              </span>
+                              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9 }}>→</span>
+                              <span style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', fontSize: 10 }}>
+                                ({fmtMs(ch.endMs)})
+                              </span>
                             </div>
-                          );
-                        });
-                      })()}
+                            {/* Title */}
+                            <span style={{ flex: 1, fontSize: 11, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ch.title}
+                            </span>
+                            {/* Duration */}
+                            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', flexShrink: 0, fontFamily: 'monospace' }}>
+                              {Math.round((ch.endMs - ch.startMs) / 1000)}s
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', padding: 8 }}>Script load karo pehle</div>
+                    <div style={{ textAlign: 'center', padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
+                      {script.length ? '↑ "Generate Chapters" dabao — AI topic groups banana hai' : 'Script load karo pehle'}
+                    </div>
                   )}
                 </div>
 
