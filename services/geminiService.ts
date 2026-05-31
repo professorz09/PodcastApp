@@ -5619,9 +5619,17 @@ export const findBestShortsSegments = async (
     : transcript;
   if (!inRange.length) throw new Error('No transcript in selected range');
 
-  const lines = inRange
-    .map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`)
-    .join('\n');
+  // Truncate transcript if too long (model context limit)
+  const MAX_CHARS = 28_000;
+  let allLines = inRange.map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`);
+  let joined = allLines.join('\n');
+  if (joined.length > MAX_CHARS) {
+    // Evenly sample across the full transcript to preserve coverage
+    const step = Math.ceil(allLines.length / Math.floor(MAX_CHARS / 60));
+    allLines = allLines.filter((_, i) => i % step === 0);
+    joined = allLines.join('\n');
+  }
+  const lines = joined;
 
   const rangeNote = (rangeStart !== undefined && rangeEnd !== undefined)
     ? `\nFocus only on the time range ${rangeStart.toFixed(1)}s to ${rangeEnd.toFixed(1)}s.`
@@ -5688,12 +5696,27 @@ ${lines}`;
   try {
     parsed = JSON.parse(text);
   } catch {
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('AI response was not valid JSON');
-    parsed = JSON.parse(m[0]);
+    // Try stripping markdown code fences first
+    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    try {
+      parsed = JSON.parse(stripped);
+    } catch {
+      // Try extracting first {...} block
+      const m = stripped.match(/\{[\s\S]*\}/);
+      if (!m) {
+        console.error('Clip AI raw response:', text.slice(0, 500));
+        throw new Error(`AI response was not valid JSON. Got: ${text.slice(0, 120)}`);
+      }
+      try {
+        parsed = JSON.parse(m[0]);
+      } catch {
+        console.error('Clip AI raw response:', text.slice(0, 500));
+        throw new Error(`AI response JSON malformed. Got: ${m[0].slice(0, 120)}`);
+      }
+    }
   }
 
-  if (!parsed.segments || !Array.isArray(parsed.segments)) {
+  if (!parsed?.segments || !Array.isArray(parsed.segments)) {
     throw new Error('AI response missing segments array');
   }
 
@@ -5907,9 +5930,16 @@ export const generateVideoClipsFromTranscript = async (
     ? 'short-form vertical video (YouTube Shorts / Reels / TikTok) — punchy, high-energy, hooky'
     : 'long-form horizontal video (YouTube full video) — informative, complete, in-depth';
 
-  const lines = transcript
-    .map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`)
-    .join('\n');
+  // Truncate transcript if too long
+  const MAX_CHARS_2 = 28_000;
+  let rawLines2 = transcript.map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`);
+  let joined2 = rawLines2.join('\n');
+  if (joined2.length > MAX_CHARS_2) {
+    const step = Math.ceil(rawLines2.length / Math.floor(MAX_CHARS_2 / 60));
+    rawLines2 = rawLines2.filter((_, i) => i % step === 0);
+    joined2 = rawLines2.join('\n');
+  }
+  const lines = joined2;
 
   const prompt = `You are an expert video editor specialising in ${formatHint}.
 
@@ -5952,12 +5982,25 @@ ${lines}`;
   try {
     parsed = JSON.parse(text);
   } catch {
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('AI response was not valid JSON');
-    parsed = JSON.parse(m[0]);
+    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    try {
+      parsed = JSON.parse(stripped);
+    } catch {
+      const m = stripped.match(/\{[\s\S]*\}/);
+      if (!m) {
+        console.error('ClipGen AI raw response:', text.slice(0, 500));
+        throw new Error(`AI response was not valid JSON. Got: ${text.slice(0, 120)}`);
+      }
+      try {
+        parsed = JSON.parse(m[0]);
+      } catch {
+        console.error('ClipGen AI raw response:', text.slice(0, 500));
+        throw new Error(`AI response JSON malformed. Got: ${m[0].slice(0, 120)}`);
+      }
+    }
   }
 
-  if (!parsed.segments || !Array.isArray(parsed.segments)) {
+  if (!parsed?.segments || !Array.isArray(parsed.segments)) {
     throw new Error('AI response missing segments array');
   }
 
