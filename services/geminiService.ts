@@ -5185,7 +5185,7 @@ Return ONLY a JSON array. Each item: {"title": "...", "start_seconds": 0, "end_s
 The first chunk's start_seconds must be 0. The last chunk's end_seconds must be ${Math.floor(totalDuration)}.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.5-flash',
     contents: prompt,
   });
 
