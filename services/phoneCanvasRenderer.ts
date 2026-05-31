@@ -176,11 +176,12 @@ export class CanvasRenderer {
     // Layout
     const phoneAspect = 9 / 19.5;
     const spacingRatio = (state.deviceSpacing ?? 50) / 100;
-    const padding = w * 0.13 * (1 - spacingRatio);
+    // Quadratic scale: at 100% gives large visible gap; at 0% phones are close
+    const padding = w * 0.06 * (1 - spacingRatio);
     const yPadding = h * 0.09;
     const availW = w - padding * 2;
     const availH = h - yPadding * 2;
-    const spacing = availW * (0.02 + 0.13 * spacingRatio);
+    const spacing = availW * (0.02 + 0.44 * spacingRatio * spacingRatio + 0.06 * spacingRatio);
     let pw = (availW - spacing * (phones.length - 1)) / phones.length;
     let ph = pw / phoneAspect;
     if (ph > availH) { ph = availH; pw = ph * phoneAspect; }
@@ -787,12 +788,14 @@ export class CanvasRenderer {
 
         line.words.forEach(w => {
           const dist  = targetWordFloat - wordIdxInGroup;
-          const alpha = dist > 0 ? Math.min(1.0, dist * 2.5) : 0;
+          // Sharp sync: word appears almost instantly when it's "active"
+          // dist > 0 means word's time has come; full alpha at dist = 0.15
+          const alpha = dist > 0 ? Math.min(1.0, dist * 7.0) : 0;
           if (alpha > 0.01) {
-            const ease    = 1 - Math.pow(1 - alpha, 3);
-            const yOffset = (1 - ease) * (sw * 0.02);
+            const ease    = 1 - Math.pow(1 - Math.min(1, alpha), 3);
+            const yOffset = (1 - ease) * (sw * 0.008); // subtle slide, much less than before
             const xOff   = prevText ? ctx.measureText(prevText + ' ').width : 0;
-            ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha * 0.95})`;
+            ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha})`;
             ctx.fillText(w, startTx + xOff, ty + li * lh + yOffset);
           }
           prevText += (prevText ? ' ' : '') + w;

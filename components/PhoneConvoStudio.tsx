@@ -810,10 +810,28 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     const W = 1920, H = 1080, FPS = 30;
     const totalMs = script.reduce((s, t) => s + t.durationMs, 0);
     const totalSec = totalMs / 1000;
+    const isLongVideo = totalSec > 8 * 60; // > 8 min = stream to disk
 
     setExporting(true); setExportProgress(0); setExportStatus('Audio decode ho raha hai…');
 
+    let fileStream: any = null;
+
     try {
+      // ── 0. For long videos: get file save handle BEFORE decoding ──────────
+      if (isLongVideo && 'showSaveFilePicker' in window) {
+        try {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: `phone-studio-${Date.now()}.mp4`,
+            types: [{ description: 'MP4 Video', accept: { 'video/mp4': ['.mp4'] } }],
+          });
+          fileStream = await fileHandle.createWritable();
+          toast.info('Long video → disk pe stream ho raha hai (RAM save hoga)');
+        } catch {
+          // User cancelled picker or browser doesn't support — fallback to in-memory
+          fileStream = null;
+        }
+      }
+
       // ── 1. Decode all audio and mix into one Float32Array ─────────────────
       const actx = new AudioContext();
       const decoded = await Promise.all(
@@ -839,13 +857,15 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       await actx.close();
 
       // ── 2. Create offscreen renderer at 1080p ─────────────────────────────
-      setExportStatus('Video render ho raha hai…');
+      setExportStatus(isLongVideo && fileStream
+        ? 'Long video — disk pe stream ho raha hai…'
+        : 'Video render ho raha hai…');
       const exportCanvas = document.createElement('canvas');
       exportCanvas.width = W; exportCanvas.height = H;
       const state = buildState();
       const exportRenderer = new CanvasRenderer(exportCanvas, state);
 
-      // ── 3. Offline render via WebCodecs (mp4-muxer) — much faster ─────────
+      // ── 3. Offline render via WebCodecs (mp4-muxer) ───────────────────────
       const blob = await renderVideoOffline({
         canvas: exportCanvas,
         audioChannels: [mixed],
@@ -863,17 +883,22 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         onProgress: p => {
           setExportProgress(Math.round(p * 100));
         },
-      });
+      }, fileStream ?? undefined);
 
-      if (!blob) throw new Error('Render empty return hua');
-
-      // ── 4. Download ───────────────────────────────────────────────────────
-      const url = URL.createObjectURL(blob as Blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `phone-studio-${Date.now()}.mp4`; a.click();
-      URL.revokeObjectURL(url);
-      toast.success('✓ 1080p MP4 download ho gaya!');
+      // ── 4. Download (only if in-memory; streaming already wrote to file) ──
+      if (fileStream) {
+        await fileStream.close();
+        toast.success('✓ Long video disk pe save ho gaya!');
+      } else {
+        if (!blob) throw new Error('Render empty return hua');
+        const url = URL.createObjectURL(blob as Blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `phone-studio-${Date.now()}.mp4`; a.click();
+        URL.revokeObjectURL(url);
+        toast.success('✓ 1080p MP4 download ho gaya!');
+      }
     } catch (err: any) {
+      if (fileStream) { try { await fileStream.close(); } catch {} }
       console.error('Export error:', err);
       toast.error(`Export failed: ${err.message}`);
     } finally {
@@ -1616,10 +1641,93 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   </div>
                 </div>
 
-                {/* Sync info */}
-                <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-                  <span style={{ color: '#86efac', fontWeight: 700 }}>Word-by-word mode:</span> Subtitles ek-ek word karke aate hain — naturally, jaise typing. Sync ki hui files (STT) use hoti hain agar available ho, warna weight estimate.
+                {/* Sync mode indicator */}
+                {(() => {
+                  const hasRealSync = script.some(t => t.wordTimings && t.wordTimings.length > 0);
+                  const realCount   = script.filter(t => t.wordTimings && t.wordTimings.length > 0).length;
+                  return (
+                    <div style={{ padding: '9px 12px', borderRadius: 10, background: hasRealSync ? 'rgba(34,197,94,0.07)' : 'rgba(251,191,36,0.07)', border: `1px solid ${hasRealSync ? 'rgba(34,197,94,0.2)' : 'rgba(251,191,36,0.2)'}`, fontSize: 11, lineHeight: 1.6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{ fontSize: 13 }}>{hasRealSync ? '✅' : '⚡'}</span>
+                        <span style={{ fontWeight: 700, color: hasRealSync ? '#86efac' : '#fde68a' }}>
+                          {hasRealSync ? `Real Word Sync — ${realCount}/${script.length} turns` : 'Estimated Sync (no STT data)'}
+                        </span>
+                      </div>
+                      <span style={{ color: 'rgba(255,255,255,0.35)' }}>
+                        {hasRealSync
+                          ? 'Word-level STT timings available hain — subtitles exact audio se sync hain.'
+                          : 'STT word timings nahi hain — weight-based estimate use ho raha hai. Voice Gen → STT karke sync improve karo.'}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* ── Timestamps / Chapters ── */}
+                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>⏱ Timestamps / Chapters</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 2 }}>YouTube description mein paste karo</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!script.length) return;
+                        let ms = 0;
+                        const lines: string[] = [];
+                        script.forEach(turn => {
+                          const totalSec = Math.floor(ms / 1000);
+                          const m = Math.floor(totalSec / 60);
+                          const s = totalSec % 60;
+                          const ts = `${m}:${String(s).padStart(2, '0')}`;
+                          const phone = phones.find(p => p.id === turn.phoneId);
+                          const speaker = phone?.name ?? turn.phoneId;
+                          // First 6 words of the turn as chapter title
+                          const preview = turn.text.replace(/\n/g, ' ').split(' ').slice(0, 6).join(' ');
+                          lines.push(`${ts} ${speaker}: ${preview}…`);
+                          ms += turn.durationMs;
+                        });
+                        const text = lines.join('\n');
+                        navigator.clipboard.writeText(text).then(() => toast.success('✓ Timestamps copy ho gaye!')).catch(() => toast.error('Copy failed'));
+                      }}
+                      style={{
+                        padding: '6px 12px', borderRadius: 8, border: 'none',
+                        background: script.length ? '#7c3aed' : 'rgba(255,255,255,0.06)',
+                        color: script.length ? '#fff' : 'rgba(255,255,255,0.3)',
+                        fontSize: 11, fontWeight: 700, cursor: script.length ? 'pointer' : 'default',
+                        fontFamily: 'inherit', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
+                  {script.length > 0 ? (
+                    <div style={{ maxHeight: 120, overflowY: 'auto', background: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: '6px 8px' }}>
+                      {(() => {
+                        let ms = 0;
+                        return script.map((turn, i) => {
+                          const totalSec = Math.floor(ms / 1000);
+                          const m = Math.floor(totalSec / 60);
+                          const s = totalSec % 60;
+                          const ts = `${m}:${String(s).padStart(2, '0')}`;
+                          const phone = phones.find(p => p.id === turn.phoneId);
+                          const speaker = phone?.name ?? turn.phoneId;
+                          const preview = turn.text.replace(/\n/g, ' ').split(' ').slice(0, 5).join(' ');
+                          ms += turn.durationMs;
+                          return (
+                            <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.5)', padding: '2px 0', fontFamily: 'monospace' }}>
+                              <span style={{ color: '#a78bfa', flexShrink: 0 }}>{ts}</span>
+                              <span style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{speaker}:</span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}…</span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', padding: 8 }}>Script load karo pehle</div>
+                  )}
                 </div>
+
               </div>
             )}
           </div>
