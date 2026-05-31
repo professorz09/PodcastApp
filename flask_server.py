@@ -13,14 +13,22 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import http.cookiejar as _http_cookiejar
+import requests as _requests_lib
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
-# Detect Node.js for yt-dlp n-challenge solving (required for yt-dlp 2026+)
+# yt-dlp binary: prefer the locally downloaded newer version, fall back to system one
+_YTDLP_LOCAL = os.path.join(os.path.dirname(__file__), 'yt-dlp-new')
+_YTDLP_BIN = _YTDLP_LOCAL if os.path.isfile(_YTDLP_LOCAL) and os.access(_YTDLP_LOCAL, os.X_OK) else (shutil.which('yt-dlp') or 'yt-dlp')
+_YTDLP_IS_NEW = (_YTDLP_BIN == _YTDLP_LOCAL)  # True if using 2026.03.17+ binary
+
 _NODE_BIN = shutil.which('node') or ''
+
 def _js_runtime_args():
-    """Return --js-runtimes and --remote-components flags if Node.js is available."""
-    if _NODE_BIN:
+    """Return --js-runtimes and --remote-components if using new yt-dlp + Node.js.
+    yt-dlp 2026.03.17+ supports these flags for EJS n-challenge solving."""
+    if _YTDLP_IS_NEW and _NODE_BIN:
         return [
             '--js-runtimes', f'node:{_NODE_BIN}',
             '--remote-components', 'ejs:github',
@@ -32,6 +40,23 @@ try:
     TRANSCRIPT_API_AVAILABLE = True
 except ImportError:
     TRANSCRIPT_API_AVAILABLE = False
+
+def make_transcript_api():
+    """Create YouTubeTranscriptApi instance (v1.x instance-based API).
+    Loads yt_cookies.txt into a requests.Session if the file exists."""
+    if not TRANSCRIPT_API_AVAILABLE:
+        return None
+    ck = cookies_path()
+    if ck:
+        try:
+            cj = _http_cookiejar.MozillaCookieJar(ck)
+            cj.load(ignore_discard=True, ignore_expires=True)
+            session = _requests_lib.Session()
+            session.cookies = cj
+            return YouTubeTranscriptApi(http_client=session)
+        except Exception:
+            pass
+    return YouTubeTranscriptApi()
 
 app = Flask(__name__)
 CORS(app)  # Allow React app to call this server
@@ -227,14 +252,11 @@ def get_transcript():
                 continue
         return result
 
-    # ── Attempt 1: list_transcripts — inspect all available, sort by preference
-    ck = cookies_path()
+    # ── Attempt 1: list() — inspect all available transcripts, sort by preference
+    # youtube-transcript-api v1.x uses instance-based API: YouTubeTranscriptApi().list(video_id)
     try:
-        transcript_list = (
-            YouTubeTranscriptApi.list_transcripts(video_id, cookies=ck)
-            if ck else
-            YouTubeTranscriptApi.list_transcripts(video_id)
-        )
+        api = make_transcript_api()
+        transcript_list = api.list(video_id)
         all_t = list(transcript_list)
         available_langs = [{'code': t.language_code, 'name': t.language, 'auto': t.is_generated} for t in all_t]
         # Sort: manual transcripts first, then by language priority rank
@@ -263,7 +285,8 @@ def get_transcript():
         else:
             failure_reason = str(e)
 
-    # ── Attempt 2: explicit language fallback
+    # ── Attempt 2: explicit language fallback via fetch()
+    # youtube-transcript-api v1.x: api.fetch(video_id, languages=[...])
     if raw is None:
         for lang_set in [
             ['hi', 'hi-IN', 'hi-Latn'],
@@ -272,11 +295,11 @@ def get_transcript():
             None,
         ]:
             try:
-                kwargs = {'cookies': ck} if ck else {}
+                api2 = make_transcript_api()
                 if lang_set is None:
-                    fetched = YouTubeTranscriptApi.get_transcript(video_id, **kwargs)
+                    fetched = api2.fetch(video_id)
                 else:
-                    fetched = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_set, **kwargs)
+                    fetched = api2.fetch(video_id, languages=lang_set)
                 candidate = normalize_raw(fetched)
                 if candidate:
                     raw = candidate
@@ -294,14 +317,13 @@ def get_transcript():
                 with tempfile.TemporaryDirectory() as tmpdir:
                     out_tmpl = os.path.join(tmpdir, '%(id)s')
                     cmd = [
-                        'yt-dlp',
+                        _YTDLP_BIN,
                         '--write-auto-subs', '--write-subs',
                         '--sub-langs', sub_langs,
                         '--sub-format', 'json3',
                         '--skip-download', '--no-playlist',
                         '--no-check-certificates',
-                        *_js_runtime_args(),
-                        '--extractor-args', 'youtube:player_client=ios',
+                        '--extractor-args', 'youtube:player_client=android,android_vr,ios',
                         *cookies_args(),
                         '-o', out_tmpl,
                         url
@@ -394,10 +416,9 @@ def get_transcript():
     video_description = ''
     try:
         meta_result = subprocess.run(
-            ['yt-dlp', '--skip-download', '--no-playlist',
+            [_YTDLP_BIN, '--skip-download', '--no-playlist',
              '--no-check-certificates',
-             *_js_runtime_args(),
-             '--extractor-args', 'youtube:player_client=ios',
+             '--extractor-args', 'youtube:player_client=android,android_vr,ios',
              *cookies_args(),
              '--print', '%(title)s\n%(description)s', url],
             capture_output=True, text=True, timeout=20
@@ -439,49 +460,51 @@ def get_comments():
 
     # Build max_comments arg string
     if str(max_comments) == 'all':
-        mc_arg = 'youtube:comment_sort=top;max_comments=all'
+        mc_count = 'all'
         timeout_val = 300
     else:
-        mc_arg = f'youtube:comment_sort=top;max_comments={max_comments}'
+        mc_count = str(max_comments)
         timeout_val = 120
+
+    # Player clients to try in order — web is required for comments scraping
+    # yt-dlp 2025+ needs explicit player_client to avoid "not available on this app" error
+    COMMENT_CLIENT_ATTEMPTS = [
+        f'youtube:comment_sort=top;max_comments={mc_count};player_client=web',
+        f'youtube:comment_sort=top;max_comments={mc_count};player_client=mweb',
+        f'youtube:max_comments={mc_count};player_client=web',
+        f'youtube:player_client=web',
+    ]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         info_path = os.path.join(tmpdir, f'{video_id}.info.json')
-        cmd = [
-            'yt-dlp',
-            '--write-info-json',
-            '--write-comments',
-            '--skip-download',
-            '--no-playlist',
-            '--no-check-certificates',
-            *_js_runtime_args(),
-            '--extractor-args', mc_arg,
-            *cookies_args(),
-            '-o', os.path.join(tmpdir, '%(id)s'),
-            url
-        ]
+        result = None
+
+        for ext_arg in COMMENT_CLIENT_ATTEMPTS:
+            if os.path.exists(info_path):
+                break
+            cmd = [
+                _YTDLP_BIN,
+                '--write-info-json',
+                '--write-comments',
+                '--skip-download',
+                '--no-playlist',
+                '--no-check-certificates',
+                *_js_runtime_args(),
+                '--extractor-args', ext_arg,
+                *cookies_args(),
+                '-o', os.path.join(tmpdir, '%(id)s'),
+                url
+            ]
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_val)
+            except subprocess.TimeoutExpired:
+                return jsonify({'error': 'Timed out fetching comments (try a video with fewer comments)'}), 500
+
+        if not os.path.exists(info_path):
+            stderr_tail = result.stderr[-600:] if result else 'No output'
+            return jsonify({'error': 'Could not fetch comments. ' + stderr_tail}), 500
+
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_val)
-
-            if not os.path.exists(info_path):
-                # Try without extractor-args (older yt-dlp fallback)
-                cmd2 = [
-                    'yt-dlp',
-                    '--write-info-json',
-                    '--write-comments',
-                    '--skip-download',
-                    '--no-playlist',
-                    '--no-check-certificates',
-                    *_js_runtime_args(),
-                    *cookies_args(),
-                    '-o', os.path.join(tmpdir, '%(id)s'),
-                    url
-                ]
-                result = subprocess.run(cmd2, capture_output=True, text=True, timeout=timeout_val)
-
-            if not os.path.exists(info_path):
-                return jsonify({'error': 'Could not fetch comments. ' + result.stderr[-500:]}), 500
-
             with open(info_path, 'r', encoding='utf-8') as f:
                 info = json.load(f)
 
@@ -505,8 +528,6 @@ def get_comments():
                 'count': len(comments),
                 'comments': comments
             })
-        except subprocess.TimeoutExpired:
-            return jsonify({'error': 'Timed out fetching comments (try a video with fewer comments)'}), 500
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
@@ -545,11 +566,19 @@ def download_video():
         import re as _re
         active_jobs[job_id] = {'job_id': job_id, 'status': 'downloading', 'progress': 0, 'speed': '', 'eta': ''}
         try:
-            format_str = f'bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]/best[ext=mp4]/best'
+            # Format selector: combined formats (like android's format 18) first, then split streams
+            format_str = (
+                f'bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]'
+                f'/best[height<={quality}][ext=mp4]'
+                f'/mp4[height<={quality}]'
+                f'/bestvideo[height<={quality}]+bestaudio'
+                f'/best[height<={quality}]'
+                f'/best'
+            )
 
             # Try multiple player clients to bypass SABR/bot restrictions
-            # iOS client bypasses SABR streaming; mweb as fallback; default last
-            clients_to_try = ['ios', 'mweb', None]
+            # android confirmed working for most videos; android_vr as fallback
+            clients_to_try = ['android', 'android_vr', 'ios', None]
             success = False
             last_error = 'yt-dlp download failed'
 
@@ -559,7 +588,7 @@ def download_video():
 
                 extractor_args = ['--extractor-args', f'youtube:player_client={client}'] if client else []
                 cmd = [
-                    'yt-dlp',
+                    _YTDLP_BIN,
                     '-f', format_str,
                     '--merge-output-format', 'mp4',
                     '--newline',
@@ -947,7 +976,7 @@ def instagram_info():
 
     try:
         cmd = [
-            'yt-dlp',
+            _YTDLP_BIN,
             '--skip-download',
             '--no-playlist',
             '--print', '%(title)s\n%(uploader)s\n%(thumbnail)s\n%(duration)s\n%(like_count)s\n%(view_count)s\n%(description)s',
@@ -1011,7 +1040,7 @@ def instagram_download():
         active_jobs[job_id] = {'job_id': job_id, 'status': 'downloading', 'progress': 0, 'speed': '', 'eta': ''}
         try:
             cmd = [
-                'yt-dlp',
+                _YTDLP_BIN,
                 '-f', 'best[ext=mp4]/best',
                 '--merge-output-format', 'mp4',
                 '--newline',
@@ -1393,7 +1422,7 @@ def render_short_clip():
 
         # Step 1 — Download with yt-dlp (try multiple clients to bypass SABR)
         base_yt_args = [
-            'yt-dlp',
+            _YTDLP_BIN,
             *cookies_args(),
             '--no-check-certificates',
             *_js_runtime_args(),
