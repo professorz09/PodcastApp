@@ -611,10 +611,32 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     // Cancelled by another call
     if (audioCtxRef.current !== actx) return null;
 
+    // ── Build actual durations from decoded buffers ───────────────────────
+    // Use real buf.duration where audio exists — fixes visual/audio desync
+    const actualDurations = buffers.map((buf, i) =>
+      buf ? Math.round(buf.duration * 1000) : script[i].durationMs
+    );
+
+    // If any duration differs from estimate → update script state + renderer
+    const hasMismatch = actualDurations.some((d, i) => d !== script[i].durationMs);
+    if (hasMismatch) {
+      setScript(prev => prev.map((t, i) => {
+        const newDur = actualDurations[i];
+        if (newDur === t.durationMs) return t;
+        return {
+          ...t,
+          durationMs: newDur,
+          wordTimings: t.wordTimings
+            ? estimateWordTimings(t.text, newDur / 1000)
+            : undefined,
+        };
+      }));
+    }
+
     let elapsed = 0;
     buffers.forEach((buf, i) => {
       const turnStartMs = elapsed;
-      const turnEndMs   = elapsed + script[i].durationMs;
+      const turnEndMs   = elapsed + actualDurations[i];   // ← actual, not estimate
       elapsed = turnEndMs;
 
       if (!buf) return;
