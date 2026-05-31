@@ -345,6 +345,8 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onAtt
     } catch { toast.error('Failed to delete cookies'); }
   };
 
+  useEffect(() => { checkCookies(); }, []);
+
   // ── Comments ─────────────────────────────────────────────────────────────────
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [comments, setComments] = useState<string[] | null>(() => readSaved('comments', null));
