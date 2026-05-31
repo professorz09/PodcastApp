@@ -1249,21 +1249,31 @@ Examples (pick what fits the topic — don't copy blindly):
 Choose whatever 4 make the most sense for THIS specific topic.
 Use those labels as speaker names throughout.`;
 
+          const qLang = isHindi
+            ? 'Hinglish (Hindi + English mix, natural conversational tone — jaise real log baat karte hain)'
+            : language;
+          const qAudience = isHindi ? 'Hindi-speaking audience (India)' : 'USA adults';
+          const contextBlock = specificDetails
+            ? `BACKGROUND KNOWLEDGE — use these points as your OWN understanding to enrich the discussion. NEVER say "podcast mein", "video mein", "unhone kaha", "as seen in", "according to the show/interview/article" or anything that references an external source. These are just facts and angles you already know:
+${specificDetails}`
+            : '';
+
           if (!includeNarrator) {
             prompt = `
               STYLE: QUESTIONING — 4 PERSPECTIVES
-              Language: English. Audience: USA adults.
-              Topic / Scenario: "${topic}"
-              ${specificDetails ? `Context: ${specificDetails}` : ''}
+              Language: ${qLang}. Audience: ${qAudience}.
+              Topic / Question: "${topic}"
+              ${contextBlock}
               ${durLineEn}
 
               ${speakerBlock}
 
               CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF.
-              Speaker 1 opens by immediately restating the question/topic in their own words and giving their first genuine take on it. They do NOT say "did you see that podcast/video/article" or reference any external content — they just engage with the question directly.
+              Speaker 1 opens by immediately stating their OWN genuine take on the question — no warm-up, no "did you see/watch/read" opener. Just their position on the question, right away.
 
-              WRONG opening: "Did you guys see that podcast where they debated whether money buys happiness?"
-              RIGHT opening: "Does money actually buy happiness? Honestly, yes — up to a real point. Here's why I think that..."
+              ${isHindi
+                ? `GALAT opening: "Yaar, tune wo podcast/video dekha jisme Vikas Sir ne kaha..." ya "Bhai, ek show mein inhone ye point rakha tha..."\nSAHI opening: "Mujhe lagta hai shadi ka concept genuinely change ho raha hai — aur ye zyada logon ke liye achha hai..." ya "Dekho, ye question hi galat hai — shadi khatam nahi ho rahi, sirf uski definition badal rahi hai..."`
+                : `WRONG opening: "Did you guys see that podcast where they debated this?"\nRIGHT opening: "Does money actually buy happiness? Yes — up to a clear point. Here's why..."`}
 
               Then all 4 speakers weigh in from their own worldview.
 
@@ -1271,20 +1281,21 @@ Use those labels as speaker names throughout.`;
               - Speak from their own worldview/identity consistently throughout
               - Support their point with at least one real, specific example (a name, event, or situation)
               - Directly respond to what others say — not just deliver separate monologues
-              - Use plain language — USA general audience, not academics
+              - Use plain language — conversational, not academic
 
               The conversation flow should feel natural and different for every topic.
               Do not repeat a rigid round-by-round template — let the dialogue evolve based on what the topic calls for.
               Speaker 1 closes with a brief final thought.
 
               RULES:
-              ✓ English only
+              ✓ Language: ${qLang}
               ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ 4 distinct voices — each sounds clearly different from the others
               ✓ Real specific examples — not vague general claims
               ✓ Genuine disagreement — speakers hold their positions
-              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question is the topic, not something they heard elsewhere
-              ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
+              ✗ NEVER say "podcast mein", "video mein", "show mein", "unhone kaha", "as per the interview/article/video" — speakers discuss the QUESTION from their OWN perspective
+              ✗ NEVER reference a show name, guest name as a source — only as a real-world example if needed
+              ✗ No generic filler ("Great point!", "Bilkul!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
               ${durFillEn}
@@ -1292,20 +1303,21 @@ Use those labels as speaker names throughout.`;
           } else {
             prompt = `
               STYLE: QUESTIONING — NARRATOR + 4 PERSPECTIVES
-              Language: English. Audience: USA adults.
+              Language: ${qLang}. Audience: ${qAudience}.
               Topic / Question: "${topic}"
-              ${specificDetails ? `Context: ${specificDetails}` : ''}
+              ${contextBlock}
               ${durLineEn}
 
               Narrator: Narrator
               ${speakerBlock}
 
-              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF. No podcast, video, or external reference anywhere.
+              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF. No podcast, video, show, or external reference anywhere.
 
-              The Narrator opens by throwing the question directly into the room — sharp and immediate: "Alright, here's the question — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — let's get into it."
-              The Narrator does NOT say "picture this scenario", does NOT reference any podcast or video — they simply pose the question and hand it over.
+              ${isHindi
+                ? `Narrator seedha question throw kare — sharp aur immediate: "Theek hai, aaj ka sawaal — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — bolo." Koi podcast/show/video ka naam nahi.`
+                : `The Narrator opens by throwing the question directly: "Alright, here's the question — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — let's get into it." No show name, no "did you watch/see".`}
 
-              Each speaker responds to the QUESTION itself from their own worldview/identity.
+              Each speaker responds to the QUESTION itself from their own worldview/identity — NOT as a reaction to something they "saw" or "watched".
               The Narrator asks sharp follow-up questions at natural moments — probing the most interesting tensions.
 
               The conversation should feel organic and specific to this topic.
@@ -1315,19 +1327,20 @@ Use those labels as speaker names throughout.`;
               - Stay consistent with their worldview/identity throughout
               - Back every major point with a real, specific example (a name, event, or concrete situation)
               - React to what others say — not just give prepared speeches
-              - Use plain accessible language — no unexplained jargon
+              - Use plain accessible language
 
               The Narrator closes with a brief honest observation about what the conversation revealed.
 
               RULES:
-              ✓ English only
+              ✓ Language: ${qLang}
               ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ Narrator appears at the start, at natural moments to ask questions, and at the close
               ✓ 4 distinct speaker voices — each sounds clearly different from the others
               ✓ Real specific examples for every major point — not abstract claims
               ✓ Genuine disagreement — speakers hold their ground
-              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question IS the topic
-              ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
+              ✗ NEVER say "podcast mein", "video mein", "show mein", "unhone kaha", "according to the interview" — speakers are discussing the QUESTION, not reacting to a source
+              ✗ NEVER reference a show name or host as the source of the topic
+              ✗ No generic filler ("Great point!", "Bilkul!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
               ${durFillEn}
@@ -2851,21 +2864,31 @@ Examples (pick what fits the topic — don't copy blindly):
 Choose whatever 4 make the most sense for THIS specific topic.
 Use those labels as speaker names throughout.`;
 
+          const qLang = isHindi
+            ? 'Hinglish (Hindi + English mix, natural conversational tone — jaise real log baat karte hain)'
+            : language;
+          const qAudience = isHindi ? 'Hindi-speaking audience (India)' : 'USA adults';
+          const contextBlock = specificDetails
+            ? `BACKGROUND KNOWLEDGE — use these points as your OWN understanding to enrich the discussion. NEVER say "podcast mein", "video mein", "unhone kaha", "as seen in", "according to the show/interview/article" or anything that references an external source. These are just facts and angles you already know:
+${specificDetails}`
+            : '';
+
           if (!includeNarrator) {
             prompt = `
               STYLE: QUESTIONING — 4 PERSPECTIVES
-              Language: English. Audience: USA adults.
-              Topic / Scenario: "${topic}"
-              ${specificDetails ? `Context: ${specificDetails}` : ''}
+              Language: ${qLang}. Audience: ${qAudience}.
+              Topic / Question: "${topic}"
+              ${contextBlock}
               ${durLineEn}
 
               ${speakerBlock}
 
               CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF.
-              Speaker 1 opens by immediately restating the question/topic in their own words and giving their first genuine take on it. They do NOT say "did you see that podcast/video/article" or reference any external content — they just engage with the question directly.
+              Speaker 1 opens by immediately stating their OWN genuine take on the question — no warm-up, no "did you see/watch/read" opener. Just their position on the question, right away.
 
-              WRONG opening: "Did you guys see that podcast where they debated whether money buys happiness?"
-              RIGHT opening: "Does money actually buy happiness? Honestly, yes — up to a real point. Here's why I think that..."
+              ${isHindi
+                ? `GALAT opening: "Yaar, tune wo podcast/video dekha jisme Vikas Sir ne kaha..." ya "Bhai, ek show mein inhone ye point rakha tha..."\nSAHI opening: "Mujhe lagta hai shadi ka concept genuinely change ho raha hai — aur ye zyada logon ke liye achha hai..." ya "Dekho, ye question hi galat hai — shadi khatam nahi ho rahi, sirf uski definition badal rahi hai..."`
+                : `WRONG opening: "Did you guys see that podcast where they debated this?"\nRIGHT opening: "Does money actually buy happiness? Yes — up to a clear point. Here's why..."`}
 
               Then all 4 speakers weigh in from their own worldview.
 
@@ -2873,20 +2896,21 @@ Use those labels as speaker names throughout.`;
               - Speak from their own worldview/identity consistently throughout
               - Support their point with at least one real, specific example (a name, event, or situation)
               - Directly respond to what others say — not just deliver separate monologues
-              - Use plain language — USA general audience, not academics
+              - Use plain language — conversational, not academic
 
               The conversation flow should feel natural and different for every topic.
               Do not repeat a rigid round-by-round template — let the dialogue evolve based on what the topic calls for.
               Speaker 1 closes with a brief final thought.
 
               RULES:
-              ✓ English only
+              ✓ Language: ${qLang}
               ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ 4 distinct voices — each sounds clearly different from the others
               ✓ Real specific examples — not vague general claims
               ✓ Genuine disagreement — speakers hold their positions
-              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question is the topic, not something they heard elsewhere
-              ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
+              ✗ NEVER say "podcast mein", "video mein", "show mein", "unhone kaha", "as per the interview/article/video" — speakers discuss the QUESTION from their OWN perspective
+              ✗ NEVER reference a show name, guest name as a source — only as a real-world example if needed
+              ✗ No generic filler ("Great point!", "Bilkul!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
               ${durFillEn}
@@ -2894,20 +2918,21 @@ Use those labels as speaker names throughout.`;
           } else {
             prompt = `
               STYLE: QUESTIONING — NARRATOR + 4 PERSPECTIVES
-              Language: English. Audience: USA adults.
+              Language: ${qLang}. Audience: ${qAudience}.
               Topic / Question: "${topic}"
-              ${specificDetails ? `Context: ${specificDetails}` : ''}
+              ${contextBlock}
               ${durLineEn}
 
               Narrator: Narrator
               ${speakerBlock}
 
-              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF. No podcast, video, or external reference anywhere.
+              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF. No podcast, video, show, or external reference anywhere.
 
-              The Narrator opens by throwing the question directly into the room — sharp and immediate: "Alright, here's the question — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — let's get into it."
-              The Narrator does NOT say "picture this scenario", does NOT reference any podcast or video — they simply pose the question and hand it over.
+              ${isHindi
+                ? `Narrator seedha question throw kare — sharp aur immediate: "Theek hai, aaj ka sawaal — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — bolo." Koi podcast/show/video ka naam nahi.`
+                : `The Narrator opens by throwing the question directly: "Alright, here's the question — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — let's get into it." No show name, no "did you watch/see".`}
 
-              Each speaker responds to the QUESTION itself from their own worldview/identity.
+              Each speaker responds to the QUESTION itself from their own worldview/identity — NOT as a reaction to something they "saw" or "watched".
               The Narrator asks sharp follow-up questions at natural moments — probing the most interesting tensions.
 
               The conversation should feel organic and specific to this topic.
@@ -2917,19 +2942,20 @@ Use those labels as speaker names throughout.`;
               - Stay consistent with their worldview/identity throughout
               - Back every major point with a real, specific example (a name, event, or concrete situation)
               - React to what others say — not just give prepared speeches
-              - Use plain accessible language — no unexplained jargon
+              - Use plain accessible language
 
               The Narrator closes with a brief honest observation about what the conversation revealed.
 
               RULES:
-              ✓ English only
+              ✓ Language: ${qLang}
               ✓ Speaker names used EXACTLY as given — do not rename or replace them
               ✓ Narrator appears at the start, at natural moments to ask questions, and at the close
               ✓ 4 distinct speaker voices — each sounds clearly different from the others
               ✓ Real specific examples for every major point — not abstract claims
               ✓ Genuine disagreement — speakers hold their ground
-              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question IS the topic
-              ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
+              ✗ NEVER say "podcast mein", "video mein", "show mein", "unhone kaha", "according to the interview" — speakers are discussing the QUESTION, not reacting to a source
+              ✗ NEVER reference a show name or host as the source of the topic
+              ✗ No generic filler ("Great point!", "Bilkul!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
               ${durFillEn}
