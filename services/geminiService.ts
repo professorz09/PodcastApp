@@ -5974,9 +5974,14 @@ export const generatePhoneStudioScript = async (
       : 'Argumentative tone. Agents actively disagree. Challenge each other. Strong opposing views. Heated but logical.',
   };
 
+  const isYtClaims = contextFileContent?.startsWith('YOUTUBE_CLAIMS:') ?? false;
   const contextSection = [
     description && `${isHindi ? 'विवरण' : 'Description'}: ${description}`,
-    contextFileContent && `${isHindi ? 'संदर्भ सामग्री' : 'Reference Material'}:\n${contextFileContent.slice(0, 4000)}`,
+    contextFileContent && (isYtClaims
+      ? (isHindi
+          ? `यह conversation एक REAL YouTube video के specific claims पर based है:\n\n${contextFileContent.slice(0, 4000)}\n\n⚠️ IMPORTANT RULES:\n- हर claim को specifically address करो — generic mat bolo.\n- Har claim par DIFFERENT DYNAMIC rakhna:\n  * Kabhi ek speaker claim ko "actually solid point hai" bolke defend kare, doosra usse completely debunk kare facts se.\n  * Kabhi ek shocked ho "ye toh crazy hai" aur doosra calmly explain kare kya actually ho raha hai.\n  * Kabhi dono mila ke claim ki depth explore karein.\n  * Kabhi ek strongly agree kare toh doosra devil's advocate khele.\n- Claim quote karo, phir react karo, phir explain/debunk/fact-check karo.\n- Scientific, historical, ya logical context zaroor do.`
+          : `This conversation is based on SPECIFIC CLAIMS from a real YouTube video:\n\n${contextFileContent.slice(0, 4000)}\n\n⚠️ CRITICAL INSTRUCTIONS — READ CAREFULLY:\n\n1. Go through each numbered claim specifically — do NOT have a generic conversation.\n\n2. For EACH claim, assign a DIFFERENT dynamic between the speakers (rotate through these):\n   • DEFEND vs DEBUNK: One speaker says "actually that point is solid / I kind of see what they mean" and genuinely defends the claim — the other then systematically destroys it with facts, logic, and evidence. The defender has to keep trying.\n   • SHOCKED + EXPLAIN: One speaker reacts with genuine shock/disbelief ("wait they actually said WHAT?") — the other calmly breaks down what it means scientifically/historically.\n   • BOTH SKEPTICAL: Both are skeptical but for different reasons — one questions the source, the other questions the logic.\n   • HYPED + CRITICAL: One gets genuinely excited about the claim ("okay but if this is true that changes everything") — the other pokes holes in it one by one.\n   • SURFACE AGREE → DEEP DISAGREE: Both initially seem to agree, then the more they dig in, the more they realize they actually disagree.\n\n3. Do NOT use the same dynamic twice in a row. Vary the roles — sometimes ${speakers[0] ?? 'Speaker 1'} is the defender, sometimes ${speakers[1] ?? 'Speaker 2'} is.\n\n4. Quote or reference the specific claim, then react, then dig into the real science/context/facts behind it.\n\n5. The style guide below governs HOW they speak — but WHAT they discuss must always be anchored to the specific claims above.`)
+      : `${isHindi ? 'संदर्भ सामग्री' : 'Reference Material'}:\n${contextFileContent.slice(0, 4000)}`),
   ].filter(Boolean).join('\n\n');
 
   const speakerList = speakers.length >= 2
