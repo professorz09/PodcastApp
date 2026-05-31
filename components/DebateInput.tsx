@@ -47,7 +47,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [speakerNames, setSpeakerNames] = useState<string[]>(['', '', '', '']);
 
   // ── Phone Studio state ──────────────────────────────────────────────────────
-  const [phoneConvoStyle, setPhoneConvoStyle] = useState<PhoneConvoStyle>('experts');
+  const [phoneConvoStyle, setPhoneConvoStyle] = useState<PhoneConvoStyle>('podcast');
   const [phoneDescription, setPhoneDescription] = useState('');
   const [useImportTranscript, setUseImportTranscript] = useState(false);
   const [phoneNarrator, setPhoneNarrator] = useState(false);
@@ -628,17 +628,20 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       <span className="text-[10px] font-semibold uppercase tracking-wider">Conversation Style</span>
                     </div>
                     <div className="grid grid-cols-1 gap-1">
-                      {([ 
-                        { id: 'experts', label: '🧠 Experts', desc: 'Knowledgeable, factual' },
-                        { id: 'detailed', label: '📖 Detailed', desc: 'In-depth analysis' },
-                        { id: 'funny', label: '😂 Funny', desc: 'Humorous & entertaining' },
-                        { id: 'sarcastic', label: '😏 Sarcastic', desc: 'Witty & sarcastic' },
-                        { id: 'debate', label: '⚔️ Debate', desc: 'Opposing views' },
+                      {([
+                        { id: 'podcast',         label: '🎙️ Podcast',          desc: 'Joe Rogan style — curious, casual, deep dives' },
+                        { id: 'roast',           label: '🔥 Roast',             desc: 'Savage burns, comedy burns, witty comebacks' },
+                        { id: 'sarcastic',       label: '😏 Sarcastic',         desc: 'Dripping sarcasm, eye-rolls, deadpan humour' },
+                        { id: 'factual',         label: '🧠 Factual Deep',      desc: 'Concepts explained simply — like to a friend' },
+                        { id: 'devils_advocate', label: "😈 Devil's Advocate",  desc: 'One defends, other destroys it ruthlessly' },
+                        { id: 'hot_takes',       label: '🌶️ Hot Takes',         desc: 'Controversial opinions, Twitter-drama energy' },
+                        { id: 'factcheck',       label: '📋 Fact-Check',        desc: 'Breaking down myths, wrong claims, misconceptions' },
+                        { id: 'react',           label: '🎬 React & Review',    desc: 'Reacting strongly with opinions, reaction-video style' },
                       ] as { id: PhoneConvoStyle; label: string; desc: string }[]).map(opt => (
                         <button
                           key={opt.id}
                           onClick={() => setPhoneConvoStyle(opt.id)}
-                          className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-left transition-all ${
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-all ${
                             phoneConvoStyle === opt.id
                               ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
                               : 'bg-[#111111] border-white/5 text-gray-400 hover:border-white/15 hover:text-gray-200'

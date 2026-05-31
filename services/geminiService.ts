@@ -5935,7 +5935,7 @@ ${lines}`;
 
 // ─── Phone Studio Script Generator ───────────────────────────────────────────
 
-export type PhoneConvoStyle = 'experts' | 'detailed' | 'funny' | 'sarcastic' | 'debate';
+export type PhoneConvoStyle = 'podcast' | 'roast' | 'sarcastic' | 'factual' | 'devils_advocate' | 'hot_takes' | 'factcheck' | 'react' | 'experts' | 'detailed' | 'funny' | 'debate';
 
 export const generatePhoneStudioScript = async (
   topic: string,
@@ -5952,6 +5952,14 @@ export const generatePhoneStudioScript = async (
   const isHindi = language.toLowerCase() === 'hindi';
 
   const styleGuides: Record<PhoneConvoStyle, string> = {
+    podcast: `Joe Rogan style casual podcast. Use phrases like "wait wait wait", "that's crazy", "what do you mean by that", "let me ask you something". Curious, open-minded. Long tangents welcome. Natural interruptions. Very conversational — as if recorded live. Mix serious points with casual banter.`,
+    roast: `Comedy roast style. Each response should contain a subtle or not-so-subtle burn/jab at the other's point. Witty, sharp, sarcastic. Think: "Oh wow, groundbreaking insight from someone who…", "That's a bold take from the AI that…". Keep it funny not mean. Each speaker tries to one-up the other with sharper jokes while still making valid points.`,
+    sarcastic: `Heavy sarcasm and deadpan humour throughout. Lots of "Oh sure, because THAT makes total sense", "Right, and I'm sure that worked out great", "Wow, never heard that one before". One AI is genuinely trying to make good points, the other responds with increasing sarcasm. Eventually they both become sarcastic together. Dry British-style humour.`,
+    factual: `Educational but conversational. Break down complex concepts using simple analogies and real-world examples. Think "okay so imagine you're at a grocery store and…", "it's basically like when…", "the crazy thing is most people don't realize that…". Deep but accessible. Both AIs build on each other's explanations. No jargon without explanation.`,
+    devils_advocate: `One AI (first speaker) is FULLY defending the topic/claim — strongly, with conviction. The other AI (second speaker) is playing devil's advocate — finding every flaw, counterexample, and logical gap in the argument. It's not a balanced debate — the second speaker is specifically trying to dismantle the first's argument. First speaker has to keep defending. Make both sides compelling.`,
+    hot_takes: `Hot takes energy. Both AIs dropping controversial, provocative opinions about the topic. Think Twitter discourse, podcast clips that go viral. "Unpopular opinion but…", "I'm going to get cancelled for this but…", "Nobody wants to admit it but…". Opinions should be spicy but defensible. The other AI reacts with "WAIT. You can't just say that", "Okay that's actually kind of true though". High energy.`,
+    factcheck: `One AI presents common misconceptions or popular claims about the topic. The other fact-checks them in real time — "Actually that's not quite right because…", "That's partially true but the part people miss is…", "The study that everyone cites actually said something different…". Educational myth-busting format. Both are curious, not combative. End goal: truth.`,
+    react: `Reaction video energy. Both AIs are reacting to the topic as if seeing it for the first time. Strong first reactions — "Oh this is actually wild", "Wait hold on", "I did NOT expect that". Mix of hype, genuine interest, and criticism. One is more positive/hyped, the other is more skeptical/critical. Like two friends watching something together and giving live commentary.`,
     experts: isHindi
       ? 'Expert aur analytical tone. Dono agents deeply knowledgeable hain. Technical terms use karo. Data aur facts cite karo. Ek doosre ki baatein seriously lete hain.'
       : 'Expert and analytical tone. Both agents are deeply knowledgeable. Use technical terms. Cite data and facts. Take each other\'s points seriously.',
@@ -5961,9 +5969,6 @@ export const generatePhoneStudioScript = async (
     funny: isHindi
       ? 'Humorous aur witty tone. Jokes aur analogies use karo. Light-hearted banter. Funny examples dena. Entertainment bhi, information bhi.'
       : 'Humorous and witty tone. Use jokes and analogies. Light-hearted banter. Funny examples. Entertaining yet informative.',
-    sarcastic: isHindi
-      ? 'Sarcastic aur edgy tone. Snarky comments. Backhanded compliments. Eye-roll worthy observations. But still informative.'
-      : 'Sarcastic and edgy tone. Snarky comments. Backhanded compliments. Eye-roll worthy observations. Still informative.',
     debate: isHindi
       ? 'Argumentative tone. Dono agents disagree karte hain. Challenge karo ek doosre ko. Strong opposing views rakhna. Heated but logical.'
       : 'Argumentative tone. Agents actively disagree. Challenge each other. Strong opposing views. Heated but logical.',
