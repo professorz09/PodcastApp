@@ -822,14 +822,26 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   {/* Horizontal scrollable chips */}
                   <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
                     {([
-                      { id: 'podcast',         emoji: '🎙️', label: 'Podcast'         },
-                      { id: 'roast',           emoji: '🔥', label: 'Roast'            },
-                      { id: 'sarcastic',       emoji: '😏', label: 'Sarcastic'        },
-                      { id: 'factual',         emoji: '🧠', label: 'Factual'          },
-                      { id: 'devils_advocate', emoji: '😈', label: "Devil's"          },
-                      { id: 'hot_takes',       emoji: '🌶️', label: 'Hot Takes'        },
-                      { id: 'factcheck',       emoji: '📋', label: 'Fact-Check'       },
-                      { id: 'react',           emoji: '🎬', label: 'React'            },
+                      { id: 'podcast',          emoji: '🎙️', label: 'Podcast'         },
+                      { id: 'roast',            emoji: '🔥', label: 'Roast'            },
+                      { id: 'debate',           emoji: '⚔️', label: 'Debate'           },
+                      { id: 'debate_sarcasm',   emoji: '🗡️', label: 'Debate+Sarcasm'  },
+                      { id: 'fight',            emoji: '🥊', label: 'Fight'            },
+                      { id: 'sarcastic',        emoji: '😏', label: 'Sarcastic'        },
+                      { id: 'funny',            emoji: '😂', label: 'Funny'            },
+                      { id: 'factual',          emoji: '🧠', label: 'Factual'          },
+                      { id: 'devils_advocate',  emoji: '😈', label: "Devil's"          },
+                      { id: 'hot_takes',        emoji: '🌶️', label: 'Hot Takes'        },
+                      { id: 'factcheck',        emoji: '📋', label: 'Fact-Check'       },
+                      { id: 'react',            emoji: '🎬', label: 'React'            },
+                      { id: 'experts',          emoji: '🔬', label: 'Experts'          },
+                      { id: 'detailed',         emoji: '📝', label: 'Detailed'         },
+                      { id: 'romantic',         emoji: '💕', label: 'Romantic'         },
+                      { id: 'celebrity_call',   emoji: '⭐', label: 'Celebrity'        },
+                      { id: 'ground_search',    emoji: '🔍', label: 'Ground Search'    },
+                      { id: 'explain_examples', emoji: '💡', label: 'w/ Examples'      },
+                      { id: 'explain_funny',    emoji: '🤪', label: 'Explain Funny'    },
+                      { id: 'explain_deep',     emoji: '🌊', label: 'Explain Deep'     },
                     ] as { id: PhoneConvoStyle; emoji: string; label: string }[]).map(opt => (
                       <button
                         key={opt.id}

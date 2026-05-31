@@ -123,6 +123,90 @@ const CONVO_STYLES: {
     desc: 'Reacting strongly with opinions, like a reaction video',
     prompt: `Reaction video energy. Both AIs are reacting to the topic as if seeing it for the first time. Strong first reactions — "Oh this is actually wild", "Wait hold on", "I did NOT expect that". Mix of hype, genuine interest, and criticism. One is more positive/hyped, the other is more skeptical/critical. Like two friends watching something together and giving live commentary.`,
   },
+  {
+    id: 'experts',
+    emoji: '🔬',
+    label: 'Experts',
+    desc: 'Deep technical analysis from two domain experts',
+    prompt: `Expert and analytical tone. Both agents are deeply knowledgeable. Use technical terms. Cite data and facts. Take each other's points seriously. Peer-review energy.`,
+  },
+  {
+    id: 'detailed',
+    emoji: '📝',
+    label: 'Detailed',
+    desc: 'Thorough breakdown covering every angle',
+    prompt: `Thorough and methodical. Explain each point in detail. Step-by-step breakdown. Cover every angle. No shortcuts.`,
+  },
+  {
+    id: 'funny',
+    emoji: '😂',
+    label: 'Funny',
+    desc: 'Hilarious takes with real info underneath',
+    prompt: `Humorous and witty tone. Use jokes and analogies. Light-hearted banter. Funny examples. Entertaining yet informative. Think stand-up meets a Wikipedia rabbit hole.`,
+  },
+  {
+    id: 'debate',
+    emoji: '⚔️',
+    label: 'Debate',
+    desc: 'Head-to-head debate — strong opposing views',
+    prompt: `Argumentative tone. Agents actively disagree. Challenge each other. Strong opposing views. Heated but logical. No cheap shots — real arguments only.`,
+  },
+  {
+    id: 'debate_sarcasm',
+    emoji: '🗡️',
+    label: 'Debate + Sarcasm',
+    desc: 'Full debate dripping with sharp sarcasm',
+    prompt: `Full debate but EVERY counterpoint drips with sarcasm. Sharp, stinging sarcastic remarks on every response. "Oh sure, great point — maybe the sky is green too." Both sides genuinely argue but every line has eye-rolls and withering sarcasm.`,
+  },
+  {
+    id: 'fight',
+    emoji: '🥊',
+    label: 'Fight Mode',
+    desc: 'Heated argument — interruptions, frustration, passion',
+    prompt: `This is a HEATED ARGUMENT — both speakers interrupt, cut each other off, get frustrated. "You're not even listening!", "Don't tell me what to think!" Real argument energy — emotional, intense, passionate. Use em-dashes to show interruptions. But facts must be real.`,
+  },
+  {
+    id: 'romantic',
+    emoji: '💕',
+    label: 'Romantic',
+    desc: 'Warm, flirty conversation exploring the topic',
+    prompt: `Two people having a warm, romantic conversation about the topic. Soft, flirty, caring tone. Playful banter with genuine affection. They listen to each other deeply. Explore the topic through a romantic, emotional lens.`,
+  },
+  {
+    id: 'celebrity_call',
+    emoji: '⭐',
+    label: 'Celebrity Call',
+    desc: 'Two A-listers calling each other about a hot topic',
+    prompt: `This is an intellectual celebrity phone call. Both speak like confident public figures — opinionated, charming, slightly larger-than-life. Witty one-liners, strong takes, name-dropping real events, playful ego clashes. Like two A-listers calling each other about a hot topic.`,
+  },
+  {
+    id: 'ground_search',
+    emoji: '🔍',
+    label: 'Ground Search',
+    desc: 'Investigative fact-finding — what does data actually say?',
+    prompt: `Research mode — both agents dig for ground-level facts. Back every claim with actual data, studies, real-world examples. "Let's look at what the actual research says...", "The real numbers are...", "That's a common myth — the reality is..." Truth-seeking, investigative journalism energy.`,
+  },
+  {
+    id: 'explain_examples',
+    emoji: '💡',
+    label: 'Explain w/ Examples',
+    desc: 'Every point backed by a real concrete example',
+    prompt: `Explain the topic entirely through REAL EXAMPLES. Every single point must have a concrete, relatable example. "Think of it like a coffee shop where...", "Real case: Apple did exactly this when...", "Imagine you're at a traffic signal and..." Both speakers build on each other's examples.`,
+  },
+  {
+    id: 'explain_funny',
+    emoji: '🤪',
+    label: 'Explain Funny',
+    desc: 'Absurd analogies + comedy = actual learning',
+    prompt: `Explain the topic in a FUNNY, comedic way. Absurd analogies, silly comparisons, unexpected humor. "This is basically like if your stomach was a startup trying to raise a Series A..." Stand-up comedy energy meets actual education. Every explanation must land a laugh but the info must be accurate.`,
+  },
+  {
+    id: 'explain_deep',
+    emoji: '🌊',
+    label: 'Explain Deep',
+    desc: 'First principles — go 3 levels deeper than anyone else',
+    prompt: `DEEP explanation mode. Every layer reveals more layers underneath. Start from first principles. "But why does that even work?" / "The root cause is..." / "That's just surface — the real mechanism is..." Philosophical and analytical depth. Nothing is taken at face value. Go three levels deeper than anyone else would.`,
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1245,15 +1329,60 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: phone.color, flexShrink: 0 }} />
+                      {/* Speaker photo thumbnail or color dot */}
+                      {phone.backgroundImage
+                        ? <img
+                            src={phone.backgroundImage}
+                            style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${phone.color}`, flexShrink: 0, cursor: 'pointer' }}
+                            onClick={() => updatePhone(phone.id, { backgroundImage: undefined })}
+                            title="Click to remove photo"
+                          />
+                        : <div style={{ width: 10, height: 10, borderRadius: '50%', background: phone.color, flexShrink: 0 }} />
+                      }
                       <input
                         value={phone.name}
                         onChange={e => updatePhone(phone.id, { name: e.target.value })}
                         style={{ flex: 1, background: 'transparent', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }}
+                        placeholder="Speaker name..."
                       />
                       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
                         {script.filter(t => t.phoneId === phone.id).length} turns
                       </span>
+                    </div>
+                    {/* Photo upload row */}
+                    <div style={{ padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flex: 1 }}>
+                        <div style={{
+                          flex: 1, padding: '5px 10px', borderRadius: 8,
+                          border: `1.5px dashed ${phone.backgroundImage ? phone.color : 'rgba(255,255,255,0.15)'}`,
+                          background: phone.backgroundImage ? phone.color + '12' : 'rgba(255,255,255,0.03)',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                        }}>
+                          <span style={{ fontSize: 13 }}>📸</span>
+                          <span style={{ fontSize: 11, color: phone.backgroundImage ? '#fff' : 'rgba(255,255,255,0.4)' }}>
+                            {phone.backgroundImage ? 'Photo set ✓' : 'Upload photo'}
+                          </span>
+                        </div>
+                        <input
+                          type="file" accept="image/*" style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = ev => {
+                              updatePhone(phone.id, { backgroundImage: ev.target?.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {phone.backgroundImage && (
+                        <button
+                          onClick={() => updatePhone(phone.id, { backgroundImage: undefined })}
+                          style={{ padding: '5px 8px', borderRadius: 7, border: 'none', background: 'rgba(239,68,68,0.18)', color: '#fca5a5', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                        >✕ Remove</button>
+                      )}
                     </div>
                     <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
 

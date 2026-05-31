@@ -10,6 +10,7 @@ export interface PhoneConfig {
   showControls?: boolean;
   voiceId?: string;
   battery?: string;
+  backgroundImage?: string;
 }
 
 export interface CloudWord {
@@ -59,6 +60,7 @@ export class CanvasRenderer {
 
   private voiceIntensities: Record<string, number> = {};
   private bgImageCache: Map<string, HTMLImageElement> = new Map();
+  private speakerImageCache: Map<string, HTMLImageElement> = new Map();
 
   public onTimeUpdate?: (t: number) => void;
   public onComplete?: () => void;
@@ -386,6 +388,33 @@ export class CanvasRenderer {
     const { ctx } = this;
     const cx = sx + sw / 2;
     const cy = sy + sh * 0.42;
+
+    // ── Speaker background image ───────────────────────────────────────────
+    if (phone.backgroundImage) {
+      let img = this.speakerImageCache.get(phone.backgroundImage);
+      if (!img) {
+        img = new Image();
+        img.src = phone.backgroundImage;
+        img.onload = () => { if (!this.playing) this.drawFrame(); };
+        this.speakerImageCache.set(phone.backgroundImage, img);
+      }
+      if (img.complete && img.naturalWidth > 0) {
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const screenAspect = sw / sh;
+        let dW = sw, dH = sh;
+        if (imgAspect > screenAspect) { dH = sh; dW = sh * imgAspect; }
+        else { dW = sw; dH = sw / imgAspect; }
+        ctx.save();
+        ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
+        ctx.globalAlpha = 0.82;
+        ctx.drawImage(img, sx - (dW - sw) / 2, sy - (dH - sh) / 2, dW, dH);
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = phone.screenColor || '#000';
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
 
     // Status bar
     ctx.fillStyle = 'rgba(255,255,255,0.85)';

@@ -5975,7 +5975,7 @@ ${lines}`;
 
 // ─── Phone Studio Script Generator ───────────────────────────────────────────
 
-export type PhoneConvoStyle = 'podcast' | 'roast' | 'sarcastic' | 'factual' | 'devils_advocate' | 'hot_takes' | 'factcheck' | 'react' | 'experts' | 'detailed' | 'funny' | 'debate';
+export type PhoneConvoStyle = 'podcast' | 'roast' | 'sarcastic' | 'factual' | 'devils_advocate' | 'hot_takes' | 'factcheck' | 'react' | 'experts' | 'detailed' | 'funny' | 'debate' | 'debate_sarcasm' | 'fight' | 'romantic' | 'celebrity_call' | 'ground_search' | 'explain_examples' | 'explain_funny' | 'explain_deep';
 
 export const generatePhoneStudioScript = async (
   topic: string,
@@ -6013,6 +6013,30 @@ export const generatePhoneStudioScript = async (
     debate: isHindi
       ? 'Argumentative tone. Dono agents disagree karte hain. Challenge karo ek doosre ko. Strong opposing views rakhna. Heated but logical.'
       : 'Argumentative tone. Agents actively disagree. Challenge each other. Strong opposing views. Heated but logical.',
+    debate_sarcasm: isHindi
+      ? 'Debate karo lekin HEAVY sarcasm ke saath. Har counterpoint mein ek stinging sarcastic remark ho. "Oh sure, bilkul — aur shayad pigs bhi ud rahe hain." Dono sides genuinely argue karte hain lekin har line mein eye-rolls aur withering sarcasm hai.'
+      : 'Full debate but EVERY counterpoint drips with sarcasm. Sharp, stinging sarcastic remarks on every response. "Oh sure, great point — maybe the sky is green too." Both sides genuinely argue but every line has eye-rolls and withering sarcasm.',
+    fight: isHindi
+      ? 'Yeh ek HEATED argument hai — dono ek doosre ko interrupt karte hain, frustrated hote hain, baat kaatte hain. "Bhai, tum sun hi nahi rahe!", "Mujhe mat batao kya sochna hai!" Real argument energy — emotional, intense, passionate. Lekin facts galat nahi hone chahiye.'
+      : 'This is a HEATED ARGUMENT — both speakers interrupt, cut each other off, get frustrated. "You\'re not even listening!", "Don\'t tell me what to think!" Real argument energy — emotional, intense, passionate. But the facts should still be real.',
+    romantic: isHindi
+      ? 'Do log ek romantic situation mein baat kar rahe hain. Warm, flirty, caring tone. Dono ek doosre ki baaton mein interest lete hain. Playful banter with genuine affection. Topic ke context ko romantic angle se explore karo.'
+      : 'Two people having a warm, romantic conversation about the topic. Soft, flirty, caring tone. Playful banter with genuine affection. They listen to each other deeply. Explore the topic through a romantic, emotional lens.',
+    celebrity_call: isHindi
+      ? 'Yeh ek intellectual celebrity phone call hai. Dono public figures ya celebrities ki tarah baat karte hain — confident, opinionated, slightly larger-than-life. Witty one-liners, strong takes, name-dropping, playful ego clashes. Like two A-listers calling each other about a hot topic.'
+      : 'This is an intellectual celebrity phone call. Both speak like confident public figures — opinionated, charming, slightly larger-than-life. Witty one-liners, strong takes, name-dropping real events, playful ego clashes. Like two A-listers calling each other about a hot topic.',
+    ground_search: isHindi
+      ? 'Research mode — dono agents ground-level facts dhundhte hain. Har claim ke peeche actual data, studies, real examples dhundho. "Dekho, actual research kya kehti hai...", "Real numbers yeh hain...", "Yeh common myth hai, reality yeh hai..." Truth-seeking journalism energy.'
+      : 'Research mode — both agents dig for ground-level facts. Back every claim with actual data, studies, real-world examples. "Let\'s look at what the actual research says...", "The real numbers are...", "That\'s a common myth — the reality is..." Truth-seeking, investigative journalism energy.',
+    explain_examples: isHindi
+      ? 'Topic ko REAL EXAMPLES se explain karo. Har point ke liye ek relatable, concrete example do. "Jaise agar tum ek chai stall pe ho...", "Real life mein yeh XYZ company ne kiya...", "Think of it like this..." Dono speakers milke examples build karte hain.'
+      : 'Explain the topic entirely through REAL EXAMPLES. Every single point must have a concrete, relatable example. "Think of it like a coffee shop where...", "Real case: Apple did exactly this when...", "Imagine you\'re at a traffic signal and..." Both speakers build on each other\'s examples.',
+    explain_funny: isHindi
+      ? 'Topic ko FUNNY WAY mein explain karo — silly analogies, absurd examples, unexpected comparisons. "Yeh basically waise hai jaise agar tera pet ek startup hota...", Stand-up comedy energy mein educational content. Har explanation mein ek laugh ho. Lekin information accurate rahe.'
+      : 'Explain the topic in a FUNNY, comedic way. Absurd analogies, silly comparisons, unexpected humor. "This is basically like if your stomach was a startup trying to raise a Series A...", Stand-up comedy energy meets actual education. Every explanation must land a laugh but the info must be accurate.',
+    explain_deep: isHindi
+      ? 'DEEP explanation mode. Har layer ke neeche aur layers hain. First principles se shuru karo. "Lekin socho kyu?" / "Iski root cause kya hai?" / "Yeh sirf surface level hai — asli cheez yeh hai..." Philosophical aur analytical depth. Nothing is taken at face value.'
+      : 'DEEP explanation mode. Every layer reveals more layers underneath. Start from first principles. "But why does that even work?" / "The root cause is..." / "That\'s just surface — the real mechanism is..." Philosophical and analytical depth. Nothing is taken at face value. Go three levels deeper than anyone else would.',
   };
 
   const isYtClaims = contextFileContent?.startsWith('YOUTUBE_CLAIMS:') ?? false;
@@ -6031,6 +6055,14 @@ export const generatePhoneStudioScript = async (
     detailed: `- Break each claim into components: What was literally said? What does it imply? What's the evidence for/against?\n- One speaker defends taking it at face value — the other adds nuance, exceptions, counterexamples.\n- Cover every angle before moving to the next claim.`,
     funny: `- Find the absurdity in each claim and run with it — funny analogies, ridiculous comparisons.\n- One defends it with increasingly silly logic — the other can't stop laughing but still makes valid points.\n- Keep it light but land actual information.`,
     debate: `- Each claim is a mini-debate. One argues FOR it, one argues AGAINST — strongly, with conviction.\n- No agreement allowed mid-debate. They can only agree in the conclusion.\n- Switch sides on each claim — the one who argued against must argue for the next one.`,
+    debate_sarcasm: `- Each claim triggers a debate WITH heavy sarcasm. One defends it sarcastically ("Oh wow yes, of course this is true, obviously"), the other dismantles it sarcastically ("Right, and I'm sure that held up in literally any real-world test ever").\n- Both argue real points but every sentence drips with sarcasm.\n- Switch who's defending vs attacking each claim.`,
+    fight: `- Each claim sparks a FIGHT. One speaker gets heated defending or attacking it — "That's not even close to what the data says!", "You're completely ignoring the obvious!".\n- Interruptions, frustration, talking over each other (show as em-dashes mid-sentence).\n- Still factually engaged — the fight is about genuine disagreement, not just noise.`,
+    romantic: `- Discuss each claim with warmth and gentle curiosity. One asks soft questions, the other answers thoughtfully.\n- "That's interesting — makes me wonder what that really means for people like us..."\n- Explore the emotional and human angle of each claim. No harsh debate — just two people genuinely curious together.`,
+    celebrity_call: `- Both speakers react to each claim like celebrities with strong public personas.\n- Confident, quotable takes. Name-drop real events. Playful ego clashes.\n- "Okay I'll be honest, I had a whole different take until I actually looked into this..." Celebrity insider energy.`,
+    ground_search: `- For each claim: one speaker states it, the other immediately digs for the ground truth.\n- "What does the actual data show?" / "Who funded that study?" / "The real number is..." Investigative fact-finding.\n- Every claim gets a clear ground-truth verdict backed by real evidence.`,
+    explain_examples: `- For each claim: explain it using a concrete real-world example or analogy.\n- One speaker states the claim, the other explains it with "Think of it like..." or gives a real case study.\n- Build on each other's examples to make the concept crystal clear.`,
+    explain_funny: `- Explain each claim using absurd, funny analogies and ridiculous comparisons.\n- "Okay this is basically like if your immune system was a bouncer at a club who's had too much coffee..."\n- Keep it hilarious but make sure the actual explanation lands correctly.`,
+    explain_deep: `- Go deep on every claim. Start from first principles. Ask "but WHY does that happen?" three times.\n- One speaker gives the surface explanation, the other keeps drilling down: "Okay but what's actually causing that?" / "One level deeper — the real mechanism is..."\n- By the end of each claim, cover root causes, second-order effects, and what most people miss.`,
   };
 
   const ytDynamicInstructions = isYtClaims
