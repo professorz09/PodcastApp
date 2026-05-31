@@ -1259,7 +1259,11 @@ Use those labels as speaker names throughout.`;
 
               ${speakerBlock}
 
-              Speaker 1 opens the conversation by presenting the topic or situation to the group — naturally and directly, like a real question being posed to real people. Not a formal introduction. More like: "Okay, here's the situation — [describe it]. What would you actually do here?"
+              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF.
+              Speaker 1 opens by immediately restating the question/topic in their own words and giving their first genuine take on it. They do NOT say "did you see that podcast/video/article" or reference any external content — they just engage with the question directly.
+
+              WRONG opening: "Did you guys see that podcast where they debated whether money buys happiness?"
+              RIGHT opening: "Does money actually buy happiness? Honestly, yes — up to a real point. Here's why I think that..."
 
               Then all 4 speakers weigh in from their own worldview.
 
@@ -1279,6 +1283,7 @@ Use those labels as speaker names throughout.`;
               ✓ 4 distinct voices — each sounds clearly different from the others
               ✓ Real specific examples — not vague general claims
               ✓ Genuine disagreement — speakers hold their positions
+              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question is the topic, not something they heard elsewhere
               ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
@@ -1288,18 +1293,20 @@ Use those labels as speaker names throughout.`;
             prompt = `
               STYLE: QUESTIONING — NARRATOR + 4 PERSPECTIVES
               Language: English. Audience: USA adults.
-              Topic / Scenario: "${topic}"
+              Topic / Question: "${topic}"
               ${specificDetails ? `Context: ${specificDetails}` : ''}
               ${durLineEn}
 
               Narrator: Narrator
               ${speakerBlock}
 
-              The Narrator opens by painting the situation vividly — as if dropping it right in front of the speakers. Think: "Alright, picture this — [scenario]. You're right there. What do you do?" Not a formal setup — immediate and immersive.
-              Then the Narrator introduces the 4 speakers by name: "I've got [Speaker 1], [Speaker 2], [Speaker 3], and [Speaker 4] here. Let's hear it."
+              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF. No podcast, video, or external reference anywhere.
 
-              Each speaker shares their genuine perspective from their own worldview/identity.
-              The Narrator asks follow-up questions at natural moments — probing the most interesting tensions, not following a script.
+              The Narrator opens by throwing the question directly into the room — sharp and immediate: "Alright, here's the question — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — let's get into it."
+              The Narrator does NOT say "picture this scenario", does NOT reference any podcast or video — they simply pose the question and hand it over.
+
+              Each speaker responds to the QUESTION itself from their own worldview/identity.
+              The Narrator asks sharp follow-up questions at natural moments — probing the most interesting tensions.
 
               The conversation should feel organic and specific to this topic.
               Do not follow a rigid round-by-round template — let the discussion evolve naturally.
@@ -1319,6 +1326,7 @@ Use those labels as speaker names throughout.`;
               ✓ 4 distinct speaker voices — each sounds clearly different from the others
               ✓ Real specific examples for every major point — not abstract claims
               ✓ Genuine disagreement — speakers hold their ground
+              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question IS the topic
               ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
@@ -2853,7 +2861,11 @@ Use those labels as speaker names throughout.`;
 
               ${speakerBlock}
 
-              Speaker 1 opens the conversation by presenting the topic or situation to the group — naturally and directly, like a real question being posed to real people. Not a formal introduction. More like: "Okay, here's the situation — [describe it]. What would you actually do here?"
+              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF.
+              Speaker 1 opens by immediately restating the question/topic in their own words and giving their first genuine take on it. They do NOT say "did you see that podcast/video/article" or reference any external content — they just engage with the question directly.
+
+              WRONG opening: "Did you guys see that podcast where they debated whether money buys happiness?"
+              RIGHT opening: "Does money actually buy happiness? Honestly, yes — up to a real point. Here's why I think that..."
 
               Then all 4 speakers weigh in from their own worldview.
 
@@ -2873,6 +2885,7 @@ Use those labels as speaker names throughout.`;
               ✓ 4 distinct voices — each sounds clearly different from the others
               ✓ Real specific examples — not vague general claims
               ✓ Genuine disagreement — speakers hold their positions
+              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question is the topic, not something they heard elsewhere
               ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
@@ -2882,18 +2895,20 @@ Use those labels as speaker names throughout.`;
             prompt = `
               STYLE: QUESTIONING — NARRATOR + 4 PERSPECTIVES
               Language: English. Audience: USA adults.
-              Topic / Scenario: "${topic}"
+              Topic / Question: "${topic}"
               ${specificDetails ? `Context: ${specificDetails}` : ''}
               ${durLineEn}
 
               Narrator: Narrator
               ${speakerBlock}
 
-              The Narrator opens by painting the situation vividly — as if dropping it right in front of the speakers. Think: "Alright, picture this — [scenario]. You're right there. What do you do?" Not a formal setup — immediate and immersive.
-              Then the Narrator introduces the 4 speakers by name: "I've got [Speaker 1], [Speaker 2], [Speaker 3], and [Speaker 4] here. Let's hear it."
+              CRITICAL — THIS IS A DIRECT DISCUSSION OF THE QUESTION ITSELF. No podcast, video, or external reference anywhere.
 
-              Each speaker shares their genuine perspective from their own worldview/identity.
-              The Narrator asks follow-up questions at natural moments — probing the most interesting tensions, not following a script.
+              The Narrator opens by throwing the question directly into the room — sharp and immediate: "Alright, here's the question — [topic]. [Speaker 1], [Speaker 2], [Speaker 3], [Speaker 4] — let's get into it."
+              The Narrator does NOT say "picture this scenario", does NOT reference any podcast or video — they simply pose the question and hand it over.
+
+              Each speaker responds to the QUESTION itself from their own worldview/identity.
+              The Narrator asks sharp follow-up questions at natural moments — probing the most interesting tensions.
 
               The conversation should feel organic and specific to this topic.
               Do not follow a rigid round-by-round template — let the discussion evolve naturally.
@@ -2913,6 +2928,7 @@ Use those labels as speaker names throughout.`;
               ✓ 4 distinct speaker voices — each sounds clearly different from the others
               ✓ Real specific examples for every major point — not abstract claims
               ✓ Genuine disagreement — speakers hold their ground
+              ✗ NEVER reference a podcast, video, article, or "did you watch/see/read" — the question IS the topic
               ✗ No generic filler ("Great point!", "Absolutely!", "I totally agree!")
               ✗ No formatting marks in output — no **, no --, no bullet symbols
               ✗ No section headings in output — just natural flowing dialogue
