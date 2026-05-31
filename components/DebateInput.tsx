@@ -820,28 +820,29 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       <Sparkles size={12} className="text-pink-400" />
                       <span className="text-[10px] font-semibold uppercase tracking-wider">Conversation Style</span>
                     </div>
-                    <div className="grid grid-cols-1 gap-1">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {([
-                        { id: 'podcast',         label: '🎙️ Podcast',          desc: 'Joe Rogan style — curious, casual, deep dives' },
-                        { id: 'roast',           label: '🔥 Roast',             desc: 'Savage burns, comedy burns, witty comebacks' },
-                        { id: 'sarcastic',       label: '😏 Sarcastic',         desc: 'Dripping sarcasm, eye-rolls, deadpan humour' },
-                        { id: 'factual',         label: '🧠 Factual Deep',      desc: 'Concepts explained simply — like to a friend' },
-                        { id: 'devils_advocate', label: "😈 Devil's Advocate",  desc: 'One defends, other destroys it ruthlessly' },
-                        { id: 'hot_takes',       label: '🌶️ Hot Takes',         desc: 'Controversial opinions, Twitter-drama energy' },
-                        { id: 'factcheck',       label: '📋 Fact-Check',        desc: 'Breaking down myths, wrong claims, misconceptions' },
-                        { id: 'react',           label: '🎬 React & Review',    desc: 'Reacting strongly with opinions, reaction-video style' },
-                      ] as { id: PhoneConvoStyle; label: string; desc: string }[]).map(opt => (
+                        { id: 'podcast',         emoji: '🎙️', label: 'Podcast',         desc: 'Casual deep dives' },
+                        { id: 'roast',           emoji: '🔥', label: 'Roast',            desc: 'Savage comebacks' },
+                        { id: 'sarcastic',       emoji: '😏', label: 'Sarcastic',        desc: 'Deadpan humour' },
+                        { id: 'factual',         emoji: '🧠', label: 'Factual Deep',     desc: 'Like to a friend' },
+                        { id: 'devils_advocate', emoji: '😈', label: "Devil's Advocate", desc: 'One destroys it' },
+                        { id: 'hot_takes',       emoji: '🌶️', label: 'Hot Takes',        desc: 'Twitter energy' },
+                        { id: 'factcheck',       emoji: '📋', label: 'Fact-Check',       desc: 'Myth busting' },
+                        { id: 'react',           emoji: '🎬', label: 'React & Review',   desc: 'Reaction style' },
+                      ] as { id: PhoneConvoStyle; emoji: string; label: string; desc: string }[]).map(opt => (
                         <button
                           key={opt.id}
                           onClick={() => setPhoneConvoStyle(opt.id)}
-                          className={`flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-all ${
+                          className={`flex flex-col items-start px-3 py-2.5 rounded-lg border text-left transition-all ${
                             phoneConvoStyle === opt.id
-                              ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
-                              : 'bg-[#111111] border-white/5 text-gray-400 hover:border-white/15 hover:text-gray-200'
+                              ? 'bg-purple-500/15 border-purple-500/40'
+                              : 'bg-[#111111] border-white/5 hover:border-white/15'
                           }`}
                         >
-                          <span className="text-[11px] font-semibold">{opt.label}</span>
-                          <span className="text-[9px] text-gray-500">{opt.desc}</span>
+                          <span className="text-base leading-none mb-1">{opt.emoji}</span>
+                          <span className={`text-[11px] font-semibold leading-tight ${phoneConvoStyle === opt.id ? 'text-purple-200' : 'text-gray-200'}`}>{opt.label}</span>
+                          <span className="text-[9px] text-gray-500 mt-0.5 leading-tight">{opt.desc}</span>
                         </button>
                       ))}
                     </div>
