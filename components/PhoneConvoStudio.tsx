@@ -456,7 +456,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
-  const [tab, setTab] = useState<'visual' | 'script' | 'export'>('visual');
+  const [tab, setTab] = useState<'visual' | 'export'>('visual');
   const [visualSub, setVisualSub] = useState<'phones' | 'background' | 'subtitle'>('phones');
 
   // Script generator state
@@ -1077,7 +1077,6 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
       <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#080809' }}>
         {([
           { id: 'visual', label: 'Settings', icon: '⚙️' },
-          { id: 'script', label: 'Generate', icon: '✨' },
           { id: 'export', label: 'Export',   icon: '📤' },
         ] as const).map(t => (
           <button
@@ -1098,21 +1097,6 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
       {/* ── Tab Content ── */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-
-        {/* ════ GENERATE / SCRIPT TAB ════ */}
-        {tab === 'script' && (
-          <ScriptGeneratorPanel
-            genStep={genStep} setGenStep={setGenStep}
-            genStyle={genStyle} setGenStyle={setGenStyle}
-            genTopic={genTopic} setGenTopic={setGenTopic}
-            genYtMode={genYtMode} setGenYtMode={setGenYtMode}
-            genYtUrl={genYtUrl} setGenYtUrl={setGenYtUrl}
-            genTurns={genTurns} setGenTurns={setGenTurns}
-            phones={phones}
-            generating={generating}
-            onGenerate={handleGenerate}
-          />
-        )}
 
         {/* ════ SETTINGS / VISUAL TAB ════ */}
         {tab === 'visual' && (
