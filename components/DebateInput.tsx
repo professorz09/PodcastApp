@@ -794,75 +794,69 @@ const DebateInput: React.FC<DebateInputProps> = ({
             {/* Combined Settings Card */}
             <div className="bg-[#0a0a0a] p-4 rounded-[16px] border border-white/5 hover:border-white/10 transition-colors shadow-sm space-y-4">
               
-              {/* Duration & Style Row */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Duration */}
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
-                    <Clock size={12} className="text-green-400" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">Duration</span>
-                  </div>
-                  <select
-                    value={duration}
-                    onChange={(e) => setDuration(Number(e.target.value))}
-                    className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-green-500/50 outline-none appearance-none cursor-pointer"
-                  >
-                    {durationOptions.map(d => (
-                      <option key={d} value={d}>{d} Min</option>
-                    ))}
-                  </select>
+              {/* Duration row — always full width */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 shrink-0 text-gray-300">
+                  <Clock size={12} className="text-green-400" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider">Duration</span>
                 </div>
+                <select
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-green-500/50 outline-none appearance-none cursor-pointer"
+                >
+                  {durationOptions.map(d => (
+                    <option key={d} value={d}>{d} Min</option>
+                  ))}
+                </select>
+              </div>
 
-                {/* Style — hidden for phone mode */}
-                {mode === 'phone' ? (
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
-                      <Sparkles size={12} className="text-pink-400" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wider">Conversation Style</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {([
-                        { id: 'podcast',         emoji: '🎙️', label: 'Podcast',         desc: 'Casual deep dives' },
-                        { id: 'roast',           emoji: '🔥', label: 'Roast',            desc: 'Savage comebacks' },
-                        { id: 'sarcastic',       emoji: '😏', label: 'Sarcastic',        desc: 'Deadpan humour' },
-                        { id: 'factual',         emoji: '🧠', label: 'Factual Deep',     desc: 'Like to a friend' },
-                        { id: 'devils_advocate', emoji: '😈', label: "Devil's Advocate", desc: 'One destroys it' },
-                        { id: 'hot_takes',       emoji: '🌶️', label: 'Hot Takes',        desc: 'Twitter energy' },
-                        { id: 'factcheck',       emoji: '📋', label: 'Fact-Check',       desc: 'Myth busting' },
-                        { id: 'react',           emoji: '🎬', label: 'React & Review',   desc: 'Reaction style' },
-                      ] as { id: PhoneConvoStyle; emoji: string; label: string; desc: string }[]).map(opt => (
-                        <button
-                          key={opt.id}
-                          onClick={() => setPhoneConvoStyle(opt.id)}
-                          className={`flex flex-col items-start px-3 py-2.5 rounded-lg border text-left transition-all ${
-                            phoneConvoStyle === opt.id
-                              ? 'bg-purple-500/15 border-purple-500/40'
-                              : 'bg-[#111111] border-white/5 hover:border-white/15'
-                          }`}
-                        >
-                          <span className="text-base leading-none mb-1">{opt.emoji}</span>
-                          <span className={`text-[11px] font-semibold leading-tight ${phoneConvoStyle === opt.id ? 'text-purple-200' : 'text-gray-200'}`}>{opt.label}</span>
-                          <span className="text-[9px] text-gray-500 mt-0.5 leading-tight">{opt.desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {/* Narrator toggle — phone mode only */}
-                    <div className="mt-2 pt-2 border-t border-white/5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider">Narrator / Question Cards</div>
-                          <div className="text-[9px] text-gray-500 mt-0.5">White screen pe question aayega, phir speakers discuss karenge</div>
-                        </div>
-                        <button
-                          onClick={() => setPhoneNarrator(p => !p)}
-                          className={`relative w-9 h-5 rounded-full transition-all shrink-0 ${phoneNarrator ? 'bg-purple-600' : 'bg-white/10'}`}
-                        >
-                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${phoneNarrator ? 'translate-x-4' : ''}`} />
-                        </button>
-                      </div>
-                    </div>
+              {/* Style — phone mode chips, other modes dropdown */}
+              {mode === 'phone' ? (
+                <div className="space-y-2">
+                  {/* Label */}
+                  <div className="flex items-center gap-1.5 text-gray-300">
+                    <Sparkles size={12} className="text-pink-400" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">Conversation Style</span>
                   </div>
-                ) : (
+                  {/* Horizontal scrollable chips */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
+                    {([
+                      { id: 'podcast',         emoji: '🎙️', label: 'Podcast'         },
+                      { id: 'roast',           emoji: '🔥', label: 'Roast'            },
+                      { id: 'sarcastic',       emoji: '😏', label: 'Sarcastic'        },
+                      { id: 'factual',         emoji: '🧠', label: 'Factual'          },
+                      { id: 'devils_advocate', emoji: '😈', label: "Devil's"          },
+                      { id: 'hot_takes',       emoji: '🌶️', label: 'Hot Takes'        },
+                      { id: 'factcheck',       emoji: '📋', label: 'Fact-Check'       },
+                      { id: 'react',           emoji: '🎬', label: 'React'            },
+                    ] as { id: PhoneConvoStyle; emoji: string; label: string }[]).map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setPhoneConvoStyle(opt.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap shrink-0 transition-all ${
+                          phoneConvoStyle === opt.id
+                            ? 'bg-purple-500/20 border-purple-500/50 text-purple-200'
+                            : 'bg-white/[0.03] border-white/8 text-gray-400 hover:border-white/20 hover:text-gray-200'
+                        }`}
+                      >
+                        <span>{opt.emoji}</span>
+                        <span>{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {/* Narrator toggle */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-gray-400">Narrator cards</span>
+                    <button
+                      onClick={() => setPhoneNarrator(p => !p)}
+                      className={`relative w-8 h-4 rounded-full transition-all ${phoneNarrator ? 'bg-purple-600' : 'bg-white/10'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${phoneNarrator ? 'translate-x-4' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
                     <Sparkles size={12} className="text-pink-400" />
@@ -912,8 +906,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="summarizer_pov">🎯 Summarizer POV</option>
                   </select>
                 </div>
-                )}
-              </div>
+              )}
 
               {/* Joe Rogan Experience — guest picker */}
               {style === 'joe_rogan' && (
