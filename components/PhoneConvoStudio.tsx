@@ -672,9 +672,10 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     }
 
     const startMs = r.currentTime;
-    r.play();
     setIsPlaying(true);
+    // Decode buffers FIRST, then start renderer — both begin simultaneously
     await scheduleAudioFrom(startMs);
+    r.play();
   };
 
   // Visual-only seek (called continuously while dragging)
@@ -684,11 +685,14 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   };
 
   // Full seek: update visual + restart audio from new position (called on mouse-up)
-  const seekWithAudio = useCallback((ms: number) => {
-    rendererRef.current?.seek(ms);
+  const seekWithAudio = useCallback(async (ms: number) => {
+    const r = rendererRef.current;
+    r?.seek(ms);
     setCurrentTime(ms);
     if (isPlayingRef.current) {
-      scheduleAudioFrom(ms);
+      r?.pause();                     // stop loop while audio decodes
+      await scheduleAudioFrom(ms);    // decode buffers first
+      r?.play();                      // restart loop — now in sync with audio
     }
   }, [scheduleAudioFrom]);
 
