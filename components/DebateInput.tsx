@@ -53,6 +53,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [phoneNarrator, setPhoneNarrator] = useState(false);
   const [phoneYtMode, setPhoneYtMode] = useState(false);
   const [phoneYtUrl, setPhoneYtUrl] = useState('');
+  const [phoneUseComments, setPhoneUseComments] = useState(false);
   const phoneFileInputRef = useRef<HTMLInputElement>(null);
   const [phoneFileName, setPhoneFileName] = useState<string | undefined>();
   const [phoneFileContent, setPhoneFileContent] = useState<string | undefined>();
@@ -119,7 +120,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       const activePhoneSpeakers = speakerNames.slice(0, speakerCount).map(n => n.trim()).filter(Boolean);
       onGenerate({
         topic: topic.trim() || 'AI Discussion',
-        specificDetails: `PHONE_STYLE:${phoneConvoStyle}\n${phoneYtMode && phoneYtUrl.trim() ? `PHONE_YT_URL:${phoneYtUrl.trim()}\n` : ''}---\n${phoneDescription}`,
+        specificDetails: `PHONE_STYLE:${phoneConvoStyle}\n${phoneYtMode && phoneYtUrl.trim() ? `PHONE_YT_URL:${phoneYtUrl.trim()}\n` : ''}${phoneYtMode && phoneUseComments ? `PHONE_USE_COMMENTS:true\n` : ''}---\n${phoneDescription}`,
         duration,
         includeNarrator: phoneNarrator,
         contextFileContent: phoneCtx,
@@ -381,6 +382,20 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       placeholder="https://youtube.com/watch?v=..."
                       className="w-full bg-[#111111] border border-white/5 rounded-lg px-3 py-2.5 text-sm text-white focus:border-red-500/50 focus:outline-none placeholder:text-gray-600"
                     />
+                    {/* Comments toggle — only when YouTube mode ON */}
+                    <div
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${phoneUseComments ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-white/[0.03] border border-white/5 hover:bg-white/[0.05]'}`}
+                      onClick={() => setPhoneUseComments(p => !p)}
+                    >
+                      <span className="text-base">💬</span>
+                      <div className="flex-1">
+                        <div className={`text-xs font-semibold ${phoneUseComments ? 'text-orange-300' : 'text-gray-400'}`}>Comments bhi use karo</div>
+                        <div className="text-[10px] text-gray-600">Funny, sarcastic, skeptical comments conversation mein aayenge</div>
+                      </div>
+                      <div className={`relative w-8 h-4 rounded-full transition-all shrink-0 ${phoneUseComments ? 'bg-orange-500' : 'bg-white/10'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${phoneUseComments ? 'translate-x-4' : ''}`} />
+                      </div>
+                    </div>
                     <input
                       type="text"
                       value={topic}

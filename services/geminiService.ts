@@ -5947,6 +5947,7 @@ export const generatePhoneStudioScript = async (
   model: string = 'gemini-3.5-flash',
   language: string = 'English',
   includeNarrator: boolean = false,
+  youtubeComments?: string[],
 ): Promise<DebateSegment[]> => {
   const targetWords = duration * 150;
   const isHindi = language.toLowerCase() === 'hindi';
@@ -5998,11 +5999,18 @@ export const generatePhoneStudioScript = async (
         : `\n⚠️ CONVERSATION OPENING (first 1-2 turns — very important):\nThe conversation must open NATURALLY — as if both speakers just watched or came across this specific video.\n- ${speakers[0] ?? 'Speaker 1'} opens the conversation by bringing up the video: mention the host/show/channel name if it's in the context above. Say they found some claims interesting, surprising, or worth questioning.\n- DO NOT use a robotic template like "I was analyzing human relationship data and found a video." Make it feel like two AI friends catching up.\n- Examples of good openings (adapt to the actual video):\n  "Hey ${speakers[1] ?? 'Speaker 2'}, did you catch that Joe Rogan episode with Elon? There's one claim in there I genuinely can't get past..."\n  "So I was going through this podcast — [show name] — and honestly some of the things they said are worth breaking down..."\n  "Okay so [host] said something that I'm still not sure what to make of. Have you seen this one?"\n- The opening should feel like the start of a real conversation, not a presentation.\n- ${speakers[1] ?? 'Speaker 2'} responds naturally and they move into the first claim together.\n\n⚠️ CLAIM DISCUSSION RULES (follow exactly):\n\nSTYLE-SPECIFIC DYNAMICS FOR EACH CLAIM:\n${ytClaimDynamics[phoneConvoStyle]}\n\nGENERAL RULES:\n- Reference each claim specifically — do NOT speak generically about the topic.\n- Quote or paraphrase the claim, react to it, then dig into the real facts/science/context.\n- Vary the dynamic on each claim — do NOT repeat the same pattern twice in a row.\n- Rotate roles — sometimes ${speakers[0] ?? 'Speaker 1'} leads/defends, sometimes ${speakers[1] ?? 'Speaker 2'} does.\n\nCONCLUSION (MANDATORY — last 2 turns of the script):\n- ${speakers[0] ?? 'Speaker 1'}: Give your personal overall verdict on this video — what held up, what didn't, one sentence rating (e.g. "6/10 — the chemistry angle was solid but the conspiracy framing was a stretch").\n- ${speakers[1] ?? 'Speaker 2'}: Give YOUR verdict — it must be DIFFERENT from the first speaker's. Harsher, more forgiving, or focused on a different angle.\n- Conclusions must feel personal and specific — not generic wrap-up lines.`)
     : '';
 
+  const commentsSection = youtubeComments && youtubeComments.length > 0
+    ? (isHindi
+        ? `\nYOUTUBE COMMENTS (audience reaction):\nNeeche kuch real comments hain jo logo ne is video par kiye hain. Inhe conversation mein naturally weave karo:\n- Kabhi ek speaker kisi comment ko quote kare: "ek comment tha jo mujhe hasaya — kisi ne likha '...'" ya "log actually frustrated hain kyunki..."\n- Comments se funny, sarcastic, ya skeptical reactions nikalo aur apni points support karne ke liye use karo.\n- Har baar comment quote mat karo — sirf woh use karo jo genuinely conversation ko enrich kare.\n${youtubeComments.slice(0, 60).map((c, i) => `${i + 1}. "${c.slice(0, 120)}"`).join('\n')}`
+        : `\nYOUTUBE COMMENTS (real audience reactions):\nBelow are real comments people left on this video. Weave them naturally into the conversation:\n- One speaker can quote a comment naturally: "someone in the comments actually said '...' and honestly..." or "the comments are full of people saying..."\n- Use comments to add funny, sarcastic, or skeptical voices — like the audience is part of the discussion.\n- Pick comments that are funny, provocative, or add a different angle. Don't force every comment in — only use ones that genuinely add flavor.\n- Do NOT list comments robotically — make it feel like the speakers discovered them.\n${youtubeComments.slice(0, 60).map((c, i) => `${i + 1}. "${c.slice(0, 120)}"`).join('\n')}`)
+    : '';
+
   const contextSection = [
     description && `${isHindi ? 'विवरण' : 'Description'}: ${description}`,
     contextFileContent && (isYtClaims
       ? `${isHindi ? 'यह conversation एक REAL YouTube video के specific claims पर based है' : 'This conversation is based on SPECIFIC CLAIMS from a real YouTube video'}:\n\n${contextFileContent.slice(0, 4000)}${ytDynamicInstructions}`
       : `${isHindi ? 'संदर्भ सामग्री' : 'Reference Material'}:\n${contextFileContent.slice(0, 4000)}`),
+    commentsSection,
   ].filter(Boolean).join('\n\n');
 
   const speakerList = speakers.length >= 2

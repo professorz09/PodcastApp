@@ -141,7 +141,8 @@ const App: React.FC = () => {
         const phoneConvoStyle = ((phoneStyleMatch?.[1]) || 'podcast') as PhoneConvoStyle;
         const phoneYtUrlMatch = details.match(/PHONE_YT_URL:(.+)/);
         const phoneYtUrl = phoneYtUrlMatch?.[1]?.trim() ?? '';
-        const phoneDescription = details.replace(/^PHONE_STYLE:\w+\n/, '').replace(/PHONE_YT_URL:.+\n/, '').replace(/^---\n?/, '') || '';
+        const phoneUseComments = /PHONE_USE_COMMENTS:true/.test(details);
+        const phoneDescription = details.replace(/^PHONE_STYLE:\w+\n/, '').replace(/PHONE_YT_URL:.+\n/, '').replace(/PHONE_USE_COMMENTS:true\n/, '').replace(/^---\n?/, '') || '';
 
         const speakers = (config.speakerNames && config.speakerNames.length >= 2)
           ? config.speakerNames
@@ -151,6 +152,7 @@ const App: React.FC = () => {
 
         // ── YouTube mode: fetch transcript → analyze with Gemini ─────────────
         let ytContext: string | undefined;
+        let ytComments: string[] = [];
         if (phoneYtUrl) {
           toast.info('YouTube transcript fetch ho raha hai…');
           const ytRes = await fetch('/api/youtube/transcript', {
@@ -205,6 +207,28 @@ Return JSON only (no markdown):
           } else {
             ytContext = `YOUTUBE_CLAIMS:\n${rawText.slice(0, 2000)}`;
           }
+
+          // ── Comments fetch (if toggle ON) ───────────────────────────────────
+          if (phoneUseComments) {
+            toast.info('Comments fetch ho rahe hain…');
+            try {
+              const cmtRes = await fetch('/api/youtube/comments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: phoneYtUrl, max_comments: 200 }),
+              });
+              if (cmtRes.ok) {
+                const cmtData = await cmtRes.json();
+                const raw: any[] = cmtData.comments ?? [];
+                ytComments = raw
+                  .map((c: any) => (typeof c === 'string' ? c : c.text ?? c.comment ?? ''))
+                  .filter(Boolean)
+                  .slice(0, 80);
+              }
+            } catch {
+              // silent — comments are optional
+            }
+          }
         }
 
         const generatedScript = await generatePhoneStudioScript(
@@ -217,6 +241,7 @@ Return JSON only (no markdown):
           config.model,
           config.language,
           config.includeNarrator,
+          ytComments.length ? ytComments : undefined,
         );
         if (!generatedScript.length) throw new Error('Phone Studio: Script generate nahi hua — dobara try karo.');
         setScript(generatedScript);
