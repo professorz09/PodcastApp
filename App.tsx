@@ -168,32 +168,39 @@ const App: React.FC = () => {
             (ytData.segments ?? ytData.transcript ?? []).map((t: any) => t.text).join(' ') ?? '';
           if (!rawText.trim()) throw new Error('Is video ka transcript available nahi hai.');
 
+          // Title + description already returned by Flask — only for host/guest extraction
+          const videoTitle: string = ytData.title ?? '';
+          const videoDescription: string = ytData.description ?? '';
+
           toast.info('Gemini claims analyze kar raha hai…');
           const analyzeRes = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               model: 'gemini-3.5-flash',
-              contents: [{ role: 'user', parts: [{ text: `You are analyzing a YouTube video transcript to extract SPECIFIC CLAIMS and STATEMENTS that were actually made in the video.
+              contents: [{ role: 'user', parts: [{ text: `You are analyzing a YouTube video to extract SPECIFIC CLAIMS and the show/host identity.
+
+VIDEO TITLE: ${videoTitle}
+VIDEO DESCRIPTION: ${videoDescription ? videoDescription.slice(0, 400) : '(not available)'}
 
 TRANSCRIPT (first 9000 chars):
 ${rawText.slice(0, 9000)}
 
 Your task — extract:
-1. "topic": A 1-2 sentence summary of what the video is about (include channel/show name if mentioned).
-2. "claims": 5-7 SPECIFIC claims, statements, or assertions made in the video — as close to verbatim as possible.
+1. "show": The show/channel/podcast name (e.g. "The Joe Rogan Experience", "Lex Fridman Podcast"). Use title/description to identify it. If unknown, use the channel vibe.
+2. "hosts": Array of names of the host(s) and main guest(s) mentioned or identifiable from title/description/transcript. E.g. ["Joe Rogan", "Elon Musk"]. If unknown, empty array.
+3. "topic": 1-2 sentence summary of what this specific episode/video is about.
+4. "claims": 5-7 SPECIFIC claims, statements, or assertions made in the video — as close to verbatim as possible.
    - Prioritize: controversial claims, surprising facts, strong opinions, numbers/statistics, conspiracy-adjacent ideas, scientific claims, shocking revelations.
-   - Include CONTEXT — who said it and about what. E.g. "The host claims that 300 gallons of sulfuric acid was found at Epstein's property" NOT "they discussed chemicals".
-   - If a claim has a specific number, name, or detail — KEEP IT in the claim.
+   - Include WHO said it if identifiable. E.g. "Elon claims that 300 gallons of sulfuric acid was found at Epstein's property" NOT "they discussed chemicals".
+   - Keep specific numbers, names, and details intact.
 
 Return JSON only (no markdown):
 {
+  "show": "...",
+  "hosts": ["name1", "name2"],
   "topic": "...",
-  "claims": [
-    "Claim 1 with full context and specific details",
-    "Claim 2...",
-    ...
-  ]
+  "claims": ["Claim 1...", "Claim 2...", ...]
 }` }] }],
             }),
           });
@@ -203,9 +210,11 @@ Return JSON only (no markdown):
           if (match) {
             const parsed = JSON.parse(match[0]);
             const claimLines = (parsed.claims as string[]).map((c: string, i: number) => `${i + 1}. ${c}`).join('\n');
-            ytContext = `YOUTUBE_CLAIMS:\nVideo: ${parsed.topic}\n\nSpecific claims made in this video:\n${claimLines}`;
+            const showLine = parsed.show ? `Show: ${parsed.show}` : '';
+            const hostsLine = parsed.hosts?.length ? `Hosts/Guests: ${(parsed.hosts as string[]).join(', ')}` : '';
+            ytContext = `YOUTUBE_CLAIMS:\n${showLine}${hostsLine ? `\n${hostsLine}` : ''}\nVideo topic: ${parsed.topic}\n\nSpecific claims made in this video:\n${claimLines}`;
           } else {
-            ytContext = `YOUTUBE_CLAIMS:\n${rawText.slice(0, 2000)}`;
+            ytContext = `YOUTUBE_CLAIMS:\n${videoTitle ? `Show/Video: ${videoTitle}\n` : ''}${rawText.slice(0, 2000)}`;
           }
 
           // ── Comments fetch (if toggle ON) ───────────────────────────────────
