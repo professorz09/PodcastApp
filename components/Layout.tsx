@@ -15,6 +15,7 @@ import {
   Scissors,
   ChevronRight,
   MonitorSmartphone,
+  Instagram,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -40,6 +41,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
     { id: AppState.STORYBOARD,        label: 'Storyboard',     icon: Film },
     { id: AppState.SHORTS,            label: 'Shorts',         icon: Smartphone },
     { id: AppState.LYRICS,            label: 'Song / Lyrics',  icon: Music2, optional: true },
+    { id: AppState.IG_SONG_STUDIO,    label: 'IG → Song',      icon: Instagram, optional: true },
     { id: AppState.VIDEO_CLIP_IMPORT, label: 'Clip Generator', icon: Scissors, optional: true },
   ];
   const steps = allSteps.filter(s => !hiddenSteps.includes(s.id));
@@ -178,6 +180,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
             const Icon = step.icon;
             const mobileLabel =
               step.id === AppState.LYRICS ? 'Song' :
+              step.id === AppState.IG_SONG_STUDIO ? 'IG Song' :
               step.id === AppState.VIDEO_CLIP_IMPORT ? 'Clips' :
               step.id === AppState.STORYBOARD ? 'Board' :
               step.id === AppState.VISUALIZER ? 'Video' :

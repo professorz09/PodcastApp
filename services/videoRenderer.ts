@@ -42,11 +42,13 @@ export const renderVideoOffline = async (
   let backgroundVideo: HTMLVideoElement | null = null;
   if (backgroundVideoUrl) {
     backgroundVideo = document.createElement('video');
-    backgroundVideo.src = backgroundVideoUrl;
-    backgroundVideo.muted = true;
+    // CORS attribute MUST be set BEFORE src — otherwise the browser issues a
+    // non-CORS request and Safari/iOS taints the canvas (export fails).
     backgroundVideo.crossOrigin = 'anonymous';
+    backgroundVideo.muted = true;
     backgroundVideo.playsInline = true;
     backgroundVideo.preload = 'auto';
+    backgroundVideo.src = backgroundVideoUrl;
     await new Promise((resolve) => {
       backgroundVideo!.onloadedmetadata = () => resolve(null);
       backgroundVideo!.onerror = () => {
@@ -167,16 +169,15 @@ export const renderVideoOffline = async (
       if (!alreadyThere) {
         backgroundVideo.currentTime = vidTime;
         await new Promise<void>(resolve => {
-          const onSeeked = () => {
+          let timerId: ReturnType<typeof setTimeout> | null = null;
+          const cleanup = () => {
             backgroundVideo!.removeEventListener('seeked', onSeeked);
-            resolve();
+            if (timerId !== null) { clearTimeout(timerId); timerId = null; }
           };
+          const onSeeked = () => { cleanup(); resolve(); };
           backgroundVideo!.addEventListener('seeked', onSeeked);
           // Hard timeout so a slow seek never stalls the export
-          setTimeout(() => {
-            backgroundVideo!.removeEventListener('seeked', onSeeked);
-            resolve();
-          }, 120);
+          timerId = setTimeout(() => { cleanup(); resolve(); }, 120);
         });
       }
     }

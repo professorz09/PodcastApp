@@ -652,7 +652,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.5-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -4716,6 +4716,66 @@ ${JSON.stringify(sample)}`;
   return comments.filter(c => c.length > 15 && c.length < 130).slice(0, 7);
 };
 
+/**
+ * Curate scraped IG comments for the IG → Song flow.
+ * Picks the funniest, wittiest, most quotable comments (roasts, one-liners,
+ * relatable reactions, sarcasm). Drops emoji-only / spam / generic praise.
+ * Returns up to `count` comments, lightly trimmed if needed.
+ */
+export const pickFunnyCommentsForSong = async (
+  comments: string[],
+  count: number = 20,
+  language: string = 'Hindi',
+  model: string = 'gemini-3-flash-preview',
+): Promise<string[]> => {
+  const ai = getAi();
+  const cleaned = comments
+    .map(c => (c || '').trim())
+    .filter(c => c.length >= 4 && c.length <= 280);
+  if (cleaned.length === 0) return [];
+  const sample = cleaned.slice(0, 300);
+
+  const prompt = `You are curating Instagram comments for a music video where the comments will scroll on screen with a song.
+LANGUAGE PREFERENCE: ${language} (but mixed-language / Hinglish / English comments are all fine — preserve the original).
+
+From the comments below, pick EXACTLY ${count} comments (or fewer if there aren't enough good ones) that are:
+- The FUNNIEST — jokes, roasts, sarcasm, wit, savage one-liners
+- The MOST RELATABLE — reactions everyone agrees with
+- The MOST QUOTABLE — punchy lines that read well on screen
+- DIVERSE — different angles/jokes, no near-duplicates
+
+REJECT:
+- Pure emoji / emoji-only comments
+- Generic praise ("nice", "wow", "great video")
+- Spam, promos, follow-requests
+- Anything under ~4 words unless it's a perfect punchline
+- Hate speech / slurs / political attacks
+
+Trim any comment over 140 chars at a natural break, keep it punchy. Preserve original spelling/language.
+
+Return ONLY a JSON array of selected comment strings — no markdown, no commentary, no keys.
+
+Comments:
+${JSON.stringify(sample)}`;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: { responseMimeType: 'application/json' },
+  });
+  const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed
+        .filter((s: any) => typeof s === 'string' && s.trim().length > 0)
+        .slice(0, count);
+    }
+  } catch {}
+  // Fallback: rough heuristic if Gemini returns bad JSON
+  return cleaned.filter(c => c.length >= 10 && c.length <= 140).slice(0, count);
+};
+
 export const generateIntroQuote = async (comments: string[]): Promise<string> => {
   const ai = getAi();
   const sample = comments.slice(0, 15).join('\n');
@@ -6317,4 +6377,236 @@ Rules:
     speaker: item.speaker || speakers[i % speakers.length] || 'Agent',
     text: item.text || '',
   }));
+};
+
+// ─── Podcast Deep-Analysis Helpers ────────────────────────────────────────────
+
+export interface PodcastTranscriptSeg { text: string; start: number; duration: number; }
+export interface PodcastCutRange { startSec: number; endSec: number; }
+
+export interface PodcastChapter {
+  startSec: number;
+  endSec: number;
+  title: string;
+  startQuote: string;
+  endQuote: string;
+  summary: string;
+}
+
+const fmtTs = (sec: number) => {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+};
+
+const applyCuts = (segs: PodcastTranscriptSeg[], cuts: PodcastCutRange[]): PodcastTranscriptSeg[] => {
+  if (!cuts.length) return segs;
+  return segs.filter(s => {
+    const mid = s.start + (s.duration || 0) / 2;
+    return !cuts.some(c => mid >= c.startSec && mid <= c.endSec);
+  });
+};
+
+export const analyzePodcastChapters = async (
+  segments: PodcastTranscriptSeg[],
+  cuts: PodcastCutRange[] = [],
+  podcastTitle: string = 'this podcast',
+): Promise<PodcastChapter[]> => {
+  if (!segments.length) return [];
+  const filtered = applyCuts(segments, cuts);
+  if (!filtered.length) throw new Error('Cuts ne saara transcript khaa liya — kam cuts karo');
+
+  // Build compact timestamped lines
+  const totalSec = filtered[filtered.length - 1].start + (filtered[filtered.length - 1].duration || 0);
+  const lines = filtered.map(s => `[${fmtTs(s.start)}] ${s.text.replace(/\s+/g, ' ').slice(0, 220)}`).join('\n');
+
+  // Cap prompt size — Gemini has limits but transcripts can be very long
+  const MAX_CHARS = 90000;
+  const promptBody = lines.length > MAX_CHARS
+    ? lines.slice(0, MAX_CHARS) + '\n…[transcript truncated for length]'
+    : lines;
+
+  const targetMin = Math.max(5, Math.min(10, Math.round(totalSec / 60 / 6)));
+
+  const prompt = `You are a podcast editor analyzing a transcript of "${podcastTitle}". Break the transcript into CHAPTERS for deep analysis.
+
+RULES:
+1. Each chapter MUST be 5-10 minutes long (a bit more/less is OK to keep a topic intact — NEVER cut a topic mid-thought).
+2. A chapter is ONE coherent topic / theme / argument — it must feel complete on its own.
+3. Target ${targetMin}-${Math.max(targetMin + 4, 8)} chapters total (depends on podcast length).
+4. For each chapter, capture the EXACT moment the topic begins and ends:
+   - "startQuote": the actual line/phrase from the transcript where this topic kicks off (10-25 words).
+   - "endQuote": the actual line/phrase where the topic naturally lands / pivots away (10-25 words).
+5. "title": 4-9 word punchy theme title (e.g. "Simulation Theory vs Self-Running Program", "Psychedelics as Source Code Access").
+6. "summary": one-line description of what this chapter is really about.
+7. Chapters MUST be in chronological order. First chapter starts near the beginning, last chapter ends near the end of the transcript.
+8. Do NOT overlap chapters. Do NOT leave gaps longer than ~1 minute between consecutive chapters.
+
+Total transcript length: ${fmtTs(totalSec)}
+
+Return JSON ONLY:
+{
+  "chapters": [
+    {
+      "startTimestamp": "M:SS",
+      "endTimestamp": "M:SS",
+      "title": "...",
+      "startQuote": "...",
+      "endQuote": "...",
+      "summary": "..."
+    }
+  ]
+}
+
+Transcript:
+${promptBody}`;
+
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+    responseMimeType: 'application/json',
+  });
+
+  const raw: string = data.text ?? data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  let parsed: { chapters: any[] };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    const m = raw.replace(/```json\s*/gi, '').replace(/```/g, '').match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Chapter response: invalid JSON');
+    parsed = JSON.parse(m[0]);
+  }
+
+  if (!parsed?.chapters?.length) throw new Error('Gemini ne chapters nahi diye');
+
+  const toSec = (ts: string): number => {
+    const parts = ts.split(':').map(Number);
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return parts[0] || 0;
+  };
+
+  return parsed.chapters
+    .map((c: any): PodcastChapter => ({
+      startSec: toSec(c.startTimestamp || c.start || '0:00'),
+      endSec: toSec(c.endTimestamp || c.end || '0:00'),
+      title: (c.title || '').toString().trim() || 'Untitled chapter',
+      startQuote: (c.startQuote || '').toString().trim(),
+      endQuote: (c.endQuote || '').toString().trim(),
+      summary: (c.summary || '').toString().trim(),
+    }))
+    .filter(c => c.endSec > c.startSec)
+    .sort((a, b) => a.startSec - b.startSec);
+};
+
+export const generatePodcastDeepAnalysisScript = async (
+  args: {
+    segments: PodcastTranscriptSeg[];
+    chapter: PodcastChapter;
+    podcastTitle: string;
+    supporterName: string;
+    criticName: string;
+    extraFocus?: string;
+    useGoogleGrounding?: boolean;
+  },
+): Promise<{ speaker: string; text: string }[]> => {
+  const { segments, chapter, podcastTitle, supporterName, criticName, extraFocus, useGoogleGrounding } = args;
+
+  // Extract only this chapter's transcript text
+  const chapterSegs = segments.filter(s => {
+    const mid = s.start + (s.duration || 0) / 2;
+    return mid >= chapter.startSec && mid <= chapter.endSec;
+  });
+
+  if (!chapterSegs.length) throw new Error('Is chapter me koi transcript content nahi mila');
+
+  const chapterText = chapterSegs.map(s => `[${fmtTs(s.start)}] ${s.text}`).join('\n');
+  const chapterTextCapped = chapterText.length > 30000
+    ? chapterText.slice(0, 30000) + '\n…[chapter truncated]'
+    : chapterText;
+
+  const prompt = `You are writing a DEEP ANALYSIS DISCUSSION script between two analysts who are reacting to and discussing a podcast segment. They are NOT recreating the podcast — they are talking ABOUT what was said.
+
+PODCAST: "${podcastTitle}"
+CHAPTER TITLE: "${chapter.title}"
+CHAPTER TIME: ${fmtTs(chapter.startSec)} → ${fmtTs(chapter.endSec)}
+CHAPTER FOCUS: ${chapter.summary || chapter.title}
+
+SPEAKERS (these are the two analysts, NOT the podcast hosts):
+- "${supporterName}" → THE SUPPORTER. Genuinely finds the podcast's points compelling. Defends them, builds on them, adds supporting evidence and context. Sees what is RIGHT about the arguments. Not blindly positive — thoughtful, but warmly agrees with the core points.
+- "${criticName}" → THE CRITIC. Sharp, skeptical analyst. Picks apart the arguments — finds logical gaps, missing nuance, dangerous implications, counterexamples. Not hostile — intellectually adversarial. Sees what is WRONG, MISSING, or DANGEROUS about the arguments.
+
+THE TWO ANALYSTS NATURALLY DISAGREE. Their back-and-forth is intellectual tension — they push back, concede points, reframe. Real conversation energy, not a polite forum.
+
+STRUCTURE the script as follows:
+
+A. **Opening Hook** (1-2 turns)
+   Start by naming the podcast + chapter. Quote/paraphrase the actual moment from the podcast that sparks this discussion.
+   Example feel:
+     "${supporterName}: Okay so on ${podcastTitle}, the part where they say [paraphrase the actual claim] — I think this is one of the sharpest things they've said all episode."
+     "${criticName}: Hold on. Before we get carried away, let's look at what's actually being claimed here..."
+
+B. **Topic-by-topic Deep Dive** (12-18 turns)
+   Identify 3-5 SPECIFIC sub-topics inside this chapter (specific claims, framings, or moments). For EACH sub-topic:
+   - One analyst introduces it by referencing what the podcast host actually said: "Next, [podcast host] argues that..." / "Then they pivot to..."
+   - The other reacts with their stance (supporter / critic depending on who's leading).
+   - They go BACK AND FORTH 2-4 turns per sub-topic — surface point → critical take → counter → concession or reframe.
+   - Use natural, spoken language. Contractions. Reactions. Interruptions ("wait, hold on..."). Don't be academic.
+   - Reference real-world examples, data, or context where it lands naturally. ${useGoogleGrounding ? 'Use the LATEST facts / events / statistics / studies you can find via search.' : ''}
+
+C. **The Critical Disagreement Beat** (2-3 turns)
+   One spot where ${supporterName} and ${criticName} clearly disagree about an interpretation. Let it breathe — they don't resolve it cleanly. That's the realism.
+
+D. **Final Key Takeaways** (2 turns at the very end — these are MANDATORY)
+   - Turn ${'{'}supporter takeaway turn${'}'}: ${supporterName} delivers a brief "what this podcast actually got RIGHT — what we should walk away learning" — 2-4 distinct positive takeaways, framed conversationally.
+   - Turn ${'{'}critic takeaway turn${'}'}: ${criticName} delivers the "what's CONCERNING / what we should be careful about" counterweight — 2-4 distinct concerns, framed sharply but not bitterly.
+
+NATURAL REFERENCING RULES:
+- Speakers refer to the podcast hosts by name where known. If hosts are unknown, use "the host", "they", "the guest".
+- Use phrases like: "next, [host] talks about...", "first thing I noticed was when they said...", "[host] argues a valid question — what's your take?", "this is where I push back...", "exactly the part that's bothering me too".
+- DO NOT roleplay AS the podcast hosts. The analysts are OUTSIDE the podcast looking in.
+- DO NOT invent quotes the hosts didn't say — paraphrase from the transcript below.
+
+LENGTH: 22-28 turns total, alternating naturally (not strictly). Each turn = 2-5 sentences of natural spoken English.
+
+${extraFocus ? `EXTRA FOCUS FROM USER: ${extraFocus}\n` : ''}
+THE CHAPTER TRANSCRIPT (this is what the analysts are reacting to — paraphrase, don't quote whole blocks):
+${chapterTextCapped}
+
+Return ONLY a JSON array. No markdown. No preamble. Just:
+[
+  { "speaker": "${supporterName}", "text": "..." },
+  { "speaker": "${criticName}", "text": "..." }
+]`;
+
+  const config: any = {};
+  if (useGoogleGrounding) {
+    config.tools = [{ googleSearch: {} }];
+  } else {
+    config.responseMimeType = 'application/json';
+  }
+
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+
+  const raw: string = data.text
+    ?? data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('')
+    ?? '';
+
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  let parsed: { speaker: string; text: string }[];
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\[[\s\S]*\]/);
+    if (!m) throw new Error('Deep analysis: invalid JSON from Gemini');
+    parsed = JSON.parse(m[0]);
+  }
+
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error('Deep analysis: empty script');
+
+  return parsed
+    .map(t => ({
+      speaker: (t.speaker || '').toString().trim() || supporterName,
+      text: (t.text || '').toString().trim(),
+    }))
+    .filter(t => t.text.length > 0);
 };

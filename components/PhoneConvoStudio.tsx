@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Play, Square, Download, Plus, Trash2, X, Check,
-  Volume2, Smartphone, Palette, Video,
-  ChevronDown, ChevronUp, Loader2,
+  Play, Square, Download, Check,
+  Volume2, Loader2,
   MonitorSmartphone,
 } from 'lucide-react';
 import { CanvasRenderer, PhoneConfig, ScriptTurn, StudioState, AnimStyle } from '../services/phoneCanvasRenderer';
 import { renderVideoOffline } from '../services/videoRenderer';
-import { generateScriptChapters } from '../services/geminiService';
+import {
+  generateScriptChapters,
+  analyzePodcastChapters,
+  generatePodcastDeepAnalysisScript,
+  PodcastTranscriptSeg,
+  PodcastCutRange,
+  PodcastChapter,
+} from '../services/geminiService';
 import { toast } from './Toast';
 import { DebateSegment } from '../types';
 
@@ -31,6 +37,12 @@ const AI_MODEL_PRESETS: {
 
 const ANIM_STYLES: { value: AnimStyle; label: string; desc: string }[] = [
   { value: 'gemini',       label: 'Gemini',        desc: 'Sphere + ripple rings' },
+  { value: 'siri-blob',    label: 'Siri Blob',     desc: 'Iridescent layered blobs' },
+  { value: 'liquid',       label: 'Liquid',        desc: 'Morphing blob' },
+  { value: 'particles',    label: 'Particles',     desc: 'Swarming dot orbit' },
+  { value: 'galaxy',       label: 'Galaxy',        desc: 'Spiral arm dots' },
+  { value: 'pulse-grid',   label: 'Pulse Grid',    desc: 'Lattice ripple' },
+  { value: 'spectrum',     label: 'Spectrum',      desc: 'Analyzer-style bars' },
   { value: 'ripple',       label: 'Ripple',        desc: 'Expanding rings' },
   { value: 'neon',         label: 'Neon Bars',     desc: 'Glowing equalizer' },
   { value: 'orb',          label: 'Orb',           desc: 'Glowing sphere' },
@@ -68,6 +80,13 @@ const BG_OPTIONS = [
 const CONVO_STYLES: {
   id: string; emoji: string; label: string; desc: string; prompt: string;
 }[] = [
+  {
+    id: 'podcast_analysis',
+    emoji: '🎙️🔍',
+    label: 'Podcast Deep Analysis',
+    desc: 'Podcast link → chapter cut → supporter vs critic deep dive',
+    prompt: `DEEP PODCAST ANALYSIS MODE. Two analysts (one supporter, one critic) discuss a podcast chapter — they are NOT recreating the podcast, they are reacting to it. Natural references like "next [host] talks about X", "valid question — what's your take", quoting/paraphrasing the actual transcript, deep structured discussion with disagreements, ending with supporter takeaways + critic concerns.`,
+  },
   {
     id: 'podcast',
     emoji: '🎙️',
@@ -262,6 +281,524 @@ const fmtTime = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
+// ─── PodcastAnalysisFlow ─────────────────────────────────────────────────────
+
+interface PodcastFlowProps {
+  sel: { emoji: string; label: string; desc: string };
+  onChangeStyle: () => void;
+  generating: boolean;
+  onGenerate: (args: {
+    podcastUrl: string;
+    chapter: PodcastChapter;
+    segments: PodcastTranscriptSeg[];
+    podcastTitle: string;
+    supporterName: string;
+    criticName: string;
+    extraFocus: string;
+    useGrounding: boolean;
+  }) => Promise<void>;
+}
+
+const fmtSec = (s: number) => {
+  const sec = Math.max(0, Math.floor(s));
+  const m = Math.floor(sec / 60);
+  const r = sec % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+};
+
+const parseTsInput = (txt: string): number | null => {
+  const t = txt.trim();
+  if (!t) return null;
+  const parts = t.split(':').map(p => +p);
+  if (parts.some(Number.isNaN)) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0];
+};
+
+const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, generating, onGenerate }) => {
+  const [phase, setPhase] = useState<'url' | 'cuts' | 'chapters' | 'ready'>('url');
+  const [podcastUrl, setPodcastUrl] = useState('');
+  const [podcastTitle, setPodcastTitle] = useState('');
+  const [supporterName, setSupporterName] = useState('Aarav');
+  const [criticName, setCriticName] = useState('Neha');
+  const [useGrounding, setUseGrounding] = useState(true);
+  const [extraFocus, setExtraFocus] = useState('');
+
+  const [segments, setSegments] = useState<PodcastTranscriptSeg[]>([]);
+  const [fetching, setFetching] = useState(false);
+
+  const [cuts, setCuts] = useState<PodcastCutRange[]>([]);
+  const [cutStartTxt, setCutStartTxt] = useState('');
+  const [cutEndTxt, setCutEndTxt] = useState('');
+
+  const [chapters, setChapters] = useState<PodcastChapter[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  const totalSec = segments.length
+    ? (segments[segments.length - 1].start + (segments[segments.length - 1].duration || 0))
+    : 0;
+
+  // ── 1. Fetch transcript ────────────────────────────────────────────────────
+  const handleFetch = async () => {
+    if (!podcastUrl.trim()) { toast.error('Podcast URL paste karo pehle'); return; }
+    setFetching(true);
+    try {
+      const r = await fetch('/api/youtube/transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: podcastUrl.trim(), language: 'auto' }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || `Transcript fetch failed (${r.status})`);
+      }
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      const segs: PodcastTranscriptSeg[] = (data.segments || data.transcript || []).map((s: any) => ({
+        text: s.text ?? '',
+        start: typeof s.start === 'number' ? s.start : 0,
+        duration: typeof s.duration === 'number' ? s.duration : 0,
+      })).filter((s: PodcastTranscriptSeg) => s.text.trim());
+      if (!segs.length) throw new Error('Is podcast me transcript available nahi hai');
+      setSegments(segs);
+      if (!podcastTitle.trim() && data.title) setPodcastTitle(data.title);
+      setPhase('cuts');
+      toast.success(`✓ Transcript fetched (${segs.length} segments, ${fmtSec(segs[segs.length - 1].start)})`);
+    } catch (e: any) {
+      toast.error(e.message || 'Transcript fetch failed');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  // ── 2. Cuts management ─────────────────────────────────────────────────────
+  const handleAddCut = () => {
+    const s = parseTsInput(cutStartTxt);
+    const e = parseTsInput(cutEndTxt);
+    if (s == null || e == null) { toast.error('Format: M:SS — e.g. 12:30'); return; }
+    if (e <= s) { toast.error('End time start ke baad honi chahiye'); return; }
+    setCuts(prev => [...prev, { startSec: s, endSec: e }].sort((a, b) => a.startSec - b.startSec));
+    setCutStartTxt(''); setCutEndTxt('');
+  };
+
+  const handleRemoveCut = (i: number) => setCuts(prev => prev.filter((_, idx) => idx !== i));
+
+  // ── 3. Analyze chapters ────────────────────────────────────────────────────
+  const handleAnalyze = async () => {
+    if (!segments.length) return;
+    setAnalyzing(true);
+    try {
+      const chaps = await analyzePodcastChapters(segments, cuts, podcastTitle || 'this podcast');
+      if (!chaps.length) throw new Error('Koi chapters detect nahi hue');
+      setChapters(chaps);
+      setSelectedIdx(0);
+      setPhase('chapters');
+      toast.success(`✓ ${chaps.length} chapters mile`);
+    } catch (e: any) {
+      toast.error(e.message || 'Chapter analysis failed');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // ── 4. Final generate ──────────────────────────────────────────────────────
+  const handleGenerateFinal = async () => {
+    if (selectedIdx == null || !chapters[selectedIdx]) {
+      toast.error('Pehle ek chapter select karo');
+      return;
+    }
+    if (!supporterName.trim() || !criticName.trim()) {
+      toast.error('Dono speaker names dalo');
+      return;
+    }
+    await onGenerate({
+      podcastUrl: podcastUrl.trim(),
+      chapter: chapters[selectedIdx],
+      segments,
+      podcastTitle: podcastTitle.trim() || 'this podcast',
+      supporterName: supporterName.trim(),
+      criticName: criticName.trim(),
+      extraFocus: extraFocus.trim(),
+      useGrounding,
+    });
+  };
+
+  // ── UI ─────────────────────────────────────────────────────────────────────
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+      {/* Selected style badge */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10,
+        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+      }}>
+        <span style={{ fontSize: 18 }}>{sel.emoji}</span>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>{sel.label}</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{sel.desc}</div>
+        </div>
+        <button
+          onClick={onChangeStyle}
+          style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}
+        >Change</button>
+      </div>
+
+      {/* Sub-step indicator */}
+      <div style={{ display: 'flex', gap: 4, fontSize: 10 }}>
+        {(['url', 'cuts', 'chapters', 'ready'] as const).map((p, i) => {
+          const labels = ['URL', 'Cuts', 'Chapters', 'Generate'];
+          const active = phase === p;
+          const passed = ['url', 'cuts', 'chapters', 'ready'].indexOf(phase) > i;
+          return (
+            <div key={p} style={{
+              flex: 1, padding: '5px 4px', borderRadius: 6, textAlign: 'center',
+              background: active ? 'rgba(239,68,68,0.15)' : passed ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.03)',
+              color: active ? '#fca5a5' : passed ? '#86efac' : 'rgba(255,255,255,0.3)',
+              border: active ? '1px solid rgba(239,68,68,0.3)' : '1px solid transparent',
+              fontWeight: 700,
+            }}>
+              {i + 1}. {labels[i]}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── PHASE: URL ── */}
+      {phase === 'url' && (
+        <>
+          <div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Podcast URL (YouTube)</div>
+            <input
+              value={podcastUrl}
+              onChange={e => setPodcastUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Podcast Title (optional)</div>
+            <input
+              value={podcastTitle}
+              onChange={e => setPodcastTitle(e.target.value)}
+              placeholder="e.g. JRE #2507, Lex Fridman #450..."
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(86,239,140,0.7)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>👍 Supporter</div>
+              <input
+                value={supporterName}
+                onChange={e => setSupporterName(e.target.value)}
+                placeholder="Name"
+                style={{
+                  width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                  background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(252,165,165,0.8)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>🗡️ Critic</div>
+              <input
+                value={criticName}
+                onChange={e => setCriticName(e.target.value)}
+                placeholder="Name"
+                style={{
+                  width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                  background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleFetch}
+            disabled={fetching || !podcastUrl.trim()}
+            style={{
+              padding: '11px', borderRadius: 12, border: 'none',
+              background: fetching ? 'rgba(239,68,68,0.3)' : '#ef4444',
+              color: '#fff', fontSize: 13, fontWeight: 800,
+              cursor: fetching ? 'default' : 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              opacity: !podcastUrl.trim() ? 0.4 : 1,
+            }}
+          >
+            {fetching
+              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Transcript fetch ho raha hai…</>
+              : <>📥 Fetch Transcript</>}
+          </button>
+        </>
+      )}
+
+      {/* ── PHASE: CUTS (skippable) ── */}
+      {phase === 'cuts' && (
+        <>
+          <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}>✓ Transcript Ready</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+              {segments.length} segments · Total {fmtSec(totalSec)}
+            </div>
+          </div>
+
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            <b style={{ color: '#fde68a' }}>Optional:</b> Ads, intros, ya boring parts cut karo (M:SS format). Skip bhi kar sakte ho — direct chapters analyze karo.
+          </div>
+
+          {/* Add cut */}
+          <div style={{ borderRadius: 10, border: '1px dashed rgba(255,255,255,0.15)', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6 }}>
+              <input
+                value={cutStartTxt}
+                onChange={e => setCutStartTxt(e.target.value)}
+                placeholder="Start (e.g. 2:15)"
+                style={{
+                  padding: '8px 10px', borderRadius: 7, boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'monospace',
+                }}
+              />
+              <input
+                value={cutEndTxt}
+                onChange={e => setCutEndTxt(e.target.value)}
+                placeholder="End (e.g. 4:30)"
+                style={{
+                  padding: '8px 10px', borderRadius: 7, boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'monospace',
+                }}
+              />
+              <button
+                onClick={handleAddCut}
+                style={{
+                  padding: '8px 12px', borderRadius: 7, border: 'none',
+                  background: 'rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >+ Cut</button>
+            </div>
+          </div>
+
+          {/* Cut list */}
+          {cuts.length > 0 && (
+            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden' }}>
+              {cuts.map((c, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
+                  borderBottom: i < cuts.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>#{i + 1}</span>
+                  <span style={{ flex: 1, fontFamily: 'monospace', fontSize: 11, color: '#fca5a5' }}>
+                    {fmtSec(c.startSec)} → {fmtSec(c.endSec)}
+                    <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>
+                      ({fmtSec(c.endSec - c.startSec)} cut)
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => handleRemoveCut(i)}
+                    style={{
+                      background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+                      cursor: 'pointer', fontSize: 14, padding: 0,
+                    }}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+            <button
+              onClick={() => { setCuts([]); handleAnalyze(); }}
+              disabled={analyzing}
+              style={{
+                padding: '11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, fontWeight: 600,
+                cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
+              }}
+            >⏭ Skip Cuts</button>
+            <button
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              style={{
+                padding: '11px', borderRadius: 10, border: 'none',
+                background: analyzing ? 'rgba(239,68,68,0.3)' : '#ef4444',
+                color: '#fff', fontSize: 13, fontWeight: 800,
+                cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              {analyzing
+                ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gemini…</>
+                : <>🧠 Analyze Chapters</>}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ── PHASE: CHAPTERS ── */}
+      {phase === 'chapters' && (
+        <>
+          <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd' }}>📚 {chapters.length} Chapters Detected</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+              Ek chapter select karo deep analysis ke liye
+            </div>
+          </div>
+
+          {/* Chapter table */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 380, overflowY: 'auto' }}>
+            {chapters.map((c, i) => {
+              const isSel = selectedIdx === i;
+              const dur = c.endSec - c.startSec;
+              return (
+                <div
+                  key={i}
+                  onClick={() => setSelectedIdx(i)}
+                  style={{
+                    padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                    border: `1.5px solid ${isSel ? '#a855f7' : 'rgba(255,255,255,0.07)'}`,
+                    background: isSel ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.025)',
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                      background: isSel ? '#a855f7' : 'rgba(255,255,255,0.08)',
+                      color: isSel ? '#fff' : 'rgba(255,255,255,0.4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, fontWeight: 800,
+                    }}>{i + 1}</div>
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#fff' }}>{c.title}</div>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                      {fmtSec(dur)}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 30 }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <span style={{ color: '#86efac', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}>
+                        START {fmtSec(c.startSec)}
+                      </span>
+                      <span style={{ flex: 1, fontStyle: 'italic' }}>{c.startQuote || c.summary}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <span style={{ color: '#fca5a5', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}>
+                        END {'  '}{fmtSec(c.endSec)}
+                      </span>
+                      <span style={{ flex: 1, fontStyle: 'italic' }}>{c.endQuote || c.summary}</span>
+                    </div>
+                    {c.summary && (
+                      <div style={{ marginTop: 3, color: 'rgba(255,255,255,0.4)' }}>↳ {c.summary}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Speakers banner */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{
+              flex: 1, padding: '7px 10px', borderRadius: 8,
+              background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)',
+            }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>SUPPORTER</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>{supporterName}</div>
+            </div>
+            <div style={{
+              flex: 1, padding: '7px 10px', borderRadius: 8,
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+            }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>CRITIC</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>{criticName}</div>
+            </div>
+          </div>
+
+          {/* Extra focus */}
+          <div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Extra Focus (optional)
+            </div>
+            <input
+              value={extraFocus}
+              onChange={e => setExtraFocus(e.target.value)}
+              placeholder="e.g. Focus on the ethical implications, or the data being cited"
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          {/* Grounding toggle */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', cursor: 'pointer' }}>
+            <div
+              onClick={() => setUseGrounding(p => !p)}
+              style={{
+                width: 36, height: 20, borderRadius: 50, position: 'relative', cursor: 'pointer',
+                background: useGrounding ? '#10b981' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s', flexShrink: 0,
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                left: useGrounding ? 18 : 2,
+              }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>🔍 Google Search Grounding</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Latest facts, data, narratives include karega</div>
+            </div>
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8 }}>
+            <button
+              onClick={() => setPhase('cuts')}
+              disabled={generating}
+              style={{
+                padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600,
+                cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit',
+              }}
+            >← Cuts</button>
+            <button
+              onClick={handleGenerateFinal}
+              disabled={generating || selectedIdx == null}
+              style={{
+                padding: '13px', borderRadius: 12, border: 'none',
+                background: generating ? 'rgba(168,85,247,0.4)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
+                color: '#fff', fontSize: 13, fontWeight: 800,
+                cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: selectedIdx == null ? 0.4 : 1,
+              }}
+            >
+              {generating
+                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating Deep Analysis…</>
+                : <>✨ Generate Deep Analysis Script</>}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── ScriptGeneratorPanel ─────────────────────────────────────────────────────
 
 interface GenPanelProps {
@@ -271,21 +808,46 @@ interface GenPanelProps {
   genYtMode: boolean; setGenYtMode: (b: boolean) => void;
   genYtUrl: string; setGenYtUrl: (s: string) => void;
   genTurns: number; setGenTurns: (n: number) => void;
+  genAutoTurns: boolean; setGenAutoTurns: (b: boolean) => void;
   phones: PhoneConfig[];
   generating: boolean;
   onGenerate: () => void;
+  onPodcastGenerate: (args: {
+    podcastUrl: string;
+    chapter: PodcastChapter;
+    segments: PodcastTranscriptSeg[];
+    podcastTitle: string;
+    supporterName: string;
+    criticName: string;
+    extraFocus: string;
+    useGrounding: boolean;
+  }) => Promise<void>;
 }
 
 const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
   genStep, setGenStep, genStyle, setGenStyle,
   genTopic, setGenTopic, genYtMode, setGenYtMode,
   genYtUrl, setGenYtUrl, genTurns, setGenTurns,
-  phones, generating, onGenerate,
+  genAutoTurns, setGenAutoTurns,
+  phones, generating, onGenerate, onPodcastGenerate,
 }) => {
   const sel = CONVO_STYLES.find(s => s.id === genStyle)!;
+  const isPodcastAnalysis = genStyle === 'podcast_analysis';
 
   return (
-    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        padding: 14,
+        paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+      }}
+    >
 
       {/* ── Step indicator ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -359,8 +921,18 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
         </div>
       )}
 
+      {/* ── Step 2: Podcast Analysis flow (special) ── */}
+      {genStep === 2 && isPodcastAnalysis && (
+        <PodcastAnalysisFlow
+          sel={sel}
+          onChangeStyle={() => setGenStep(1)}
+          onGenerate={onPodcastGenerate}
+          generating={generating}
+        />
+      )}
+
       {/* ── Step 2: Topic + YouTube ── */}
-      {genStep === 2 && (
+      {genStep === 2 && !isPodcastAnalysis && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* Selected style badge */}
@@ -479,19 +1051,47 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
             </div>
           )}
 
-          {/* Turns count */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          {/* Turns count — with Auto toggle */}
+          <div style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                 Conversation Length
               </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{genTurns} turns (~{Math.round(genTurns * 12)}s)</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: genAutoTurns ? '#86efac' : '#fff' }}>
+                {genAutoTurns ? 'Auto · 3-15 min' : `${genTurns} turns (~${Math.round(genTurns * 12)}s)`}
+              </span>
             </div>
-            <input
-              type="range" min={6} max={24} step={2} value={genTurns}
-              onChange={e => setGenTurns(+e.target.value)}
-              style={{ width: '100%', accentColor: '#ef4444' }}
-            />
+
+            {/* Auto toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' }}>
+              <div
+                onClick={() => setGenAutoTurns(!genAutoTurns)}
+                style={{
+                  width: 34, height: 18, borderRadius: 50, position: 'relative', cursor: 'pointer',
+                  background: genAutoTurns ? '#10b981' : 'rgba(255,255,255,0.12)', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%',
+                  background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                  left: genAutoTurns ? 18 : 2,
+                }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>🪄 Auto Length</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                  Gemini topic depth dekh ke turns decide karega (3-15 min target)
+                </div>
+              </div>
+            </label>
+
+            {!genAutoTurns && (
+              <input
+                type="range" min={6} max={60} step={2} value={genTurns}
+                onChange={e => setGenTurns(+e.target.value)}
+                style={{ width: '100%', accentColor: '#ef4444', marginTop: 6 }}
+              />
+            )}
           </div>
 
           {/* Generate button */}
@@ -534,7 +1134,17 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [phones, setPhones]   = useState<PhoneConfig[]>([]);
   const [script, setScript]   = useState<ScriptTurn[]>([]);
   const [bg, setBg]           = useState('#f0f4f8');
-  const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [bgImageUrl, setBgImageUrlRaw] = useState<string | null>(null);
+  // Always revoke the previous blob URL before swapping in a new one.
+  // Without this, every uploaded image leaks until tab close (MBs each).
+  const setBgImageUrl = useCallback((next: string | null) => {
+    setBgImageUrlRaw(prev => {
+      if (prev && prev.startsWith('blob:') && prev !== next) {
+        try { URL.revokeObjectURL(prev); } catch {}
+      }
+      return next;
+    });
+  }, []);
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
   const [subtitleBg, setSubtitleBg]           = useState<'dark' | 'light' | 'none'>('dark');
   const [subtitleSize, setSubtitleSize]       = useState(1.6);
@@ -552,6 +1162,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const [generating, setGenerating] = useState(false);
   const [genStep, setGenStep] = useState<1 | 2>(1);
   const [genTurns, setGenTurns] = useState(14);
+  const [genAutoTurns, setGenAutoTurns] = useState(true);
 
   // Canvas + renderer
   const canvasRef   = useRef<HTMLCanvasElement>(null);
@@ -646,6 +1257,29 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     };
     rendererRef.current = r;
     r.drawFrame();
+
+    // Cleanup on unmount: stop the render loop AND any active audio.
+    // Without this, navigating away from Phone Studio while playing leaks
+    // the AudioContext (browsers cap to ~6 — eventually new AudioContext() throws)
+    // and keeps voices playing in the background.
+    return () => {
+      try { r.pause(); } catch {}
+      try { r.stop(); } catch {}
+      audioSourcesRef.current.forEach(s => { try { s.stop(0); } catch {} });
+      audioSourcesRef.current = [];
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch {}
+        audioCtxRef.current = null;
+      }
+      rendererRef.current = null;
+      // Revoke any pending background-image blob URL
+      setBgImageUrlRaw(prev => {
+        if (prev && prev.startsWith('blob:')) {
+          try { URL.revokeObjectURL(prev); } catch {}
+        }
+        return null;
+      });
+    };
   }, []);
 
   // Update renderer state
@@ -698,7 +1332,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         return abPromise.then(ab => actx.decodeAudioData(ab)).catch(() => null);
       })
     );
-    // Cancelled by another call
+    // Cancelled by another call OR component unmounted
     if (audioCtxRef.current !== actx) return null;
 
     // ── Build actual durations from decoded buffers ───────────────────────
@@ -706,6 +1340,12 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     const actualDurations = buffers.map((buf, i) =>
       buf ? Math.round(buf.duration * 1000) : script[i].durationMs
     );
+
+    // Re-check cancellation right before mutating React state — between the
+    // await and here, the user could have seeked again or unmounted the
+    // component (cleanup nulls audioCtxRef). Without this guard, a superseded
+    // decode would clobber word timings on a now-different script.
+    if (audioCtxRef.current !== actx) return null;
 
     // If any duration differs from estimate → update script state + renderer
     const hasMismatch = actualDurations.some((d, i) => d !== script[i].durationMs);
@@ -722,6 +1362,11 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         };
       }));
     }
+
+    // Final guard before scheduling on the AudioContext — if cancelled,
+    // actx may already be closing; creating BufferSourceNodes on a closed
+    // context throws.
+    if (audioCtxRef.current !== actx) return null;
 
     let elapsed = 0;
     buffers.forEach((buf, i) => {
@@ -815,7 +1460,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
     const W = 1920, H = 1080, FPS = 30;
     const totalMs = script.reduce((s, t) => s + t.durationMs, 0);
     const totalSec = totalMs / 1000;
-    const isLongVideo = totalSec > 8 * 60; // > 8 min = stream to disk
+    // Stream to disk for anything > 3 min — keeps RAM flat regardless of duration
+    const isLongVideo = totalSec > 3 * 60;
 
     setExporting(true); setExportProgress(0); setExportStatus('Audio decode ho raha hai…');
 
@@ -837,28 +1483,58 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         }
       }
 
-      // ── 1. Decode all audio and mix into one Float32Array ─────────────────
-      const actx = new AudioContext();
-      const decoded = await Promise.all(
-        script.map(t =>
-          t.audioUrl
-            ? fetch(t.audioUrl).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).catch(() => null)
-            : Promise.resolve(null)
-        )
-      );
-      const sampleRate = decoded.find(Boolean)?.sampleRate ?? 24000;
+      // ── 1. Decode audio serially and mix into one Float32Array ────────────
+      // Force 24kHz AudioContext — TTS voices are mono ~22kHz max, this halves
+      // the mixed buffer size vs 48kHz default (huge memory win on long exports).
+      // Decode one turn at a time so peak memory = mixed + 1 decoded chunk
+      // instead of mixed + ALL-decoded (which OOM-crashed on long exports).
+      const TARGET_SR = 24_000;
+      let actx: AudioContext;
+      try {
+        actx = new AudioContext({ sampleRate: TARGET_SR });
+      } catch {
+        // Older Safari doesn't allow setting sampleRate — fall back to default
+        actx = new AudioContext();
+      }
+      const sampleRate = actx.sampleRate;
       const totalSamples = Math.ceil(totalSec * sampleRate);
+
+      // Guard: refuse to attempt > ~1.5 GB mixed buffer (would OOM the tab)
+      const bufferBytes = totalSamples * 4;
+      if (bufferBytes > 1_500_000_000) {
+        throw new Error(`Video bahut lambi hai (${Math.round(totalSec / 60)} min) — RAM me fit nahi hogi. Split karke export karo.`);
+      }
+
       const mixed = new Float32Array(totalSamples);
       let offsetMs = 0;
-      decoded.forEach((buf, i) => {
-        if (buf) {
-          const startSample = Math.floor(offsetMs / 1000 * sampleRate);
-          const ch = buf.getChannelData(0);
-          for (let j = 0; j < ch.length && startSample + j < totalSamples; j++)
-            mixed[startSample + j] += ch[j];
+      let decodedCount = 0;
+      const totalAudioTurns = script.filter(t => t.audioUrl).length || 1;
+
+      for (let i = 0; i < script.length; i++) {
+        const t = script[i];
+        if (t.audioUrl) {
+          try {
+            const ab = await (await fetch(t.audioUrl)).arrayBuffer();
+            const buf = await actx.decodeAudioData(ab);
+            const startSample = Math.floor(offsetMs / 1000 * sampleRate);
+            const ch = buf.getChannelData(0);
+            const writeLen = Math.min(ch.length, totalSamples - startSample);
+            for (let j = 0; j < writeLen; j++) {
+              mixed[startSample + j] += ch[j];
+            }
+            decodedCount++;
+            // Update status occasionally so user sees progress on long exports
+            if (decodedCount % 5 === 0 || decodedCount === totalAudioTurns) {
+              setExportStatus(`Audio decode: ${decodedCount}/${totalAudioTurns}`);
+              // Yield to UI thread between batches
+              await new Promise(r => setTimeout(r, 0));
+            }
+          } catch (decodeErr) {
+            console.warn(`Audio decode failed for turn ${i}:`, decodeErr);
+          }
         }
-        offsetMs += script[i].durationMs;
-      });
+        offsetMs += t.durationMs;
+      }
       await actx.close();
 
       // ── 2. Create offscreen renderer at 1080p ─────────────────────────────
@@ -899,7 +1575,10 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         const url = URL.createObjectURL(blob as Blob);
         const a = document.createElement('a');
         a.href = url; a.download = `phone-studio-${Date.now()}.mp4`; a.click();
-        URL.revokeObjectURL(url);
+        // Defer revoke — Firefox/Safari sometimes need the URL live for several
+        // seconds after .click() to actually save the file. Immediate revoke
+        // causes empty / 0-byte downloads on those browsers.
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 60_000);
         toast.success('✓ 1080p MP4 download ho gaya!');
       }
     } catch (err: any) {
@@ -982,16 +1661,39 @@ Return JSON only:
         const analyzeJson = await analyzeRes.json();
         const analyzeText = analyzeJson.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
         const match = analyzeText.match(/\{[\s\S]*\}/);
+        let analyzed: { topic?: string; points?: unknown } | null = null;
         if (match) {
-          const parsed = JSON.parse(match[0]);
-          topicContext = `Based on this YouTube video:\n${parsed.topic}\n\nKey discussion points to explore:\n${(parsed.points as string[]).map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
+          try { analyzed = JSON.parse(match[0]); } catch { analyzed = null; }
+        }
+        if (analyzed && Array.isArray(analyzed.points) && analyzed.points.length > 0) {
+          const pointsList = (analyzed.points as unknown[])
+            .filter((p): p is string => typeof p === 'string')
+            .map((p, i) => `${i + 1}. ${p}`)
+            .join('\n');
+          const topicLine = typeof analyzed.topic === 'string' ? analyzed.topic : '(video topic)';
+          topicContext = `Based on this YouTube video:\n${topicLine}\n\nKey discussion points to explore:\n${pointsList}`;
         } else {
+          // Gemini didn't return usable JSON — fall back to raw transcript slice
           topicContext = rawText.slice(0, 1500);
         }
       }
 
       // ── Generate conversation script via Gemini ────────────────────────────
       toast.info('Script generate ho raha hai…');
+      const sourceLenHint = genYtMode
+        ? `Source: YouTube transcript (~${Math.round(topicContext.length / 1000)}k chars of context).`
+        : `Source: topic prompt (user-supplied, no transcript).`;
+      const lengthRule = genAutoTurns
+        ? `1. AUTO LENGTH MODE — YOU decide the turn count yourself. ${sourceLenHint}
+   Target final video: **3 to 15 minutes** (each turn ~12-14s spoken, so 12-75 turns total).
+   Choose the count that does justice to the topic — NO PADDING, NO FILLER:
+   - Quick / shallow topic → 12-22 turns (~3-5 min)
+   - Standard topic with 2-3 sub-points → 22-40 turns (~5-9 min)
+   - Rich / deep / multi-claim topic (or long transcript source) → 40-75 turns (~9-15 min)
+   Pick based on actual richness, not arbitrarily. If the topic is shallow, STAY SHORT — don't pad to hit 15 min.
+   Alternate between speakers (start with ${speaker1}).`
+        : `1. Generate exactly ${genTurns} turns total, alternating between speakers (start with ${speaker1}).`;
+
       const prompt = `You are writing a script for a phone conversation video between two AI assistants: "${speaker1}" and "${speaker2}".
 
 TOPIC/CONTEXT:
@@ -1001,7 +1703,7 @@ CONVERSATION STYLE:
 ${style.prompt}
 
 RULES:
-1. Generate exactly ${genTurns} turns total, alternating between speakers (start with ${speaker1}).
+${lengthRule}
 2. Each turn: 2-4 natural sentences. No bullet points. No headers.
 3. Each turn should feel like actual spoken dialogue — contractions, casual language, reactions.
 4. Avoid "In conclusion" or formal summaries — keep the conversation flowing.
@@ -1066,14 +1768,85 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
     } finally {
       setGenerating(false);
     }
-  }, [genStyle, genTopic, genYtMode, genYtUrl, genTurns, phones]);
+  }, [genStyle, genTopic, genYtMode, genYtUrl, genTurns, genAutoTurns, phones]);
+
+  // ── Podcast Deep-Analysis Generator ───────────────────────────────────────
+
+  const handlePodcastGenerate = useCallback(async (args: {
+    podcastUrl: string;
+    chapter: PodcastChapter;
+    segments: PodcastTranscriptSeg[];
+    podcastTitle: string;
+    supporterName: string;
+    criticName: string;
+    extraFocus: string;
+    useGrounding: boolean;
+  }) => {
+    setGenerating(true);
+    try {
+      toast.info('Gemini chapter deep-analyze kar raha hai…');
+      const turns = await generatePodcastDeepAnalysisScript({
+        segments: args.segments,
+        chapter: args.chapter,
+        podcastTitle: args.podcastTitle,
+        supporterName: args.supporterName,
+        criticName: args.criticName,
+        extraFocus: args.extraFocus || undefined,
+        useGoogleGrounding: args.useGrounding,
+      });
+      if (!turns.length) throw new Error('Script empty hai');
+
+      // Build / reuse phones for supporter (green) + critic (red)
+      const supporterPhoneId = speakerToPhoneId(args.supporterName);
+      const criticPhoneId = speakerToPhoneId(args.criticName);
+      const greenPreset = PRESET_COLORS.find(p => p.label === 'Green') ?? PRESET_COLORS[1];
+      const redPreset   = PRESET_COLORS.find(p => p.label === 'Red')   ?? PRESET_COLORS[4];
+      const newPhones: PhoneConfig[] = [
+        {
+          id: supporterPhoneId, name: args.supporterName,
+          style: 'aurora', color: greenPreset.color, screenColor: greenPreset.screen,
+          rotation: -4, showControls: true, battery: '87%',
+        },
+        {
+          id: criticPhoneId, name: args.criticName,
+          style: 'ripple', color: redPreset.color, screenColor: redPreset.screen,
+          rotation: 5, showControls: true, battery: '73%',
+        },
+      ];
+      setPhones(newPhones);
+
+      const newScript: ScriptTurn[] = turns.map((t, i) => {
+        const isSupp = t.speaker.trim().toLowerCase() === args.supporterName.trim().toLowerCase();
+        const phoneId = isSupp ? supporterPhoneId : criticPhoneId;
+        const estDur = Math.max(3000, t.text.length * 72);
+        return {
+          id: `podcast_${i}_${Date.now()}`,
+          phoneId,
+          text: t.text,
+          isNarrator: false,
+          durationMs: estDur,
+          audioUrl: undefined,
+          wordTimings: estimateWordTimings(t.text, estDur / 1000),
+        };
+      });
+
+      setScript(newScript);
+      setTab('visual');
+      toast.success(`✓ ${newScript.length} turns ka deep-analysis script ready hai!`);
+    } catch (err: any) {
+      console.error('Podcast generate error:', err);
+      toast.error(`Generate failed: ${err.message}`);
+    } finally {
+      setGenerating(false);
+    }
+  }, []);
 
   // ── No script fallback → show generator ───────────────────────────────────
 
   if (!mainScript.length && !script.length) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#050507', color: '#e0e0e0', fontFamily: 'inherit' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: '#050507', color: '#e0e0e0', fontFamily: 'inherit' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <MonitorSmartphone size={18} color="#ef4444" />
           <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Phone Studio — Script Generator</span>
         </div>
@@ -1084,9 +1857,11 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           genYtMode={genYtMode} setGenYtMode={setGenYtMode}
           genYtUrl={genYtUrl} setGenYtUrl={setGenYtUrl}
           genTurns={genTurns} setGenTurns={setGenTurns}
+          genAutoTurns={genAutoTurns} setGenAutoTurns={setGenAutoTurns}
           phones={phones}
           generating={generating}
           onGenerate={handleGenerate}
+          onPodcastGenerate={handlePodcastGenerate}
         />
       </div>
     );
@@ -1147,7 +1922,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             onClick={togglePlay}
             disabled={!script.length}
             style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
               background: '#fff', border: 'none', cursor: script.length ? 'pointer' : 'default',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               opacity: script.length ? 1 : 0.3,
@@ -1237,11 +2012,11 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
       </div>
 
       {/* ── Tab Content ── */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
 
         {/* ════ SETTINGS / VISUAL TAB ════ */}
         {tab === 'visual' && (
-          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ padding: 12, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
             {/* Script info banner */}
             <div style={{
@@ -1310,7 +2085,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                         <input
                           value={startTime}
                           onChange={e => setStartTime(e.target.value)}
-                          style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', width: 50, textAlign: 'right' }}
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: 12, fontFamily: 'monospace', outline: 'none', width: 72, textAlign: 'right', padding: '6px 8px' }}
                           placeholder="09:41"
                         />
                       </div>
@@ -1340,11 +2115,11 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                                 style: model.style,
                               })}
                               style={{
-                                padding: '4px 9px', borderRadius: 20,
+                                padding: '8px 12px', borderRadius: 20, minHeight: 36,
                                 border: `1px solid ${sel ? model.color : 'rgba(255,255,255,0.1)'}`,
                                 background: sel ? model.color + '30' : 'rgba(255,255,255,0.04)',
                                 color: sel ? '#fff' : 'rgba(255,255,255,0.45)',
-                                fontSize: 11, fontWeight: sel ? 700 : 500,
+                                fontSize: 12, fontWeight: sel ? 700 : 500,
                                 cursor: 'pointer', fontFamily: 'inherit',
                                 display: 'flex', alignItems: 'center', gap: 4,
                                 transition: 'all 0.12s',
@@ -1410,7 +2185,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       {phone.backgroundImage && (
                         <button
                           onClick={() => updatePhone(phone.id, { backgroundImage: undefined })}
-                          style={{ padding: '5px 8px', borderRadius: 7, border: 'none', background: 'rgba(239,68,68,0.18)', color: '#fca5a5', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                          style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.18)', color: '#fca5a5', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', minHeight: 36 }}
                         >✕ Remove</button>
                       )}
                     </div>
@@ -1442,19 +2217,20 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       {/* Color presets */}
                       <div>
                         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Color</div>
-                        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {PRESET_COLORS.map(pc => (
                             <div
                               key={pc.color}
                               onClick={() => updatePhone(phone.id, { color: pc.color, screenColor: pc.screen })}
                               title={pc.label}
                               style={{
-                                width: 24, height: 24, borderRadius: '50%', background: pc.color, cursor: 'pointer',
+                                width: 32, height: 32, borderRadius: '50%', background: pc.color, cursor: 'pointer',
                                 boxShadow: phone.color === pc.color
-                                  ? `0 0 0 2px #050507, 0 0 0 3.5px ${pc.color}`
+                                  ? `0 0 0 2px #050507, 0 0 0 4px ${pc.color}`
                                   : 'none',
-                                transform: phone.color === pc.color ? 'scale(1.18)' : 'scale(1)',
+                                transform: phone.color === pc.color ? 'scale(1.12)' : 'scale(1)',
                                 transition: 'all 0.15s',
+                                flexShrink: 0,
                               }}
                             />
                           ))}
@@ -1462,7 +2238,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                             <input
                               type="color" value={phone.color}
                               onChange={e => updatePhone(phone.id, { color: e.target.value })}
-                              style={{ width: 24, height: 24, border: 'none', padding: 0, background: 'none', cursor: 'pointer', borderRadius: '50%' }}
+                              style={{ width: 32, height: 32, border: 'none', padding: 0, background: 'none', cursor: 'pointer', borderRadius: '50%' }}
                               title="Custom color"
                             />
                           </div>
@@ -1489,7 +2265,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                           <input
                             value={phone.battery ?? '87%'}
                             onChange={e => updatePhone(phone.id, { battery: e.target.value })}
-                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', width: 52, textAlign: 'center', padding: '2px 4px' }}
+                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', fontSize: 12, fontFamily: 'monospace', outline: 'none', width: 72, textAlign: 'center', padding: '6px 8px' }}
                             placeholder="87%"
                           />
                         </div>
@@ -1560,7 +2336,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 </div>
 
                 {/* Preset colors */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
                   {BG_OPTIONS.map(opt => {
                     const sel = !bgImageUrl && bg === opt.value;
                     const preview = opt.value.startsWith('linear:')
@@ -1782,7 +2558,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
         {/* ════ EXPORT TAB ════ */}
         {tab === 'export' && (
-          <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: 14, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             {/* Info card */}
             <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 14 }}>

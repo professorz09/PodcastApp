@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(git stash *)",
+      "Bash(yt-dlp --version)",
+      "Bash(yt-dlp --cookies yt_cookies.txt --skip-download --write-comments --extractor-args \"instagram:comment_count=10\" --no-warnings --print \"%\\(comments\\)j\" \"https://www.instagram.com/reel/DD6mDuTodVl/\")"
+    ]
+  }
+}

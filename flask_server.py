@@ -98,29 +98,42 @@ def cookies_path():
 
 
 def get_instagram_cookies():
-    """Extract all Instagram cookies from the saved Netscape cookies.txt file.
+    """Extract all Instagram cookies from the saved cookies file.
+    Accepts Netscape format (preferred) or auto-converts JSON cookies in place.
     URL-decodes values so requests/instaloader gets the raw cookie values."""
     from urllib.parse import unquote
     ck = cookies_path()
     if not ck:
         return {}
-    cookies = {}
     try:
         with open(ck, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                parts = line.split('\t')
-                if len(parts) >= 7:
-                    domain = parts[0].lstrip('.')
-                    name = parts[5]
-                    value = parts[6].strip('"')  # strip surrounding quotes
-                    if 'instagram.com' in domain:
-                        # URL-decode values — some exports encode colons as %3A etc.
-                        cookies[name] = unquote(value)
+            raw = f.read()
     except Exception:
-        pass
+        return {}
+
+    # If file is JSON cookies, convert in place to Netscape and re-read
+    if raw.lstrip().startswith(('"', '[')):
+        converted = _json_cookies_to_netscape(raw)
+        if converted:
+            try:
+                with open(ck, 'w', encoding='utf-8') as f:
+                    f.write(converted)
+                raw = converted
+            except Exception:
+                pass
+
+    cookies = {}
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        parts = line.split('\t')
+        if len(parts) >= 7:
+            domain = parts[0].lstrip('.')
+            name = parts[5]
+            value = parts[6].strip('"')
+            if 'instagram.com' in domain:
+                cookies[name] = unquote(value)
     return cookies
 
 
@@ -149,9 +162,58 @@ def health():
     })
 
 
+def _json_cookies_to_netscape(content: str) -> str | None:
+    """If `content` is a JSON array of cookie objects (Chrome/EditThisCookie
+    extension exports — possibly double-encoded as a JSON string), convert it
+    to Netscape cookies.txt format. Returns the converted string, or None if
+    the content is not JSON cookies.
+    """
+    import json, time
+    try:
+        first = json.loads(content)
+        # Double-encoded case: outer string wraps the actual JSON array
+        if isinstance(first, str):
+            cookies = json.loads(first)
+        else:
+            cookies = first
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(cookies, list) or not cookies or not isinstance(cookies[0], dict):
+        return None
+
+    lines = [
+        "# Netscape HTTP Cookie File",
+        "# This is a generated file! Do not edit.",
+        "",
+    ]
+    far_future = str(int(time.time()) + 365 * 24 * 3600 * 2)
+    for c in cookies:
+        domain = c.get('domain', '')
+        name = c.get('name', '')
+        if not domain or not name:
+            continue
+        if not domain.startswith('.') and not c.get('hostOnly', True):
+            domain = '.' + domain
+        flag_subdomains = "TRUE" if domain.startswith('.') else "FALSE"
+        path   = c.get('path', '/')
+        secure = "TRUE" if c.get('secure') else "FALSE"
+        exp    = c.get('expirationDate', c.get('expires'))
+        if exp is None or c.get('session', False):
+            expires = far_future
+        else:
+            try:
+                expires = str(int(float(exp)))
+            except (TypeError, ValueError):
+                expires = far_future
+        value = str(c.get('value', ''))
+        lines.append('\t'.join([domain, flag_subdomains, path, secure, expires, name, value]))
+    return '\n'.join(lines) + '\n'
+
+
 @app.route('/api/cookies/upload', methods=['POST'])
 def upload_cookies():
-    """Upload a Netscape-format cookies.txt file for YouTube authentication."""
+    """Upload a cookies file. Accepts Netscape (.txt) format directly, or
+    Chrome/EditThisCookie JSON exports (auto-converted to Netscape)."""
     if 'file' in request.files:
         f = request.files['file']
         content = f.read().decode('utf-8', errors='replace')
@@ -163,10 +225,16 @@ def upload_cookies():
     if not content.strip():
         return jsonify({'error': 'Empty cookies file'}), 400
 
+    # Auto-convert JSON cookies to Netscape — required for yt-dlp + instagrapi
+    converted = _json_cookies_to_netscape(content)
+    fmt = 'json→netscape' if converted else 'netscape'
+    if converted:
+        content = converted
+
     with open(COOKIES_FILE, 'w', encoding='utf-8') as out:
         out.write(content)
 
-    return jsonify({'ok': True, 'size': len(content), 'path': COOKIES_FILE})
+    return jsonify({'ok': True, 'size': len(content), 'path': COOKIES_FILE, 'format': fmt})
 
 
 @app.route('/api/cookies/delete', methods=['POST'])
@@ -927,6 +995,17 @@ def merge_videos():
 # Instagram Routes
 # ──────────────────────────────────────────────────────────────────────────────
 
+def shortcode_to_mediaid(shortcode: str) -> str | None:
+    """Convert Instagram shortcode to numeric media ID (base64 with IG alphabet)."""
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    n = 0
+    for char in shortcode:
+        if char not in alphabet:
+            return None
+        n = n * 64 + alphabet.index(char)
+    return str(n)
+
+
 def extract_instagram_shortcode(url: str):
     """Extract Instagram post shortcode from URL."""
     import re
@@ -1092,7 +1171,10 @@ def instagram_download_status(job_id):
 
 def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_comments: int):
     """
-    Background worker: scrape Instagram comments via 5-strategy fallback chain.
+    Background worker: scrape Instagram comments.
+    Strategy chain:
+      1. curl_cffi + Chrome TLS impersonation + web cookies — best for browser-exported cookies
+      2. instagrapi + Android API — only works if cookies came from an Android app session
     Updates active_jobs[job_id] with status/result.
     max_comments: 0 = no limit.
     """
@@ -1119,39 +1201,140 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
             'error': msg, 'error_code': code,
         }
 
-    # ── instagrapi — Private API with chunked pagination ──────────────────────
-    update('Connecting to Instagram…')
+    # ── Strategy 1: curl_cffi — Chrome TLS + web cookies (best for web sessions) ─
+    # Web-browser cookies don't work with the Android instagrapi API
+    # (causes challenge_required/unsupported_version errors). This strategy uses
+    # the same i.instagram.com endpoint via Chrome TLS impersonation + web headers,
+    # which is what works when the user uploaded cookies from a browser.
+    update('Connecting via Chrome TLS…')
+    try:
+        from curl_cffi import requests as cffi_req
+        import json as _json
+        import time as _time
+
+        ig_cookies = get_instagram_cookies()
+        media_id = shortcode_to_mediaid(shortcode)
+        if not media_id:
+            raise Exception(f'Invalid shortcode: {shortcode}')
+
+        sess_cffi = cffi_req.Session(impersonate='chrome124')
+        if ig_cookies:
+            for name, val in ig_cookies.items():
+                sess_cffi.cookies.set(name, val, domain='.instagram.com')
+
+        cffi_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'X-IG-App-ID': '936619743392459',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': f'https://www.instagram.com/p/{shortcode}/',
+            'Origin': 'https://www.instagram.com',
+        }
+
+        collected = []
+        min_id = None
+        page = 0
+        for _page in range(60):   # safety cap — ~1500 comments at 25/page
+            params = {'can_support_threading': 'true', 'permalink_enabled': 'false'}
+            if min_id:
+                params['min_id'] = min_id
+            r = sess_cffi.get(
+                f'https://i.instagram.com/api/v1/media/{media_id}/comments/',
+                params=params, headers=cffi_headers, timeout=20,
+            )
+            if r.status_code == 401 or r.status_code == 403:
+                raise Exception(f'HTTP {r.status_code} (Unauthorized — cookies may be expired)')
+            if r.status_code == 429:
+                raise Exception('HTTP 429 (Rate limited — wait a few minutes)')
+            if r.status_code != 200:
+                raise Exception(f'HTTP {r.status_code}: {r.text[:120]}')
+
+            try:
+                d = r.json()
+            except Exception:
+                raise Exception(f'Non-JSON response: {r.text[:120]}')
+
+            for c in d.get('comments', []):
+                text = (c.get('text') or '').strip()
+                if text:
+                    collected.append(text)
+                if max_comments > 0 and len(collected) >= max_comments:
+                    break
+
+            page += 1
+            update(f'Fetching comments… {len(collected)} so far (page {page})')
+
+            if max_comments > 0 and len(collected) >= max_comments:
+                break
+            next_min = d.get('next_min_id')
+            if not next_min or not d.get('has_more_comments'):
+                break
+            min_id = next_min
+            _time.sleep(0.4)
+
+        comments = collected[:max_comments] if max_comments > 0 else collected
+
+        # If main endpoint returned nothing, try GraphQL fallback (older posts)
+        if not comments:
+            update('Trying GraphQL fallback…')
+            try:
+                gql_params = {
+                    'doc_id': '9310670392322965',
+                    'variables': _json.dumps({'shortcode': shortcode, 'first': 50}),
+                }
+                gr = sess_cffi.get('https://www.instagram.com/graphql/query/', params=gql_params,
+                                   headers=cffi_headers, timeout=20)
+                if gr.status_code == 200:
+                    edges = (gr.json().get('data', {}).get('xdt_shortcode_media', {})
+                             .get('edge_media_to_parent_comment', {}).get('edges', []))
+                    for edge in edges:
+                        text = (edge.get('node', {}).get('text') or '').strip()
+                        if text:
+                            comments.append(text)
+                            if max_comments > 0 and len(comments) >= max_comments:
+                                break
+            except Exception:
+                pass
+
+        if comments:
+            return finish_ok(comments, 'curl_cffi')
+        last_error = 'curl_cffi: 0 comments returned'
+
+    except ImportError:
+        last_error = 'curl_cffi not installed'
+    except Exception as e0:
+        err0 = str(e0)
+        if any(k in err0.lower() for k in ['401', '403', 'login', 'forbidden', 'challenge', 'unauthorized', 'cookie']):
+            last_error_code = 'LOGIN_REQUIRED'
+        last_error = f'curl_cffi: {err0}'
+
+    # ── Strategy 2: instagrapi — only useful if cookies are from Android app ─
+    update('Trying instagrapi fallback…')
     try:
         import time as _time
         from instagrapi import Client as IGClient
 
         ig_cookies = get_instagram_cookies()
         if not ig_cookies or 'sessionid' not in ig_cookies:
-            raise Exception("No session cookies — upload cookies.txt first")
+            raise Exception('No session cookies')
 
         cl = IGClient()
         cl.set_settings({'authorization_data': {'sessionid': ig_cookies.get('sessionid', '')}})
         for name, val in ig_cookies.items():
             cl.private.cookies.set(name, val, domain='.instagram.com', path='/')
         cl.private.headers.update({
-            'User-Agent': 'Instagram 295.0.0.32.119 Android (30/11; 420dpi; 1080x2400; Google; Pixel 6; oriole; qcom; en_US; 490770583)',
+            'User-Agent': 'Instagram 380.0.0.40.110 Android (33/13; 420dpi; 1080x2400; samsung; SM-G998B; o1s; exynos2100; en_US; 670268615)',
         })
 
-        update('Fetching post ID…')
         mpk = cl.media_pk_from_url(url)
-
-        # ── Chunked pagination: keeps fetching until max_comments reached ──────
         collected = []
         min_id = None
         page = 0
-        # Batch size per request: 20 is Instagram's typical page size
-        BATCH = 20
         while True:
             try:
-                # media_comments_chunk(media_pk, max_amount, min_id=None)
-                chunk, min_id = cl.media_comments_chunk(mpk, BATCH, min_id=min_id)
+                chunk, min_id = cl.media_comments_chunk(mpk, 20, min_id=min_id)
             except (AttributeError, TypeError):
-                # Older instagrapi / different signature — fallback to media_comments
                 raw_all = cl.media_comments(mpk, amount=max_comments if max_comments > 0 else 0)
                 for c in raw_all:
                     text = (c.text or '').strip()
@@ -1168,33 +1351,38 @@ def _scrape_instagram_comments(job_id: str, url: str, shortcode: str, max_commen
                     break
 
             page += 1
-            update(f'Fetching comments… {len(collected)} so far (page {page})')
-
+            update(f'instagrapi: {len(collected)} comments (page {page})')
             if not min_id:
                 break
             if max_comments > 0 and len(collected) >= max_comments:
                 break
-            _time.sleep(0.4)   # small delay to avoid rate-limiting
+            _time.sleep(0.4)
 
         comments = collected[:max_comments] if max_comments > 0 else collected
-
         if comments:
             return finish_ok(comments, 'instagrapi')
-        last_error = 'instagrapi: post has 0 comments'
+        if not last_error:
+            last_error = 'instagrapi: 0 comments'
 
     except ImportError:
-        last_error = 'instagrapi not installed'
-    except Exception as e0:
-        err0 = str(e0)
-        if any(k in err0.lower() for k in ['401', '403', 'login', 'forbidden', 'challenge', 'unauthorized', 'cookie']):
+        if not last_error:
+            last_error = 'instagrapi not installed'
+    except Exception as e1:
+        err1 = str(e1)
+        if 'challenge_required' in err1.lower() or 'unsupported_version' in err1.lower():
+            # Specific message — web cookies hit Android API mismatch
+            if not last_error or 'curl_cffi' in (last_error or ''):
+                last_error = (last_error or '') + ' | instagrapi: web cookies incompatible with Android API'
+        elif any(k in err1.lower() for k in ['401', '403', 'login', 'forbidden', 'unauthorized']):
             last_error_code = 'LOGIN_REQUIRED'
-        last_error = f'instagrapi: {err0}'
+            if not last_error:
+                last_error = f'instagrapi: {err1}'
 
     # ── Failed ────────────────────────────────────────────────────────────────
     if last_error_code == 'LOGIN_REQUIRED':
-        msg = 'Instagram blocked the request (login required). Upload a fresh cookies.txt from an active Instagram session.'
+        msg = 'Instagram blocked the request (login/auth required). Cookies may be expired or rate-limited — upload fresh cookies.txt from a logged-in browser session.'
     else:
-        msg = last_error or 'Could not fetch comments. Try uploading fresh cookies.txt.'
+        msg = last_error or 'Could not fetch comments. Try uploading fresh cookies.txt or wait a few minutes if rate-limited.'
     finish_err(msg, last_error_code)
 
 

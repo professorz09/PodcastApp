@@ -3,3 +3,5 @@ flask-cors
 yt-dlp
 youtube-transcript-api
 instaloader
+instagrapi==2.1.3
+pydantic<2.12

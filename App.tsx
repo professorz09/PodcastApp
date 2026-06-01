@@ -13,6 +13,7 @@ const Storyboard       = lazy(() => import('./components/Storyboard'));
 const Shorts           = lazy(() => import('./components/Shorts'));
 const LyricsGenerator  = lazy(() => import('./components/LyricsGenerator'));
 const PhoneConvoStudio = lazy(() => import('./components/PhoneConvoStudio'));
+const IgSongStudio     = lazy(() => import('./components/IgSongStudio'));
 import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
@@ -537,6 +538,10 @@ Return JSON only (no markdown):
 
       {appState === AppState.PHONE_STUDIO && (
         <PhoneConvoStudio mainScript={script} />
+      )}
+
+      {appState === AppState.IG_SONG_STUDIO && (
+        <IgSongStudio />
       )}
 
       {appState === AppState.INPUT && (

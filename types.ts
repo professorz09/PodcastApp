@@ -24,6 +24,7 @@ export enum AppState {
   IMPORT = 'IMPORT',                   // Step 0  - Unified importer (YT / IG / Reddit, skippable)
   LYRICS = 'LYRICS',                   // Step 0b - Lyrics / Song Studio (skippable)
   PHONE_STUDIO = 'PHONE_STUDIO',       // Step 0c - Phone Conversation Studio (skippable)
+  IG_SONG_STUDIO = 'IG_SONG_STUDIO',   // Step 0d - IG → Song Studio (skippable, IG link → scrape → song → scrolling-comments video)
   // Legacy states kept for backward-compat with persisted storage
   YOUTUBE_IMPORT = 'YOUTUBE_IMPORT',
   INSTAGRAM_IMPORT = 'INSTAGRAM_IMPORT',

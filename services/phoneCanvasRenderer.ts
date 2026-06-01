@@ -1,4 +1,18 @@
-export type AnimStyle = 'orb' | 'bottom-glow' | 'wave' | 'cosmic-sphere' | 'aurora' | 'gemini' | 'ripple' | 'neon';
+export type AnimStyle =
+  | 'orb'
+  | 'bottom-glow'
+  | 'wave'
+  | 'cosmic-sphere'
+  | 'aurora'
+  | 'gemini'
+  | 'ripple'
+  | 'neon'
+  | 'particles'
+  | 'liquid'
+  | 'spectrum'
+  | 'pulse-grid'
+  | 'siri-blob'
+  | 'galaxy';
 
 export interface PhoneConfig {
   id: string;
@@ -676,6 +690,232 @@ export class CanvasRenderer {
         ctx.beginPath();
         ctx.roundRect(bx - bw / 2, cy - h / 2, bw, h, bw * 0.4);
         ctx.fill();
+      }
+      ctx.restore();
+
+    } else if (phone.style === 'particles') {
+      // ── Particles: floating dots swarming around a center, drift outward on speech ──
+      const t = this.currentTime / 1000;
+      const N = 28;
+      const baseR = sw * 0.16;
+      const reach = sw * 0.32;
+
+      ctx.save();
+      ctx.shadowColor = phone.color;
+      for (let i = 0; i < N; i++) {
+        // Deterministic per-particle "seed" — no rand to keep stable
+        const seed = i * 137.508;
+        const angle = (seed + t * (0.4 + (i % 3) * 0.25)) % (Math.PI * 2);
+        const orbitJitter = Math.sin(t * 1.7 + i) * 0.2;
+        const r = baseR + (reach - baseR) * (isActive ? volt : 0.15) * (0.55 + orbitJitter);
+        const px = cx + Math.cos(angle) * r;
+        const py = cy + Math.sin(angle) * r * 0.78;
+        const pr = sw * 0.013 * (0.7 + Math.sin(t * 2 + i) * 0.3) * (isActive ? 0.7 + volt * 0.6 : 0.4);
+        ctx.shadowBlur = pr * 4 * (isActive ? volt : 0.2);
+        ctx.globalAlpha = isActive ? 0.55 + 0.35 * volt : 0.22;
+        ctx.fillStyle = phone.color;
+        ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+      }
+      // Soft center core
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR);
+      cg.addColorStop(0, phone.color + 'cc');
+      cg.addColorStop(1, 'transparent');
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = isActive ? 0.7 : 0.35;
+      ctx.fillStyle = cg;
+      ctx.beginPath(); ctx.arc(cx, cy, baseR, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+    } else if (phone.style === 'liquid') {
+      // ── Liquid: morphing blob with bezier-distorted radius ──
+      const t = this.currentTime / 800;
+      const baseR = sw * 0.22 + (isActive ? volt * sw * 0.08 : 0);
+      const points = 14;
+      const wobble = (isActive ? 0.18 + volt * 0.32 : 0.08);
+
+      ctx.save();
+      ctx.shadowColor = phone.color;
+      ctx.shadowBlur = baseR * (isActive ? 0.55 * volt : 0.12);
+
+      // Build a smooth closed blob path
+      ctx.beginPath();
+      const pts: { x: number; y: number }[] = [];
+      for (let i = 0; i < points; i++) {
+        const a = (i / points) * Math.PI * 2;
+        const noise =
+          Math.sin(a * 3 + t * 1.3) * wobble +
+          Math.sin(a * 5 + t * 0.7) * wobble * 0.55 +
+          Math.cos(a * 2 + t * 2.1) * wobble * 0.45;
+        const r = baseR * (1 + noise);
+        pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+      }
+      // Catmull-Rom-ish smoothing via quadratic curves to midpoints
+      for (let i = 0; i < points; i++) {
+        const cur = pts[i];
+        const nxt = pts[(i + 1) % points];
+        const mx = (cur.x + nxt.x) / 2;
+        const my = (cur.y + nxt.y) / 2;
+        if (i === 0) ctx.moveTo(mx, my);
+        else ctx.quadraticCurveTo(cur.x, cur.y, mx, my);
+      }
+      ctx.closePath();
+
+      const lg = ctx.createRadialGradient(cx - baseR * 0.3, cy - baseR * 0.3, 0, cx, cy, baseR * 1.1);
+      lg.addColorStop(0, '#ffffff');
+      lg.addColorStop(0.22, phone.color);
+      lg.addColorStop(0.85, phone.color + 'cc');
+      lg.addColorStop(1, phone.color + '20');
+      ctx.fillStyle = lg;
+      ctx.globalAlpha = isActive ? 1 : 0.55;
+      ctx.fill();
+      ctx.restore();
+
+    } else if (phone.style === 'spectrum') {
+      // ── Spectrum: tall analyzer-style bars across full width ──
+      const t = this.currentTime / 110;
+      const bars = 22;
+      const totalW = sw * 0.82;
+      const startBX = cx - totalW / 2;
+      const bw = totalW / bars * 0.55;
+      const slot = totalW / bars;
+      const maxH = sh * 0.34;
+
+      ctx.save();
+      ctx.shadowColor = phone.color;
+      for (let i = 0; i < bars; i++) {
+        const bx = startBX + i * slot + slot / 2;
+        // Pink-noise-ish: lower freq bars more energetic
+        const k = 1 - Math.abs(i - bars / 2) / (bars / 2) * 0.45;
+        const wave = isActive
+          ? (0.45 + Math.sin(t + i * 0.42) * 0.3 + Math.sin(t * 1.8 + i * 0.9) * 0.25) * k
+          : 0.08 + Math.sin(t * 0.5 + i * 0.3) * 0.04;
+        const h = Math.max(bw * 0.4, maxH * Math.max(0, wave) * (isActive ? (0.4 + volt * 0.9) : 1));
+        ctx.shadowBlur = isActive ? bw * 2.4 * volt : 0;
+
+        const bg = ctx.createLinearGradient(bx, cy - h / 2, bx, cy + h / 2);
+        bg.addColorStop(0,   phone.color);
+        bg.addColorStop(0.5, '#ffffff');
+        bg.addColorStop(1,   phone.color);
+        ctx.fillStyle = bg;
+        ctx.globalAlpha = isActive ? 0.85 : 0.28;
+        ctx.beginPath();
+        ctx.roundRect(bx - bw / 2, cy - h / 2, bw, h, bw * 0.4);
+        ctx.fill();
+      }
+      ctx.restore();
+
+    } else if (phone.style === 'pulse-grid') {
+      // ── Pulse grid: dot lattice that ripples outward from center ──
+      const t = this.currentTime / 700;
+      const cols = 7, rows = 7;
+      const spanW = sw * 0.78;
+      const spanH = sh * 0.5;
+      const dotMax = sw * 0.022;
+
+      ctx.save();
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const dx = cx - spanW / 2 + (c + 0.5) * (spanW / cols);
+          const dy = cy - spanH / 2 + (r + 0.5) * (spanH / rows);
+          const dist = Math.hypot(dx - cx, dy - cy) / (sw * 0.4);
+          // Outward wave
+          const wave = isActive
+            ? Math.sin(t * 1.5 - dist * 3.2) * 0.5 + 0.5
+            : (1 - dist) * 0.25;
+          const intensity = Math.max(0, wave) * (isActive ? (0.45 + volt * 0.8) : 0.35);
+          const dr = dotMax * (0.35 + intensity * 0.9);
+          ctx.fillStyle = phone.color;
+          ctx.shadowColor = phone.color;
+          ctx.shadowBlur = isActive ? dr * 3 * intensity : 0;
+          ctx.globalAlpha = isActive ? 0.35 + intensity * 0.6 : 0.16;
+          ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+
+    } else if (phone.style === 'siri-blob') {
+      // ── Siri-style: layered iridescent blobs blended with screen mode ──
+      const t = this.currentTime / 1100;
+      const R = sw * (0.26 + (isActive ? volt * 0.14 : 0.03));
+      const layers = 5;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+
+      // Parse phone.color → mix with white + accent for iridescent feel
+      const hexToRgb = (hex: string) => {
+        const m = /^#?([0-9a-f]{6})$/i.exec(hex.replace('#', ''));
+        if (!m) return { r: 200, g: 200, b: 255 };
+        const n = parseInt(m[1], 16);
+        return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+      };
+      const { r: br, g: bg, b: bb } = hexToRgb(phone.color);
+      // 3 accent hues that orbit the primary
+      const accents = [
+        `rgba(${br},${bg},${bb},1)`,
+        `rgba(${Math.min(255, br + 60)},${Math.min(255, bg + 30)},255,1)`,
+        `rgba(255,${Math.min(255, bg + 90)},${Math.min(255, bb + 60)},1)`,
+      ];
+
+      for (let i = 0; i < layers; i++) {
+        const ang = t * (0.8 + i * 0.2) + i * Math.PI * 0.4;
+        const off = R * (0.25 + Math.sin(t * 1.3 + i) * 0.12);
+        const lx  = cx + Math.cos(ang) * off;
+        const ly  = cy + Math.sin(ang) * off * 0.7;
+        const lr  = R * (0.85 + Math.sin(t * 0.9 + i) * 0.18);
+        const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
+        grad.addColorStop(0, accents[i % accents.length]);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = isActive ? 0.55 + 0.35 * volt : 0.28;
+        ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+
+      // Bright highlight on top
+      const hg = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.3, 0, cx, cy, R);
+      hg.addColorStop(0, 'rgba(255,255,255,0.55)');
+      hg.addColorStop(1, 'transparent');
+      ctx.fillStyle = hg;
+      ctx.globalAlpha = isActive ? 1 : 0.5;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+
+    } else if (phone.style === 'galaxy') {
+      // ── Galaxy: spiral of bright dots, rotating slowly ──
+      const t = this.currentTime / 2200;
+      const arms = 3;
+      const perArm = 22;
+      const reach = sw * (0.34 + (isActive ? volt * 0.08 : 0));
+
+      ctx.save();
+      ctx.shadowColor = phone.color;
+
+      // Central glow
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, sw * 0.18);
+      cg.addColorStop(0, '#ffffff');
+      cg.addColorStop(0.4, phone.color);
+      cg.addColorStop(1, 'transparent');
+      ctx.globalAlpha = isActive ? 0.9 : 0.5;
+      ctx.fillStyle = cg;
+      ctx.beginPath(); ctx.arc(cx, cy, sw * 0.18, 0, Math.PI * 2); ctx.fill();
+
+      // Spiral arms
+      for (let a = 0; a < arms; a++) {
+        const armOffset = (a / arms) * Math.PI * 2;
+        for (let k = 0; k < perArm; k++) {
+          const f = k / perArm;
+          const r = reach * f;
+          const angle = armOffset + f * 4.4 + t * (isActive ? 0.9 : 0.45);
+          const px = cx + Math.cos(angle) * r;
+          const py = cy + Math.sin(angle) * r * 0.78;
+          const pr = sw * (0.012 - f * 0.006) * (isActive ? 0.7 + volt * 0.5 : 0.5);
+          if (pr <= 0) continue;
+          ctx.fillStyle = phone.color;
+          ctx.shadowBlur = pr * 4 * (isActive ? volt : 0.3);
+          ctx.globalAlpha = (1 - f * 0.65) * (isActive ? 0.8 : 0.4);
+          ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+        }
       }
       ctx.restore();
     }
