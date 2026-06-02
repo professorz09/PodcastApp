@@ -6427,21 +6427,22 @@ export const analyzePodcastChapters = async (
     ? lines.slice(0, MAX_CHARS) + '\n…[transcript truncated for length]'
     : lines;
 
-  const targetMin = Math.max(5, Math.min(10, Math.round(totalSec / 60 / 6)));
+  const prompt = `You are a podcast editor analyzing a transcript of "${podcastTitle}". Break the transcript into CHAPTERS based on the ACTUAL TOPIC SHIFTS in the conversation — not by clock time.
 
-  const prompt = `You are a podcast editor analyzing a transcript of "${podcastTitle}". Break the transcript into CHAPTERS for deep analysis.
+CORE PRINCIPLE: A chapter is ONE coherent main point / argument / theme / story. Start a new chapter ONLY when the speaker genuinely pivots to a clearly different idea. Chapter length is whatever the topic naturally demands — one chapter might be 90 seconds, the next 12 minutes. DO NOT force uniform durations.
 
 RULES:
-1. Each chapter MUST be 5-10 minutes long (a bit more/less is OK to keep a topic intact — NEVER cut a topic mid-thought).
-2. A chapter is ONE coherent topic / theme / argument — it must feel complete on its own.
-3. Target ${targetMin}-${Math.max(targetMin + 4, 8)} chapters total (depends on podcast length).
-4. For each chapter, capture the EXACT moment the topic begins and ends:
-   - "startQuote": the actual line/phrase from the transcript where this topic kicks off (10-25 words).
+1. Cut chapters at REAL topic boundaries — phrases like "anyway, moving on…", "speaking of which…", "let me tell you about…", "next thing I want to talk about…", a host changing the question, or the conversation visibly pivoting to a new subject.
+2. NEVER cut a topic mid-thought just because some time has passed. NEVER split one idea into two chapters to fill a quota.
+3. The number of chapters depends entirely on how many distinct main points the transcript actually contains. Could be 3, could be 15 — let the content decide. Do NOT aim for a fixed count.
+4. Short tangents / side comments inside a larger topic belong to that topic's chapter — don't make a separate chapter for them.
+5. For each chapter, capture the EXACT moment the topic begins and ends:
+   - "startQuote": the actual line/phrase from the transcript where this main point kicks off (10-25 words).
    - "endQuote": the actual line/phrase where the topic naturally lands / pivots away (10-25 words).
-5. "title": 4-9 word punchy theme title (e.g. "Simulation Theory vs Self-Running Program", "Psychedelics as Source Code Access").
-6. "summary": one-line description of what this chapter is really about.
-7. Chapters MUST be in chronological order. First chapter starts near the beginning, last chapter ends near the end of the transcript.
-8. Do NOT overlap chapters. Do NOT leave gaps longer than ~1 minute between consecutive chapters.
+6. "title": 4-9 word punchy theme title that captures the SPECIFIC main point (e.g. "Simulation Theory vs Self-Running Program", "Psychedelics as Source Code Access") — not generic ("Introduction", "Main Discussion").
+7. "summary": one-line description of what main point this chapter is really about.
+8. Chapters MUST be in chronological order. First chapter starts near the beginning, last chapter ends near the end of the transcript.
+9. Do NOT overlap chapters. Do NOT leave gaps longer than ~1 minute between consecutive chapters.
 
 Total transcript length: ${fmtTs(totalSec)}
 
