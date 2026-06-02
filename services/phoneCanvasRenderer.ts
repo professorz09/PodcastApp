@@ -60,6 +60,11 @@ export interface StudioState {
     narratorColor?: string;
     boxBorder?: number;
   };
+  // Voice-driven "z-axis" scale pulse on the active phone. Default ON for
+  // single-speaker scripts, OFF for 2+ speakers (set by the consumer).
+  phoneZPulse?: boolean;
+  // VU meter (audio-reactive vertical bar) beside the active phone. Default OFF.
+  vuMeter?: boolean;
 }
 
 export class CanvasRenderer {
@@ -70,6 +75,10 @@ export class CanvasRenderer {
 
   public currentTime = 0;
   public playing = false;
+  // 0..1 — set externally each frame from an AnalyserNode during playback,
+  // or passed in from videoRenderer during export. Drives the active-phone
+  // z-pulse and the VU meter.
+  public audioLevel = 0;
   private wallStart = 0;
 
   private voiceIntensities: Record<string, number> = {};
@@ -189,6 +198,7 @@ export class CanvasRenderer {
 
     // Layout
     const phoneAspect = 9 / 19.5;
+    const isSingle = phones.length === 1;
     const spacingRatio = (state.deviceSpacing ?? 50) / 100;
     // Quadratic scale: at 100% gives large visible gap; at 0% phones are close
     const padding = w * 0.06 * (1 - spacingRatio);
@@ -202,13 +212,23 @@ export class CanvasRenderer {
     const scale = (state.deviceScale ?? 100) / 100;
     pw *= scale; ph *= scale;
     const totalW = pw * phones.length + spacing * (phones.length - 1);
-    const startX = (w - totalW) / 2;
+    // Single-speaker mode: phone sits on the LEFT side of the frame so the
+    // right side is free for subtitles / overlays. Multi-speaker stays centred.
+    const startX = isSingle ? (w * 0.04) : (w - totalW) / 2;
     const startY = (h - ph) / 2;
+
+    // Z-pulse: default ON when single-speaker, OFF for multi. Consumer can
+    // override either way via state.phoneZPulse.
+    const zPulseOn = state.phoneZPulse ?? isSingle;
 
     phones.forEach((phone, idx) => {
       const x = startX + idx * (pw + spacing);
       const isActive = activeTurn?.phoneId === phone.id;
-      this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn);
+      // DebateVisualizer-style pulse: small scale-up driven by audioLevel.
+      // Single-speaker uses a stronger pulse so the depth effect reads clearly.
+      const pulse = (zPulseOn && isActive) ? 1 + this.audioLevel * (isSingle ? 0.085 : 0.045) : 1;
+      const force0Rotation = isSingle;
+      this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn, pulse, force0Rotation);
     });
   }
 
@@ -295,16 +315,30 @@ export class CanvasRenderer {
   private drawPhone(
     x: number, y: number, w: number, h: number,
     phone: PhoneConfig, isActive: boolean, hasActive: boolean,
-    text?: string, turnProgress = 0, activeTurn: ScriptTurn | null = null
+    text?: string, turnProgress = 0, activeTurn: ScriptTurn | null = null,
+    pulseScale: number = 1, forceZeroRotation: boolean = false
   ) {
     const { ctx } = this;
     const r = w * 0.12;
     const cx = x + w / 2, cy = y + h / 2;
 
+    // VU meter renders OUTSIDE the rotated/scaled phone transform so it stays
+    // anchored to a clean vertical orientation.
+    if (this.state.vuMeter && isActive) {
+      this.drawVuMeter(x, y, w, h);
+    }
+
     ctx.save();
-    if (phone.rotation) {
+    // Z-pulse: scale around the phone centre. Combines with rotation cleanly.
+    if (pulseScale !== 1) {
       ctx.translate(cx, cy);
-      ctx.rotate((phone.rotation * Math.PI) / 180);
+      ctx.scale(pulseScale, pulseScale);
+      ctx.translate(-cx, -cy);
+    }
+    const effRotation = forceZeroRotation ? 0 : (phone.rotation ?? 0);
+    if (effRotation) {
+      ctx.translate(cx, cy);
+      ctx.rotate((effRotation * Math.PI) / 180);
       ctx.translate(-cx, -cy);
     }
 
@@ -392,6 +426,55 @@ export class CanvasRenderer {
     ctx.beginPath(); ctx.roundRect(x - btnW, y + h * 0.3, btnW, btnH * 0.8, 2); ctx.fill();
     ctx.beginPath(); ctx.roundRect(x + w, y + h * 0.25, btnW, btnH * 1.1, 2); ctx.fill();
 
+    ctx.restore();
+  }
+
+  // ── VU meter ─────────────────────────────────────────────────────────────
+  // Vertical segmented bar to the LEFT of the active phone, driven by
+  // this.audioLevel (0..1). LED-style — green at the bottom, amber midway,
+  // red at peak — with a small "decay" highlight at the current level.
+  private drawVuMeter(phoneX: number, phoneY: number, phoneW: number, phoneH: number) {
+    const { ctx } = this;
+    const segments = 14;
+    const meterW = phoneW * 0.18;
+    const gap    = phoneW * 0.025;
+    const x      = phoneX - meterW - gap * 2;
+    const y      = phoneY + phoneH * 0.05;
+    const totalH = phoneH * 0.9;
+    const segH   = (totalH - (segments - 1) * 2) / segments;
+
+    const lvl = Math.max(0, Math.min(1, this.audioLevel));
+    const filled = Math.round(lvl * segments);
+
+    ctx.save();
+    // Faint backing strip
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.roundRect(x - 3, y - 3, meterW + 6, totalH + 6, 6);
+    ctx.fill();
+
+    for (let i = 0; i < segments; i++) {
+      const segY = y + totalH - (i + 1) * segH - i * 2;
+      const isOn = i < filled;
+      let col: string;
+      if (i >= segments - 2)       col = isOn ? '#ef4444' : 'rgba(239,68,68,0.18)';      // top 2 red
+      else if (i >= segments - 5)  col = isOn ? '#f59e0b' : 'rgba(245,158,11,0.18)';     // next 3 amber
+      else                         col = isOn ? '#22c55e' : 'rgba(34,197,94,0.18)';      // rest green
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.roundRect(x, segY, meterW, segH, 2);
+      ctx.fill();
+    }
+
+    // "Peak" highlight at the current top filled segment
+    if (filled > 0) {
+      const i = filled - 1;
+      const segY = y + totalH - (i + 1) * segH - i * 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.roundRect(x, segY, meterW, Math.max(2, segH * 0.25), 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 

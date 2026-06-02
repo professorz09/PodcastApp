@@ -58,20 +58,109 @@ export const renderVideoOffline = async (
     });
   }
 
-  // ── Muxer ─────────────────────────────────────────────────────────────────
+  // ── Pick a supported audio codec ──────────────────────────────────────────
+  // Chrome Android also lacks an AAC encoder in WebCodecs — configure() succeeds
+  // but the encoder enters closed state on first encode (cryptic "Cannot call
+  // 'encode' on a closed codec"). Opus is always available on Chromium, and
+  // mp4-muxer can put Opus inside MP4 fine.
+  type AudioFamily = 'aac' | 'opus';
+  const audioCandidates: { family: AudioFamily; codec: string }[] = [
+    { family: 'aac',  codec: 'mp4a.40.2'  },
+    { family: 'aac',  codec: 'mp4a.40.5'  },
+    { family: 'aac',  codec: 'mp4a.40.29' },
+    { family: 'opus', codec: 'opus'       },
+  ];
+  let pickedAudio: { family: AudioFamily; codec: string } | null = null;
+  const audioErrors: string[] = [];
+  for (const { family, codec } of audioCandidates) {
+    const cfg = { codec, sampleRate, numberOfChannels: audioChannels.length, bitrate: 192_000 };
+    try {
+      const sup = await AudioEncoder.isConfigSupported(cfg);
+      if (!sup?.supported) { audioErrors.push(`${codec}: isConfigSupported=false`); continue; }
+      const probe = new AudioEncoder({ output: () => {}, error: () => {} });
+      probe.configure(cfg);
+      probe.close();
+      pickedAudio = { family, codec };
+      break;
+    } catch (e: any) {
+      audioErrors.push(`${codec}: ${e?.message ?? e}`);
+    }
+  }
+  if (!pickedAudio) {
+    console.error('All audio codec candidates failed:\n' + audioErrors.join('\n'));
+    throw new Error('Is device pe koi audio codec (AAC/Opus) WebCodecs me supported nahi hai.');
+  }
+  console.log(`[videoRenderer] picked audio codec=${pickedAudio.codec} family=${pickedAudio.family}`);
+
+  // ── Pick a supported video codec ──────────────────────────────────────────
+  // Chrome Android often doesn't expose H.264 to WebCodecs (no hw encoder
+  // available) but VP9 always works. Try AVC family first (best MP4
+  // compatibility), then VP9. Test with isConfigSupported AND a real
+  // configure() since isConfigSupported can lie on some builds.
+  const pixels = width * height;
+  let avcLevels: string[];
+  if      (pixels >= 3840 * 2160) avcLevels = ['34', '33', '32'];
+  else if (pixels >= 1920 * 1080) avcLevels = ['28', '29', '2A', '32'];
+  else if (pixels >= 1280 *  720) avcLevels = ['1F', '20', '28'];
+  else                            avcLevels = ['1E', '1F', '28'];
+  const avcProfiles = ['6400', '4D40', '42E0', '4200'];
+
+  let vp9Level: string;
+  if      (pixels >= 3840 * 2160) vp9Level = '60';
+  else if (pixels >= 1920 * 1080) vp9Level = '50';
+  else if (pixels >= 1280 *  720) vp9Level = '40';
+  else                            vp9Level = '30';
+  const vp9Codecs = [`vp09.00.${vp9Level}.08`, `vp09.00.31.08`, `vp09.00.21.08`];
+
+  type Family = 'avc' | 'vp9';
+  const candidates: { family: Family; codec: string }[] = [
+    ...avcProfiles.flatMap(p => avcLevels.map(l => ({ family: 'avc' as Family, codec: `avc1.${p}${l}` }))),
+    ...vp9Codecs.map(c => ({ family: 'vp9' as Family, codec: c })),
+  ];
+
+  let picked: { family: Family; codec: string; latencyMode: 'quality' | 'realtime'; hwAccel: 'no-preference' | 'prefer-hardware' | 'prefer-software' } | null = null;
+  const triedErrors: string[] = [];
+
+  outer: for (const latencyMode of ['quality', 'realtime'] as const) {
+    for (const hwAccel of ['no-preference', 'prefer-hardware', 'prefer-software'] as const) {
+      for (const { family, codec } of candidates) {
+        const cfg = { codec, width, height, bitrate, framerate: fps, latencyMode, hardwareAcceleration: hwAccel };
+        try {
+          const sup = await VideoEncoder.isConfigSupported(cfg);
+          if (!sup?.supported) continue;
+          // Actually attempt configure — isConfigSupported lies on Chrome Android sometimes.
+          const probe = new VideoEncoder({ output: () => {}, error: () => {} });
+          probe.configure(cfg);
+          probe.close();
+          picked = { family, codec, latencyMode, hwAccel };
+          break outer;
+        } catch (e: any) {
+          triedErrors.push(`${codec} (${latencyMode}/${hwAccel}): ${e?.message ?? e}`);
+        }
+      }
+    }
+  }
+  if (!picked) {
+    console.error('All video codec candidates failed:\n' + triedErrors.join('\n'));
+    throw new Error('Is device pe koi bhi video codec (H.264/VP9) WebCodecs me supported nahi hai. Chrome/Edge latest version try karo.');
+  }
+  console.log(`[videoRenderer] picked codec=${picked.codec} family=${picked.family} latency=${picked.latencyMode} hw=${picked.hwAccel}`);
+
+  // ── Muxer (codec family must match the encoder we picked) ─────────────────
+  const muxerVideoCfg = { codec: picked.family, width, height } as const;
   let muxer: Muxer<ArrayBufferTarget | FileSystemWritableFileStreamTarget>;
   if (fileStream) {
     muxer = new Muxer({
       target: new FileSystemWritableFileStreamTarget(fileStream),
-      video: { codec: 'avc', width, height },
-      audio: { codec: 'aac', sampleRate, numberOfChannels: audioChannels.length },
+      video: muxerVideoCfg,
+      audio: { codec: pickedAudio.family, sampleRate, numberOfChannels: audioChannels.length },
       fastStart: false
     });
   } else {
     muxer = new Muxer({
       target: new ArrayBufferTarget(),
-      video: { codec: 'avc', width, height },
-      audio: { codec: 'aac', sampleRate, numberOfChannels: audioChannels.length },
+      video: muxerVideoCfg,
+      audio: { codec: pickedAudio.family, sampleRate, numberOfChannels: audioChannels.length },
       fastStart: 'in-memory'
     });
   }
@@ -82,21 +171,23 @@ export const renderVideoOffline = async (
     error: (e) => console.error("Video Encoder Error", e)
   });
   videoEncoder.configure({
-    codec: 'avc1.640028',
+    codec: picked.codec,
     width,
     height,
     bitrate,
     framerate: fps,
-    latencyMode: 'quality',
+    latencyMode: picked.latencyMode,
+    hardwareAcceleration: picked.hwAccel,
   });
 
   // ── Audio Encoder ─────────────────────────────────────────────────────────
+  let audioFatal: Error | null = null;
   const audioEncoder = new AudioEncoder({
     output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-    error: (e) => console.error("Audio Encoder Error", e)
+    error: (e) => { audioFatal = e instanceof Error ? e : new Error(String(e)); console.error("Audio Encoder Error", e); }
   });
   audioEncoder.configure({
-    codec: 'mp4a.40.2',
+    codec: pickedAudio.codec,
     sampleRate,
     numberOfChannels: audioChannels.length,
     bitrate: 192_000
@@ -108,6 +199,8 @@ export const renderVideoOffline = async (
   const samplesPerChunk = Math.floor(sampleRate * chunkDuration);
 
   for (let i = 0; i < totalSamples; i += samplesPerChunk) {
+    if (audioFatal) throw new Error(`Audio encoder failed (${pickedAudio.codec}): ${audioFatal.message}`);
+    if (audioEncoder.state === 'closed') throw new Error(`Audio encoder closed unexpectedly (${pickedAudio.codec}) — codec not actually supported on this device.`);
     let waitCount = 0;
     while (audioEncoder.encodeQueueSize > 10 && waitCount < 100) {
       await new Promise(r => setTimeout(r, 5));
@@ -133,6 +226,7 @@ export const renderVideoOffline = async (
     audioData.close();
   }
   await audioEncoder.flush();
+  if (audioFatal) throw new Error(`Audio encoder failed (${pickedAudio.codec}): ${audioFatal.message}`);
 
   // ── Render & Encode Video ─────────────────────────────────────────────────
   const frameDuration = 1 / fps;

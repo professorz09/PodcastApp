@@ -4893,6 +4893,104 @@ Return ONLY the topic phrase, nothing else. Example outputs:
   return `In this clip, ${speakerA} and ${speakerB} talk about ${topic}. Let's check it out! If you want to watch the reaction version, skip the timeline.`;
 };
 
+// ── Optional Intro Generator (Phone Studio · Step 2) ──────────────────────
+// Uses gemini-3.1-flash-lite + Google Search grounding to write a 2-3 sentence
+// intro in the style: "In this clip, <host> <action> about <topic>. <one-line
+// host context — what they do / why they matter>. Let's check it out."
+// Returns the intro text + the extracted topic phrase (for UI display).
+export const generateIntroFromTranscript = async (args: {
+  transcriptText: string;
+  podcastTitle?: string;
+  podcastHost?: string;
+  podcastGuests?: string[];
+}): Promise<{ intro: string; topic: string; host: string }> => {
+  const { transcriptText, podcastTitle, podcastHost, podcastGuests } = args;
+  const excerpt = (transcriptText || '').slice(0, 4000);
+  const hostHint = (podcastHost || '').trim();
+  const guestsHint = (podcastGuests || []).filter(Boolean).join(', ');
+
+  const prompt = `You are writing a SHORT, CATCHY spoken intro (1-2 sentences, ~18-32 words total) for a YouTube clip.
+
+CONTEXT
+- Podcast title: ${podcastTitle || '(unknown)'}
+- Detected host: ${hostHint || '(unknown — figure out from transcript / search)'}
+- Detected guest(s): ${guestsHint || '(none / unknown)'}
+- Transcript excerpt (THIS is the clip — base the topic ONLY on what's actually discussed here, do not invent):
+${excerpt}
+
+YOUR JOB
+1. Identify the HOST (use detected host if given; otherwise infer from transcript / search).
+2. Identify the GUEST if there is one (use detected guest if given; otherwise infer). If multiple guests, pick the primary one.
+3. Identify the CORE TOPIC of THIS CLIP specifically (3-7 words, concrete — not "stuff" / "things" / generic).
+4. Use Google Search grounding to pull ONE short factual description of the GUEST's role/profession (e.g. "a professional comedian", "a neuroscientist", "the founder of Tesla"). Keep it 2-6 words. Must be TRUE.
+
+OUTPUT — pick ONE shape based on whether there's a guest:
+
+WITH GUEST:
+"In this clip <Host> and <Guest>, who is <guest's role description>, talk about <topic>."
+
+NO GUEST (solo episode):
+"In this clip <Host> <verb> about <topic>."
+
+EXAMPLES
+✓ "In this clip Joe Rogan and Hardly Williams, who is a professional comedian, talk about prison stories from his early career."
+✓ "In this clip Lex Fridman and Andrej Karpathy, who is a leading AI researcher, talk about how large language models actually learn."
+✓ "In this clip Tim Ferriss explains why he stopped drinking coffee for 30 days."
+
+VERB CHOICES (no-guest case): talks about / explains / breaks down / argues / reveals / reacts to / shares
+RULES
+- ONE sentence preferred. Two max. Hard cap 35 words.
+- No emojis. No quotes around the intro. No "welcome back" / "hey guys" / "let's check it out" / "today we have".
+- The guest description must be FACTUAL and grounded — not invented. If unsure, use a safe generic ("a writer", "an entrepreneur") rather than guessing specifics.
+- Topic comes from THE TRANSCRIPT EXCERPT above — NOT from the title or anything external. If the excerpt is about prison stories, the topic is prison stories — even if the podcast title says something else.
+- Plain spoken English. Contractions OK. Punchy, catchy, hook-y.
+
+Return JSON ONLY (no markdown, no preamble):
+{
+  "host": "the host's full name as you'd say it",
+  "guest": "the primary guest's full name, or empty string if solo",
+  "guestRole": "short factual role description of the guest, or empty string if solo",
+  "topic": "3-7 word topic phrase grounded in the excerpt",
+  "intro": "the full 1-2 sentence spoken intro"
+}`;
+
+  // Grounding ON — we want the latest factual context about the host.
+  const data = await callGemini(
+    'gemini-3.1-flash-lite',
+    [{ role: 'user', parts: [{ text: prompt }] }],
+    { tools: [{ googleSearch: {} }] },
+  );
+
+  const raw: string =
+    data.text
+    ?? data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('')
+    ?? '';
+
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  let parsed: { host?: string; guest?: string; guestRole?: string; topic?: string; intro?: string } | null = null;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (m) {
+      try { parsed = JSON.parse(m[0]); } catch { parsed = null; }
+    }
+  }
+
+  const host = (parsed?.host || hostHint || 'the host').toString().trim();
+  const guest = (parsed?.guest || (podcastGuests || [])[0] || '').toString().trim();
+  const guestRole = (parsed?.guestRole || '').toString().trim();
+  const topic = (parsed?.topic || 'this topic').toString().trim();
+  let intro = (parsed?.intro || '').toString().trim();
+
+  if (!intro) {
+    intro = guest
+      ? `In this clip ${host} and ${guest}${guestRole ? `, who is ${guestRole},` : ''} talk about ${topic}.`
+      : `In this clip ${host} talks about ${topic}.`;
+  }
+  return { intro, topic, host };
+};
+
 // Speaker appearance pools for variety
 const SPEAKER_STYLES = [
   { gender: 'man', age: 'mid-30s', ethnicity: 'South Asian Indian', hair: 'short dark hair', top: 'navy blue collared shirt', bg: 'blurred home office with bookshelf' },
@@ -6427,22 +6525,51 @@ export const analyzePodcastChapters = async (
     ? lines.slice(0, MAX_CHARS) + '\n…[transcript truncated for length]'
     : lines;
 
-  const prompt = `You are a podcast editor analyzing a transcript of "${podcastTitle}". Break the transcript into CHAPTERS based on the ACTUAL TOPIC SHIFTS in the conversation — not by clock time.
+  const prompt = `You are extracting the MAIN POINTS from a podcast transcript of "${podcastTitle}". You are NOT writing YouTube-style chapter markers that cover every second of the video. You are picking out the DISCRETE BIG IDEAS that this podcast actually makes — and skipping everything else.
 
-CORE PRINCIPLE: A chapter is ONE coherent main point / argument / theme / story. Start a new chapter ONLY when the speaker genuinely pivots to a clearly different idea. Chapter length is whatever the topic naturally demands — one chapter might be 90 seconds, the next 12 minutes. DO NOT force uniform durations.
+═══ MENTAL MODEL ═══
+Think of it like this: if a journalist took notes during this podcast, what would the bullet-point list of "main things they actually discussed" look like? That bullet list IS your chapter list. Each bullet = one chapter. Filler, intros, banter, tangents, transitions, ads, sponsor reads, small talk = NOT chapters. They get SKIPPED.
 
-RULES:
-1. Cut chapters at REAL topic boundaries — phrases like "anyway, moving on…", "speaking of which…", "let me tell you about…", "next thing I want to talk about…", a host changing the question, or the conversation visibly pivoting to a new subject.
-2. NEVER cut a topic mid-thought just because some time has passed. NEVER split one idea into two chapters to fill a quota.
-3. The number of chapters depends entirely on how many distinct main points the transcript actually contains. Could be 3, could be 15 — let the content decide. Do NOT aim for a fixed count.
-4. Short tangents / side comments inside a larger topic belong to that topic's chapter — don't make a separate chapter for them.
-5. For each chapter, capture the EXACT moment the topic begins and ends:
-   - "startQuote": the actual line/phrase from the transcript where this main point kicks off (10-25 words).
-   - "endQuote": the actual line/phrase where the topic naturally lands / pivots away (10-25 words).
-6. "title": 4-9 word punchy theme title that captures the SPECIFIC main point (e.g. "Simulation Theory vs Self-Running Program", "Psychedelics as Source Code Access") — not generic ("Introduction", "Main Discussion").
-7. "summary": one-line description of what main point this chapter is really about.
-8. Chapters MUST be in chronological order. First chapter starts near the beginning, last chapter ends near the end of the transcript.
-9. Do NOT overlap chapters. Do NOT leave gaps longer than ~1 minute between consecutive chapters.
+═══ HOW TO DO THIS (two passes — actually do this) ═══
+
+PASS 1 — Read the entire transcript and identify the DISCRETE MAIN POINTS the conversation actually makes. Write them down as a private list. A "main point" is a specific claim, argument, story, framework, or theme the speakers genuinely develop for more than a passing moment. Greetings, "how are you", reading sponsor copy, off-topic banter, transitions, repeated reframings of the same idea — these are NOT main points.
+
+PASS 2 — For EACH main point in your list, find the EXACT span of transcript where it lives. That span becomes one chapter. The start is the line where the speakers GENUINELY begin discussing that point (not the polite lead-in). The end is where they GENUINELY land on it before pivoting away (not the next greeting/banter).
+
+═══ HARD RULES ═══
+
+1. **CHAPTERS DO NOT HAVE TO COVER THE FULL TRANSCRIPT.** Most podcasts have huge amounts of non-content time — intros, ads, tangents, "by the way", "anyway", "hey check out our sponsor", random anecdotes that don't connect to a main point. **SKIP all of that.** Gaps of 2, 5, even 15 minutes between chapters are FINE if the in-between section has no main point. The chapters are the GOLD — the rest is dirt.
+
+2. **CHAPTER LENGTH IS WILDLY VARIABLE.** Some main points are 60 seconds. Some are 18 minutes. Some are 4 minutes. DO NOT regularize. Two adjacent chapters of vastly different lengths is the CORRECT output.
+
+3. **DO NOT INVENT EVENLY-SPACED CHAPTERS.** If your output shows chapter ends and starts at roughly even intervals (e.g. chapter 1: 0:00-5:30, chapter 2: 5:31-11:00, chapter 3: 11:01-16:30), you have FAILED — you are doing time-slot chunking, not topic extraction. Start over.
+
+4. **EVERY CHAPTER MUST BE A SPECIFIC IDEA, NOT A SECTION OF TIME.** A bad title is "Introduction" / "First Half" / "Main Discussion" / "Wrapping Up". A good title names the actual claim or theme: "Why LLMs Don't Reason", "The Case Against Daily Standups", "What Aliens Would See in Earth Radio".
+
+5. **3–15 chapters total**, but ONLY use as many as there are real main points. A 3-hour podcast that's mostly chit-chat with 4 real ideas → 4 chapters. A 30-minute focused interview that hits 10 distinct claims → 10 chapters. Be honest about what's actually there.
+
+6. **NEVER cut a main point in half** to fit a quota or even out chapter sizes. If one idea takes 20 minutes to fully develop, that's one 20-minute chapter, period.
+
+7. **startQuote / endQuote**: must be ACTUAL phrases from the transcript (10–25 words). startQuote is the moment the main point ignites. endQuote is the moment it lands / they pivot away.
+
+8. Chapters in chronological order. NO overlaps. Gaps between chapters are FINE and expected.
+
+═══ EXAMPLES — internalize the contrast ═══
+
+❌ BAD (time-slot chunking — what you should NEVER produce):
+  - 0:00 → 8:30   "Introduction"
+  - 8:31 → 17:00  "Main discussion part 1"
+  - 17:01 → 25:30 "Main discussion part 2"
+  - 25:31 → 34:00 "Wrap up"
+
+✅ GOOD (real topic extraction):
+  - 4:12 → 6:08   "Why He Walked Out of His First Startup"   (1m 56s)
+  - 12:40 → 14:55 "The 'Vibes Hiring' Anti-Pattern"          (2m 15s)
+  - 22:30 → 41:18 "His Full Framework for Product Discovery" (18m 48s)
+  - 53:00 → 56:32 "Critique of Y Combinator's New Cohort"    (3m 32s)
+  - (Note: there are large gaps between these — that's correct. The gap content was banter / tangents / setup / not a main point.)
+
+═══ OUTPUT ═══
 
 Total transcript length: ${fmtTs(totalSec)}
 
@@ -6452,13 +6579,18 @@ Return JSON ONLY:
     {
       "startTimestamp": "M:SS",
       "endTimestamp": "M:SS",
-      "title": "...",
-      "startQuote": "...",
-      "endQuote": "...",
-      "summary": "..."
+      "title": "specific main-point name (4-9 words)",
+      "startQuote": "actual phrase from transcript where this point ignites",
+      "endQuote": "actual phrase from transcript where this point lands",
+      "summary": "one-line description of the specific main point"
     }
   ]
 }
+
+Before finalizing, AUDIT your output:
+- Are any two adjacent chapters at suspiciously similar lengths? If yes → you're chunking by time, redo.
+- Do gaps exist between consecutive chapters? If no gaps anywhere → you covered filler, redo.
+- Does each title name a SPECIFIC idea? If any are generic ("Introduction", "Discussion") → rename or remove.
 
 Transcript:
 ${promptBody}`;
@@ -6529,7 +6661,7 @@ Return JSON ONLY:
 { "host": "First Last or empty", "guests": ["First Last", ...] }`;
 
   try {
-    const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+    const data = await callGemini('gemini-3.1-flash-lite', [{ role: 'user', parts: [{ text: prompt }] }], {
       responseMimeType: 'application/json',
     });
     const raw: string = data.text ?? data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
@@ -6550,6 +6682,132 @@ Return JSON ONLY:
   }
 };
 
+export type PodcastAnalysisVariant = 'adaptive' | 'funny' | 'friendly' | 'clip_take';
+
+// Single-speaker "Clip Reaction" — intro template + take + takeaways, max ~5 min.
+// Person / verb / topic are auto-extracted from the transcript by Gemini.
+// Optional overrides are accepted but rarely needed.
+export const generateClipTakeScript = async (
+  args: {
+    segments: PodcastTranscriptSeg[];
+    chapter?: PodcastChapter;
+    chapters?: PodcastChapter[];
+    podcastTitle: string;
+    analystName: string;        // the single speaker reacting to the clip
+    podcastHost?: string;       // hint for auto-detect (who is speaking in the clip)
+    podcastGuests?: string[];   // hint for auto-detect
+    // Optional overrides — if empty, Gemini auto-extracts each from the transcript.
+    personInClip?: string;      // e.g. "Elon Musk" — host or guest, whoever is talking
+    actionVerb?: string;        // e.g. "talks about" / "explains" / …
+    topicHeading?: string;      // short heading e.g. "AI feature risks…"
+    extraFocus?: string;
+    useGoogleGrounding?: boolean;
+  },
+): Promise<{ speaker: string; text: string }[]> => {
+  const { segments, chapter, chapters: chaptersArg, analystName, podcastHost, podcastGuests, extraFocus, useGoogleGrounding } = args;
+
+  const personOverride = (args.personInClip || '').trim();
+  const verbOverride   = (args.actionVerb   || '').trim();
+  const topicOverride  = (args.topicHeading || '').trim();
+  const autoDetect = !personOverride || !verbOverride || !topicOverride;
+
+  const chapters: PodcastChapter[] = chaptersArg && chaptersArg.length
+    ? [...chaptersArg].sort((a, b) => a.startSec - b.startSec)
+    : (chapter ? [chapter] : []);
+  if (!chapters.length) throw new Error('Koi chapter select nahi kiya gaya');
+
+  const chapterSegs = segments.filter(s => {
+    const mid = s.start + (s.duration || 0) / 2;
+    return chapters.some(c => mid >= c.startSec && mid <= c.endSec);
+  });
+  if (!chapterSegs.length) throw new Error('Selected chapter me transcript content nahi mila');
+
+  const transcriptText = chapterSegs.map(s => `[${fmtTs(s.start)}] ${s.text}`).join('\n');
+  const transcriptCapped = transcriptText.length > 22000
+    ? transcriptText.slice(0, 22000) + '\n…[transcript truncated]'
+    : transcriptText;
+
+  // Build the INTRO instruction. If overrides given, use them literally; else
+  // ask Gemini to extract person/verb/topic from the transcript itself.
+  const knownPeople = [podcastHost, ...(podcastGuests || [])].filter(Boolean).join(', ');
+  const introInstruction = autoDetect
+    ? `EXTRACT three things from the TRANSCRIPT below — do NOT use placeholders, fill in real values:
+  • PERSON: the real full name of the main speaker in the clip (the one whose ideas dominate). ${knownPeople ? `Known people on this show: ${knownPeople}.` : ''} If a guest is the dominant voice, use the guest's name; if it's the host, use the host's name. Use a real human name — never "the speaker" / "the host" / "the guest".
+  • VERB: pick ONE verb phrase that best fits what the speaker is doing in the clip. Choose from: talks about / explains / breaks down / argues / exposes / reveals / warns about / reacts to / shares.
+  • TOPIC: a short, specific topic phrase (5-12 words) that captures the actual subject of the clip — concrete, not vague. Avoid "this topic" / "various things".
+
+Then write the FIRST turn EXACTLY as: "In this clip <PERSON> <VERB> about <TOPIC>. Let's watch — then I'll give my take on this." — substituting the real values you extracted. No quotes, no brackets around the substitutions. Output that line as the first turn. Nothing else in this turn.`
+    : `The FIRST and ONLY turn of this phase MUST be EXACTLY this sentence, with no prelude, no greeting, no extra wording:
+"In this clip ${personOverride} ${verbOverride} about ${topicOverride}. Let's watch — then I'll give my take on this."
+Output that single line as the first turn. Nothing else in this turn.`;
+
+  const prompt = `You are writing a SINGLE-SPEAKER reaction script for "${analystName}", who is reacting to a clip from a YouTube video.
+
+STRUCTURE — EXACTLY 3 SECTIONS, in this order. NEVER add a fourth section. The whole output is just these three parts.
+
+═══ SECTION 1 — INTRO (exactly 1 turn — MANDATORY FIXED OPENING) ═══
+${introInstruction}
+
+═══ SECTION 2 — MAIN BODY · MY ANALYSIS (4-6 turns total — NOT MORE) ═══
+${analystName}'s personal take on the clip. Treat this as ONE cohesive analysis block split into 4-6 longer turns (3-5 sentences each, ~30-45 sec spoken per turn).
+- Walk through the 4-6 MOST IMPORTANT POINTS from the clip — pick the strongest ones, drop the rest. One point per turn.
+- For each turn: briefly paraphrase the claim (1 sentence), THEN react with your own analysis / agreement / pushback / context (2-4 sentences).
+- Explain technical jargon FROM BASICS in 1-2 sentences inside the same turn before using it ("quick context — X is basically...").
+- Confident, conversational, smart-friend energy. Real spoken English with contractions. No filler.
+- ${useGoogleGrounding ? 'Where useful, weave in LATEST facts / data / events / studies from search.' : ''}
+- DO NOT split a single point into multiple short turns. Each turn = one complete thought.
+- DO NOT exceed 6 turns in this section.
+
+═══ SECTION 3 — TAKEAWAYS (exactly 3 turns — CLOSING) ═══
+- Turn 1 MUST start with EXACTLY this phrase: "First takeaway from this is" — then complete the first takeaway in 1-2 sentences.
+- Turn 2: "Second takeaway —" or "And the second thing —" followed by takeaway 2 in 1-2 sentences.
+- Turn 3: "And finally —" or "Last one —" followed by takeaway 3 in 1-2 sentences. End cleanly. No "thanks for watching" sign-off.
+
+TOTAL TURN COUNT: 8-10 turns (1 intro + 4-6 body + 3 takeaways). Never more.
+LENGTH CAP — DO NOT EXCEED ~750 WORDS TOTAL across all turns combined (target ~5 minutes). If unsure, err shorter, not longer.
+
+TONE: Single-speaker reflection. Articulate, opinionated, warm, smart-friend voice. Not lecture-y. Not formal. Real spoken English with contractions.
+
+${extraFocus ? `EXTRA FOCUS FROM USER: ${extraFocus}\n` : ''}
+CLIP TRANSCRIPT (paraphrase, react — don't quote whole blocks):
+${transcriptCapped}
+
+Return ONLY a JSON array. No markdown. No preamble. ${autoDetect
+    ? 'The first item\'s text MUST follow the exact shape "In this clip <real-person-name> <verb> about <real-topic>. Let\'s watch — then I\'ll give my take on this." with the actual values you extracted — never literal placeholders.'
+    : `The first item's text MUST be EXACTLY: "In this clip ${personOverride} ${verbOverride} about ${topicOverride}. Let's watch — then I'll give my take on this."`}
+Just:
+[
+  { "speaker": "${analystName}", "text": "In this clip ... ... about .... Let's watch — then I'll give my take on this." },
+  { "speaker": "${analystName}", "text": "..." }
+]`;
+
+  const config: any = {};
+  if (useGoogleGrounding) {
+    config.tools = [{ googleSearch: {} }];
+  } else {
+    config.responseMimeType = 'application/json';
+  }
+
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+  const raw: string = data.text
+    ?? data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('')
+    ?? '';
+
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  let parsed: { speaker: string; text: string }[];
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\[[\s\S]*\]/);
+    if (!m) throw new Error('Clip Reaction: invalid JSON from Gemini');
+    parsed = JSON.parse(m[0]);
+  }
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error('Clip Reaction: empty script');
+
+  // Force every speaker label to analystName (single-speaker invariant)
+  return parsed.map(t => ({ speaker: analystName, text: (t.text ?? '').toString() })).filter(t => t.text);
+};
+
 export const generatePodcastDeepAnalysisScript = async (
   args: {
     segments: PodcastTranscriptSeg[];
@@ -6562,9 +6820,11 @@ export const generatePodcastDeepAnalysisScript = async (
     criticName: string;
     extraFocus?: string;
     useGoogleGrounding?: boolean;
+    variant?: PodcastAnalysisVariant;
   },
 ): Promise<{ speaker: string; text: string }[]> => {
   const { segments, chapter, chapters: chaptersArg, podcastTitle, podcastHost, podcastGuests, supporterName, criticName, extraFocus, useGoogleGrounding } = args;
+  const variant: PodcastAnalysisVariant = args.variant ?? 'adaptive';
 
   const chapters: PodcastChapter[] = chaptersArg && chaptersArg.length
     ? [...chaptersArg].sort((a, b) => a.startSec - b.startSec)
@@ -6604,33 +6864,115 @@ ${isMulti ? `CHAPTERS UNDER DISCUSSION (${chapters.length}):\n${chapterListLine}
 CHAPTER FOCUS: ${focusLine}${isMulti ? `\n\nMULTI-CHAPTER RULE: Cover BOTH chapters in the discussion. After exploring chapter 1, the analysts naturally transition to chapter 2 (e.g. "next they pivot to...", "later in the episode they get into..."). Each chapter gets meaningful airtime — don't let one swallow the other. Surface connections / contrasts between the two chapters where they genuinely exist.` : ''}
 
 SPEAKERS (these are the two analysts, NOT the podcast hosts):
-- "${supporterName}" → THE SUPPORTER. Genuinely finds the podcast's points compelling. Defends them, builds on them, adds supporting evidence and context. Sees what is RIGHT about the arguments. Not blindly positive — thoughtful, but warmly agrees with the core points.
-- "${criticName}" → THE CRITIC. Sharp, skeptical analyst. Picks apart the arguments — finds logical gaps, missing nuance, dangerous implications, counterexamples. Not hostile — intellectually adversarial. Sees what is WRONG, MISSING, or DANGEROUS about the arguments.
+- "${supporterName}" → leans toward seeing what's RIGHT and INTERESTING about what the podcast says. Builds on points, adds supporting context, defends the strong takes.
+- "${criticName}" → leans skeptical / curious-pushback. Spots gaps, missing nuance, weak assumptions. NOT a knee-jerk disagreer — when a point is genuinely solid, ${criticName} ADMITS it and explains WHY it's solid (then maybe adds nuance). Mindless contrarianism is forbidden.
 
-THE TWO ANALYSTS NATURALLY DISAGREE. Their back-and-forth is intellectual tension — they push back, concede points, reframe. Real conversation energy, not a polite forum.
+${variant === 'funny' ? `
+TONE — FUNNY / SARCASTIC:
+The whole conversation has comedic, lightly sarcastic energy. Witty one-liners, playful jabs at the podcast guest AND at each other, deadpan observations. The points still land — the humour is the wrapper, not a replacement for substance. Not mean — funny. Both speakers are in on the joke.
+` : variant === 'friendly' ? `
+TONE — FRIENDLY CHAT:
+Two friends discussing the chapter over coffee. Warm, curious, no adversarial framing. They riff together, share what struck them, build on each other's reactions. Mild disagreement is fine but the default mode is exploring TOGETHER, not arguing. "Yeah and the other thing that hit me…", "Oh totally, and what I loved was…", "Hmm I read that differently though — what about…". Interesting > combative.
+` : `
+TONE — ADAPTIVE (this is the most important rule for this style):
+BEFORE writing, JUDGE the chapter's content and pick the right register. Different parts of the chapter may call for different registers — switch within the script as the content shifts.
+
+  1. SERIOUS ANALYTICAL CONTENT (claims about facts, science, politics, business, public figures, public policy, controversial claims about external things):
+     → Full supporter-vs-critic dynamic. Push back, find logical gaps, demand evidence, disagree when justified.
+
+  2. CASUAL / FUNNY / SHIT-TALK (banter, jokes, light stories, "guys hanging out" energy, ribbing each other):
+     → DO NOT argue. Both analysts find it interesting / funny. Comment on what was said in an entertaining way, riff on the moment, share a related thought. Light teasing of the podcast guests is fine. No critic mode. No "let me dismantle this banter".
+
+  3. PERSONAL STORY / LIFE EXPERIENCE (someone sharing a personal journey, memory, emotion, relationship moment):
+     → Respond with WARMTH and CURIOSITY. NEVER criticize the person's choices, feelings, or lived experience. Reflect on what's interesting, relate it to broader human themes, share what it makes you think about. The analyst might one of them share a parallel of their own ("yeah this reminds me of…") rather than analyse the person.
+
+  4. PERSONAL PREFERENCE / TASTE ("I love X", "my favourite Y is Z", "I think this place is beautiful"):
+     → Do NOT criticize the preference itself. You can't tell someone their favourite restaurant is wrong. You CAN ask "what about it specifically", compare to your own taste, gently push on the *reasoning* if they gave one — but NEVER mock or invalidate the preference. "Mujhe Taj Mahal pasand hai" cannot be rebutted.
+
+  5. MIXED CONTENT (most real chapters):
+     → Switch registers as the content shifts. Critic-mode on the analytical claims, warm/curious on the personal parts, interesting-commentary on the banter. Same two speakers, fluid register.
+
+THE CRITIC IS NOT A KNEE-JERK DISAGREER (this overrides everything above):
+- When the podcast makes a point that is actually GOOD / TRUE / WELL-REASONED, ${criticName} explicitly admits it and explains why it's solid — then may add nuance.
+- Sometimes ${criticName} fully agrees and ${supporterName} adds the nuance. Mix who plays which role.
+- "Auto-disagreement" reads as fake and is FORBIDDEN.
+`}
+
+CONCEPT BRIDGING — TEACH WHEN IT'S NEEDED, SKIP WHEN IT'S NOT (apply throughout the script):
+
+When the chapter mentions a TERM, FRAMEWORK, EVENT, FIGURE, or IDEA that a smart-but-non-expert listener probably doesn't know cold, ONE analyst (whoever is leading that beat) drops a quick 1-2 sentence plain-English "basics bridge" THE FIRST TIME it's mentioned — before going into the deeper take. Keep it conversational, not Wikipedia-style. The OTHER analyst then immediately continues the analysis, building on top of it.
+
+✅ BRIDGE when the chapter mentions things like:
+   - Technical jargon ("quantitative easing", "neuroplasticity", "principal-agent problem", "RAG pipeline")
+   - Niche concepts / theories / frameworks ("Dunbar's number", "Overton window", "first-mover advantage")
+   - People / events the listener may not recognise ("the Volcker shock", "Renaissance Technologies", "what George Soros did in '92")
+   - Domain-specific phrases used as shorthand ("zero-day", "alpha", "p-value", "fiat", "M2 supply")
+   - Anything where the host/guest assumes background knowledge the average listener lacks
+
+   Example pattern:
+   "${supporterName}: They're banking on a 'flywheel effect' here — quick context, that just means each part of the business makes the next part easier, so growth compounds. And what's sharp is..."
+   "${criticName}: Right, but the flywheel only spins if [actual analysis]..."
+
+❌ DO NOT bridge — there's nothing to explain — when the chapter is about:
+   - Personal preference / taste ("I love Paris", "Mujhe Taj Mahal pasand hai", "my favourite restaurant is X") — preferences aren't concepts.
+   - Personal stories / memories / emotions
+   - Common everyday things everyone already knows ("traffic", "school", "marriage", "money")
+   - Casual banter / jokes / shit-talk
+   - Already-mainstream ideas the average listener clearly knows ("inflation", "AI is rising", "social media is addictive")
+
+   If you're not sure whether to bridge: ask "would a smart 22-year-old who doesn't work in this field need this?" — if no, skip the bridge.
+
+BRIDGE RULES:
+- 1-2 sentences MAX. Land it inside an analyst's existing turn — don't make it a separate "explanation turn".
+- Plain language, no textbook tone. Use "basically", "quick context —", "for anyone unfamiliar —", "the idea is —".
+- ONCE per term per script. Don't re-explain something already bridged.
+- The bridge should make the ANALYSIS that comes right after make sense — it's a setup for the punchline, not a tangent.
 
 STRUCTURE the script as follows:
 
-A. **Opening Hook** (1-2 turns)
-   Start by naming the podcast + chapter. Quote/paraphrase the actual moment from the podcast that sparks this discussion.
-   Example feel:
-     "${supporterName}: Okay so on ${podcastTitle}, the part where they say [paraphrase the actual claim] — I think this is one of the sharpest things they've said all episode."
-     "${criticName}: Hold on. Before we get carried away, let's look at what's actually being claimed here..."
+A. **Opening Hook** (1-2 turns) — IN MEDIAS RES
+   Open as if the two analysts are ALREADY mid-conversation about this idea — they've already established context off-screen. Drop the listener straight into the SPECIFIC CLAIM or argument being discussed. The first line is a sharp, opinionated reaction to a concrete claim — not a setup, not a recap, not a "let me tell you what we just watched".
+
+   ❌ FORBIDDEN OPENERS (do NOT use any of these patterns — they make the discussion sound like a YouTube reaction video):
+     - "So, I was listening to..." / "I just watched..." / "We watched this clip..."
+     - "On ${podcastTitle}, the part where they say..."
+     - "Have you seen the new ${podcastTitle} episode?"
+     - "${supporterName}: Today we're going to talk about..."
+     - Any opener that announces the podcast or chapter as if introducing it to a viewer.
+
+   ✅ CORRECT FEEL (mid-conversation, content-first):
+     "${supporterName}: Okay, the [specific claim from the chapter — name it directly] — that's actually a sharper point than people are giving them credit for."
+     "${criticName}: Sharper? It only sounds sharp because they smuggled in an assumption. Watch — [zeroes in on the load-bearing flaw]."
+   Notice: no "I was listening to", no podcast announcement, no greeting. They're already deep in it.
 
 B. **Topic-by-topic Deep Dive** (${isMulti ? '18-24' : '12-18'} turns)
    Identify ${isMulti ? '3-5 SPECIFIC sub-topics per chapter (across BOTH chapters — clearly bridge from one chapter to the next mid-discussion)' : '3-5 SPECIFIC sub-topics inside this chapter'} (specific claims, framings, or moments). For EACH sub-topic:
-   - One analyst introduces it by referencing what the podcast host actually said: "Next, [podcast host] argues that..." / "Then they pivot to..."
-   - The other reacts with their stance (supporter / critic depending on who's leading).
+   - One analyst introduces it by referencing what the podcast host actually said — paraphrase the SPECIFIC line/claim, don't speak generically. "Next, [podcast host] argues that [actual claim]..." / "Then they pivot to [specific framing]..."
+   - If that sub-topic contains an unfamiliar term/concept (per the CONCEPT BRIDGING rules above), the introducing analyst drops the 1-2 sentence bridge inside their turn BEFORE the analysis lands.
+   - The other reacts with their stance (supporter / critic depending on who's leading) — and must respond to the SPECIFIC claim, not vague "yeah I see what you mean" filler.
    - They go BACK AND FORTH 2-4 turns per sub-topic — surface point → critical take → counter → concession or reframe.
    - Use natural, spoken language. Contractions. Reactions. Interruptions ("wait, hold on..."). Don't be academic.
    - Reference real-world examples, data, or context where it lands naturally. ${useGoogleGrounding ? 'Use the LATEST facts / events / statistics / studies you can find via search.' : ''}
+   - NO PADDING — every turn must add a new thought, example, counter, or nuance. Banned filler patterns: "That's a great point", "I totally agree, and I'd add...", "Exactly, and what's interesting is...", "Yeah no for sure...". Each turn EARNS its slot.
+   - VARY RHYTHM — mix short jabs (1 sentence) with longer analytical turns (4-5 sentences). All-uniform-length turns feel robotic.
 
-C. **The Critical Disagreement Beat** (2-3 turns)
-   One spot where ${supporterName} and ${criticName} clearly disagree about an interpretation. Let it breathe — they don't resolve it cleanly. That's the realism.
+${variant === 'friendly' ? `C. **One Moment of Light Difference** (2-3 turns) — OPTIONAL
+   If there's a natural place where ${supporterName} and ${criticName} read something differently, let it surface gently. Not a confrontation — a "huh, I saw that differently" moment that opens up the topic further. If nothing in the chapter genuinely invites disagreement (e.g. it's all personal stories or shared taste), SKIP this beat entirely.
 
-D. **Final Key Takeaways** (2 turns at the very end — these are MANDATORY)
-   - Turn ${'{'}supporter takeaway turn${'}'}: ${supporterName} delivers a brief "what this podcast actually got RIGHT — what we should walk away learning" — 2-4 distinct positive takeaways, framed conversationally.
-   - Turn ${'{'}critic takeaway turn${'}'}: ${criticName} delivers the "what's CONCERNING / what we should be careful about" counterweight — 2-4 distinct concerns, framed sharply but not bitterly.
+D. **Final Wrap** (2 turns at the very end)
+   - ${supporterName}: "what stuck with me from this" — a few warm, conversational takeaways.
+   - ${criticName}: "yeah, and the thing I'm still chewing on is…" — what's interesting, what's still open, anything that gave them pause. NOT a "concerns" list — a friendly reflection.` : variant === 'funny' ? `C. **The Disagreement Beat** (2-3 turns) — OPTIONAL
+   If the chapter has a serious claim worth landing a punch on, ${supporterName} and ${criticName} disagree with comedic energy — sarcastic jabs, witty pushback. If the chapter is pure banter / personal story with nothing to actually disagree about, SKIP this beat.
+
+D. **Final Wrap** (2 turns at the very end)
+   - ${supporterName}: a punchy takeaway — what actually worked, delivered with comedic timing.
+   - ${criticName}: a sharp/sarcastic counter-beat — what was sus, weak, or pure copium — delivered with humour, not bitterness.` : `C. **Disagreement Beat** (2-3 turns) — ONLY IF JUSTIFIED BY THE CONTENT
+   If the chapter has substantive analytical claims worth disputing, this is the spot where ${supporterName} and ${criticName} clearly disagree about an interpretation. Let it breathe — they don't resolve it cleanly. That's the realism.
+   IMPORTANT: If the chapter is mostly personal story, banter, or shared taste (i.e. there's nothing genuinely *worth* disagreeing about), DO NOT force an artificial disagreement. SKIP this beat and let the discussion stay curious/warm.
+
+D. **Final Wrap** (2 turns at the very end — adapt to what the chapter actually was)
+   - ${supporterName}: closing reflection — for analytical chapters this is "what this podcast actually got RIGHT — what we should walk away learning" (2-4 positive takeaways). For personal/casual chapters this is "what stuck with me from this" (warm, conversational).
+   - ${criticName}: closing reflection — for analytical chapters this is "what's CONCERNING / what to be careful about" (2-4 concerns, sharp but not bitter). For personal/casual chapters this is "yeah, and what I'm still thinking about is…" — open-ended reflection, NOT a concerns list. Match the register of the chapter, not a hardcoded template.`}
 
 ${(podcastHost || (podcastGuests && podcastGuests.length)) ? `PODCAST PEOPLE (use these EXACT names when the analysts refer to who said what):
 ${podcastHost ? `- HOST: ${podcastHost}` : ''}
@@ -6641,6 +6983,8 @@ ${podcastGuests && podcastGuests.length ? `- GUEST(S): ${podcastGuests.join(', '
 - Use phrases like: "next, ${podcastHost || '[host]'} talks about...", "first thing I noticed was when ${podcastGuests && podcastGuests[0] ? podcastGuests[0] : '[the guest]'} said...", "${podcastHost || '[the host]'} pushes back, asking — what's your take?", "this is where I push back...", "exactly the part that's bothering me too".
 - DO NOT roleplay AS the podcast host or guest. The analysts are OUTSIDE the podcast looking in.
 - DO NOT invent quotes the host/guest didn't say — paraphrase from the transcript below.
+- **NEVER open with viewer-commentary phrasing.** The first sentence of the script MUST NOT contain: "I was listening to", "I just watched", "we watched this clip", "I want to talk about", "today we're discussing", "on ${podcastTitle}", "in this episode of", or any phrase that introduces the podcast to a third-party viewer. The two analysts assume the listener already knows what they're discussing — they go straight into the SPECIFIC CLAIM.
+- The analysts are NOT TV hosts addressing an audience. They are two thinkers in the middle of an argument with each other.
 
 LENGTH: ${isMulti ? '28-36' : '22-28'} turns total, alternating naturally (not strictly). Each turn = 2-5 sentences of natural spoken English.
 

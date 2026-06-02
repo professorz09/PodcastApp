@@ -545,21 +545,27 @@ Return JSON only (no markdown):
       )}
 
       {appState === AppState.INPUT && (
-        <DebateInput 
-          onGenerate={handleGenerateScript} 
+        <DebateInput
+          onGenerate={handleGenerateScript}
           isLoading={isLoading}
           initialContextContent={youtubeData?.contextFileContent}
           initialFileName={youtubeData?.contextFileName}
           initialCommentsContent={youtubeData?.commentsFileContent}
           initialCommentsFileName={youtubeData?.commentsFileName}
+          onPhoneStudioReady={(segments) => {
+            setScript(segments);
+            setScriptStyle('phone_studio');
+            setAppState(AppState.SCRIPT);
+            toast.success('✓ Script ready — Script Editor me review karo, fir Phone Studio open karo');
+          }}
         />
       )}
 
       {appState === AppState.SCRIPT && (
-        <ScriptEditor 
-          script={script} 
+        <ScriptEditor
+          script={script}
           onUpdateScript={setScript}
-          onNext={() => setAppState(AppState.THUMBNAIL)}
+          onNext={() => setAppState(AppState.AUDIO)}
           onBack={() => setAppState(AppState.INPUT)}
           youtubeData={youtubeData}
           speakerVoices={audioVoices}
@@ -568,22 +574,22 @@ Return JSON only (no markdown):
       )}
 
       {appState === AppState.THUMBNAIL && (
-        <ThumbnailGenerator 
+        <ThumbnailGenerator
           script={script}
           youtubeData={youtubeData}
           thumbnailState={thumbnailState}
           onUpdateThumbnailState={setThumbnailState}
-          onNext={() => setAppState(AppState.AUDIO)}
-          onBack={() => setAppState(AppState.SCRIPT)}
+          onNext={() => setAppState(AppState.STORYBOARD)}
+          onBack={() => setAppState(AppState.VISUALIZER)}
         />
       )}
 
       {appState === AppState.AUDIO && (
-        <AudioGenerator 
+        <AudioGenerator
           script={script}
           onUpdateScript={setScript}
           onNext={() => setAppState(AppState.VISUALIZER)}
-          onBack={() => setAppState(AppState.THUMBNAIL)}
+          onBack={() => setAppState(AppState.SCRIPT)}
           onVoicesChange={setAudioVoices}
           youtubeData={youtubeData}
         />
@@ -600,7 +606,7 @@ Return JSON only (no markdown):
       {appState === AppState.STORYBOARD && (
         <Storyboard
           script={script}
-          onBack={() => setAppState(AppState.VISUALIZER)}
+          onBack={() => setAppState(AppState.THUMBNAIL)}
         />
       )}
 

@@ -10,11 +10,18 @@ import {
   generateScriptChapters,
   analyzePodcastChapters,
   generatePodcastDeepAnalysisScript,
+  generateClipTakeScript,
   detectPodcastSpeakers,
+  generateIntroFromTranscript,
+  generateSpeech,
   PodcastTranscriptSeg,
   PodcastCutRange,
   PodcastChapter,
 } from '../services/geminiService';
+import {
+  transcribeAudioGoogleCloud,
+  generateProportionalWordTimings,
+} from '../services/googleCloudService';
 import { toast } from './Toast';
 import { DebateSegment } from '../types';
 
@@ -85,8 +92,105 @@ const CONVO_STYLES: {
     id: 'podcast_analysis',
     emoji: '🎙️🔍',
     label: 'Podcast Deep Analysis',
-    desc: 'Podcast link → chapter cut → supporter vs critic deep dive',
-    prompt: `DEEP PODCAST ANALYSIS MODE. Two analysts (one supporter, one critic) discuss a podcast chapter — they are NOT recreating the podcast, they are reacting to it. Natural references like "next [host] talks about X", "valid question — what's your take", quoting/paraphrasing the actual transcript, deep structured discussion with disagreements, ending with supporter takeaways + critic concerns.`,
+    desc: 'Adaptive — auto-adjusts tone by chapter (debate / banter / personal / preference)',
+    prompt: `DEEP PODCAST ANALYSIS MODE — ADAPTIVE. Two analysts react to a podcast chapter. Their tone auto-adjusts: serious claims → push-back debate; funny banter → interesting commentary, not arguing; personal stories → warm curiosity, no criticizing someone's life; personal tastes ("I like the Taj Mahal") → no mocking the preference. Critic agrees when a point is genuinely solid — no knee-jerk contrarianism.`,
+  },
+  {
+    id: 'podcast_analysis_funny',
+    emoji: '🎙️😏',
+    label: 'Podcast Analysis — Funny/Sarcastic',
+    desc: 'Same deep analysis but with comedic, lightly-sarcastic banter throughout',
+    prompt: `FUNNY/SARCASTIC PODCAST ANALYSIS. Same deep dive into the chapter, but the energy is comedic and lightly sarcastic. Witty observations, playful jabs, deadpan one-liners. Both speakers tease the podcast guests AND each other — but the actual points still land. Not mean — funny.`,
+  },
+  {
+    id: 'podcast_analysis_friendly',
+    emoji: '🎙️☕',
+    label: 'Podcast Analysis — Friendly Chat',
+    desc: 'Two friends talking warmly about what they heard — curious, no adversarial energy',
+    prompt: `FRIENDLY PODCAST CHAT. Two friends discussing a podcast chapter together over coffee. Warm, curious, no adversarial framing. They build on each other's reactions, share what struck them, riff on ideas. Mild disagreement is fine but the default is exploring TOGETHER. Interesting > combative.`,
+  },
+  {
+    id: 'clip_reaction',
+    emoji: '🎥',
+    label: 'Clip Reaction (1 Speaker, ~5 min)',
+    desc: 'YouTube clip → one speaker introduces it, gives their take, ends with takeaways',
+    prompt: '', // unused — handled by generateClipTakeScript via PodcastAnalysisFlow
+  },
+  {
+    id: 'what_if',
+    emoji: '🌌',
+    label: 'What If…',
+    desc: 'Hypothetical scenarios — setup → basics → debate → fun deep conclusion',
+    prompt: `WHAT-IF MODE — for hypothetical / thought-experiment scenarios like "What if all data centers shifted to Mars?", "What if the sun disappeared?", "What if gravity didn't exist?".
+
+FOLLOW THIS STRUCTURE EXACTLY:
+
+PHASE 1 — SCENARIO SETUP (first 2 turns, MUST come first, do NOT start in-medias-res):
+- Speaker 1 introduces the wild scenario clearly so the listener instantly knows what's being imagined. Frame it with stakes/scale and a hook. Use their name once. ("Okay picture this — every data center on Earth, packed onto rockets, launched to Mars. Yes literally Mars. What actually happens?")
+- Speaker 2 reacts with energy and locks in the premise. Maybe defines the rules of the thought experiment. ("Wait, are we assuming the rockets even make it? Because step one is already a disaster…")
+
+PHASE 2 — BASICS BRIDGE (3-5 turns):
+- Walk through the underlying REAL-WORLD facts the hypothetical depends on, FROM BASICS, assuming the listener knows nothing.
+- One explains a basic in a fun, conversational way ("okay so first — a data center is basically a warehouse full of computers running so hot they need AC units the size of buildings just to not melt"), the other adds the next layer.
+- Each fact should land a small "huh, interesting" moment. Teach like a clever friend over chai, NOT a textbook. Light sarcasm is fine.
+
+PHASE 3 — IMPLICATIONS, ONE BY ONE, WITH DEBATE (60% of turns):
+- Walk through the specific implications point by point — pick 4-6 distinct angles relevant to THIS scenario (for Mars data centers: latency, power, cooling, repairs, cost, solar storms, time-zone for engineers… for sun-disappears: light, gravity, temperature, oceans, atmosphere, photosynthesis…).
+- For EACH implication: explain the science/mechanism FROM BASICS in 1-2 sentences, then the speakers GENUINELY DISAGREE — one says "actually this could work because X", the other says "nope, absurd, because Y". Take both sides seriously — steelman each.
+- Sprinkle funny analogies + light sarcasm — "Right, so we'll just FedEx Mars our servers, what could possibly go wrong" — but the FACTS stay real.
+- Don't agree just to be agreeable. Don't disagree just to be contrarian. Earn the disagreement with content.
+
+PHASE 4 — FUN + DEEP CONCLUSION (last 2 turns):
+- Each speaker delivers a final take that's PUNCHY and FUNNY on the surface but lands a genuinely deep observation — what this hypothetical actually reveals about the real world.
+- NOT "well that was fun!" — a real insight. Example: "The funniest part is we're already doing the small version of this — every undersea cable is a less dramatic Mars launch. We've just normalised the absurdity."
+- They don't fully agree. One ends with a witty line, the other with the deeper takeaway.
+
+GLOBAL TONE RULES:
+- Funny + interesting + lightly sarcastic — two smart friends at a dinner party.
+- Real science/facts as the foundation, even when the scenario is absurd.
+- Explain technical concepts FROM BASICS — never assume background knowledge. But DON'T explain things the listener already knows (gravity, sun, computer, etc.).
+- Each turn earns its slot — no filler ("great point", "I totally agree and would add").
+- Mix turn lengths — short stinging jabs with longer 4-5 sentence analytical turns.
+- Speakers refer to each other by name occasionally, not every turn.`,
+  },
+  {
+    id: 'debate2',
+    emoji: '⚡',
+    label: 'Debate 2 — Extremes',
+    desc: 'Funny + sarcastic EXTREMES debate on big questions, with deep knowledgeable wrap-up',
+    prompt: `DEBATE 2 MODE — high-energy, funny, sarcastic debate on big "is X possible / should we do X / can X ever happen" questions like "Should we move data centers to Mars?", "Can human suffering ever truly end?", "Is privacy already dead?". This is NOT the regular Debate style — both speakers take EXTREME positions with full conviction, no middle ground, but the form is witty/sharp/clever, NEVER hostile.
+
+FOLLOW THIS STRUCTURE EXACTLY:
+
+PHASE 1 — FRAMING (1-2 turns):
+- Open by stating the question plainly but with attitude. Speaker 1 stakes out one extreme position immediately with a punchy declarative line. ("Honestly? Moving data centers to Mars is the most beautifully unhinged idea humanity has had since the pyramids — and I think we should absolutely do it.")
+- Speaker 2 responds with the OPPOSITE extreme, also punchy. ("Okay, you've lost the plot. This is a Tony Stark fanfic, not a plan. Sit down.")
+- No "well, on one hand…" centrism allowed. No qualifier-hedging openers.
+
+PHASE 2 — EXTREMES, FACTS, WIT (70% of turns):
+- Pick 3-5 specific debate sub-points (different angles on the question).
+- For EACH sub-point:
+  - Speaker A makes their extreme case with humour + ONE real fact/study/example/historical precedent that genuinely supports it.
+  - Speaker B counter-extremes with sarcasm + their OWN real fact/example backing the opposite extreme.
+  - Both must use REAL data and examples — the form is funny, the substance is honest.
+- When a sub-point uses a TECHNICAL concept the listener may not know (e.g. "latency", "entropy", "hedonic treadmill", "Pareto distribution"), the speaker explains it FROM BASICS in 1-2 sentences inside their turn before using it — conversationally, not textbook-style.
+- DO NOT bridge for things the listener already knows (happiness, money, marriage, AI, school) — only genuinely technical/niche terms.
+- Sarcasm examples: "Right, and the moon is made of cheese — let me know how the round-trip ping works out", "Sure, we'll eliminate suffering by Tuesday, I'll put it on the calendar between dentist and laundry".
+- Two clever friends arguing at a dinner party — sharp, never mean, never personal.
+- NO conceding mid-debate. Both stay on their extreme until Phase 3.
+
+PHASE 3 — DEEP + FUN CONCLUSION (last 2 turns, MANDATORY):
+- The energy softens just slightly. Each speaker delivers a FINAL take that's funny on the surface but contains a deep, genuinely knowledgeable insight — something worth chewing on hours after the video ends.
+- They don't fully agree — that's the realism. But each gives the listener a real takeaway.
+- Example for "Can suffering ever end?": "Look — I'll concede this much: total elimination is fantasy. But every century has cut average suffering by orders of magnitude, and the only reason that sounds wild is that we measure pain in screams, not in the silences we never noticed. Maybe ending suffering isn't a target — it's a direction." / "Sure, beautifully said, and also exactly what every utopian who got people killed used to say. The danger isn't the goal — it's mistaking direction for permission. I'll keep my screams, thanks."
+- One ends with a punchy line, the other with the deeper observation.
+
+GLOBAL TONE RULES:
+- Funny + sarcastic FORM, deeply knowledgeable SUBSTANCE. Jokes are the wrapping, facts are the gift.
+- Each turn must add a new fact, angle, counter, or insight — no filler.
+- Mix turn lengths — short stinging jabs with longer 4-5 sentence analytical turns.
+- Speakers refer to each other by name occasionally.
+- THIS IS NOT THE STANDARD 'DEBATE' STYLE. Make it feel distinctly different — sharper, funnier, smarter, more extreme positions, deeper wrap.`,
   },
   {
     id: 'podcast',
@@ -282,10 +386,479 @@ const fmtTime = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
+// ─── IntroFlow — Optional Intro Video (Step 2 / Cuts) ────────────────────────
+// Pipeline: gemini-3.1-flash-lite + Google grounding → TTS → STT → 1080p MP4.
+// Single phone called "Intro" (aurora purple). Per-step status + retry.
+
+type IntroStepKey = 'text' | 'tts' | 'stt' | 'render';
+type IntroStepStatus = 'pending' | 'running' | 'done' | 'failed';
+
+const INTRO_STEPS: { key: IntroStepKey; label: string }[] = [
+  { key: 'text',   label: '🧠 Intro likh raha hai (Gemini 3.1 Flash Lite · Search ON)' },
+  { key: 'tts',    label: '🗣️ Intro ka audio bana raha hai (TTS)' },
+  { key: 'stt',    label: '🔤 Speech-to-text — word timings nikaal raha hai' },
+  { key: 'render', label: '🎬 1080p MP4 render kar raha hai' },
+];
+
+interface IntroFlowProps {
+  segments: PodcastTranscriptSeg[];
+  podcastTitle: string;
+  podcastHost: string;
+  podcastGuests: string[];
+  // Time range (seconds) covering ONLY the selected chapters. When provided,
+  // the intro is generated from this slice of the transcript — NOT the whole
+  // episode — so the topic matches what the user actually picked.
+  selectedRanges?: { startSec: number; endSec: number }[];
+  selectionLabel?: string;
+}
+
+const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel }) => {
+  const [open, setOpen] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [steps, setSteps] = useState<Record<IntroStepKey, { status: IntroStepStatus; detail?: string; error?: string }>>({
+    text:   { status: 'pending' },
+    tts:    { status: 'pending' },
+    stt:    { status: 'pending' },
+    render: { status: 'pending' },
+  });
+
+  // Mirror in state for display
+  const [introText, setIntroText] = useState<string | null>(null);
+  const [topic, setTopic] = useState<string | null>(null);
+  const [detectedHost, setDetectedHost] = useState<string | null>(null);
+
+  // Cached intermediate results — refs so the pipeline can read them sync
+  const introTextRef = useRef<string | null>(null);
+  const audioRef = useRef<{ blob: Blob; url: string; duration: number } | null>(null);
+  const timingsRef = useRef<{ word: string; start: number; end: number }[] | null>(null);
+  const videoRef = useRef<{ blob: Blob; url: string } | null>(null);
+
+  // Free the video blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (videoRef.current?.url) {
+        try { URL.revokeObjectURL(videoRef.current.url); } catch {}
+      }
+      if (audioRef.current?.url) {
+        try { URL.revokeObjectURL(audioRef.current.url); } catch {}
+      }
+    };
+  }, []);
+
+  const patchStep = (key: IntroStepKey, patch: Partial<{ status: IntroStepStatus; detail?: string; error?: string }>) => {
+    setSteps(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+  };
+
+  const STEP_ORDER: IntroStepKey[] = INTRO_STEPS.map(s => s.key);
+
+  // Run the pipeline from `fromStep` to end. Earlier steps reuse cached refs.
+  const runFrom = async (fromStep: IntroStepKey) => {
+    if (running) return;
+    if (!segments.length) {
+      toast.error('Transcript empty hai — pehle URL fetch karo');
+      return;
+    }
+    setRunning(true);
+
+    // Reset this step + all later steps to pending (clear any old failure / done)
+    const startIdx = STEP_ORDER.indexOf(fromStep);
+    setSteps(prev => {
+      const next = { ...prev };
+      STEP_ORDER.forEach((k, i) => {
+        if (i >= startIdx) next[k] = { status: 'pending' };
+      });
+      return next;
+    });
+
+    try {
+      // ── Step 1: Generate intro text ───────────────────────────────────
+      if (startIdx <= 0) {
+        patchStep('text', { status: 'running' });
+        try {
+          // Slice the transcript to ONLY the selected chapter ranges so the
+          // intro's topic matches what the user actually picked. Fall back to
+          // the full transcript only if no ranges were provided.
+          const ranges = (selectedRanges || []).filter(r => r.endSec > r.startSec);
+          const segsForIntro = ranges.length
+            ? segments.filter(s => {
+                const segEnd = s.start + (s.duration || 0);
+                return ranges.some(r => segEnd > r.startSec && s.start < r.endSec);
+              })
+            : segments;
+          const transcriptText = segsForIntro.map(s => s.text).join(' ');
+          if (!transcriptText.trim()) throw new Error('Selected chapters ka transcript empty hai');
+          const res = await generateIntroFromTranscript({
+            transcriptText,
+            podcastTitle,
+            podcastHost,
+            podcastGuests,
+          });
+          introTextRef.current = res.intro;
+          setIntroText(res.intro);
+          setTopic(res.topic);
+          setDetectedHost(res.host);
+          patchStep('text', { status: 'done', detail: `Topic: "${res.topic}" · Host: ${res.host}` });
+        } catch (e: any) {
+          patchStep('text', { status: 'failed', error: e?.message || 'Intro text generation failed' });
+          setRunning(false);
+          return;
+        }
+      }
+
+      // ── Step 2: TTS ───────────────────────────────────────────────────
+      if (startIdx <= 1) {
+        patchStep('tts', { status: 'running' });
+        try {
+          const txt = introTextRef.current;
+          if (!txt) throw new Error('Intro text missing — Step 1 re-run karo');
+          const ttsRes = await generateSpeech(txt, 'Zubenelgenubi');
+          const blob = await (await fetch(ttsRes.audioUrl)).blob();
+          // Free any prior audio blob URL
+          if (audioRef.current?.url && audioRef.current.url !== ttsRes.audioUrl) {
+            try { URL.revokeObjectURL(audioRef.current.url); } catch {}
+          }
+          audioRef.current = { blob, url: ttsRes.audioUrl, duration: ttsRes.duration };
+          patchStep('tts', { status: 'done', detail: `${ttsRes.duration.toFixed(1)}s WAV` });
+        } catch (e: any) {
+          patchStep('tts', { status: 'failed', error: e?.message || 'TTS failed' });
+          setRunning(false);
+          return;
+        }
+      }
+
+      // ── Step 3: STT (word timings) ────────────────────────────────────
+      if (startIdx <= 2) {
+        patchStep('stt', { status: 'running' });
+        try {
+          if (!audioRef.current) throw new Error('Audio missing — Step 2 re-run karo');
+          let timings: { word: string; start: number; end: number }[];
+          try {
+            timings = await transcribeAudioGoogleCloud(audioRef.current.blob, 'en-US');
+            if (!timings.length) throw new Error('STT returned 0 words');
+          } catch (sttErr: any) {
+            // Fallback: proportional timings from the text + duration
+            console.warn('Google STT failed → proportional fallback', sttErr);
+            timings = generateProportionalWordTimings(introTextRef.current || '', audioRef.current.duration);
+          }
+          timingsRef.current = timings;
+          patchStep('stt', { status: 'done', detail: `${timings.length} words timed` });
+        } catch (e: any) {
+          patchStep('stt', { status: 'failed', error: e?.message || 'STT failed' });
+          setRunning(false);
+          return;
+        }
+      }
+
+      // ── Step 4: Video render ──────────────────────────────────────────
+      if (startIdx <= 3) {
+        patchStep('render', { status: 'running', detail: '0%' });
+        try {
+          if (!audioRef.current || !timingsRef.current || !introTextRef.current) {
+            throw new Error('Pichla data missing — pichle step retry karo');
+          }
+          if (!('VideoEncoder' in window)) {
+            throw new Error('Browser WebCodecs support nahi karta — Chrome/Edge try karo');
+          }
+
+          // Build single-phone state for the renderer
+          const introPhone: PhoneConfig = {
+            id: 'intro_phone',
+            name: 'Intro',
+            style: 'aurora',
+            color: '#a855f7',
+            screenColor: '#0d0618',
+            rotation: 0,
+            showControls: true,
+            battery: '87%',
+          };
+          const turn: ScriptTurn = {
+            id: 'intro_turn',
+            phoneId: 'intro_phone',
+            text: introTextRef.current,
+            durationMs: Math.round(audioRef.current.duration * 1000),
+            audioUrl: audioRef.current.url,
+            wordTimings: timingsRef.current.map(w => ({
+              word: w.word, startTime: w.start, endTime: w.end,
+            })),
+            isNarrator: false,
+          };
+
+          // Decode audio → mono Float32Array for the muxer.
+          //
+          // Resilience: decodeAudioData detaches the ArrayBuffer, so we always
+          // clone the blob to a fresh buffer first. Without this, a retry of
+          // the render step (re-using the SAME blob via .arrayBuffer()) would
+          // get an empty buffer on some browsers, producing a silent MP4.
+          const TARGET_SR = 24_000;
+          let actx: AudioContext;
+          try { actx = new AudioContext({ sampleRate: TARGET_SR }); }
+          catch { actx = new AudioContext(); }
+          const rawAb = await audioRef.current.blob.arrayBuffer();
+          // Clone so decodeAudioData's detach doesn't corrupt anything reused later.
+          const ab = rawAb.slice(0);
+          if (ab.byteLength < 100) {
+            await actx.close();
+            throw new Error(`TTS audio empty hai (${ab.byteLength} bytes) — Step 2 dobara chalao`);
+          }
+          const decoded = await actx.decodeAudioData(ab);
+          const ch0 = decoded.getChannelData(0);
+          // Copy out before closing the AudioContext (otherwise buffer is detached)
+          const mixed = new Float32Array(ch0.length);
+          mixed.set(ch0);
+          const sampleRate = decoded.sampleRate;
+          const duration = decoded.duration;
+          await actx.close();
+
+          // Sanity: confirm the buffer actually contains sound. If TTS came
+          // back as digital silence (rare but happens on quota errors), the
+          // MP4 would render fine visually but be mute — surface that early.
+          let peak = 0, sumSq = 0;
+          const stride = Math.max(1, Math.floor(mixed.length / 4096));
+          for (let k = 0; k < mixed.length; k += stride) {
+            const v = Math.abs(mixed[k]);
+            if (v > peak) peak = v;
+            sumSq += mixed[k] * mixed[k];
+          }
+          const rms = Math.sqrt(sumSq / Math.max(1, Math.floor(mixed.length / stride)));
+          console.log(`[IntroFlow] audio decoded — samples=${mixed.length} sr=${sampleRate} dur=${duration.toFixed(2)}s peak=${peak.toFixed(4)} rms=${rms.toFixed(4)}`);
+          if (mixed.length === 0) {
+            throw new Error('Decoded audio me 0 samples hain — TTS step retry karo');
+          }
+          if (peak < 0.0005) {
+            throw new Error('TTS ne silent audio diya (peak ~ 0) — Step 2 retry karo');
+          }
+
+          // Offscreen canvas + renderer
+          const W = 1920, H = 1080, FPS = 30;
+          const exportCanvas = document.createElement('canvas');
+          exportCanvas.width = W;
+          exportCanvas.height = H;
+          const state: StudioState = {
+            phones: [introPhone],
+            script: [turn],
+            background: { type: 'color', value: '#ffffff' },
+            deviceSpacing: 50,
+            deviceScale: 100,
+            startTime: '09:41',
+            subtitleConfig: { enabled: true, size: 1.6, background: 'dark', textColor: '#ffffff' },
+            phoneZPulse: false,
+          };
+          const exportRenderer = new CanvasRenderer(exportCanvas, state);
+
+          const blob = await renderVideoOffline({
+            canvas: exportCanvas,
+            audioChannels: [mixed],
+            sampleRate,
+            duration,
+            fps: FPS,
+            bitrate: 8_000_000,
+            width: W,
+            height: H,
+            renderCallback: (_time, _level, _vid, offCtx) => {
+              exportRenderer.currentTime = _time * 1000;
+              exportRenderer.audioLevel = _level;
+              exportRenderer.drawFrame();
+              offCtx.drawImage(exportCanvas, 0, 0, W, H);
+            },
+            onProgress: p => {
+              patchStep('render', { status: 'running', detail: `${Math.round(p * 100)}%` });
+            },
+          }) as Blob | void;
+
+          if (!blob) throw new Error('Render empty blob return hua');
+          // Free any old video URL before replacing
+          if (videoRef.current?.url) {
+            try { URL.revokeObjectURL(videoRef.current.url); } catch {}
+          }
+          const url = URL.createObjectURL(blob);
+          videoRef.current = { blob, url };
+          patchStep('render', { status: 'done', detail: `${(blob.size / 1024 / 1024).toFixed(1)} MB MP4 ready` });
+          toast.success('✓ Intro video ready — download click karo');
+        } catch (e: any) {
+          console.error('Intro render error:', e);
+          patchStep('render', { status: 'failed', error: e?.message || 'Render failed' });
+          setRunning(false);
+          return;
+        }
+      }
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!videoRef.current) return;
+    const a = document.createElement('a');
+    a.href = videoRef.current.url;
+    a.download = `intro-${Date.now()}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const allDone = STEP_ORDER.every(k => steps[k].status === 'done');
+  const allPending = STEP_ORDER.every(k => steps[k].status === 'pending');
+  const startedAny = !allPending;
+
+  return (
+    <div style={{
+      borderRadius: 12,
+      border: '1px solid rgba(168,85,247,0.25)',
+      background: 'linear-gradient(135deg, rgba(168,85,247,0.06), rgba(124,58,237,0.04))',
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10,
+          background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 20, flexShrink: 0 }}>🎤</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>
+            Optional Intro Video <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>(separate MP4 download)</span>
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1, wordBreak: 'break-word' }}>
+            {selectionLabel ? <>From <b style={{ color: '#c4b5fd' }}>{selectionLabel}</b> → </> : null}
+            "In this clip {detectedHost || podcastHost || 'host'}{podcastGuests?.[0] ? ` and ${podcastGuests[0]}` : ''} talk about…" → audio → 1080p MP4
+          </div>
+        </div>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{open ? '▾' : '▸'}</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: '4px 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Generate button — visible when nothing has started yet OR when allDone (to regenerate) */}
+          {(allPending || allDone) && (
+            <button
+              onClick={() => runFrom('text')}
+              disabled={running || !segments.length}
+              style={{
+                padding: '11px', borderRadius: 10, border: 'none',
+                background: running ? 'rgba(168,85,247,0.4)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
+                color: '#fff', fontSize: 13, fontWeight: 800,
+                cursor: running ? 'default' : 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: !segments.length ? 0.4 : 1,
+              }}
+            >
+              {running
+                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Pipeline chal raha hai…</>
+                : allDone ? '🔁 Re-generate Intro' : '🎤 Generate Intro'}
+            </button>
+          )}
+
+          {/* Steps panel — shown once pipeline has started */}
+          {startedAny && (
+            <div style={{
+              borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(0,0,0,0.3)', padding: 8, display: 'flex', flexDirection: 'column', gap: 6,
+            }}>
+              {INTRO_STEPS.map((s, i) => {
+                const st = steps[s.key];
+                const icon =
+                  st.status === 'done' ? '✓' :
+                  st.status === 'failed' ? '✗' :
+                  st.status === 'running' ? '⋯' : '○';
+                const color =
+                  st.status === 'done' ? '#86efac' :
+                  st.status === 'failed' ? '#fca5a5' :
+                  st.status === 'running' ? '#fde68a' : 'rgba(255,255,255,0.3)';
+                return (
+                  <div key={s.key} style={{
+                    padding: '6px 8px', borderRadius: 7,
+                    background: st.status === 'running' ? 'rgba(253,230,138,0.06)'
+                              : st.status === 'failed'  ? 'rgba(239,68,68,0.06)'
+                              : st.status === 'done'    ? 'rgba(34,197,94,0.05)'
+                              : 'transparent',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(255,255,255,0.06)', color, fontSize: 11, fontWeight: 800,
+                      }}>
+                        {st.status === 'running'
+                          ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                          : icon}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: st.status === 'pending' ? 'rgba(255,255,255,0.4)' : '#fff', wordBreak: 'break-word' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.35)', marginRight: 5 }}>{i + 1}.</span>
+                        {s.label}
+                      </span>
+                      {st.status === 'failed' && (
+                        <button
+                          onClick={() => runFrom(s.key)}
+                          disabled={running}
+                          style={{
+                            flexShrink: 0, whiteSpace: 'nowrap',
+                            padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(252,165,165,0.4)',
+                            background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 10, fontWeight: 700,
+                            cursor: running ? 'default' : 'pointer', fontFamily: 'inherit',
+                          }}
+                        >↻ Retry</button>
+                      )}
+                    </div>
+                    {st.detail && (
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginLeft: 26, marginTop: 2 }}>
+                        {st.detail}
+                      </div>
+                    )}
+                    {st.error && (
+                      <div style={{ fontSize: 10, color: '#fca5a5', marginLeft: 26, marginTop: 2 }}>
+                        ⚠ {st.error}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Intro text preview */}
+          {introText && (
+            <div style={{
+              padding: '8px 10px', borderRadius: 8,
+              background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)',
+            }}>
+              <div style={{ fontSize: 9, color: 'rgba(196,181,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                Generated Intro
+              </div>
+              <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, fontStyle: 'italic' }}>
+                "{introText}"
+              </div>
+            </div>
+          )}
+
+          {/* Download button */}
+          {allDone && videoRef.current && (
+            <button
+              onClick={handleDownload}
+              style={{
+                padding: '11px', borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg,#10b981,#059669)',
+                color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <Download size={14} /> Download Intro MP4
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── PodcastAnalysisFlow ─────────────────────────────────────────────────────
+
+type PodcastVariant = 'adaptive' | 'funny' | 'friendly' | 'clip_take';
 
 interface PodcastFlowProps {
   sel: { emoji: string; label: string; desc: string };
+  variant: PodcastVariant;
   onChangeStyle: () => void;
   generating: boolean;
   onGenerate: (args: {
@@ -299,6 +872,12 @@ interface PodcastFlowProps {
     criticName: string;
     extraFocus: string;
     useGrounding: boolean;
+    variant: PodcastVariant;
+    // Clip Reaction extras (only used when variant === 'clip_take')
+    analystName?: string;
+    personInClip?: string;
+    actionVerb?: string;
+    topicHeading?: string;
   }) => Promise<void>;
 }
 
@@ -319,12 +898,12 @@ const parseTsInput = (txt: string): number | null => {
   return parts[0];
 };
 
-const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, generating, onGenerate }) => {
+const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChangeStyle, generating, onGenerate }) => {
   const [phase, setPhase] = useState<'url' | 'cuts' | 'chapters' | 'ready'>('url');
   const [podcastUrl, setPodcastUrl] = useState('');
   const [podcastTitle, setPodcastTitle] = useState('');
-  const [supporterName, setSupporterName] = useState('Aarav');
-  const [criticName, setCriticName] = useState('Neha');
+  const [supporterName, setSupporterName] = useState('Sam');
+  const [criticName, setCriticName] = useState('Alex');
   const [useGrounding, setUseGrounding] = useState(true);
   const [extraFocus, setExtraFocus] = useState('');
 
@@ -335,6 +914,11 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
   const [podcastHost, setPodcastHost] = useState('');
   const [podcastGuests, setPodcastGuests] = useState<string[]>([]);
   const [detectingSpeakers, setDetectingSpeakers] = useState(false);
+
+  // Clip Reaction: only the analyst (reacting speaker) name is user-input.
+  // Person-in-clip / verb / topic are auto-detected from the transcript by Gemini.
+  const isClip = variant === 'clip_take';
+  const [analystName, setAnalystName] = useState('Sam');
 
   const [cuts, setCuts] = useState<PodcastCutRange[]>([]);
   const [cutStartTxt, setCutStartTxt] = useState('');
@@ -447,19 +1031,35 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
 
   // ── 4. Final generate ──────────────────────────────────────────────────────
   const handleGenerateFinal = async () => {
-    if (!selectedIdxs.length) {
-      toast.error('Pehle ek (ya do) chapter select karo');
-      return;
-    }
-    if (!supporterName.trim() || !criticName.trim()) {
+    if (isClip) {
+      if (!analystName.trim()) { toast.error('Speaker (analyst) ka naam dalo'); return; }
+      // person-in-clip / verb / topic → auto-detected by Gemini from transcript
+    } else if (!supporterName.trim() || !criticName.trim()) {
       toast.error('Dono speaker names dalo');
       return;
     }
-    const ordered = [...selectedIdxs].sort((a, b) => a - b);
-    const picked = ordered.map(i => chapters[i]).filter(Boolean);
-    if (!picked.length) {
-      toast.error('Selected chapters invalid hain');
-      return;
+    let picked: PodcastChapter[];
+    if (selectedIdxs.length === 0) {
+      // No chapter selected → use the whole transcript as one synthetic chapter
+      if (!segments.length) {
+        toast.error('Transcript empty hai');
+        return;
+      }
+      picked = [{
+        startSec: 0,
+        endSec: totalSec,
+        title: `${podcastTitle.trim() || 'Full Podcast'} — Full Episode`,
+        startQuote: '',
+        endQuote: '',
+        summary: 'Full episode — covering all main topics of the podcast.',
+      }];
+    } else {
+      const ordered = [...selectedIdxs].sort((a, b) => a - b);
+      picked = ordered.map(i => chapters[i]).filter(Boolean);
+      if (!picked.length) {
+        toast.error('Selected chapters invalid hain');
+        return;
+      }
     }
     await onGenerate({
       podcastUrl: podcastUrl.trim(),
@@ -472,6 +1072,11 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
       criticName: criticName.trim(),
       extraFocus: extraFocus.trim(),
       useGrounding,
+      variant,
+      ...(isClip ? {
+        analystName: analystName.trim(),
+        // person/verb/topic are auto-detected — left undefined so Gemini extracts
+      } : {}),
     });
   };
 
@@ -546,7 +1151,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
             <div>
               <div style={{ fontSize: 10, color: 'rgba(86,239,140,0.7)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>👍 Supporter</div>
               <input
@@ -614,8 +1219,8 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
                 {detectingSpeakers ? 'Detect ho raha hai…' : 'Auto-detected — fix kar sakte ho'}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 9, color: 'rgba(147,197,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Host</div>
                 <input
                   value={podcastHost}
@@ -628,7 +1233,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
                   }}
                 />
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 9, color: 'rgba(147,197,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Guest(s) — comma separated</div>
                 <input
                   value={podcastGuests.join(', ')}
@@ -648,17 +1253,19 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
           </div>
 
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-            <b style={{ color: '#fde68a' }}>Optional:</b> Ads, intros, ya boring parts cut karo (M:SS format). Skip bhi kar sakte ho — direct chapters analyze karo.
+            <b style={{ color: '#fde68a' }}>Optional:</b> Ads, intros, ya boring parts cut karo (M:SS format). Kuch nahi dalna ho to direct <b>🧠 Analyze Chapters</b> daba do — pura video use hoga.
+            <br />Ya <b style={{ color: '#c4b5fd' }}>Skip Chapter</b> dabake seedha Step 4 par jaa ke full-video deep analysis bana sakte ho.
           </div>
 
           {/* Add cut */}
           <div style={{ borderRadius: 10, border: '1px dashed rgba(255,255,255,0.15)', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: '100%' }}>
               <input
                 value={cutStartTxt}
                 onChange={e => setCutStartTxt(e.target.value)}
                 placeholder="Start (e.g. 2:15)"
                 style={{
+                  flex: '1 1 120px', minWidth: 0,
                   padding: '8px 10px', borderRadius: 7, boxSizing: 'border-box',
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                   color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'monospace',
@@ -669,6 +1276,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
                 onChange={e => setCutEndTxt(e.target.value)}
                 placeholder="End (e.g. 4:30)"
                 style={{
+                  flex: '1 1 120px', minWidth: 0,
                   padding: '8px 10px', borderRadius: 7, boxSizing: 'border-box',
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                   color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'monospace',
@@ -677,6 +1285,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
               <button
                 onClick={handleAddCut}
                 style={{
+                  flex: '0 0 auto', whiteSpace: 'nowrap',
                   padding: '8px 12px', borderRadius: 7, border: 'none',
                   background: 'rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: 12, fontWeight: 700,
                   cursor: 'pointer', fontFamily: 'inherit',
@@ -712,16 +1321,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-            <button
-              onClick={() => { setCuts([]); handleAnalyze([]); }}
-              disabled={analyzing}
-              style={{
-                padding: '11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, fontWeight: 600,
-                cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
-              }}
-            >⏭ Skip Cuts (Pure Video)</button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
@@ -737,17 +1337,27 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
                 ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gemini…</>
                 : <>🧠 Analyze Chapters</>}
             </button>
+            <button
+              onClick={() => { setChapters([]); setSelectedIdxs([]); setPhase('ready'); }}
+              disabled={analyzing}
+              style={{
+                padding: '11px', borderRadius: 10, border: '1px solid rgba(168,85,247,0.3)',
+                background: 'rgba(168,85,247,0.1)', color: '#c4b5fd', fontSize: 12, fontWeight: 700,
+                cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
+              }}
+            >⏩ Skip Chapter → Step 4 (Full Video)</button>
           </div>
         </>
       )}
 
-      {/* ── PHASE: CHAPTERS ── */}
+      {/* ── PHASE: CHAPTERS (selection only) ── */}
       {phase === 'chapters' && (
         <>
           <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd' }}>📚 {chapters.length} Chapters Detected</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-              Ek ya do chapter select karo ({selectedIdxs.length}/2 selected) — 2 chunte ho to dono ko mila ke combined analysis banegi
+              Ek ya do chapter select karo ({selectedIdxs.length}/2 selected) — 2 chunte ho to combined analysis banegi.
+              <br />Koi select nahi karoge to <b style={{ color: '#c4b5fd' }}>puri transcript</b> par deep analysis banegi.
             </div>
           </div>
 
@@ -776,8 +1386,8 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 10, fontWeight: 800,
                     }}>{isSel ? `✓${selOrder + 1}` : i + 1}</div>
-                    <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#fff' }}>{c.title}</div>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: '#fff', wordBreak: 'break-word' }}>{c.title}</div>
+                    <span style={{ flexShrink: 0, fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
                       {fmtSec(dur)}
                     </span>
                   </div>
@@ -804,23 +1414,169 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
             })}
           </div>
 
-          {/* Speakers banner */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            <div style={{
-              flex: 1, padding: '7px 10px', borderRadius: 8,
-              background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)',
-            }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>SUPPORTER</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>{supporterName}</div>
+          {/* Nav buttons */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <button
+              onClick={() => setPhase('cuts')}
+              style={{
+                flex: '0 0 auto', whiteSpace: 'nowrap',
+                padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >← Cuts</button>
+            <button
+              onClick={() => setPhase('ready')}
+              style={{
+                flex: '1 1 200px', minWidth: 0,
+                padding: '13px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg,#a855f7,#7c3aed)',
+                color: '#fff', fontSize: 13, fontWeight: 800,
+                cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {selectedIdxs.length === 0
+                ? 'Next → Use Full Transcript'
+                : selectedIdxs.length === 2
+                  ? 'Next → Generate (2 Chapters)'
+                  : 'Next → Generate Script'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ── PHASE: READY (Step 4 — Generate Script) ── */}
+      {phase === 'ready' && (
+        <>
+          <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd' }}>
+              ✨ Step 4 — Generate Script
             </div>
-            <div style={{
-              flex: 1, padding: '7px 10px', borderRadius: 8,
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-            }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>CRITIC</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>{criticName}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.45 }}>
+              {selectedIdxs.length === 0
+                ? '0 chapters selected → puri transcript par deep analysis banegi'
+                : selectedIdxs.length === 2
+                  ? `${selectedIdxs.length} chapters selected — combined deep analysis banegi`
+                  : '1 chapter selected — deep analysis script banegi'}
+              <br />Generate ke baad Script Editor khulega — wahaan review/edit karke aap Phone Studio open kar sakte ho.
             </div>
           </div>
+
+          {/* Selected chapter summary (or full-transcript card if no selection) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {selectedIdxs.length === 0 ? (
+              <div style={{
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)',
+              }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                    background: '#a855f7', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12,
+                  }}>∞</div>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Full Episode (whole transcript)</div>
+                  <span style={{ flexShrink: 0, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)' }}>
+                    {fmtSec(0)}–{fmtSec(totalSec)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              [...selectedIdxs].sort((a, b) => a - b).map((idx, n) => {
+                const c = chapters[idx];
+                if (!c) return null;
+                return (
+                  <div key={idx} style={{
+                    padding: '8px 10px', borderRadius: 8,
+                    background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)',
+                  }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                        background: '#a855f7', color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 10, fontWeight: 800,
+                      }}>{n + 1}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</div>
+                      <span style={{ flexShrink: 0, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)' }}>
+                        {fmtSec(c.startSec)}–{fmtSec(c.endSec)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Speakers banner (or Clip Reaction single-speaker form) */}
+          {isClip ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)' }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>🎥 Clip Reaction — 1 Speaker</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>
+                  Ek speaker clip ko introduce karega → apna take dega → takeaways. Total ~5 min.
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(168,85,247,0.85)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>🎙️ Analyst (speaker)</div>
+                <input
+                  value={analystName}
+                  onChange={e => setAnalystName(e.target.value)}
+                  placeholder="e.g. Sam"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              {/* Auto-detect notice — person / verb / topic come from Gemini's transcript pass */}
+              <div style={{
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.25)',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#86efac', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  ✨ Auto-detect ON
+                  {detectingSpeakers && <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.45 }}>
+                  Gemini transcript se khud nikalega: <b style={{ color: '#fff' }}>kaun bol raha hai</b>, <b style={{ color: '#fff' }}>kya kar raha hai</b> (talks about / explains / etc.), aur <b style={{ color: '#fff' }}>topic</b> — koi field manually bharne ki zaroorat nahi.
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 5, fontStyle: 'italic' }}>
+                  Intro line ban jayegi: <span style={{ color: 'rgba(255,255,255,0.6)' }}>"In this clip &lt;person&gt; &lt;verb&gt; about &lt;topic&gt;. Let's watch — then I'll give my take."</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{
+                flex: 1, padding: '7px 10px', borderRadius: 8,
+                background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)',
+              }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>SUPPORTER</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>{supporterName}</div>
+              </div>
+              <div style={{
+                flex: 1, padding: '7px 10px', borderRadius: 8,
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+              }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>CRITIC</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>{criticName}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Host/Guest mini-summary (so user sees what'll be referenced) */}
+          {(podcastHost || podcastGuests.length > 0) && (
+            <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>🎙️ Podcast People (analysts inhe naam se refer karenge)</div>
+              <div style={{ fontSize: 11, color: '#93c5fd', marginTop: 2 }}>
+                {podcastHost && <><b>Host:</b> {podcastHost}</>}
+                {podcastHost && podcastGuests.length > 0 && ' · '}
+                {podcastGuests.length > 0 && <><b>Guest:</b> {podcastGuests.join(', ')}</>}
+              </div>
+            </div>
+          )}
 
           {/* Extra focus */}
           <div>
@@ -838,6 +1594,30 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
               }}
             />
           </div>
+
+          {/* Optional Intro Video — generated from SELECTED chapters only,
+              so the topic in the intro line matches what the user picked. */}
+          <IntroFlow
+            segments={segments}
+            podcastTitle={podcastTitle}
+            podcastHost={podcastHost}
+            podcastGuests={podcastGuests}
+            selectedRanges={
+              selectedIdxs.length === 0
+                ? [{ startSec: 0, endSec: totalSec }]
+                : [...selectedIdxs].sort((a, b) => a - b)
+                    .map(i => chapters[i])
+                    .filter(Boolean)
+                    .map(c => ({ startSec: c.startSec, endSec: c.endSec }))
+            }
+            selectionLabel={
+              selectedIdxs.length === 0
+                ? 'full episode'
+                : selectedIdxs.length === 1
+                  ? '1 selected chapter'
+                  : `${selectedIdxs.length} selected chapters`
+            }
+          />
 
           {/* Grounding toggle */}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', cursor: 'pointer' }}>
@@ -860,33 +1640,35 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
             </div>
           </label>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8 }}>
+          {/* Generate / Done buttons */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button
-              onClick={() => setPhase('cuts')}
+              onClick={() => setPhase('chapters')}
               disabled={generating}
               style={{
+                flex: '0 0 auto', whiteSpace: 'nowrap',
                 padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
                 background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600,
                 cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit',
               }}
-            >← Cuts</button>
+            >← Chapters</button>
             <button
               onClick={handleGenerateFinal}
-              disabled={generating || !selectedIdxs.length}
+              disabled={generating}
               style={{
+                flex: '1 1 200px', minWidth: 0,
                 padding: '13px', borderRadius: 12, border: 'none',
                 background: generating ? 'rgba(168,85,247,0.4)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
                 color: '#fff', fontSize: 13, fontWeight: 800,
                 cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: !selectedIdxs.length ? 0.4 : 1,
               }}
             >
               {generating
                 ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating Deep Analysis…</>
-                : selectedIdxs.length === 2
-                  ? <>✨ Generate Combined Analysis (2 Chapters)</>
-                  : <>✨ Generate Deep Analysis Script</>}
+                : selectedIdxs.length === 0
+                  ? <>✅ Generate Full-Transcript Script → Script Editor</>
+                  : <>✅ Generate Script → Script Editor</>}
             </button>
           </div>
         </>
@@ -919,6 +1701,11 @@ interface GenPanelProps {
     criticName: string;
     extraFocus: string;
     useGrounding: boolean;
+    variant: PodcastVariant;
+    analystName?: string;
+    personInClip?: string;
+    actionVerb?: string;
+    topicHeading?: string;
   }) => Promise<void>;
 }
 
@@ -930,7 +1717,10 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
   phones, generating, onGenerate, onPodcastGenerate,
 }) => {
   const sel = CONVO_STYLES.find(s => s.id === genStyle)!;
-  const isPodcastAnalysis = genStyle === 'podcast_analysis';
+  const isPodcastAnalysis = genStyle === 'podcast_analysis'
+    || genStyle === 'podcast_analysis_funny'
+    || genStyle === 'podcast_analysis_friendly'
+    || genStyle === 'clip_reaction';
 
   return (
     <div
@@ -1023,6 +1813,12 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
       {genStep === 2 && isPodcastAnalysis && (
         <PodcastAnalysisFlow
           sel={sel}
+          variant={
+            genStyle === 'podcast_analysis_funny' ? 'funny'
+              : genStyle === 'podcast_analysis_friendly' ? 'friendly'
+                : genStyle === 'clip_reaction' ? 'clip_take'
+                  : 'adaptive'
+          }
           onChangeStyle={() => setGenStep(1)}
           onGenerate={onPodcastGenerate}
           generating={generating}
@@ -1224,11 +2020,15 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
 
 interface Props {
   mainScript: DebateSegment[];
+  /** Embedded mode: render ONLY the script-generator UI (used inside DebateInput's "New Phone Studio" tab). */
+  embedded?: boolean;
+  /** Fired when the embedded generator finishes — caller commits the script (and routes to PHONE_STUDIO). */
+  onGeneratorComplete?: (turns: ScriptTurn[], phones: PhoneConfig[]) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
+const PhoneConvoStudio: React.FC<Props> = ({ mainScript, embedded = false, onGeneratorComplete }) => {
   const [phones, setPhones]   = useState<PhoneConfig[]>([]);
   const [script, setScript]   = useState<ScriptTurn[]>([]);
   const [bg, setBg]           = useState('#f0f4f8');
@@ -1275,6 +2075,15 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const audioSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   // Pre-fetched raw ArrayBuffer cache (keyed by URL) so play starts instantly
   const audioCacheRef  = useRef<Map<string, ArrayBuffer>>(new Map());
+  // AnalyserNode that taps the playback chain so the renderer can drive
+  // its z-pulse / VU meter from the actual audio.
+  const analyserRef    = useRef<AnalyserNode | null>(null);
+  const levelLoopRef   = useRef<number | null>(null);
+  const smoothedLevelRef = useRef(0);
+
+  // Visual toggles (persist on the renderer state)
+  const [vuMeterOn, setVuMeterOn] = useState(false);
+  const [phoneZPulseOverride, setPhoneZPulseOverride] = useState<boolean | null>(null);
 
   // Chapters
   const [chapters, setChapters] = useState<{ startMs: number; endMs: number; title: string }[]>([]);
@@ -1338,7 +2147,10 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
       background: subtitleBg,
       textColor: '#ffffff',
     },
-  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize]);
+    vuMeter: vuMeterOn,
+    // Default: z-pulse on for 1 speaker, off for 2+. User can override.
+    phoneZPulse: phoneZPulseOverride ?? (phones.length === 1),
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -1404,6 +2216,13 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
   const killAudio = useCallback(() => {
     audioSourcesRef.current.forEach(s => { try { s.stop(0); } catch {} });
     audioSourcesRef.current = [];
+    if (levelLoopRef.current !== null) {
+      cancelAnimationFrame(levelLoopRef.current);
+      levelLoopRef.current = null;
+    }
+    analyserRef.current = null;
+    smoothedLevelRef.current = 0;
+    if (rendererRef.current) rendererRef.current.audioLevel = 0;
     if (audioCtxRef.current) {
       try { audioCtxRef.current.close(); } catch {}
       audioCtxRef.current = null;
@@ -1419,6 +2238,11 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
 
     const actx = new AudioContext();
     audioCtxRef.current = actx;
+    const analyser = actx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.6;
+    analyser.connect(actx.destination);
+    analyserRef.current = analyser;
 
     const buffers = await Promise.all(
       script.map(t => {
@@ -1482,10 +2306,38 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
 
       const src = actx.createBufferSource();
       src.buffer = buf;
-      src.connect(actx.destination);
+      src.connect(analyser);
       src.start(scheduleAtSec, audioOffsetSec);
       audioSourcesRef.current.push(src);
     });
+
+    // Start the level-meter loop. Reads RMS from the analyser, smooths it,
+    // writes to the renderer's audioLevel. Stops via cancelAnimationFrame on
+    // killAudio or when the AudioContext is closed.
+    const buf = new Uint8Array(analyser.fftSize);
+    const tick = () => {
+      const a = analyserRef.current;
+      const r = rendererRef.current;
+      if (!a || !r || audioCtxRef.current !== actx) {
+        levelLoopRef.current = null;
+        return;
+      }
+      a.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      const raw = Math.min(1, Math.pow(rms * 4.5, 0.75));
+      const cur = smoothedLevelRef.current;
+      const alpha = raw > cur ? 0.55 : 0.18;
+      const next = cur + (raw - cur) * alpha;
+      smoothedLevelRef.current = next;
+      r.audioLevel = next;
+      levelLoopRef.current = requestAnimationFrame(tick);
+    };
+    levelLoopRef.current = requestAnimationFrame(tick);
 
     return actx;
   }, [script, killAudio]);
@@ -1656,6 +2508,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript }) => {
         height: H,
         renderCallback: (_time, _level, _vid, offCtx) => {
           exportRenderer.currentTime = _time * 1000;
+          exportRenderer.audioLevel = _level;
           exportRenderer.drawFrame();
           offCtx.drawImage(exportCanvas, 0, 0, W, H);
         },
@@ -1856,9 +2709,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         };
       });
 
-      setScript(newScript);
-      setTab('visual');
-      toast.success(`✓ ${newScript.length} turns generate ho gaye!`);
+      if (embedded && onGeneratorComplete) {
+        onGeneratorComplete(newScript, newPhones);
+        toast.success(`✓ ${newScript.length} turns generate ho gaye! Script Editor me jaa raha hai…`);
+      } else {
+        setScript(newScript);
+        setTab('visual');
+        toast.success(`✓ ${newScript.length} turns generate ho gaye!`);
+      }
 
     } catch (err: any) {
       console.error('Generate error:', err);
@@ -1881,9 +2739,64 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
     criticName: string;
     extraFocus: string;
     useGrounding: boolean;
+    variant: PodcastVariant;
+    analystName?: string;
+    personInClip?: string;
+    actionVerb?: string;
+    topicHeading?: string;
   }) => {
     setGenerating(true);
     try {
+      // ── Clip Reaction (single-speaker) ───────────────────────────────────
+      if (args.variant === 'clip_take') {
+        toast.info('Gemini clip reaction script bana raha hai…');
+        const turns = await generateClipTakeScript({
+          segments: args.segments,
+          chapters: args.chapters,
+          podcastTitle: args.podcastTitle,
+          personInClip: args.personInClip || args.podcastHost || 'the speaker',
+          actionVerb: args.actionVerb || 'talks about',
+          topicHeading: args.topicHeading || 'this topic',
+          analystName: args.analystName || 'Sam',
+          extraFocus: args.extraFocus || undefined,
+          useGoogleGrounding: args.useGrounding,
+        });
+        if (!turns.length) throw new Error('Clip reaction script empty hai');
+
+        const analyst = args.analystName || 'Sam';
+        const phoneId = speakerToPhoneId(analyst);
+        const purplePreset = PRESET_COLORS.find(p => p.label === 'Purple') ?? PRESET_COLORS[0];
+        const newPhones: PhoneConfig[] = [{
+          id: phoneId, name: analyst,
+          style: 'aurora', color: purplePreset.color, screenColor: purplePreset.screen,
+          rotation: 0, showControls: true, battery: '87%',
+        }];
+        const newScript: ScriptTurn[] = turns.map((t, i) => {
+          const estDur = Math.max(3000, t.text.length * 72);
+          return {
+            id: `clip_${i}_${Date.now()}`,
+            phoneId,
+            text: t.text,
+            isNarrator: false,
+            durationMs: estDur,
+            audioUrl: undefined,
+            wordTimings: estimateWordTimings(t.text, estDur / 1000),
+          };
+        });
+
+        if (embedded && onGeneratorComplete) {
+          onGeneratorComplete(newScript, newPhones);
+          toast.success(`✓ ${newScript.length} turns clip-reaction ready!`);
+        } else {
+          setPhones(newPhones);
+          setScript(newScript);
+          setTab('visual');
+          toast.success(`✓ ${newScript.length} turns ka clip-reaction script ready hai!`);
+        }
+        return;
+      }
+
+      // ── Standard 2-speaker Deep Analysis ─────────────────────────────────
       toast.info(args.chapters.length > 1
         ? `Gemini ${args.chapters.length} chapters ki combined analysis bana raha hai…`
         : 'Gemini chapter deep-analyze kar raha hai…');
@@ -1897,6 +2810,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         criticName: args.criticName,
         extraFocus: args.extraFocus || undefined,
         useGoogleGrounding: args.useGrounding,
+        variant: args.variant,
       });
       if (!turns.length) throw new Error('Script empty hai');
 
@@ -1917,8 +2831,6 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           rotation: 5, showControls: true, battery: '73%',
         },
       ];
-      setPhones(newPhones);
-
       const newScript: ScriptTurn[] = turns.map((t, i) => {
         const isSupp = t.speaker.trim().toLowerCase() === args.supporterName.trim().toLowerCase();
         const phoneId = isSupp ? supporterPhoneId : criticPhoneId;
@@ -1934,9 +2846,15 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         };
       });
 
-      setScript(newScript);
-      setTab('visual');
-      toast.success(`✓ ${newScript.length} turns ka deep-analysis script ready hai!`);
+      if (embedded && onGeneratorComplete) {
+        onGeneratorComplete(newScript, newPhones);
+        toast.success(`✓ ${newScript.length} turns deep-analysis ready! Script Editor me jaa raha hai…`);
+      } else {
+        setPhones(newPhones);
+        setScript(newScript);
+        setTab('visual');
+        toast.success(`✓ ${newScript.length} turns ka deep-analysis script ready hai!`);
+      }
     } catch (err: any) {
       console.error('Podcast generate error:', err);
       toast.error(`Generate failed: ${err.message}`);
@@ -1945,14 +2863,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
     }
   }, []);
 
-  // ── No script fallback → show generator ───────────────────────────────────
+  // ── Embedded mode: render ONLY the script generator (used inside DebateInput's "New Phone Studio" tab) ──
 
-  if (!mainScript.length && !script.length) {
+  if (embedded) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: '#050507', color: '#e0e0e0', fontFamily: 'inherit' }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <MonitorSmartphone size={18} color="#ef4444" />
-          <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Phone Studio — Script Generator</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>New Phone Studio — Script Generator</span>
         </div>
         <ScriptGeneratorPanel
           genStep={genStep} setGenStep={setGenStep}
@@ -1967,6 +2885,34 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           onGenerate={handleGenerate}
           onPodcastGenerate={handlePodcastGenerate}
         />
+      </div>
+    );
+  }
+
+  // ── Standalone PHONE_STUDIO state with no script yet → show empty-state placeholder.
+  //    Generator UI lives in DebateInput "New Phone Studio" tab now — Phone Studio always shows main UI here.
+
+  if (!mainScript.length && !script.length) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: '#050507', color: '#e0e0e0', fontFamily: 'inherit' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <MonitorSmartphone size={18} color="#ef4444" />
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Phone Studio</span>
+        </div>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24, textAlign: 'center',
+        }}>
+          <div style={{ maxWidth: 320 }}>
+            <div style={{ fontSize: 48, marginBottom: 14 }}>📱</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
+              Koi script load nahi hua
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.55 }}>
+              Input page pe jaa ke <b style={{ color: '#fca5a5' }}>“New Phone Studio”</b> tab choose karo — wahaan script generate karne ke baad ye studio automatically open ho jayega.
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -2194,6 +3140,64 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                         />
                       </div>
                     </div>
+
+                    {/* VU meter toggle (default OFF) */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer' }}>
+                      <div
+                        onClick={() => setVuMeterOn(v => !v)}
+                        style={{
+                          width: 34, height: 18, borderRadius: 50, position: 'relative', cursor: 'pointer',
+                          background: vuMeterOn ? '#22c55e' : 'rgba(255,255,255,0.12)', transition: 'background 0.2s', flexShrink: 0,
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%',
+                          background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                          left: vuMeterOn ? 18 : 2,
+                        }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>📊 VU Meter</div>
+                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Audio-reactive bar beside active phone</div>
+                      </div>
+                    </label>
+
+                    {/* Z-pulse toggle (default = single-speaker auto) */}
+                    {(() => {
+                      const effectiveOn = phoneZPulseOverride ?? (phones.length === 1);
+                      const isDefault = phoneZPulseOverride === null;
+                      return (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer' }}>
+                          <div
+                            onClick={() => setPhoneZPulseOverride(effectiveOn ? false : true)}
+                            style={{
+                              width: 34, height: 18, borderRadius: 50, position: 'relative', cursor: 'pointer',
+                              background: effectiveOn ? '#a855f7' : 'rgba(255,255,255,0.12)', transition: 'background 0.2s', flexShrink: 0,
+                            }}
+                          >
+                            <div style={{
+                              position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%',
+                              background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                              left: effectiveOn ? 18 : 2,
+                            }} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>🌀 Z-Pulse (voice depth)</div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                              {isDefault
+                                ? (phones.length === 1 ? 'Default ON (1 speaker)' : 'Default OFF (2+ speakers)')
+                                : 'Manual override active'}
+                            </div>
+                          </div>
+                          {!isDefault && (
+                            <button
+                              onClick={e => { e.preventDefault(); setPhoneZPulseOverride(null); }}
+                              style={{ fontSize: 9, padding: '3px 7px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: 'inherit' }}
+                            >reset</button>
+                          )}
+                        </label>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -2251,10 +3255,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       <input
                         value={phone.name}
                         onChange={e => updatePhone(phone.id, { name: e.target.value })}
-                        style={{ flex: 1, background: 'transparent', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }}
+                        style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }}
                         placeholder="Speaker name..."
                       />
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+                      <span style={{ flexShrink: 0, fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
                         {script.filter(t => t.phoneId === phone.id).length} turns
                       </span>
                     </div>
@@ -2440,7 +3444,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 </div>
 
                 {/* Preset colors */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
                   {BG_OPTIONS.map(opt => {
                     const sel = !bgImageUrl && bg === opt.value;
                     const preview = opt.value.startsWith('linear:')
@@ -2528,8 +3532,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
                 {/* Sync mode indicator */}
                 {(() => {
-                  const hasRealSync = script.some(t => t.wordTimings && t.wordTimings.length > 0);
-                  const realCount   = script.filter(t => t.wordTimings && t.wordTimings.length > 0).length;
+                  // Estimated wordTimings get set when the script is generated, BEFORE audio/STT.
+                  // Real STT sync writes phraseTimings — that's the canonical "actually synced" marker.
+                  const hasRealSync = script.some(t => (t as any).phraseTimings && (t as any).phraseTimings.length > 0);
+                  const realCount   = script.filter(t => (t as any).phraseTimings && (t as any).phraseTimings.length > 0).length;
                   return (
                     <div style={{ padding: '9px 12px', borderRadius: 10, background: hasRealSync ? 'rgba(34,197,94,0.07)' : 'rgba(251,191,36,0.07)', border: `1px solid ${hasRealSync ? 'rgba(34,197,94,0.2)' : 'rgba(251,191,36,0.2)'}`, fontSize: 11, lineHeight: 1.6 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>

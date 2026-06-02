@@ -398,70 +398,82 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       targetSegments.forEach(seg => { next[seg.id] = 'loading'; });
       return next;
     });
+
+    const BATCH_SIZE = 8;
     let completedCount = 0;
+    let rateLimitHit = false;
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-    for (let i = 0; i < targetSegments.length; i++) {
-      const seg = targetSegments[i];
-      const voice = voices[seg.speaker as keyof typeof voices];
-      if (!voice) {
-        console.error(`No voice selected for ${seg.speaker}`);
-        setSegmentStatus(prev => ({ ...prev, [seg.id]: 'error' }));
-        completedCount++;
-        setProgress((completedCount / targetSegments.length) * 100);
-        continue;
-      }
-      try {
-        let audioUrl: string;
-        if (ttsProvider === 'elevenlabs') {
-          const res = await generateElevenLabsSpeech(seg.text, voice);
-          audioUrl = res.audioUrl;
-        } else if (ttsProvider === 'chirp3hd') {
-          const res = await generateSpeechChirp3HD(seg.text, voice, transcriptLanguage);
-          audioUrl = res.audioUrl;
-        } else {
-          const res = await generateSpeech(seg.text, voice);
-          audioUrl = res.audioUrl;
+
+    // Process in parallel batches of 8. Each batch settles fully before the
+    // next starts so we cap concurrent TTS provider load while running ~8×
+    // faster than the previous serial-with-2s-delay loop.
+    for (let batchStart = 0; batchStart < targetSegments.length && !rateLimitHit; batchStart += BATCH_SIZE) {
+      const batch = targetSegments.slice(batchStart, batchStart + BATCH_SIZE);
+
+      await Promise.all(batch.map(async (seg) => {
+        const voice = voices[seg.speaker as keyof typeof voices];
+        if (!voice) {
+          console.error(`No voice selected for ${seg.speaker}`);
+          setSegmentStatus(prev => ({ ...prev, [seg.id]: 'error' }));
+          return;
         }
-        const audio = new Audio();
-        await new Promise<void>((resolve, reject) => {
-          const onLoad = () => {
-            audio.removeEventListener('loadedmetadata', onLoad);
-            audio.removeEventListener('error', onError);
-            resolve();
-          };
-          const onError = (e: Event) => {
-            audio.removeEventListener('loadedmetadata', onLoad);
-            audio.removeEventListener('error', onError);
-            const target = e.target as HTMLAudioElement;
-            const err = target?.error;
-            reject(new Error(`Audio failed to load: ${err?.code ?? 0} ${err?.message ?? ''}`));
-          };
-          audio.addEventListener('loadedmetadata', onLoad);
-          audio.addEventListener('error', onError);
-          audio.src = audioUrl;
-          if (audio.readyState >= 1) onLoad();
-        });
-        onUpdateScript(prev => {
-          const idx = prev.findIndex(s => s.id === seg.id);
-          if (idx === -1) return prev;
-          const newScript = [...prev];
-          const oldUrl = newScript[idx]?.audioUrl;
-          if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-          newScript[idx] = { ...newScript[idx], audioUrl, duration: audio.duration || 0 };
-          return newScript;
-        });
-        setSegmentStatus(prev => ({ ...prev, [seg.id]: 'success' }));
-      } catch (error: any) {
-        console.error(`Error generating segment ${seg.id}`, error);
-        setSegmentStatus(prev => ({ ...prev, [seg.id]: 'error' }));
-        if (error.message?.includes('429') || error.status === 'RESOURCE_EXHAUSTED' || error.message?.includes('quota')) {
-          setAudioError('Rate limit exceeded. Please wait a few moments and try again.');
-          break;
+        try {
+          let audioUrl: string;
+          if (ttsProvider === 'elevenlabs') {
+            const res = await generateElevenLabsSpeech(seg.text, voice);
+            audioUrl = res.audioUrl;
+          } else if (ttsProvider === 'chirp3hd') {
+            const res = await generateSpeechChirp3HD(seg.text, voice, transcriptLanguage);
+            audioUrl = res.audioUrl;
+          } else {
+            const res = await generateSpeech(seg.text, voice);
+            audioUrl = res.audioUrl;
+          }
+          const audio = new Audio();
+          await new Promise<void>((resolve, reject) => {
+            const onLoad = () => {
+              audio.removeEventListener('loadedmetadata', onLoad);
+              audio.removeEventListener('error', onError);
+              resolve();
+            };
+            const onError = (e: Event) => {
+              audio.removeEventListener('loadedmetadata', onLoad);
+              audio.removeEventListener('error', onError);
+              const target = e.target as HTMLAudioElement;
+              const err = target?.error;
+              reject(new Error(`Audio failed to load: ${err?.code ?? 0} ${err?.message ?? ''}`));
+            };
+            audio.addEventListener('loadedmetadata', onLoad);
+            audio.addEventListener('error', onError);
+            audio.src = audioUrl;
+            if (audio.readyState >= 1) onLoad();
+          });
+          onUpdateScript(prev => {
+            const idx = prev.findIndex(s => s.id === seg.id);
+            if (idx === -1) return prev;
+            const newScript = [...prev];
+            const oldUrl = newScript[idx]?.audioUrl;
+            if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+            newScript[idx] = { ...newScript[idx], audioUrl, duration: audio.duration || 0 };
+            return newScript;
+          });
+          setSegmentStatus(prev => ({ ...prev, [seg.id]: 'success' }));
+        } catch (error: any) {
+          console.error(`Error generating segment ${seg.id}`, error);
+          setSegmentStatus(prev => ({ ...prev, [seg.id]: 'error' }));
+          if (error?.message?.includes('429') || error?.status === 'RESOURCE_EXHAUSTED' || error?.message?.includes('quota')) {
+            rateLimitHit = true;
+            setAudioError('Rate limit exceeded. Please wait a few moments and try again.');
+          }
+        } finally {
+          completedCount++;
+          setProgress((completedCount / targetSegments.length) * 100);
         }
-      } finally {
-        completedCount++;
-        setProgress((completedCount / targetSegments.length) * 100);
-        await delay(2000);
+      }));
+
+      // Small breather between batches to be nice to the provider.
+      if (!rateLimitHit && batchStart + BATCH_SIZE < targetSegments.length) {
+        await delay(800);
       }
     }
     isGeneratingRef.current = false;
@@ -575,49 +587,73 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
 
   const handleSyncAll = async () => {
     setSyncStatus('loading');
+    const BATCH_SIZE = 8;
     let fallbackCount = 0;
+    let okCount = 0;
+    let failCount = 0;
+
+    // Sync ONLY segments that have audio. Process in parallel batches of 8 —
+    // each batch waits for all 8 STT calls to finish before starting the next,
+    // so we cap concurrent network load while still being ~8x faster than serial.
+    const targets = script.map((seg, i) => ({ seg, i })).filter(({ seg }) => !!seg.audioUrl);
+    if (!targets.length) { setSyncStatus('success'); return; }
+
     try {
-      const syncResults: Record<number, { wordTimings: any[]; phraseTimings: any[] }> = {};
-      for (let i = 0; i < script.length; i++) {
-        const seg = script[i];
-        if (!seg.audioUrl) continue;
-        try {
-          const response = await fetch(seg.audioUrl);
-          if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
-          const blob = await response.blob();
+      for (let batchStart = 0; batchStart < targets.length; batchStart += BATCH_SIZE) {
+        const batch = targets.slice(batchStart, batchStart + BATCH_SIZE);
 
-          let wordTimings: { word: string; start: number; end: number }[];
-          try {
-            wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
-          } catch (cloudErr: any) {
-            console.warn(`Segment ${i}: Cloud STT unavailable, using offline fallback`, cloudErr);
-            fallbackCount++;
-            const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
-            wordTimings = generateProportionalWordTimings(seg.text, duration);
-          }
-
-          const phraseTimings = buildPhrases(wordTimings);
-          syncResults[i] = { wordTimings, phraseTimings };
-        } catch (err) {
-          console.error(`Failed to sync segment ${i}`, err);
-        }
-        await new Promise(r => setTimeout(r, 200));
-      }
-      onUpdateScript(prev => {
-        const newScript = [...prev];
-        Object.keys(syncResults).forEach(key => {
-          const idx = parseInt(key);
-          newScript[idx] = {
-            ...newScript[idx],
-            wordTimings: syncResults[idx].wordTimings,
-            phraseTimings: syncResults[idx].phraseTimings,
-          };
+        // Mark this batch as syncing (per-segment spinner)
+        setSyncingSegments(prev => {
+          const next = { ...prev };
+          batch.forEach(({ seg }) => { next[seg.id] = true; });
+          return next;
         });
-        return newScript;
-      });
-      setSyncStatus('success');
+
+        await Promise.all(batch.map(async ({ seg, i }) => {
+          try {
+            const response = await fetch(seg.audioUrl!);
+            if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+            const blob = await response.blob();
+
+            let wordTimings: { word: string; start: number; end: number }[];
+            try {
+              wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
+            } catch (cloudErr: any) {
+              console.warn(`Segment ${i}: Cloud STT unavailable, using offline fallback`, cloudErr);
+              fallbackCount++;
+              const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
+              wordTimings = generateProportionalWordTimings(seg.text, duration);
+            }
+            const phraseTimings = buildPhrases(wordTimings);
+
+            // Update incrementally so the user sees per-turn progress mid-run
+            onUpdateScript(prev => {
+              const idx = prev.findIndex(s => s.id === seg.id);
+              if (idx === -1) return prev;
+              const next = [...prev];
+              next[idx] = { ...next[idx], wordTimings, phraseTimings };
+              return next;
+            });
+            okCount++;
+          } catch (err) {
+            console.error(`Failed to sync segment ${i}`, err);
+            failCount++;
+          } finally {
+            setSyncingSegments(prev => {
+              const next = { ...prev };
+              delete next[seg.id];
+              return next;
+            });
+          }
+        }));
+      }
+
+      setSyncStatus(okCount > 0 ? 'success' : 'error');
       if (fallbackCount > 0) {
         toast.info(`Offline mode: ${fallbackCount} segment(s) used approximate timings (Google Cloud STT unavailable)`);
+      }
+      if (failCount > 0) {
+        toast.warning(`${failCount} segment(s) failed to sync`);
       }
     } catch (error) {
       console.error('Sync All Failed', error);
@@ -1128,13 +1164,13 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                                 onClick={() => syncTranscript(idx)}
                                 disabled={syncingSegments[seg.id]}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors border disabled:opacity-50 ${
-                                  seg.wordTimings && seg.wordTimings.length > 0
+                                  seg.phraseTimings && seg.phraseTimings.length > 0
                                     ? 'text-green-400 border-green-500/30 bg-green-900/10 hover:bg-green-900/30'
                                     : 'text-blue-400 border-blue-500/30 bg-blue-900/10 hover:bg-blue-900/30 hover:text-white'
                                 }`}
                               >
-                                {syncingSegments[seg.id] ? <RefreshCw size={14} className="animate-spin" /> : seg.wordTimings && seg.wordTimings.length > 0 ? <Check size={14} /> : <RefreshCw size={14} />}
-                                <span className="text-xs font-medium">{seg.wordTimings && seg.wordTimings.length > 0 ? 'Synced' : 'Sync'}</span>
+                                {syncingSegments[seg.id] ? <RefreshCw size={14} className="animate-spin" /> : seg.phraseTimings && seg.phraseTimings.length > 0 ? <Check size={14} /> : <RefreshCw size={14} />}
+                                <span className="text-xs font-medium">{seg.phraseTimings && seg.phraseTimings.length > 0 ? 'Synced' : 'Sync'}</span>
                               </button>
                               <button
                                 onClick={() => handleDownloadSingleTranscript(seg, idx)}

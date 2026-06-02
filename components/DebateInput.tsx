@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, lazy, Suspense } from 'react';
 import { toast } from './Toast';
-import { DebateConfig } from '../types';
+import { DebateConfig, DebateSegment } from '../types';
 import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Zap, Brain, Activity, Video, BookOpen, Smartphone, Link2, Scissors, Loader2 } from 'lucide-react';
 import type { PhoneConvoStyle, TranscriptChunk } from '../services/geminiService';
 import { splitTranscriptByTopics } from '../services/geminiService';
 import IntroVideoMaker from './IntroVideoMaker';
+
+const PhoneConvoStudio = lazy(() => import('./PhoneConvoStudio'));
 
 interface DebateInputProps {
   onGenerate: (config: DebateConfig) => void;
@@ -13,6 +15,8 @@ interface DebateInputProps {
   initialFileName?: string;
   initialCommentsContent?: string;
   initialCommentsFileName?: string;
+  /** Fired by the "New Phone Studio" tab once its embedded generator commits a script. Caller routes to PHONE_STUDIO. */
+  onPhoneStudioReady?: (script: DebateSegment[]) => void;
 }
 
 const DebateInput: React.FC<DebateInputProps> = ({
@@ -22,9 +26,10 @@ const DebateInput: React.FC<DebateInputProps> = ({
   initialFileName,
   initialCommentsContent,
   initialCommentsFileName,
+  onPhoneStudioReady,
 }) => {
   const [showIntroMaker, setShowIntroMaker] = useState(false);
-  const [mode, setMode] = useState<'topic' | 'script' | 'youtube' | 'phone'>('topic');
+  const [mode, setMode] = useState<'topic' | 'script' | 'youtube' | 'phone' | 'phone_new'>('topic');
   const [topic, setTopic] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [specificDetails, setSpecificDetails] = useState('');
@@ -338,17 +343,66 @@ const DebateInput: React.FC<DebateInputProps> = ({
           <button
             onClick={() => { setMode('phone'); setSpeakerCount(2); }}
             className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
-              mode === 'phone' 
-                ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 text-white shadow-md ring-1 ring-purple-500/30' 
+              mode === 'phone'
+                ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 text-white shadow-md ring-1 ring-purple-500/30'
                 : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
             }`}
           >
             <Smartphone size={16} className={mode === 'phone' ? 'text-purple-400' : ''} />
             Phone Studio
           </button>
+          <button
+            onClick={() => setMode('phone_new')}
+            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
+              mode === 'phone_new'
+                ? 'bg-gradient-to-r from-red-600/30 to-pink-600/30 text-white shadow-md ring-1 ring-red-500/30'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+            }`}
+          >
+            <Sparkles size={16} className={mode === 'phone_new' ? 'text-red-400' : ''} />
+            New Phone Studio
+          </button>
         </div>
       </div>
 
+      {/* ── "New Phone Studio" tab: render the embedded script generator directly here. ── */}
+      {mode === 'phone_new' && (
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-pink-600 rounded-[18px] opacity-25 group-hover:opacity-50 transition duration-500 blur"></div>
+          <div className="relative bg-[#0a0a0a] rounded-[16px] border border-white/5 overflow-hidden" style={{ height: '78vh', minHeight: 600 }}>
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-full text-gray-500 text-sm gap-2">
+                <Loader2 size={16} className="animate-spin" /> Loading Phone Studio Generator…
+              </div>
+            }>
+              <PhoneConvoStudio
+                mainScript={[]}
+                embedded
+                onGeneratorComplete={(turns, phones) => {
+                  // Convert ScriptTurn[] → DebateSegment[] for the rest of the app pipeline.
+                  const phoneToSpeaker = new Map(phones.map(p => [p.id, p.name]));
+                  const segments: DebateSegment[] = turns.map(t => ({
+                    id: t.id,
+                    speaker: t.isNarrator ? 'NARRATOR' : (phoneToSpeaker.get(t.phoneId) ?? 'Speaker'),
+                    text: t.text,
+                    audioUrl: t.audioUrl,
+                    duration: t.durationMs / 1000,
+                    wordTimings: t.wordTimings?.map(w => ({ word: w.word, start: w.startTime, end: w.endTime })),
+                  }));
+                  if (onPhoneStudioReady) {
+                    onPhoneStudioReady(segments);
+                  } else {
+                    toast.error('Phone Studio route configured nahi hai — app ko reload karo.');
+                  }
+                }}
+              />
+            </Suspense>
+          </div>
+        </div>
+      )}
+
+      {/* All other modes share the standard input layout below. */}
+      {mode !== 'phone_new' && (
       <div className="space-y-5">
         {/* Main Input Area */}
         <div className="relative group">
@@ -1114,6 +1168,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
           )}
         </button>
       </div>
+      )}
 
       {showIntroMaker && initialCommentsContent && (
         <IntroVideoMaker
