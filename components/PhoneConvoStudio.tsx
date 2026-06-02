@@ -10,6 +10,7 @@ import {
   generateScriptChapters,
   analyzePodcastChapters,
   generatePodcastDeepAnalysisScript,
+  detectPodcastSpeakers,
   PodcastTranscriptSeg,
   PodcastCutRange,
   PodcastChapter,
@@ -289,9 +290,11 @@ interface PodcastFlowProps {
   generating: boolean;
   onGenerate: (args: {
     podcastUrl: string;
-    chapter: PodcastChapter;
+    chapters: PodcastChapter[];
     segments: PodcastTranscriptSeg[];
     podcastTitle: string;
+    podcastHost: string;
+    podcastGuests: string[];
     supporterName: string;
     criticName: string;
     extraFocus: string;
@@ -327,6 +330,11 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
 
   const [segments, setSegments] = useState<PodcastTranscriptSeg[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [podcastDescription, setPodcastDescription] = useState('');
+  const [podcastUploader, setPodcastUploader] = useState('');
+  const [podcastHost, setPodcastHost] = useState('');
+  const [podcastGuests, setPodcastGuests] = useState<string[]>([]);
+  const [detectingSpeakers, setDetectingSpeakers] = useState(false);
 
   const [cuts, setCuts] = useState<PodcastCutRange[]>([]);
   const [cutStartTxt, setCutStartTxt] = useState('');
@@ -334,7 +342,15 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
 
   const [chapters, setChapters] = useState<PodcastChapter[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [selectedIdxs, setSelectedIdxs] = useState<number[]>([]);
+
+  const toggleChapter = (i: number) => {
+    setSelectedIdxs(prev => {
+      if (prev.includes(i)) return prev.filter(x => x !== i);
+      if (prev.length >= 2) return [prev[1], i]; // drop oldest, keep latest 2
+      return [...prev, i];
+    });
+  };
 
   const totalSec = segments.length
     ? (segments[segments.length - 1].start + (segments[segments.length - 1].duration || 0))
@@ -363,9 +379,34 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
       })).filter((s: PodcastTranscriptSeg) => s.text.trim());
       if (!segs.length) throw new Error('Is podcast me transcript available nahi hai');
       setSegments(segs);
-      if (!podcastTitle.trim() && data.title) setPodcastTitle(data.title);
+      const fetchedTitle = (data.title || '').toString();
+      const fetchedDesc = (data.description || '').toString();
+      const fetchedUploader = (data.uploader || '').toString();
+      setPodcastDescription(fetchedDesc);
+      setPodcastUploader(fetchedUploader);
+      if (!podcastTitle.trim() && fetchedTitle) setPodcastTitle(fetchedTitle);
       setPhase('cuts');
       toast.success(`✓ Transcript fetched (${segs.length} segments, ${fmtSec(segs[segs.length - 1].start)})`);
+
+      // Background: auto-detect host + guest names (don't block UI)
+      const titleForDetect = fetchedTitle || podcastTitle;
+      if (titleForDetect || fetchedDesc || fetchedUploader) {
+        setDetectingSpeakers(true);
+        const transcriptSample = segs.slice(0, 30).map(s => s.text).join(' ');
+        detectPodcastSpeakers({
+          title: titleForDetect,
+          description: fetchedDesc,
+          uploader: fetchedUploader,
+          transcriptSample,
+        }).then(res => {
+          setPodcastHost(res.host);
+          setPodcastGuests(res.guests);
+          if (res.host || res.guests.length) {
+            const parts = [res.host && `Host: ${res.host}`, res.guests.length && `Guest: ${res.guests.join(', ')}`].filter(Boolean).join(' · ');
+            toast.success(`✓ ${parts}`);
+          }
+        }).catch(() => { /* silent */ }).finally(() => setDetectingSpeakers(false));
+      }
     } catch (e: any) {
       toast.error(e.message || 'Transcript fetch failed');
     } finally {
@@ -386,14 +427,15 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
   const handleRemoveCut = (i: number) => setCuts(prev => prev.filter((_, idx) => idx !== i));
 
   // ── 3. Analyze chapters ────────────────────────────────────────────────────
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (overrideCuts?: PodcastCutRange[]) => {
     if (!segments.length) return;
+    const cutsToUse = overrideCuts !== undefined ? overrideCuts : cuts;
     setAnalyzing(true);
     try {
-      const chaps = await analyzePodcastChapters(segments, cuts, podcastTitle || 'this podcast');
+      const chaps = await analyzePodcastChapters(segments, cutsToUse, podcastTitle || 'this podcast');
       if (!chaps.length) throw new Error('Koi chapters detect nahi hue');
       setChapters(chaps);
-      setSelectedIdx(0);
+      setSelectedIdxs([0]);
       setPhase('chapters');
       toast.success(`✓ ${chaps.length} chapters mile`);
     } catch (e: any) {
@@ -405,19 +447,27 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
 
   // ── 4. Final generate ──────────────────────────────────────────────────────
   const handleGenerateFinal = async () => {
-    if (selectedIdx == null || !chapters[selectedIdx]) {
-      toast.error('Pehle ek chapter select karo');
+    if (!selectedIdxs.length) {
+      toast.error('Pehle ek (ya do) chapter select karo');
       return;
     }
     if (!supporterName.trim() || !criticName.trim()) {
       toast.error('Dono speaker names dalo');
       return;
     }
+    const ordered = [...selectedIdxs].sort((a, b) => a - b);
+    const picked = ordered.map(i => chapters[i]).filter(Boolean);
+    if (!picked.length) {
+      toast.error('Selected chapters invalid hain');
+      return;
+    }
     await onGenerate({
       podcastUrl: podcastUrl.trim(),
-      chapter: chapters[selectedIdx],
+      chapters: picked,
       segments,
       podcastTitle: podcastTitle.trim() || 'this podcast',
+      podcastHost: podcastHost.trim(),
+      podcastGuests: podcastGuests.filter(g => g.trim()).map(g => g.trim()),
       supporterName: supporterName.trim(),
       criticName: criticName.trim(),
       extraFocus: extraFocus.trim(),
@@ -554,6 +604,49 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
             </div>
           </div>
 
+          {/* Detected Host / Guest banner — editable */}
+          <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd' }}>
+                🎙️ Podcast People {detectingSpeakers && <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle', marginLeft: 4 }} />}
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                {detectingSpeakers ? 'Detect ho raha hai…' : 'Auto-detected — fix kar sakte ho'}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'rgba(147,197,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Host</div>
+                <input
+                  value={podcastHost}
+                  onChange={e => setPodcastHost(e.target.value)}
+                  placeholder="e.g. Lex Fridman"
+                  style={{
+                    width: '100%', padding: '7px 10px', borderRadius: 7, boxSizing: 'border-box',
+                    background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                    color: '#fff', fontSize: 11, outline: 'none', fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'rgba(147,197,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Guest(s) — comma separated</div>
+                <input
+                  value={podcastGuests.join(', ')}
+                  onChange={e => setPodcastGuests(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="e.g. Elon Musk, Naval Ravikant"
+                  style={{
+                    width: '100%', padding: '7px 10px', borderRadius: 7, boxSizing: 'border-box',
+                    background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                    color: '#fff', fontSize: 11, outline: 'none', fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 6, lineHeight: 1.4 }}>
+              Conversation me ye naam use honge jab analysts podcast hosts/guest ko refer karenge.
+            </div>
+          </div>
+
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
             <b style={{ color: '#fde68a' }}>Optional:</b> Ads, intros, ya boring parts cut karo (M:SS format). Skip bhi kar sakte ho — direct chapters analyze karo.
           </div>
@@ -621,14 +714,14 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
             <button
-              onClick={() => { setCuts([]); handleAnalyze(); }}
+              onClick={() => { setCuts([]); handleAnalyze([]); }}
               disabled={analyzing}
               style={{
                 padding: '11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
                 background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, fontWeight: 600,
                 cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
               }}
-            >⏭ Skip Cuts</button>
+            >⏭ Skip Cuts (Pure Video)</button>
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
@@ -654,19 +747,20 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
           <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd' }}>📚 {chapters.length} Chapters Detected</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-              Ek chapter select karo deep analysis ke liye
+              Ek ya do chapter select karo ({selectedIdxs.length}/2 selected) — 2 chunte ho to dono ko mila ke combined analysis banegi
             </div>
           </div>
 
           {/* Chapter table */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 380, overflowY: 'auto' }}>
             {chapters.map((c, i) => {
-              const isSel = selectedIdx === i;
+              const selOrder = selectedIdxs.indexOf(i); // -1 / 0 / 1
+              const isSel = selOrder !== -1;
               const dur = c.endSec - c.startSec;
               return (
                 <div
                   key={i}
-                  onClick={() => setSelectedIdx(i)}
+                  onClick={() => toggleChapter(i)}
                   style={{
                     padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
                     border: `1.5px solid ${isSel ? '#a855f7' : 'rgba(255,255,255,0.07)'}`,
@@ -681,7 +775,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
                       color: isSel ? '#fff' : 'rgba(255,255,255,0.4)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 10, fontWeight: 800,
-                    }}>{i + 1}</div>
+                    }}>{isSel ? `✓${selOrder + 1}` : i + 1}</div>
                     <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#fff' }}>{c.title}</div>
                     <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
                       {fmtSec(dur)}
@@ -778,19 +872,21 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, onChangeStyle, g
             >← Cuts</button>
             <button
               onClick={handleGenerateFinal}
-              disabled={generating || selectedIdx == null}
+              disabled={generating || !selectedIdxs.length}
               style={{
                 padding: '13px', borderRadius: 12, border: 'none',
                 background: generating ? 'rgba(168,85,247,0.4)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
                 color: '#fff', fontSize: 13, fontWeight: 800,
                 cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: selectedIdx == null ? 0.4 : 1,
+                opacity: !selectedIdxs.length ? 0.4 : 1,
               }}
             >
               {generating
                 ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating Deep Analysis…</>
-                : <>✨ Generate Deep Analysis Script</>}
+                : selectedIdxs.length === 2
+                  ? <>✨ Generate Combined Analysis (2 Chapters)</>
+                  : <>✨ Generate Deep Analysis Script</>}
             </button>
           </div>
         </>
@@ -814,9 +910,11 @@ interface GenPanelProps {
   onGenerate: () => void;
   onPodcastGenerate: (args: {
     podcastUrl: string;
-    chapter: PodcastChapter;
+    chapters: PodcastChapter[];
     segments: PodcastTranscriptSeg[];
     podcastTitle: string;
+    podcastHost: string;
+    podcastGuests: string[];
     supporterName: string;
     criticName: string;
     extraFocus: string;
@@ -1774,9 +1872,11 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
   const handlePodcastGenerate = useCallback(async (args: {
     podcastUrl: string;
-    chapter: PodcastChapter;
+    chapters: PodcastChapter[];
     segments: PodcastTranscriptSeg[];
     podcastTitle: string;
+    podcastHost: string;
+    podcastGuests: string[];
     supporterName: string;
     criticName: string;
     extraFocus: string;
@@ -1784,11 +1884,15 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
   }) => {
     setGenerating(true);
     try {
-      toast.info('Gemini chapter deep-analyze kar raha hai…');
+      toast.info(args.chapters.length > 1
+        ? `Gemini ${args.chapters.length} chapters ki combined analysis bana raha hai…`
+        : 'Gemini chapter deep-analyze kar raha hai…');
       const turns = await generatePodcastDeepAnalysisScript({
         segments: args.segments,
-        chapter: args.chapter,
+        chapters: args.chapters,
         podcastTitle: args.podcastTitle,
+        podcastHost: args.podcastHost || undefined,
+        podcastGuests: args.podcastGuests.length ? args.podcastGuests : undefined,
         supporterName: args.supporterName,
         criticName: args.criticName,
         extraFocus: args.extraFocus || undefined,

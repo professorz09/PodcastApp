@@ -6499,38 +6499,109 @@ ${promptBody}`;
     .sort((a, b) => a.startSec - b.startSec);
 };
 
+export interface DetectedSpeakers {
+  host: string;
+  guests: string[];
+}
+
+export const detectPodcastSpeakers = async (args: {
+  title: string;
+  description: string;
+  uploader?: string;
+  transcriptSample?: string;
+}): Promise<DetectedSpeakers> => {
+  const { title, description, uploader, transcriptSample } = args;
+
+  const prompt = `Identify the HOST(s) and GUEST(s) of this podcast from the metadata below.
+
+PODCAST TITLE: ${title || '(none)'}
+CHANNEL / UPLOADER: ${uploader || '(none)'}
+DESCRIPTION: ${description || '(none)'}
+${transcriptSample ? `\nTRANSCRIPT FIRST 800 CHARS (only if host/guest introduce themselves):\n${transcriptSample.slice(0, 800)}\n` : ''}
+
+RULES:
+- "host": the primary person/people running the show. Usually matches the channel name (e.g. "Lex Fridman Podcast" → "Lex Fridman", "The Joe Rogan Experience" → "Joe Rogan"). If two hosts, pick the main one.
+- "guests": the people being interviewed on this episode. Could be 0, 1, or more. Look for "with [Name]", "featuring [Name]", "guest: [Name]", "[Name] on [topic]", or names mentioned in title that aren't the host.
+- Return real human names only — not titles, not "the host", not channel suffixes ("Podcast", "Show", "Clips").
+- If you genuinely cannot determine a host or guest, return empty string / empty array. DO NOT invent names.
+
+Return JSON ONLY:
+{ "host": "First Last or empty", "guests": ["First Last", ...] }`;
+
+  try {
+    const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+      responseMimeType: 'application/json',
+    });
+    const raw: string = data.text ?? data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+    let parsed: any;
+    try { parsed = JSON.parse(cleaned); }
+    catch {
+      const m = cleaned.match(/\{[\s\S]*\}/);
+      parsed = m ? JSON.parse(m[0]) : {};
+    }
+    const host = (parsed?.host || '').toString().trim();
+    const guests = Array.isArray(parsed?.guests)
+      ? parsed.guests.map((g: any) => (g || '').toString().trim()).filter(Boolean)
+      : [];
+    return { host, guests };
+  } catch {
+    return { host: '', guests: [] };
+  }
+};
+
 export const generatePodcastDeepAnalysisScript = async (
   args: {
     segments: PodcastTranscriptSeg[];
-    chapter: PodcastChapter;
+    chapter?: PodcastChapter;
+    chapters?: PodcastChapter[];
     podcastTitle: string;
+    podcastHost?: string;
+    podcastGuests?: string[];
     supporterName: string;
     criticName: string;
     extraFocus?: string;
     useGoogleGrounding?: boolean;
   },
 ): Promise<{ speaker: string; text: string }[]> => {
-  const { segments, chapter, podcastTitle, supporterName, criticName, extraFocus, useGoogleGrounding } = args;
+  const { segments, chapter, chapters: chaptersArg, podcastTitle, podcastHost, podcastGuests, supporterName, criticName, extraFocus, useGoogleGrounding } = args;
 
-  // Extract only this chapter's transcript text
+  const chapters: PodcastChapter[] = chaptersArg && chaptersArg.length
+    ? [...chaptersArg].sort((a, b) => a.startSec - b.startSec)
+    : (chapter ? [chapter] : []);
+  if (!chapters.length) throw new Error('Koi chapter select nahi kiya gaya');
+
+  // Extract transcript from any selected chapter range (skips the gap between them)
   const chapterSegs = segments.filter(s => {
     const mid = s.start + (s.duration || 0) / 2;
-    return mid >= chapter.startSec && mid <= chapter.endSec;
+    return chapters.some(c => mid >= c.startSec && mid <= c.endSec);
   });
 
-  if (!chapterSegs.length) throw new Error('Is chapter me koi transcript content nahi mila');
+  if (!chapterSegs.length) throw new Error('Selected chapters me koi transcript content nahi mila');
 
-  const chapterText = chapterSegs.map(s => `[${fmtTs(s.start)}] ${s.text}`).join('\n');
-  const chapterTextCapped = chapterText.length > 30000
-    ? chapterText.slice(0, 30000) + '\n…[chapter truncated]'
-    : chapterText;
+  // Build chapter-by-chapter transcript blocks so the LLM knows where each chapter starts/ends
+  const chapterBlocks = chapters.map((c, i) => {
+    const segs = chapterSegs.filter(s => {
+      const mid = s.start + (s.duration || 0) / 2;
+      return mid >= c.startSec && mid <= c.endSec;
+    });
+    const body = segs.map(s => `[${fmtTs(s.start)}] ${s.text}`).join('\n');
+    return `=== CHAPTER ${i + 1}: "${c.title}" (${fmtTs(c.startSec)} → ${fmtTs(c.endSec)}) ===\n${c.summary ? `Focus: ${c.summary}\n` : ''}${body}`;
+  });
+  const fullText = chapterBlocks.join('\n\n');
+  const chapterTextCapped = fullText.length > 30000
+    ? fullText.slice(0, 30000) + '\n…[transcript truncated]'
+    : fullText;
 
-  const prompt = `You are writing a DEEP ANALYSIS DISCUSSION script between two analysts who are reacting to and discussing a podcast segment. They are NOT recreating the podcast — they are talking ABOUT what was said.
+  const isMulti = chapters.length > 1;
+  const chapterListLine = chapters.map((c, i) => `${i + 1}. "${c.title}" (${fmtTs(c.startSec)} → ${fmtTs(c.endSec)})`).join('\n');
+  const focusLine = chapters.map(c => c.summary || c.title).join(' | ');
+
+  const prompt = `You are writing a DEEP ANALYSIS DISCUSSION script between two analysts who are reacting to and discussing ${isMulti ? `${chapters.length} podcast chapters back-to-back` : 'a podcast segment'}. They are NOT recreating the podcast — they are talking ABOUT what was said.
 
 PODCAST: "${podcastTitle}"
-CHAPTER TITLE: "${chapter.title}"
-CHAPTER TIME: ${fmtTs(chapter.startSec)} → ${fmtTs(chapter.endSec)}
-CHAPTER FOCUS: ${chapter.summary || chapter.title}
+${isMulti ? `CHAPTERS UNDER DISCUSSION (${chapters.length}):\n${chapterListLine}` : `CHAPTER TITLE: "${chapters[0].title}"\nCHAPTER TIME: ${fmtTs(chapters[0].startSec)} → ${fmtTs(chapters[0].endSec)}`}
+CHAPTER FOCUS: ${focusLine}${isMulti ? `\n\nMULTI-CHAPTER RULE: Cover BOTH chapters in the discussion. After exploring chapter 1, the analysts naturally transition to chapter 2 (e.g. "next they pivot to...", "later in the episode they get into..."). Each chapter gets meaningful airtime — don't let one swallow the other. Surface connections / contrasts between the two chapters where they genuinely exist.` : ''}
 
 SPEAKERS (these are the two analysts, NOT the podcast hosts):
 - "${supporterName}" → THE SUPPORTER. Genuinely finds the podcast's points compelling. Defends them, builds on them, adds supporting evidence and context. Sees what is RIGHT about the arguments. Not blindly positive — thoughtful, but warmly agrees with the core points.
@@ -6546,8 +6617,8 @@ A. **Opening Hook** (1-2 turns)
      "${supporterName}: Okay so on ${podcastTitle}, the part where they say [paraphrase the actual claim] — I think this is one of the sharpest things they've said all episode."
      "${criticName}: Hold on. Before we get carried away, let's look at what's actually being claimed here..."
 
-B. **Topic-by-topic Deep Dive** (12-18 turns)
-   Identify 3-5 SPECIFIC sub-topics inside this chapter (specific claims, framings, or moments). For EACH sub-topic:
+B. **Topic-by-topic Deep Dive** (${isMulti ? '18-24' : '12-18'} turns)
+   Identify ${isMulti ? '3-5 SPECIFIC sub-topics per chapter (across BOTH chapters — clearly bridge from one chapter to the next mid-discussion)' : '3-5 SPECIFIC sub-topics inside this chapter'} (specific claims, framings, or moments). For EACH sub-topic:
    - One analyst introduces it by referencing what the podcast host actually said: "Next, [podcast host] argues that..." / "Then they pivot to..."
    - The other reacts with their stance (supporter / critic depending on who's leading).
    - They go BACK AND FORTH 2-4 turns per sub-topic — surface point → critical take → counter → concession or reframe.
@@ -6561,16 +6632,20 @@ D. **Final Key Takeaways** (2 turns at the very end — these are MANDATORY)
    - Turn ${'{'}supporter takeaway turn${'}'}: ${supporterName} delivers a brief "what this podcast actually got RIGHT — what we should walk away learning" — 2-4 distinct positive takeaways, framed conversationally.
    - Turn ${'{'}critic takeaway turn${'}'}: ${criticName} delivers the "what's CONCERNING / what we should be careful about" counterweight — 2-4 distinct concerns, framed sharply but not bitterly.
 
-NATURAL REFERENCING RULES:
-- Speakers refer to the podcast hosts by name where known. If hosts are unknown, use "the host", "they", "the guest".
-- Use phrases like: "next, [host] talks about...", "first thing I noticed was when they said...", "[host] argues a valid question — what's your take?", "this is where I push back...", "exactly the part that's bothering me too".
-- DO NOT roleplay AS the podcast hosts. The analysts are OUTSIDE the podcast looking in.
-- DO NOT invent quotes the hosts didn't say — paraphrase from the transcript below.
+${(podcastHost || (podcastGuests && podcastGuests.length)) ? `PODCAST PEOPLE (use these EXACT names when the analysts refer to who said what):
+${podcastHost ? `- HOST: ${podcastHost}` : ''}
+${podcastGuests && podcastGuests.length ? `- GUEST(S): ${podcastGuests.join(', ')}` : ''}
 
-LENGTH: 22-28 turns total, alternating naturally (not strictly). Each turn = 2-5 sentences of natural spoken English.
+` : ''}NATURAL REFERENCING RULES:
+- Speakers refer to the podcast host(s) and guest(s) by their REAL NAMES${podcastHost ? ` (host is ${podcastHost}${podcastGuests && podcastGuests.length ? `, guest${podcastGuests.length > 1 ? 's are' : ' is'} ${podcastGuests.join(', ')}` : ''})` : ''}. If a name is unknown, use "the host", "they", "the guest" — do NOT invent names.
+- Use phrases like: "next, ${podcastHost || '[host]'} talks about...", "first thing I noticed was when ${podcastGuests && podcastGuests[0] ? podcastGuests[0] : '[the guest]'} said...", "${podcastHost || '[the host]'} pushes back, asking — what's your take?", "this is where I push back...", "exactly the part that's bothering me too".
+- DO NOT roleplay AS the podcast host or guest. The analysts are OUTSIDE the podcast looking in.
+- DO NOT invent quotes the host/guest didn't say — paraphrase from the transcript below.
+
+LENGTH: ${isMulti ? '28-36' : '22-28'} turns total, alternating naturally (not strictly). Each turn = 2-5 sentences of natural spoken English.
 
 ${extraFocus ? `EXTRA FOCUS FROM USER: ${extraFocus}\n` : ''}
-THE CHAPTER TRANSCRIPT (this is what the analysts are reacting to — paraphrase, don't quote whole blocks):
+THE ${isMulti ? 'CHAPTER TRANSCRIPTS' : 'CHAPTER TRANSCRIPT'} (this is what the analysts are reacting to — paraphrase, don't quote whole blocks):
 ${chapterTextCapped}
 
 Return ONLY a JSON array. No markdown. No preamble. Just:

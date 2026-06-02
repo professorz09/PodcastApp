@@ -479,22 +479,27 @@ def get_transcript():
     ]
     full_text = ' '.join(item['text'] for item in raw)
 
-    # Fetch video title and description via yt-dlp (light, skip-download)
+    # Fetch video title, channel, and description via yt-dlp (light, skip-download)
     video_title = ''
     video_description = ''
+    video_uploader = ''
     try:
+        # Use a unique separator so multi-line description doesn't get truncated by splits.
+        SEP = '<<|FIELDSEP|>>'
         meta_result = subprocess.run(
             [_YTDLP_BIN, '--skip-download', '--no-playlist',
              '--no-check-certificates',
              '--extractor-args', 'youtube:player_client=android,android_vr,ios',
              *cookies_args(),
-             '--print', '%(title)s\n%(description)s', url],
+             '--print', f'%(title)s{SEP}%(uploader)s{SEP}%(description)s', url],
             capture_output=True, text=True, timeout=20
         )
         if meta_result.returncode == 0:
-            parts = meta_result.stdout.strip().split('\n', 1)
-            video_title = parts[0].strip() if parts else ''
-            video_description = parts[1].strip()[:600] if len(parts) > 1 else ''
+            parts = meta_result.stdout.strip().split(SEP)
+            video_title = (parts[0].strip() if len(parts) > 0 else '')
+            video_uploader = (parts[1].strip() if len(parts) > 1 else '')
+            # Cap description at 3000 chars — enough to capture host/guest intros + bios
+            video_description = (parts[2].strip()[:3000] if len(parts) > 2 else '')
     except Exception:
         pass
 
@@ -505,6 +510,7 @@ def get_transcript():
         'full_text': full_text,
         'title': video_title,
         'description': video_description,
+        'uploader': video_uploader,
     })
 
 
