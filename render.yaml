@@ -1,0 +1,15 @@
+# Render.com infrastructure-as-code config. Push this to GitHub and on
+# Render click "New +" → "Blueprint" → select the repo to auto-create
+# the service. Free tier sleeps after 15 min inactivity; first request
+# after sleep takes ~30s to wake.
+services:
+  - type: web
+    name: autovid-flask
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"

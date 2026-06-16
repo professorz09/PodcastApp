@@ -8,5 +8,15 @@
     "api/**/*.ts": {
       "runtime": "@vercel/node@5.6.9"
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/youtube/:path*",   "destination": "https://autovid-flask.onrender.com/api/youtube/:path*" },
+    { "source": "/api/video/:path*",     "destination": "https://autovid-flask.onrender.com/api/video/:path*" },
+    { "source": "/api/files/:path*",     "destination": "https://autovid-flask.onrender.com/api/files/:path*" },
+    { "source": "/api/instagram/:path*", "destination": "https://autovid-flask.onrender.com/api/instagram/:path*" },
+    { "source": "/api/cookies/:path*",   "destination": "https://autovid-flask.onrender.com/api/cookies/:path*" },
+    { "source": "/api/reddit/:path*",    "destination": "https://autovid-flask.onrender.com/api/reddit/:path*" },
+    { "source": "/api/shorts/:path*",    "destination": "https://autovid-flask.onrender.com/api/shorts/:path*" },
+    { "source": "/api/health",           "destination": "https://autovid-flask.onrender.com/api/health" }
+  ]
 }
