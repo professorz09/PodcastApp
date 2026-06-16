@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { callGemini } from '../services/vertexProxy';
+import { callGemini } from '../services/vertexProxy.js';
 
 export const config = {
   api: {
