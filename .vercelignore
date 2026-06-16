@@ -1,0 +1,24 @@
+# Python / Flask — runs on a separate host (Render/Fly/HF), not Vercel
+flask_server.py
+requirements.txt
+requirements_flask.txt
+__pycache__/
+*.pyc
+.pythonlibs/
+
+# Replit-only files
+.replit
+replit.nix
+replit.md
+start.sh
+
+# Binaries + cookies (Flask-side, not used by the frontend)
+yt-dlp-new
+yt_cookies.txt
+
+# Build artefacts / caches
+downloads/
+.cache/
+.local/
+artifacts/
+attached_assets/
