@@ -55,7 +55,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
   const [directLyrics, setDirectLyrics] = useState('');
   const [style] = useState<Style>('auto');
   const [language, setLanguage] = useState<LangKey>('Hindi');
-  const [model, setModel] = useState('gemini-3-flash');
+  const [model, setModel] = useState('gemini-3.5-flash');
 
   // ── Generated lyrics ─────────────────────────────────────────
   const [lyrics, setLyrics] = useState('');
@@ -341,7 +341,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                 <Label>AI Model</Label>
                 <div className="flex flex-col gap-1.5">
                   {[
-                    { id: 'gemini-3-flash', label: 'Gemini 3 Flash', badge: 'Fast' },
+                    { id: 'gemini-3.5-flash', label: 'Gemini 3 Flash', badge: 'Fast' },
                     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', badge: 'Best' },
                   ].map(m => (
                     <button
