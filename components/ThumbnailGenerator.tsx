@@ -62,6 +62,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'podcast', label: 'Podcast', desc: 'Shocking clickbait', color: 'purple' },
     { value: 'explained', label: 'Explained', desc: 'Big face + topic visual', color: 'emerald' },
     { value: 'professor_jiang', label: '🎓 Prof. Jiang', desc: 'Fox News Alert — breaking news', color: 'red' },
+    { value: 'phone_studio', label: '📱 Phone Studio', desc: 'Phone + celebrity face + red/white impact text', color: 'pink' },
   ];
 
   const hasScript = script.length > 0;
@@ -603,6 +604,29 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 3: Celebrity (Phone Studio only) ── */}
+              {videoStyle === 'phone_studio' && (
+                <div className="bg-[#0d0d0d] border border-pink-500/15 rounded-2xl p-5 space-y-3">
+                  <div>
+                    <p className="text-[11px] text-pink-400 uppercase tracking-widest font-semibold">Step 3 — Celebrity / Featured Person</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Jiska face thumbnail ke right side pe aayega — phone se "talk" kar raha hoga</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-gray-500 font-medium">Celebrity name</label>
+                    <input
+                      type="text"
+                      value={guestName}
+                      onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
+                      placeholder="e.g. Joe Rogan, Trump, Elon Musk, Robert Greene"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-pink-500 transition-colors placeholder-gray-600"
+                    />
+                    <p className="text-[10px] text-gray-600">
+                      Real person ka naam dalo — Gemini exactly unka face match karega.
+                    </p>
                   </div>
                 </div>
               )}

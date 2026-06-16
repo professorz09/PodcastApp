@@ -583,45 +583,55 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             isNarrator: false,
           };
 
-          // Decode audio → mono Float32Array for the muxer.
+          // Decode audio → 48kHz STEREO Float32Arrays for the muxer.
           //
-          // Resilience: decodeAudioData detaches the ArrayBuffer, so we always
-          // clone the blob to a fresh buffer first. Without this, a retry of
-          // the render step (re-using the SAME blob via .arrayBuffer()) would
-          // get an empty buffer on some browsers, producing a silent MP4.
-          const TARGET_SR = 24_000;
+          // Why 48k stereo:
+          // - Gemini TTS outputs 24kHz mono WAV. Some WebCodecs AAC encoder
+          //   builds (notably Chrome on Windows/Android) silently misencode
+          //   24kHz mono — the MP4 muxes a track but it's empty / unplayable
+          //   in QuickTime / WMP / default Android player. 48kHz stereo is
+          //   the most universally accepted AAC config.
+          // - decodeAudioData(ab) detaches the ArrayBuffer — we slice() to a
+          //   fresh copy so retries don't read a zero-length buffer.
+          const TARGET_SR = 48_000;
           let actx: AudioContext;
           try { actx = new AudioContext({ sampleRate: TARGET_SR }); }
           catch { actx = new AudioContext(); }
           const rawAb = await audioRef.current.blob.arrayBuffer();
-          // Clone so decodeAudioData's detach doesn't corrupt anything reused later.
           const ab = rawAb.slice(0);
           if (ab.byteLength < 100) {
             await actx.close();
             throw new Error(`TTS audio empty hai (${ab.byteLength} bytes) — Step 2 dobara chalao`);
           }
           const decoded = await actx.decodeAudioData(ab);
-          const ch0 = decoded.getChannelData(0);
-          // Copy out before closing the AudioContext (otherwise buffer is detached)
-          const mixed = new Float32Array(ch0.length);
-          mixed.set(ch0);
+          // decodeAudioData resamples to the AudioContext's rate automatically,
+          // so `decoded` is at TARGET_SR (or whatever the fallback context chose).
+          const srcCh0 = decoded.getChannelData(0);
+          const srcCh1 = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : srcCh0;
+          // Copy out BEFORE closing the AudioContext (otherwise the underlying
+          // buffer is detached and reads return zero).
+          const left  = new Float32Array(srcCh0.length);
+          const right = new Float32Array(srcCh1.length);
+          left.set(srcCh0);
+          right.set(srcCh1);
           const sampleRate = decoded.sampleRate;
           const duration = decoded.duration;
           await actx.close();
 
-          // Sanity: confirm the buffer actually contains sound. If TTS came
-          // back as digital silence (rare but happens on quota errors), the
-          // MP4 would render fine visually but be mute — surface that early.
+          // Sanity: confirm the buffer actually contains sound. Catches the
+          // rare case where TTS returned silent PCM (quota errors etc.).
           let peak = 0, sumSq = 0;
-          const stride = Math.max(1, Math.floor(mixed.length / 4096));
-          for (let k = 0; k < mixed.length; k += stride) {
-            const v = Math.abs(mixed[k]);
+          const stride = Math.max(1, Math.floor(left.length / 4096));
+          let counted = 0;
+          for (let k = 0; k < left.length; k += stride) {
+            const v = Math.abs(left[k]);
             if (v > peak) peak = v;
-            sumSq += mixed[k] * mixed[k];
+            sumSq += left[k] * left[k];
+            counted++;
           }
-          const rms = Math.sqrt(sumSq / Math.max(1, Math.floor(mixed.length / stride)));
-          console.log(`[IntroFlow] audio decoded — samples=${mixed.length} sr=${sampleRate} dur=${duration.toFixed(2)}s peak=${peak.toFixed(4)} rms=${rms.toFixed(4)}`);
-          if (mixed.length === 0) {
+          const rms = Math.sqrt(sumSq / Math.max(1, counted));
+          console.log(`[IntroFlow] audio ready — samples=${left.length} sr=${sampleRate} ch=2 dur=${duration.toFixed(2)}s peak=${peak.toFixed(4)} rms=${rms.toFixed(4)}`);
+          if (left.length === 0) {
             throw new Error('Decoded audio me 0 samples hain — TTS step retry karo');
           }
           if (peak < 0.0005) {
@@ -647,7 +657,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
           const blob = await renderVideoOffline({
             canvas: exportCanvas,
-            audioChannels: [mixed],
+            audioChannels: [left, right],
             sampleRate,
             duration,
             fps: FPS,
@@ -1771,7 +1781,7 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
               return (
                 <button
                   key={style.id}
-                  onClick={() => setGenStyle(style.id)}
+                  onClick={() => { setGenStyle(style.id); setGenStep(2); }}
                   style={{
                     textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
                     border: `1.5px solid ${isSel ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
@@ -1796,16 +1806,6 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
               );
             })}
           </div>
-          <button
-            onClick={() => setGenStep(2)}
-            style={{
-              marginTop: 4, padding: '11px', borderRadius: 12, border: 'none',
-              background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 800,
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
-            Next: Topic Set Karo →
-          </button>
         </div>
       )}
 

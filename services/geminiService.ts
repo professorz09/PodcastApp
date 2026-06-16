@@ -30,7 +30,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -88,6 +88,35 @@ Return ONLY a valid JSON array of 4 strings. No markdown.
     4. Under 65 characters. Must feel like a hot debate, not a tutorial.
     5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
     6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
+    `;
+  }
+  if (style === 'phone_studio') {
+    return `
+You are a YouTube copywriter for the "Phone Studio" thumbnail style — punchy AI-chat-style clips that go viral on Shorts and homepage. The thumbnail shows a phone screen on one side (AI chat about a celebrity's take) and the celebrity's face on the other, with HUGE red+white impact text in the middle.
+
+Read the script and generate 4 SHORT, CATCHY, ULTRA-CLICKABLE YouTube titles in this style.
+
+STYLE: Ultra-short. Question or bold claim. Sounds like a headline you'd say out loud. The shorter, the better. The celebrity / person being discussed MUST be named.
+
+REQUIREMENTS:
+1. 35-55 characters max. Tight, punchy, no filler words.
+2. Format options to mix across the 4:
+   - Direct question: "Do Aliens Exist? — Joe Rogan Answers"
+   - Bold claim with name: "Elon Musk: Shift Data Centers To The Moon"
+   - Punchy shock: "Trump: War Phase Won Again"
+   - Reveal: "Joe Rogan Reveals What's Really In Area 51"
+3. Always name the celebrity / person from the script in the title.
+4. No semicolons, no em-dashes overuse — keep it conversational.
+5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
+6. The 4 titles must approach the SAME topic from DIFFERENT angles (question / bold claim / reveal / consequence).
+
+EXAMPLES (for tone — do NOT copy verbatim):
+- "Do Aliens Exist? Trump Reveals The Truth"
+- "Elon Musk Wants Data Centers On The Moon"
+- "Joe Rogan: War Phase Has Already Started"
+- "Putin Just Said Something Insane About AI"
+
+Return ONLY a valid JSON array of 4 strings. No markdown.
     `;
   }
   if (style === 'professor_jiang') {
@@ -256,6 +285,31 @@ RULES:
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
+  if (style === 'phone_studio') {
+    return `
+You are a thumbnail copywriter for the "Phone Studio" style — ultra-bold red+white text overlaid on a phone screen + celebrity face composition.
+
+STYLE: 2-5 word ALL-CAPS punch line. Either a SHORT QUESTION (ends with ?) or a SHOCK DECLARATION (ends with ! or no punctuation). Half the words will be WHITE, the most explosive 1-2 words RED.
+
+CRITICAL RULE — MUST BE TOPIC-SPECIFIC:
+Read the script. Pick the SINGLE most viral 2-5 word hook from the actual content. Never generic.
+
+Generate exactly 5 options with VARIETY:
+- Option 1: 2-word shock question — "ALIENS REAL?" / "WAR OVER?" / "DOGE DEAD?"
+- Option 2: 3-4 word bold claim — "WAR PHASE WON" / "MOON IS TARGET" / "DOGE WILL WIN"
+- Option 3: 4-5 word question — "DO ALIENS REALLY EXIST?" / "SHIFT DATA TO MOON?"
+- Option 4: 2-3 word declaration — "AREA 51 EXPOSED" / "ELON LIED"
+- Option 5: Punchy verb-action — "TRUMP WINS AGAIN" / "MUSK GOES MARS"
+
+RULES:
+- Max 5 words. Lean toward 2-3.
+- ALL CAPS only.
+- Each option DIFFERENT — different word, different angle, different punctuation.
+- ALWAYS English only — no Hindi/Hinglish.
+- No emojis, no quotes, no punctuation except ? or !
+- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
+    `;
+  }
   if (style === 'professor_jiang') {
     return `
 You are a thumbnail copywriter for breaking news and current-events analysis channels. Write the BIG BOLD TEXT that appears on the thumbnail — the 2-4 word SHOCKER in huge yellow/white caps on a red breaking news banner.
@@ -400,6 +454,34 @@ THUMBNAIL TEXT RULES:
 - 2-4 words CAPS. NAME the core concept or drop the most shocking fact.
 - BAD: "MUST WATCH" (says nothing)
 - GOOD: "48 LAWS" / "WAR TRUTH" / "REAL REASON" / "HIDDEN TRUTH"`
+
+    : videoStyle === 'phone_studio'
+    ? `STYLE — Phone Studio (Phone Screen + Celebrity Face + Big Red/White Text):
+TITLE RULES:
+- Ultra-short, catchy, viral-Shorts energy. 35-55 chars MAX.
+- ALWAYS name the celebrity / featured person from the script in the title (e.g. "Joe Rogan", "Trump", "Elon Musk").
+- Format options: bold question / shock claim / reveal. Pick whichever hits hardest for THIS script.
+- BAD: "An Interesting Take On Aliens" (no name, no punch)
+- GOOD: "Do Aliens Exist? — Joe Rogan Reveals The Truth"
+- GOOD: "Elon Musk Wants Data Centers On The Moon"
+- GOOD: "Trump: War Phase Won Again"
+
+THUMBNAIL TEXT RULES:
+- 2-5 word ALL CAPS punch — fits inside the central red+white impact text block.
+- A short QUESTION ("ALIENS REAL?") or a SHOCK DECLARATION ("WAR PHASE WON").
+- The CELEBRITY NAME from the title goes on the PHONE STATUS BAR, NOT in the big text — so the big text is the topic hook, not the person.
+- Title + thumbnail text together should feel like one viral combo where the text is the visual stinger.
+- BAD: thumbnail text = same words as title (echoes)
+- GOOD pair: title "Do Aliens Exist? — Joe Rogan Reveals The Truth" + text "DO ALIENS EXIST?"
+- GOOD pair: title "Elon Musk Wants Data Centers On The Moon" + text "SHIFT DATA TO MOON"
+- GOOD pair: title "Trump: War Phase Won Again" + text "WAR PHASE WON!"
+
+DESCRIPTION RULES — write the BRIEF for an AI image generator. MUST include:
+- The CELEBRITY NAME so the generator places the right face on the right side of the phone (e.g. "celebrity: Joe Rogan, late 50s, bald, grey goatee, black t-shirt")
+- The PHONE SCREEN content — a topic-specific image showing on the phone (e.g. "phone screen shows a glowing alien face / a moon with data servers / war battlefield")
+- The BIG TEXT on screen (matches thumbnailText, ALL CAPS, white + red split)
+- Background = pure black or very dark grey, cinematic.
+- Keep it 3-5 sentences, actionable for an image model.`
 
     : videoStyle === 'professor_jiang'
     ? `STYLE — Breaking News / Current Events Analysis (Fox News Alert style):
@@ -4378,6 +4460,110 @@ KEY VISUAL RULES:
 - 16:9 aspect ratio, 1920×1080 quality feel
 - Photorealistic — NOT illustrated or cartoon${extraNote}`;
 
+  } else if (videoStyle === 'phone_studio') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    // The featured person whose face goes on the right side of the thumbnail.
+    // The user picks them in the "Guest" field — fall back to host if guest empty.
+    const celebrityName = (guestName || hostName || '').trim();
+
+    // ── Step 1: Ask Gemini what should appear on the PHONE SCREEN ──
+    let phoneScreenVisual = 'A topic-specific dramatic photo filling the phone screen — e.g. a glowing alien face, a moon base, a war battlefield, a stock market crash — chosen to match the script topic';
+    let celebrityDescription = celebrityName
+      ? `${celebrityName} — match the real public photographs of this person EXACTLY (face, age, hair, signature look). Confident expression, head-and-shoulders crop.`
+      : 'A confident, recognizable male public figure appropriate for the topic — photorealistic head-and-shoulders crop, dramatic studio lighting';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `You are a thumbnail art director for the "Phone Studio" YouTube style — a viral format where a vertical phone (showing an AI chat about the topic) sits on the LEFT and a celebrity's face fills the RIGHT, with huge red+white text in the middle.
+
+SCRIPT EXCERPT:
+${scriptSnippet}
+
+CELEBRITY (featured person whose face goes on the right): ${celebrityName || '(unspecified — infer from script)'}
+HOOK TEXT (will appear huge on screen): "${title}"
+
+Decide the SINGLE most viral image to display ON THE PHONE SCREEN — one bold photo/illustration that visually represents the topic. Examples:
+- For "Do Aliens Exist?" → a glowing alien grey face, sci-fi neon
+- For "Shift Data Centers To Moon" → a glowing moon with server racks, deep space stars
+- For "War Phase Won" → a dramatic battlefield with explosions and tanks
+- For "Trump Beats Powell" → a federal reserve building crumbling with dollar bills flying
+
+Reply ONLY in JSON, no markdown:
+{
+  "phoneScreen": "One vivid 1-2 sentence description of the topic image showing on the phone screen — photorealistic, dramatic, fills the screen",
+  "celebrity": "One sentence pinning the celebrity's appearance — face, age, hair, what they're wearing, expression matching the topic mood"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const entityRaw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const entities = JSON.parse(entityRaw);
+        if (entities.phoneScreen) phoneScreenVisual = entities.phoneScreen;
+        if (entities.celebrity && !celebrityName) celebrityDescription = entities.celebrity;
+        else if (entities.celebrity && celebrityName) {
+          celebrityDescription = `${celebrityName} — ${entities.celebrity}. Match the real public photographs of ${celebrityName} EXACTLY (face, age, hair, signature look).`;
+        }
+      } catch (e) {
+        console.warn('[PhoneStudio] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    // Split the hook text — first half white, last 1-2 words red (matches reference).
+    const hookClean = (title || '').replace(/["“”]/g, '').trim();
+    const hookWords = hookClean.split(/\s+/).filter(Boolean);
+    const redWordCount = Math.min(2, Math.max(1, Math.floor(hookWords.length / 2)));
+    const whitePart = hookWords.slice(0, hookWords.length - redWordCount).join(' ');
+    const redPart   = hookWords.slice(hookWords.length - redWordCount).join(' ');
+
+    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE STUDIO" style thumbnail — viral AI-chat / podcast-clip aesthetic. The composition is FIXED:
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ LEFT SIDE (≈ 35% of frame): A REALISTIC IPHONE-STYLE SMARTPHONE
+- Vertical phone, slight tilt (~-4°), photorealistic glossy black bezel, rounded corners
+- Status bar at top: small white text "${celebrityName || 'Speaker'}" (left, with tiny pulse dot indicating "Speaking") and battery "73%" on the right
+- The ENTIRE phone screen is filled with this image: ${phoneScreenVisual}
+- At the bottom of the phone screen: a small red circular X close button (the "end call" button)
+- The phone sits against the dark background, dramatic side-light glinting on the bezel
+
+▶ RIGHT SIDE (≈ 50% of frame): THE CELEBRITY FACE
+- ${celebrityDescription}
+- Head-and-shoulders, sharp focus, looking slightly toward the text (i.e. toward the left/center)
+- Cinematic studio lighting — slight rim light, dramatic mood matching the topic
+- A small name label tag floating near the face: "${celebrityName || 'SPEAKER'}" — white text, thin pointer line from the label to the person
+
+▶ CENTER / OVERLAY — THE MASSIVE HOOK TEXT:
+- The text "${hookClean}" rendered HUGE, dominating the middle of the frame, overlapping slightly onto the phone area
+- Font: ultra-bold, condensed italic display sans-serif (Anton / Bebas Neue / Impact extended-italic feel), ALL CAPS, slight rightward tilt
+- Color split: "${whitePart}" in PURE WHITE, "${redPart}" in BRIGHT RED (#ED1C24) — this is the visual stinger
+- Stack on 2-3 lines if needed, left-aligned, hugging the right edge of the phone
+- Slight subtle dark drop-shadow under the text so it stays readable against the celebrity face
+- NO additional text elements anywhere else
+
+▶ BACKGROUND:
+- Pure black to very dark charcoal (#0a0a0a → #1a1a1a) with a soft vignette
+- NO patterns, NO gradients other than vignette, NO additional graphics
+- Cinematic, moody, completely focused on the phone + face + text
+
+════ STRICT RULES ════
+- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D-rendered look
+- The celebrity face MUST be recognizable as ${celebrityName || 'the named figure'} — match real reference photos
+- Phone screen visual MUST match the topic of the script
+- Big text is the most readable element — high contrast, sharp edges
+- 16:9 aspect ratio (1920×1080)
+- No watermarks, no logos other than the small phone status icons${extraNote}`;
+
   } else if (videoStyle === 'professor_jiang') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
 
@@ -5762,6 +5948,65 @@ export interface ShortsSegment {
 
 export type ClipMode = 'short' | 'long';
 
+// Robust text extraction — `response.text` getter can be missing after JSON
+// proxying, and grounding/tool calls sometimes leave it empty. Falls back to
+// concatenating every text part across every candidate.
+const extractGeminiText = (response: any): string => {
+  if (typeof response?.text === 'string' && response.text.trim()) return response.text;
+  const candidates = response?.candidates;
+  if (!Array.isArray(candidates)) return '';
+  const chunks: string[] = [];
+  for (const c of candidates) {
+    const parts = c?.content?.parts;
+    if (!Array.isArray(parts)) continue;
+    for (const p of parts) {
+      if (typeof p?.text === 'string') chunks.push(p.text);
+    }
+  }
+  return chunks.join('').trim();
+};
+
+const parseSegmentsJson = (
+  text: string,
+  label: string,
+): { segments: ShortsSegment[] } => {
+  const tryParse = (s: string): { segments: ShortsSegment[] } | null => {
+    try {
+      const p = JSON.parse(s);
+      if (p && Array.isArray(p.segments)) return p;
+      if (Array.isArray(p)) return { segments: p };
+      return null;
+    } catch { return null; }
+  };
+
+  let parsed = tryParse(text);
+  if (!parsed) {
+    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    parsed = tryParse(stripped);
+    if (!parsed) {
+      const obj = stripped.match(/\{[\s\S]*\}/);
+      if (obj) parsed = tryParse(obj[0]);
+      if (!parsed) {
+        const arr = stripped.match(/\[[\s\S]*\]/);
+        if (arr) {
+          const p = tryParse(arr[0]);
+          if (p) parsed = p;
+        }
+      }
+    }
+  }
+
+  if (!parsed) {
+    console.error(`${label} AI raw response:`, text.slice(0, 500));
+    throw new Error(
+      text.trim()
+        ? `AI response was not valid JSON. Got: ${text.slice(0, 120)}`
+        : 'AI returned an empty response. Try again, or shorten the transcript.'
+    );
+  }
+  return parsed;
+};
+
 export const findBestShortsSegments = async (
   transcript: { text: string; start: number; end: number }[],
   rangeStart?: number,
@@ -5846,37 +6091,33 @@ ${lines}`;
   const response = await ai.models.generateContent({
     model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
-    config: { responseMimeType: 'application/json' },
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          segments: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                start: { type: Type.NUMBER },
+                end: { type: Type.NUMBER },
+                description: { type: Type.STRING },
+                hook: { type: Type.STRING },
+              },
+              required: ['title', 'start', 'end'],
+            },
+          },
+        },
+        required: ['segments'],
+      },
+    },
   });
 
-  const text = response.text || '';
-  let parsed: { segments: ShortsSegment[] };
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    // Try stripping markdown code fences first
-    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-    try {
-      parsed = JSON.parse(stripped);
-    } catch {
-      // Try extracting first {...} block
-      const m = stripped.match(/\{[\s\S]*\}/);
-      if (!m) {
-        console.error('Clip AI raw response:', text.slice(0, 500));
-        throw new Error(`AI response was not valid JSON. Got: ${text.slice(0, 120)}`);
-      }
-      try {
-        parsed = JSON.parse(m[0]);
-      } catch {
-        console.error('Clip AI raw response:', text.slice(0, 500));
-        throw new Error(`AI response JSON malformed. Got: ${m[0].slice(0, 120)}`);
-      }
-    }
-  }
-
-  if (!parsed?.segments || !Array.isArray(parsed.segments)) {
-    throw new Error('AI response missing segments array');
-  }
+  const text = extractGeminiText(response);
+  const parsed = parseSegmentsJson(text, 'Clip');
 
   return parsed.segments
     .filter(s => typeof s.start === 'number' && typeof s.end === 'number' && s.end > s.start)
@@ -6050,12 +6291,26 @@ STRICT: Do NOT add watermarks. Only show the person and the text box as describe
 export type ClipDurationMode = 'auto' | 'under1min' | '2min' | '5min' | '8min' | '15min' | 'custom';
 export type ClipRatio = '9:16' | '16:9';
 
+export type ClipCount = number | 'auto';
+
 export interface VideoClipGeneratorConfig {
   ratio: ClipRatio;
   durationMode: ClipDurationMode;
   customDurationSeconds?: number; // used when durationMode === 'custom'
-  clipCount: number; // 1–5
+  clipCount: ClipCount; // 1–5, or 'auto' to scale with video length
 }
+
+// Auto clip count: scales with video length so a 2-hour video yields many clips,
+// not just 3. Caps at sane upper bounds so we don't blow up the prompt budget.
+const autoClipCount = (totalSeconds: number, ratio: ClipRatio): number => {
+  const minutes = totalSeconds / 60;
+  if (ratio === '9:16') {
+    // ~1 short per 8 min of content, baseline 3, capped at 30
+    return Math.min(30, Math.max(3, Math.round(minutes / 8)));
+  }
+  // long form: ~1 clip per 15 min, baseline 2, capped at 15
+  return Math.min(15, Math.max(2, Math.round(minutes / 15)));
+};
 
 function buildDurationConstraint(config: VideoClipGeneratorConfig): { minS: number; maxS: number; label: string } {
   if (config.durationMode === 'custom' && config.customDurationSeconds) {
@@ -6083,7 +6338,10 @@ export const generateVideoClipsFromTranscript = async (
   const ai = getAi();
 
   const { minS, maxS, label } = buildDurationConstraint(config);
-  const n = config.clipCount;
+  const totalSeconds = transcript[transcript.length - 1].end - transcript[0].start;
+  const n = config.clipCount === 'auto'
+    ? autoClipCount(totalSeconds, config.ratio)
+    : config.clipCount;
   const formatHint = config.ratio === '9:16'
     ? 'short-form vertical video (YouTube Shorts / Reels / TikTok) — punchy, high-energy, hooky'
     : 'long-form horizontal video (YouTube full video) — informative, complete, in-depth';
@@ -6132,39 +6390,37 @@ ${lines}`;
   const response = await ai.models.generateContent({
     model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
-    config: { responseMimeType: 'application/json' },
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          segments: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                start: { type: Type.NUMBER },
+                end: { type: Type.NUMBER },
+                description: { type: Type.STRING },
+                hook: { type: Type.STRING },
+              },
+              required: ['title', 'start', 'end'],
+            },
+          },
+        },
+        required: ['segments'],
+      },
+    },
   });
 
-  const text = response.text || '';
-  let parsed: { segments: ShortsSegment[] };
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-    try {
-      parsed = JSON.parse(stripped);
-    } catch {
-      const m = stripped.match(/\{[\s\S]*\}/);
-      if (!m) {
-        console.error('ClipGen AI raw response:', text.slice(0, 500));
-        throw new Error(`AI response was not valid JSON. Got: ${text.slice(0, 120)}`);
-      }
-      try {
-        parsed = JSON.parse(m[0]);
-      } catch {
-        console.error('ClipGen AI raw response:', text.slice(0, 500));
-        throw new Error(`AI response JSON malformed. Got: ${m[0].slice(0, 120)}`);
-      }
-    }
-  }
-
-  if (!parsed?.segments || !Array.isArray(parsed.segments)) {
-    throw new Error('AI response missing segments array');
-  }
+  const text = extractGeminiText(response);
+  const parsed = parseSegmentsJson(text, 'ClipGen');
 
   return parsed.segments
     .filter(s => typeof s.start === 'number' && typeof s.end === 'number' && s.end > s.start)
-    .slice(0, config.clipCount)
+    .slice(0, n)
     .map(s => ({
       title: s.title || 'Untitled clip',
       start: Math.max(0, s.start),

@@ -20,6 +20,7 @@ import {
   type ClipDurationMode,
   type ClipRatio,
   type VideoClipGeneratorConfig,
+  type ClipCount,
 } from '../services/geminiService';
 import type { YoutubeImportData } from '../types';
 
@@ -111,7 +112,7 @@ const VideoClipImporter: React.FC<Props> = ({ onUseTranscript, onSendToShorts })
   const [ratio,        setRatio]        = useState<ClipRatio>('9:16');
   const [durationMode, setDurationMode] = useState<ClipDurationMode>('auto');
   const [customMins,   setCustomMins]   = useState('2');
-  const [clipCount,    setClipCount]    = useState(3);
+  const [clipCount,    setClipCount]    = useState<ClipCount>('auto');
   const [step,         setStep]         = useState<ProcessStep>('idle');
   const [errorMsg,     setErrorMsg]     = useState('');
   const [dlSub,        setDlSub]        = useState('');
@@ -318,25 +319,32 @@ const VideoClipImporter: React.FC<Props> = ({ onUseTranscript, onSendToShorts })
           )}
         </div>
 
-        {/* Clip Count — 5 number pills */}
+        {/* Clip Count — Auto + 5 number pills */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Number of Clips</label>
           <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map(n => (
-              <button
-                key={n}
-                onClick={() => setClipCount(n)}
-                disabled={running}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all disabled:opacity-40 ${
-                  clipCount === n
-                    ? 'bg-purple-500/[0.12] border-purple-500/40 text-white shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                    : 'bg-[#0d0d0d] border-white/[0.06] text-gray-500 hover:border-white/[0.1] hover:text-gray-300'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+            {(['auto', 1, 2, 3, 4, 5] as const).map(n => {
+              const selected = clipCount === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => setClipCount(n)}
+                  disabled={running}
+                  title={n === 'auto' ? 'AI picks count based on video length (long videos → many clips)' : undefined}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all disabled:opacity-40 ${
+                    selected
+                      ? 'bg-purple-500/[0.12] border-purple-500/40 text-white shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                      : 'bg-[#0d0d0d] border-white/[0.06] text-gray-500 hover:border-white/[0.1] hover:text-gray-300'
+                  }`}
+                >
+                  {n === 'auto' ? 'Auto' : n}
+                </button>
+              );
+            })}
           </div>
+          {clipCount === 'auto' && (
+            <p className="text-[10px] text-gray-600 pt-0.5">Scales with video length — a 2 hr video → ~15 shorts or ~8 long clips.</p>
+          )}
         </div>
       </div>
 
