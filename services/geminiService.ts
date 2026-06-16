@@ -594,7 +594,7 @@ Write in plain English. No bullet points. No JSON. Just a short, crisp art direc
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
     return response.text?.trim() || '';
@@ -631,7 +631,7 @@ export const generateNarratorPrompts = async (scriptText: string): Promise<strin
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -677,7 +677,7 @@ export const transcribeAudioBlob = async (audioBlob: Blob): Promise<TranscriptSe
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
+      model: 'gemini-3-flash', 
       contents: {
         parts: [
             {
@@ -4119,7 +4119,7 @@ export const detectSpeakers = async (topic: string, count: number = 2): Promise<
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-flash',
       contents: { parts: [{ text: prompt }] },
       config: {
         responseMimeType: "application/json",
@@ -4175,7 +4175,7 @@ export const rewriteScriptSegment = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-flash',
       contents: { parts: [{ text: prompt }] },
     });
 
@@ -4292,7 +4292,7 @@ const fileToBase64 = (file: File): Promise<string> => {
 const extractStyleFromImage = async (
   referenceImage: { data: string; mimeType: string }
 ): Promise<string> => {
-  const response = await callGemini('gemini-3-flash-preview', {
+  const response = await callGemini('gemini-3-flash', {
     parts: [
       {
         inlineData: {
@@ -4762,7 +4762,7 @@ STYLE RULES:
     parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-3.1-flash-image',
       contents: { parts: parts },
       config: {
         imageConfig: {
@@ -4890,7 +4890,7 @@ Comments:
 ${JSON.stringify(sample)}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -4912,7 +4912,7 @@ export const pickFunnyCommentsForSong = async (
   comments: string[],
   count: number = 20,
   language: string = 'Hindi',
-  model: string = 'gemini-3-flash-preview',
+  model: string = 'gemini-3-flash',
 ): Promise<string[]> => {
   const ai = getAi();
   const cleaned = comments
@@ -4972,7 +4972,7 @@ Comments:
 ${sample}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
   return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Every opinion matters. Every voice counts.";
@@ -4991,7 +4991,7 @@ Input:
 ${textsJson}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -5029,7 +5029,7 @@ Script excerpt:
 ${excerpt}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -5070,7 +5070,7 @@ Return ONLY the topic phrase, nothing else. Example outputs:
 - "celebrity mental health crisis"`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
@@ -5244,7 +5244,7 @@ ${commentSample}
 Write ONE complete, detailed Veo 3 prompt. Start directly with the scene description. No preamble, no explanation, no markdown headers. Just the prompt text (150-250 words).`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
   return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
@@ -5303,7 +5303,7 @@ SCRIPT POINTS TO MAP (each point = Narrator intro + full speaker discussion):
 ${narratorStr}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
@@ -5406,7 +5406,7 @@ export const generateContextBridgeConclusion = async (
   language: string,
   speakerName: string,
   contextContent: string,
-  model: string = 'gemini-3-flash-preview',
+  model: string = 'gemini-3-flash',
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -5647,7 +5647,7 @@ STRICT RULES:
 
   try {
     const response = await ai.models.generateContent({
-      model: params.model || 'gemini-3-flash-preview',
+      model: params.model || 'gemini-3-flash',
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],

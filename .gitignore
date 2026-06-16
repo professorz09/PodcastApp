@@ -31,3 +31,4 @@ artifacts/
 attached_assets/
 __pycache__/
 *.pyc
+.vercel

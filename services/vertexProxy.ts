@@ -95,8 +95,47 @@ export function translateThinkingForVertex(model: string, genConfig: any): any {
   };
 }
 
+// Vertex AI strictly requires every `contents` entry to carry an explicit
+// `role` of "user" or "model". The Gemini direct API and older SDK paths
+// silently auto-wrap shapes like `{ parts: [...] }` or a bare parts
+// array, but Vertex returns 400 INVALID_ARGUMENT. We normalize once at
+// the proxy so 30+ call sites don't each need to spell out the role.
+function looksLikePart(x: any): boolean {
+  return !!x && typeof x === 'object' && (
+    'text' in x || 'inlineData' in x || 'fileData' in x ||
+    'functionCall' in x || 'functionResponse' in x || 'executableCode' in x ||
+    'codeExecutionResult' in x || 'thought' in x
+  );
+}
+
+function normalizeOne(item: any): any {
+  if (!item || typeof item !== 'object') return item;
+  // Already canonical shape — leave alone.
+  if (item.role && item.parts) return item;
+  // `{ parts: [...] }` with no role — default to user.
+  if (item.parts && !item.role) return { role: 'user', ...item };
+  // Bare Part (e.g. `{ text: '...' }` or `{ inlineData: ... }`) — wrap.
+  if (looksLikePart(item)) return { role: 'user', parts: [item] };
+  return item;
+}
+
+export function normalizeContents(contents: any): any {
+  if (contents == null) return contents;
+  // Plain string — SDK wraps as user message itself.
+  if (typeof contents === 'string') return contents;
+  if (Array.isArray(contents)) {
+    // Mixed array of bare Parts → wrap whole thing as one user message.
+    if (contents.length > 0 && contents.every(looksLikePart)) {
+      return [{ role: 'user', parts: contents }];
+    }
+    return contents.map(normalizeOne);
+  }
+  return normalizeOne(contents);
+}
+
 export async function callGemini(model: string, contents: any, genConfig: any) {
   const { ai, mode } = getGeminiClient();
   const finalConfig = mode === 'vertex' ? translateThinkingForVertex(model, genConfig) : genConfig;
-  return ai.models.generateContent({ model, contents, config: finalConfig });
+  const finalContents = mode === 'vertex' ? normalizeContents(contents) : contents;
+  return ai.models.generateContent({ model, contents: finalContents, config: finalConfig });
 }
