@@ -309,33 +309,34 @@ async function startServer() {
     }
   });
 
-  // ── Gemini API proxy — keeps the key server-side only ───────────────────
+  // ── Gemini API proxy — Vertex AI (Service Account) preferred, falls back
+  // to GEMINI_API_KEY. Same logic the Vercel function uses in production
+  // (api/gemini.ts), so dev/prod behave identically.
   app.post('/api/gemini', async (req, res) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
-    }
-
     const { model, contents, config: genConfig } = req.body;
     if (!model || !contents) {
       return res.status(400).json({ error: 'Missing model or contents in request body.' });
     }
-
     try {
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({ model, contents, config: genConfig });
+      const { callGemini } = await import('./services/vertexProxy');
+      const response = await callGemini(model, contents, genConfig);
       res.json(response);
     } catch (error: any) {
       console.error('Gemini proxy error:', error);
-      res.status(500).json({ error: error.message || 'Gemini API call failed' });
+      const msg = error?.message || 'Gemini API call failed';
+      const isQuota = /RESOURCE_EXHAUSTED|429|quota/i.test(msg);
+      res.status(isQuota ? 429 : 500).json({ error: msg });
     }
   });
 
-  // ── Gemini API key check endpoint ────────────────────────────────────────
+  // ── Gemini key/backend check endpoint ────────────────────────────────────
   app.get('/api/gemini/key-check', (_req, res) => {
-    const hasKey = !!(process.env.GEMINI_API_KEY);
-    res.json({ hasKey });
+    const hasVertex = !!(process.env.GCP_SA_KEY && process.env.GCP_PROJECT_ID);
+    const hasApiKey = !!process.env.GEMINI_API_KEY;
+    res.json({
+      hasKey: hasVertex || hasApiKey,
+      backend: hasVertex ? 'vertex' : hasApiKey ? 'apikey' : 'none',
+    });
   });
 
   // Flask proxy routes — forward YouTube/video/files API calls to Flask on port 8000
