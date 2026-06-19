@@ -432,6 +432,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   const audioRef = useRef<{ blob: Blob; url: string; duration: number } | null>(null);
   const timingsRef = useRef<{ word: string; start: number; end: number }[] | null>(null);
   const videoRef = useRef<{ blob: Blob; url: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Free the video blob URL on unmount
   useEffect(() => {
@@ -1008,6 +1009,65 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
     }
   };
 
+  // ── 1b. Upload transcript file ─────────────────────────────────────────────
+  const handleTranscriptFile = async (file: File) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const text = await file.text();
+    let segs: PodcastTranscriptSeg[] = [];
+
+    try {
+      if (ext === 'json') {
+        // JSON: [{text, start, duration?}] or [{text, offset, duration?}] (yt formats)
+        const parsed = JSON.parse(text);
+        const arr = Array.isArray(parsed) ? parsed : (parsed.segments || parsed.transcript || []);
+        segs = arr.map((s: any, i: number) => ({
+          text: String(s.text || s.content || '').trim(),
+          start: Number(s.start ?? s.offset ?? i * 5),
+          duration: Number(s.duration ?? 5),
+        })).filter((s: PodcastTranscriptSeg) => s.text);
+      } else if (ext === 'srt') {
+        // SRT: parse timing + text
+        const blocks = text.trim().split(/\n\n+/);
+        segs = blocks.flatMap(block => {
+          const lines = block.trim().split('\n');
+          const timeLine = lines.find(l => l.includes('-->'));
+          if (!timeLine) return [];
+          const textLines = lines.filter(l => l.trim() && !l.includes('-->') && !/^\d+$/.test(l.trim()));
+          const txt = textLines.join(' ').trim();
+          if (!txt) return [];
+          const toSec = (t: string) => {
+            const [h, m, rest] = t.trim().replace(',', '.').split(':');
+            return (+h) * 3600 + (+m) * 60 + parseFloat(rest);
+          };
+          const [startStr, endStr] = timeLine.split('-->');
+          const start = toSec(startStr);
+          const end = toSec(endStr);
+          return [{ text: txt, start, duration: Math.max(0, end - start) }];
+        }).filter(s => s.text);
+      } else {
+        // Plain text — split by lines/paragraphs, fake timestamps
+        const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+        let t = 0;
+        segs = lines.map(line => {
+          const dur = Math.max(3, line.split(' ').length * 0.4);
+          const seg = { text: line, start: t, duration: dur };
+          t += dur;
+          return seg;
+        });
+      }
+    } catch {
+      toast.error('File parse nahi hui — JSON, SRT, ya plain text try karo');
+      return;
+    }
+
+    if (!segs.length) { toast.error('File mein koi transcript nahi mila'); return; }
+    setSegments(segs);
+    if (!podcastTitle.trim()) setPodcastTitle(file.name.replace(/\.[^.]+$/, ''));
+    setPhase('cuts');
+    toast.success(`✓ ${segs.length} segments file se load hue`);
+  };
+
   // ── 2. Cuts management ─────────────────────────────────────────────────────
   const handleAddCut = () => {
     const s = parseTsInput(cutStartTxt);
@@ -1205,6 +1265,36 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
             {fetching
               ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Transcript fetch ho raha hai…</>
               : <>📥 Fetch Transcript</>}
+          </button>
+
+          {/* Transcript file upload — fallback when YouTube fails */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ya</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.srt,.txt"
+            style={{ display: 'none' }}
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) handleTranscriptFile(f);
+              e.target.value = '';
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              padding: '10px', borderRadius: 12, border: '1px dashed rgba(255,255,255,0.2)',
+              background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.55)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            📄 Transcript File Upload (.json / .srt / .txt)
           </button>
         </>
       )}
