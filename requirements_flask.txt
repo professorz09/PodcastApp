@@ -11,7 +11,3 @@ yt-dlp>=2024.1.0
 youtube-transcript-api>=0.6.0
 instagrapi==2.1.3
 pydantic<2.12
-# Gemini fallback for transcript fetching when YouTube blocks scraping.
-# Gemini 3.x watches the video directly from the URL and returns a transcript.
-google-genai>=1.0.0
-google-auth>=2.0.0
