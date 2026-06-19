@@ -210,6 +210,28 @@ def _json_cookies_to_netscape(content: str) -> str | None:
     return '\n'.join(lines) + '\n'
 
 
+def _load_cookies_from_env():
+    """On startup: if YT_COOKIES_JSON env var is set, convert it to Netscape
+    format and write to yt_cookies.txt. This lets cookies be configured via
+    Render environment variables instead of manual uploads (which don't survive
+    restarts on the free tier)."""
+    raw = os.environ.get('YT_COOKIES_JSON', '').strip()
+    if not raw:
+        return
+    netscape = _json_cookies_to_netscape(raw)
+    if not netscape:
+        print('[cookies] YT_COOKIES_JSON set but could not parse — ignored', flush=True)
+        return
+    try:
+        with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
+            f.write(netscape)
+        print(f'[cookies] Loaded YouTube cookies from YT_COOKIES_JSON env var ({COOKIES_FILE})', flush=True)
+    except Exception as exc:
+        print(f'[cookies] Failed to write cookies file: {exc}', flush=True)
+
+_load_cookies_from_env()
+
+
 @app.route('/api/cookies/upload', methods=['POST'])
 def upload_cookies():
     """Upload a cookies file. Accepts Netscape (.txt) format directly, or
