@@ -370,7 +370,7 @@ def get_transcript():
             failure_reason = 'VIDEO_UNAVAILABLE'
         elif 'too many requests' in err_str or '429' in err_str:
             failure_reason = 'RATE_LIMITED'
-        elif 'age' in err_str or 'inappropriate' in err_str:
+        elif 'age-restricted' in err_str or 'age restricted' in err_str or 'inappropriate' in err_str:
             failure_reason = 'AGE_RESTRICTED'
         else:
             failure_reason = str(e)
@@ -401,65 +401,84 @@ def get_transcript():
                 continue
 
     # ── Attempt 3: yt-dlp subtitle fallback
+    # Uses two player-client sets:
+    #   Pass A — fast clients, no login needed for normal videos
+    #   Pass B — tv_embedded / web_creator which YouTube allows for age-gated
+    #            content (they bypass age-check even without cookies)
+    _ytdlp_passes = [
+        ['android', 'android_vr', 'ios', 'mweb'],
+        ['tv_embedded', 'web_creator', 'web_embedded'],
+    ]
     if raw is None:
-        for sub_langs in ['hi.*,hi-IN,ur.*', 'en.*', 'all']:
-            try:
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    out_tmpl = os.path.join(tmpdir, '%(id)s')
-                    cmd = [
-                        _YTDLP_BIN,
-                        '--write-auto-subs', '--write-subs',
-                        '--sub-langs', sub_langs,
-                        '--sub-format', 'json3',
-                        '--skip-download', '--no-playlist',
-                        '--no-check-certificates',
-                        '--extractor-args', 'youtube:player_client=android,android_vr,ios',
-                        *cookies_args(),
-                        '-o', out_tmpl,
-                        url
-                    ]
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-                    # Detect yt-dlp specific errors
-                    if result.returncode != 0:
-                        stderr = result.stderr.lower()
-                        if 'private video' in stderr:
-                            failure_reason = 'VIDEO_PRIVATE'
-                        elif 'age' in stderr:
-                            failure_reason = 'AGE_RESTRICTED'
-                        elif 'not available' in stderr or 'unavailable' in stderr:
-                            failure_reason = 'VIDEO_UNAVAILABLE'
-
-                    files = [f for f in os.listdir(tmpdir) if f.endswith('.json3')]
-                    files.sort(key=lambda f: lang_rank(f.split('.')[-2]) if '.' in f else 99)
-                    for fname in files:
-                        try:
-                            lcode = fname.split('.')[-2] if fname.count('.') >= 2 else 'auto'
-                            with open(os.path.join(tmpdir, fname), 'r', encoding='utf-8') as f:
-                                sub_data = json.load(f)
-                            events = sub_data.get('events', [])
-                            candidate = []
-                            for ev in events:
-                                segs = ev.get('segs', [])
-                                raw_text = ''.join(s.get('utf8', '') for s in segs)
-                                text = clean_caption_text(raw_text)
-                                if text:
-                                    candidate.append({
-                                        'text': text,
-                                        'start': ev.get('tStartMs', 0) / 1000,
-                                        'duration': ev.get('dDurationMs', 0) / 1000
-                                    })
-                            if candidate:
-                                raw = candidate
-                                lang_used = lcode
-                                break
-                        except Exception:
-                            continue
+        _all_ytdlp_errors = []
+        for _pass_clients in _ytdlp_passes:
+            if raw:
+                break
+            for sub_langs in ['hi.*,hi-IN,ur.*', 'en.*', 'all']:
                 if raw:
                     break
-            except Exception as e:
-                if not failure_reason:
-                    failure_reason = str(e)
-                continue
+                try:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        out_tmpl = os.path.join(tmpdir, '%(id)s')
+                        cmd = [
+                            _YTDLP_BIN,
+                            '--write-auto-subs', '--write-subs',
+                            '--sub-langs', sub_langs,
+                            '--sub-format', 'json3',
+                            '--skip-download', '--no-playlist',
+                            '--no-check-certificates',
+                            '--extractor-args', f'youtube:player_client={",".join(_pass_clients)}',
+                            *_js_runtime_args(),
+                            *cookies_args(),
+                            '-o', out_tmpl,
+                            url
+                        ]
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                        if result.returncode != 0:
+                            _stderr = result.stderr
+                            _stderr_l = _stderr.lower()
+                            _all_ytdlp_errors.append(_stderr.strip()[-300:])
+                            # Precise matching — 'age' alone is too broad and
+                            # matches "usage", "package", "message", etc.
+                            if 'private video' in _stderr_l:
+                                failure_reason = 'VIDEO_PRIVATE'
+                            elif 'age-restricted' in _stderr_l or 'age restricted' in _stderr_l or 'inappropriate for some users' in _stderr_l:
+                                failure_reason = 'AGE_RESTRICTED'
+                            elif 'not available' in _stderr_l or 'unavailable' in _stderr_l:
+                                failure_reason = 'VIDEO_UNAVAILABLE'
+                            elif '429' in _stderr_l or 'too many requests' in _stderr_l:
+                                failure_reason = 'RATE_LIMITED'
+
+                        files = [f for f in os.listdir(tmpdir) if f.endswith('.json3')]
+                        files.sort(key=lambda f: lang_rank(f.split('.')[-2]) if '.' in f else 99)
+                        for fname in files:
+                            try:
+                                lcode = fname.split('.')[-2] if fname.count('.') >= 2 else 'auto'
+                                with open(os.path.join(tmpdir, fname), 'r', encoding='utf-8') as f:
+                                    sub_data = json.load(f)
+                                events = sub_data.get('events', [])
+                                candidate = []
+                                for ev in events:
+                                    segs = ev.get('segs', [])
+                                    raw_text = ''.join(s.get('utf8', '') for s in segs)
+                                    text = clean_caption_text(raw_text)
+                                    if text:
+                                        candidate.append({
+                                            'text': text,
+                                            'start': ev.get('tStartMs', 0) / 1000,
+                                            'duration': ev.get('dDurationMs', 0) / 1000
+                                        })
+                                if candidate:
+                                    raw = candidate
+                                    lang_used = lcode
+                                    break
+                            except Exception:
+                                continue
+                except Exception as e:
+                    _all_ytdlp_errors.append(str(e))
+                    if not failure_reason:
+                        failure_reason = str(e)
+                    continue
 
     if not raw:
         # Build specific, actionable error message
@@ -484,9 +503,14 @@ def get_transcript():
             lang_names = [f"{l['name']} ({l['code']})" for l in available_langs[:5]]
             available_hint = f" Available languages: {', '.join(lang_names)}"
 
+        # Log actual yt-dlp stderr to server console so it shows in Render logs
+        if '_all_ytdlp_errors' in dir() and _all_ytdlp_errors:
+            print(f'[transcript] yt-dlp errors for {video_id}: {_all_ytdlp_errors}', flush=True)
+
         return jsonify({
             'error': error_msg + available_hint,
             'error_code': error_code,
+            'debug_reason': failure_reason,
             'available_languages': available_langs,
         }), 200
 
