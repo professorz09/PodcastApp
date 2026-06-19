@@ -481,6 +481,9 @@ def get_transcript():
                     continue
 
     if not raw:
+        # Log everything so Render console shows the real cause
+        print(f'[transcript] FAILED video={video_id} reason={failure_reason!r}', flush=True)
+
         # Build specific, actionable error message
         error_code = 'NO_TRANSCRIPT'
         if failure_reason == 'TRANSCRIPTS_DISABLED':
@@ -490,13 +493,13 @@ def get_transcript():
             error_msg = 'This video is private or unavailable. Please try a public video.'
             error_code = 'VIDEO_UNAVAILABLE'
         elif failure_reason == 'RATE_LIMITED':
-            error_msg = 'YouTube is blocking too many requests. Please wait a minute and try again.'
+            error_msg = 'YouTube is rate-limiting this server. Please wait a minute and try again, or upload YouTube cookies via the settings panel.'
             error_code = 'RATE_LIMITED'
         elif failure_reason == 'AGE_RESTRICTED':
-            error_msg = 'This video is age-restricted. Transcript could not be fetched.'
+            error_msg = 'This video is age-restricted. Upload YouTube cookies via the settings panel to unlock it.'
             error_code = 'AGE_RESTRICTED'
         else:
-            error_msg = 'No transcript found for this video. The creator may have disabled captions, or the video may be too new.'
+            error_msg = f'No transcript found. ({failure_reason or "unknown error"})'
 
         available_hint = ''
         if available_langs:
