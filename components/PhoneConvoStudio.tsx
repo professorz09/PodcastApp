@@ -432,7 +432,6 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   const audioRef = useRef<{ blob: Blob; url: string; duration: number } | null>(null);
   const timingsRef = useRef<{ word: string; start: number; end: number }[] | null>(null);
   const videoRef = useRef<{ blob: Blob; url: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Free the video blob URL on unmount
   useEffect(() => {
@@ -938,6 +937,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   const [chapters, setChapters] = useState<PodcastChapter[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedIdxs, setSelectedIdxs] = useState<number[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleChapter = (i: number) => {
     setSelectedIdxs(prev => {
