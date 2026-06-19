@@ -13,3 +13,15 @@ services:
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
+      # Gemini fallback for transcript fetching when YouTube blocks the scraper.
+      # Set the value in the Render dashboard (sync: false keeps it out of git).
+      # Either GEMINI_API_KEY alone, or GCP_SA_KEY + GCP_PROJECT_ID for Vertex.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GCP_SA_KEY
+        sync: false
+      - key: GCP_PROJECT_ID
+        sync: false
+      # Optional override; defaults to gemini-3.5-flash in code.
+      - key: GEMINI_TRANSCRIPT_MODEL
+        sync: false
