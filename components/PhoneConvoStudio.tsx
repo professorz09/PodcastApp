@@ -938,6 +938,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   const [chapters, setChapters] = useState<PodcastChapter[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedIdxs, setSelectedIdxs] = useState<number[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleChapter = (i: number) => {
     setSelectedIdxs(prev => {
