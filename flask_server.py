@@ -160,9 +160,15 @@ def extract_video_id(url: str) -> str | None:
 @app.route('/api/health', methods=['GET'])
 def health():
     ck = cookies_path()
+    _gemini_configured = bool(
+        os.environ.get('GEMINI_API_KEY')
+        or (os.environ.get('GCP_SA_KEY') and os.environ.get('GCP_PROJECT_ID'))
+    )
     return jsonify({
         'status': 'ok',
         'transcript_api': TRANSCRIPT_API_AVAILABLE,
+        'gemini_sdk': GEMINI_SDK_AVAILABLE,
+        'gemini_fallback': GEMINI_SDK_AVAILABLE and _gemini_configured,
         'download_dir': DOWNLOAD_DIR,
         'cookies': bool(ck),
         'cookies_size': os.path.getsize(COOKIES_FILE) if ck else 0,
@@ -497,21 +503,49 @@ def get_transcript():
                         _genai_types.Part(text=_prompt),
                     ])
                 ],
+                config=_genai_types.GenerateContentConfig(
+                    # Grounding with Google Search — lets Gemini cross-check
+                    # names, facts and context from the video against the web.
+                    tools=[_genai_types.Tool(google_search=_genai_types.GoogleSearch())],
+                    temperature=0.2,
+                ),
             )
 
             _text = (_response.text or '').strip()
-            _json_match = _re.search(r'\[[\s\S]*\]', _text)
-            if _json_match:
-                _segs = json.loads(_json_match.group())
+            # Strip ```json fences if Gemini wrapped the output despite instructions
+            _text = _re.sub(r'^```(?:json)?\s*|\s*```$', '', _text).strip()
+
+            _segs = None
+            # First try: parse the whole array (clean response)
+            _arr_match = _re.search(r'\[[\s\S]*\]', _text)
+            if _arr_match:
+                try:
+                    _segs = json.loads(_arr_match.group())
+                except Exception:
+                    _segs = None
+            # Fallback: long videos can blow the output-token limit and truncate
+            # the JSON mid-array. Salvage every complete {...} object individually.
+            if _segs is None:
+                _segs = []
+                for _obj in _re.finditer(r'\{[^{}]*\}', _text):
+                    try:
+                        _segs.append(json.loads(_obj.group()))
+                    except Exception:
+                        continue
+
+            if _segs:
                 _candidate = []
                 for _s in _segs:
+                    if not isinstance(_s, dict):
+                        continue
                     _t = clean_caption_text(str(_s.get('text', '')))
                     if _t:
-                        _candidate.append({
-                            'text': _t,
-                            'start': float(_s.get('start', 0)),
-                            'duration': float(_s.get('duration', 5)),
-                        })
+                        try:
+                            _start = float(_s.get('start', 0))
+                            _dur = float(_s.get('duration', 5))
+                        except (TypeError, ValueError):
+                            _start, _dur = 0.0, 5.0
+                        _candidate.append({'text': _t, 'start': _start, 'duration': _dur})
                 if _candidate:
                     raw = _candidate
                     lang_used = 'gemini'
