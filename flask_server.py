@@ -41,6 +41,13 @@ try:
 except ImportError:
     TRANSCRIPT_API_AVAILABLE = False
 
+try:
+    from google import genai as _genai
+    from google.genai import types as _genai_types
+    GEMINI_SDK_AVAILABLE = True
+except ImportError:
+    GEMINI_SDK_AVAILABLE = False
+
 def make_transcript_api():
     """Create YouTubeTranscriptApi instance (v1.x instance-based API).
     Loads yt_cookies.txt into a requests.Session if the file exists."""
@@ -439,6 +446,79 @@ def get_transcript():
                     failure_reason = str(e)
                 continue
 
+    # ── Attempt 4: Gemini AI fallback — passes YouTube URL directly to Gemini
+    # Gemini 3.x models can watch the video and produce a transcript natively.
+    if raw is None and GEMINI_SDK_AVAILABLE:
+        try:
+            import re as _re
+            gemini_key = os.environ.get('GEMINI_API_KEY', '')
+            gcp_sa_key = os.environ.get('GCP_SA_KEY', '')
+            gcp_project = os.environ.get('GCP_PROJECT_ID', '')
+            gcp_region = os.environ.get('GCP_REGION', 'global')
+            gemini_model = os.environ.get('GEMINI_TRANSCRIPT_MODEL', 'gemini-3.5-flash')
+
+            if gcp_sa_key and gcp_project:
+                import google.oauth2.service_account as _sa_creds
+                _sa_info = json.loads(gcp_sa_key)
+                _credentials = _sa_creds.Credentials.from_service_account_info(
+                    _sa_info,
+                    scopes=['https://www.googleapis.com/auth/cloud-platform']
+                )
+                _gemini_client = _genai.Client(
+                    vertexai=True,
+                    project=gcp_project,
+                    location=gcp_region,
+                    credentials=_credentials,
+                )
+            elif gemini_key:
+                _gemini_client = _genai.Client(api_key=gemini_key)
+            else:
+                raise ValueError('No Gemini credentials in environment (GEMINI_API_KEY or GCP_SA_KEY+GCP_PROJECT_ID)')
+
+            _prompt = (
+                'Watch this YouTube video carefully and provide a complete, word-for-word transcript.\n\n'
+                'Return ONLY a valid JSON array — no markdown, no explanation, nothing else:\n'
+                '[{"text": "exact spoken words", "start": 0.0, "duration": 5.0}, ...]\n\n'
+                'Rules:\n'
+                '- "text": verbatim speech (Hindi, English, or mixed — preserve as-is)\n'
+                '- "start": seconds from video beginning\n'
+                '- "duration": how long this segment plays (seconds)\n'
+                '- Each segment = one natural sentence or ~5-15 seconds of speech\n'
+                '- If exact timestamps are uncertain, space them evenly based on pacing'
+            )
+
+            _response = _gemini_client.models.generate_content(
+                model=gemini_model,
+                contents=[
+                    _genai_types.Content(parts=[
+                        _genai_types.Part(
+                            file_data=_genai_types.FileData(file_uri=url)
+                        ),
+                        _genai_types.Part(text=_prompt),
+                    ])
+                ],
+            )
+
+            _text = (_response.text or '').strip()
+            _json_match = _re.search(r'\[[\s\S]*\]', _text)
+            if _json_match:
+                _segs = json.loads(_json_match.group())
+                _candidate = []
+                for _s in _segs:
+                    _t = clean_caption_text(str(_s.get('text', '')))
+                    if _t:
+                        _candidate.append({
+                            'text': _t,
+                            'start': float(_s.get('start', 0)),
+                            'duration': float(_s.get('duration', 5)),
+                        })
+                if _candidate:
+                    raw = _candidate
+                    lang_used = 'gemini'
+        except Exception as _ge:
+            if not failure_reason:
+                failure_reason = str(_ge)
+
     if not raw:
         # Build specific, actionable error message
         error_code = 'NO_TRANSCRIPT'
@@ -506,6 +586,7 @@ def get_transcript():
     return jsonify({
         'video_id': video_id,
         'language': lang_used,
+        'transcript_source': 'gemini' if lang_used == 'gemini' else 'youtube',
         'segments': segments,
         'full_text': full_text,
         'title': video_title,
