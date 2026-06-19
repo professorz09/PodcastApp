@@ -87,7 +87,14 @@ function parseSegments(text: string): any[] {
   return objs;
 }
 
-async function geminiFallback(url: string, videoId: string, base: any) {
+// Returns { ok: true, data } on success, or { ok: false, reason } with a
+// human-readable reason so the caller can surface WHY Gemini failed instead
+// of masking it behind the scraper's original error.
+async function geminiFallback(
+  url: string,
+  videoId: string,
+  base: any,
+): Promise<{ ok: true; data: any } | { ok: false; reason: string }> {
   const prompt =
     'Watch this YouTube video carefully and provide a complete, word-for-word transcript.\n\n' +
     'Return ONLY a valid JSON array — no markdown, no explanation, nothing else:\n' +
@@ -99,9 +106,16 @@ async function geminiFallback(url: string, videoId: string, base: any) {
     '- Each segment = one natural sentence or ~5-15 seconds of speech\n' +
     '- If exact timestamps are uncertain, space them evenly based on pacing';
 
+  // Explicit Content with role:'user' — works on both the Vertex and the
+  // direct-API-key SDK paths (a bare Part array is ambiguous on apikey mode).
   const contents = [
-    { fileData: { fileUri: url } },
-    { text: prompt },
+    {
+      role: 'user',
+      parts: [
+        { fileData: { fileUri: url, mimeType: 'video/*' } },
+        { text: prompt },
+      ],
+    },
   ];
   const genConfig = {
     // Grounding with Google Search — cross-checks names/facts against the web.
@@ -109,7 +123,12 @@ async function geminiFallback(url: string, videoId: string, base: any) {
     temperature: 0.2,
   };
 
-  const response: any = await callGemini(GEMINI_MODEL, contents, genConfig);
+  let response: any;
+  try {
+    response = await callGemini(GEMINI_MODEL, contents, genConfig);
+  } catch (e: any) {
+    return { ok: false, reason: `Gemini call failed: ${e?.message || String(e)}` };
+  }
 
   // @google/genai exposes `.text`; fall back to walking candidates.
   let raw = '';
@@ -118,11 +137,20 @@ async function geminiFallback(url: string, videoId: string, base: any) {
   } catch {
     raw = '';
   }
-  if (!raw && response.candidates?.[0]?.content?.parts) {
+  if (!raw && response?.candidates?.[0]?.content?.parts) {
     raw = response.candidates[0].content.parts.map((p: any) => p.text || '').join('');
   }
 
-  const segs = parseSegments(raw || '');
+  if (!raw) {
+    const finish = response?.candidates?.[0]?.finishReason || 'unknown';
+    const block = response?.promptFeedback?.blockReason;
+    return {
+      ok: false,
+      reason: `Gemini returned no text (finishReason=${finish}${block ? `, blockReason=${block}` : ''})`,
+    };
+  }
+
+  const segs = parseSegments(raw);
   const segments = [];
   for (const s of segs) {
     if (!s || typeof s !== 'object') continue;
@@ -138,19 +166,27 @@ async function geminiFallback(url: string, videoId: string, base: any) {
     });
   }
 
-  if (!segments.length) return null;
+  if (!segments.length) {
+    return {
+      ok: false,
+      reason: `Gemini replied but no transcript segments parsed. First 200 chars: ${raw.slice(0, 200)}`,
+    };
+  }
 
   const fullText = segments.map((s) => s.text).join(' ');
   return {
-    video_id: videoId,
-    language: 'gemini',
-    transcript_source: 'gemini',
-    segments,
-    full_text: fullText,
-    // Carry over any metadata the scraper managed to fetch before failing.
-    title: base?.title || '',
-    description: base?.description || '',
-    uploader: base?.uploader || '',
+    ok: true,
+    data: {
+      video_id: videoId,
+      language: 'gemini',
+      transcript_source: 'gemini',
+      segments,
+      full_text: fullText,
+      // Carry over any metadata the scraper managed to fetch before failing.
+      title: base?.title || '',
+      description: base?.description || '',
+      uploader: base?.uploader || '',
+    },
   };
 }
 
@@ -194,29 +230,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // ── Stage B: Gemini fallback (watches the video directly).
+  let gemReason = '';
   try {
     const gem = await geminiFallback(url, videoId, scraperData);
-    if (gem) {
-      return res.status(200).json(gem);
+    if (gem.ok) {
+      return res.status(200).json(gem.data);
     }
+    gemReason = gem.reason;
   } catch (err: any) {
-    console.error('Gemini transcript fallback error:', err?.message || err);
-    // If the scraper had a concrete error to report, prefer surfacing that.
-    if (scraperData?.error) {
-      return res.status(200).json(scraperData);
-    }
-    return res.status(200).json({
-      error: 'Transcript could not be fetched by scraping or Gemini. ' + (err?.message || ''),
-      error_code: 'NO_TRANSCRIPT',
-    });
+    gemReason = `Unexpected: ${err?.message || String(err)}`;
   }
+  console.error('Gemini transcript fallback failed:', gemReason);
 
-  // Both stages produced nothing usable.
-  if (scraperData) {
-    return res.status(200).json(scraperData);
-  }
+  // Surface the real Gemini reason so the cause is visible in the UI toast —
+  // don't silently fall back to the scraper's stale "rate limited" message.
+  const scraperWhy = scraperData?.error_code
+    ? ` (scraper: ${scraperData.error_code})`
+    : '';
   return res.status(200).json({
-    error: 'No transcript found for this video.',
-    error_code: 'NO_TRANSCRIPT',
+    error: `Transcript fetch failed${scraperWhy}. ${gemReason}`,
+    error_code: 'GEMINI_FALLBACK_FAILED',
+    gemini_reason: gemReason,
   });
 }
