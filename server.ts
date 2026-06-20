@@ -87,23 +87,16 @@ async function startServer() {
   });
 
   app.post('/api/google/speech-to-text', async (req, res) => {
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GOOGLE_CLOUD_API_KEY environment variable is not set. Please add it in Secrets.' });
-    }
-
     const { audioContent, languageCode = 'en-US', mimeType, sampleRate } = req.body;
     if (!audioContent) {
       return res.status(400).json({ error: 'Missing audioContent' });
     }
 
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-
-    // ── Helper: call Google STT and return parsed JSON ─────────────────────
-    const callGoogleSTT = async (url: string, body: object) => {
+    // ── Helper: POST to Google STT with given auth header ─────────────────
+    const callGoogleSTT = async (url: string, body: object, authHeader: Record<string, string>) => {
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify(body),
       });
       const ct = resp.headers.get('content-type') || '';
@@ -111,7 +104,7 @@ async function startServer() {
         const txt = await resp.text();
         throw new Error(`Google STT returned non-JSON (HTTP ${resp.status}): ${txt.slice(0, 200)}`);
       }
-      const data = await resp.json();
+      const data = await resp.json() as any;
       if (!resp.ok) {
         const msg = data.error?.message || data.error?.status || JSON.stringify(data.error) || 'Unknown Google STT error';
         throw new Error(`Google STT error (HTTP ${resp.status}): ${msg}`);
@@ -119,11 +112,26 @@ async function startServer() {
       return data;
     };
 
-    try {
-      // ── Try Speech-to-Text v2 first if project ID is available ───────────
+    const buildConfig = (enhanced: boolean) => {
+      const cfg: any = { languageCode, enableWordTimeOffsets: true };
+      if (enhanced) { cfg.model = 'latest_long'; cfg.useEnhanced = true; }
+      if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3') {
+        cfg.encoding = 'MP3'; cfg.sampleRateHertz = sampleRate || 44100;
+      } else if (mimeType === 'audio/wav') {
+        cfg.encoding = 'LINEAR16';
+      } else if (sampleRate) {
+        cfg.sampleRateHertz = sampleRate;
+      }
+      return cfg;
+    };
+
+    const runSTT = async (authHeader: Record<string, string>, urlSuffix: (base: string) => string) => {
+      const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+
+      // Try STT v2 first if project ID is available
       if (projectId) {
         console.log(`Using Google STT v2 (project: ${projectId})`);
-        const v2Url = `https://speech.googleapis.com/v2/projects/${projectId}/locations/global/recognizers/_:recognize?key=${apiKey}`;
+        const v2Url = urlSuffix(`https://speech.googleapis.com/v2/projects/${projectId}/locations/global/recognizers/_:recognize`);
         const v2Body = {
           config: {
             autoDecodingConfig: {},
@@ -134,36 +142,20 @@ async function startServer() {
           content: audioContent,
         };
         try {
-          const v2Data = await callGoogleSTT(v2Url, v2Body);
-          // v2 returns startOffset/endOffset — normalise to v1 shape for client
+          const v2Data = await callGoogleSTT(v2Url, v2Body, authHeader);
           if (v2Data.results) {
             v2Data.results.forEach((r: any) => {
               r.alternatives?.[0]?.words?.forEach((w: any) => {
-                // v2 uses startOffset/endOffset (e.g. "1.200s"); map to startTime/endTime
                 if (w.startOffset !== undefined) w.startTime = w.startOffset;
                 if (w.endOffset !== undefined)   w.endTime   = w.endOffset;
               });
             });
           }
-          return res.json(v2Data);
+          return v2Data;
         } catch (v2Err: any) {
           console.warn('STT v2 failed, falling back to v1p1beta1:', v2Err.message);
         }
       }
-
-      // ── Try v1p1beta1, then fall back to plain v1 ───────────────────────
-      const buildConfig = (enhanced: boolean) => {
-        const cfg: any = { languageCode, enableWordTimeOffsets: true };
-        if (enhanced) { cfg.model = 'latest_long'; cfg.useEnhanced = true; }
-        if (mimeType === 'audio/mpeg' || mimeType === 'audio/mp3') {
-          cfg.encoding = 'MP3'; cfg.sampleRateHertz = sampleRate || 44100;
-        } else if (mimeType === 'audio/wav') {
-          cfg.encoding = 'LINEAR16'; // omit sampleRateHertz — let Google read WAV header
-        } else if (sampleRate) {
-          cfg.sampleRateHertz = sampleRate;
-        }
-        return cfg;
-      };
 
       const versions = [
         { label: 'v1p1beta1', base: 'https://speech.googleapis.com/v1p1beta1', enhanced: true  },
@@ -175,27 +167,24 @@ async function startServer() {
         try {
           console.log(`Trying Google STT ${ver.label}`);
           const config = buildConfig(ver.enhanced);
-          const url = `${ver.base}/speech:recognize?key=${apiKey}`;
-          const data = await callGoogleSTT(url, { config, audio: { content: audioContent } });
+          const url = urlSuffix(`${ver.base}/speech:recognize`);
+          const data = await callGoogleSTT(url, { config, audio: { content: audioContent } }, authHeader);
 
-          // Handle "too long" → long-running
           if (data.error?.message?.includes('too long') || data.error?.message?.includes('duration limit')) {
-            const lrUrl = `${ver.base}/speech:longrunningrecognize?key=${apiKey}`;
-            const lrData = await callGoogleSTT(lrUrl, { config, audio: { content: audioContent } });
+            const lrUrl = urlSuffix(`${ver.base}/speech:longrunningrecognize`);
+            const lrData = await callGoogleSTT(lrUrl, { config, audio: { content: audioContent } }, authHeader);
             console.log('Long-running operation started:', lrData.name);
-            return res.json({ operationName: lrData.name });
+            return { operationName: lrData.name };
           }
 
-          return res.json(data);
+          return data;
         } catch (verErr: any) {
           console.warn(`STT ${ver.label} failed:`, verErr.message);
           lastErr = verErr;
-          // If it's a key-restriction or API-disabled error, no point retrying other versions
           if (verErr.message?.includes('disabled') || verErr.message?.includes('blocked')) break;
         }
       }
 
-      // Build a helpful error with fix instructions
       const rawMsg = lastErr?.message || 'Failed to transcribe audio';
       let helpMsg = rawMsg;
       if (rawMsg.includes('blocked') || rawMsg.includes('API restrictions')) {
@@ -206,6 +195,27 @@ async function startServer() {
         helpMsg = `${rawMsg} — Fix: Enable billing for your Google Cloud project at console.cloud.google.com/billing`;
       }
       throw new Error(helpMsg);
+    };
+
+    // Try Vertex SA auth first
+    try {
+      const { getGCPAccessToken } = await import('./services/vertexProxy.js');
+      const token = await getGCPAccessToken();
+      console.log('STT: using Vertex SA auth');
+      const data = await runSTT({ Authorization: `Bearer ${token}` }, (base) => base);
+      return res.json(data);
+    } catch (saErr: any) {
+      console.warn('STT SA auth failed, falling back to API key:', saErr.message);
+    }
+
+    // Fallback: plain API key
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'No STT auth available: set GCP_SA_KEY or GOOGLE_CLOUD_API_KEY' });
+    }
+    try {
+      const data = await runSTT({}, (base) => `${base}?key=${apiKey}`);
+      res.json(data);
     } catch (error: any) {
       console.error('Google Speech API Error:', error.message);
       res.status(500).json({ error: error.message || 'Failed to transcribe audio' });
@@ -213,40 +223,45 @@ async function startServer() {
   });
 
   app.get('/api/google/operations', async (req, res) => {
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GOOGLE_CLOUD_API_KEY is missing' });
-    }
-
     const { name } = req.query;
     if (!name) {
       return res.status(400).json({ error: 'Missing operation name' });
     }
 
-    try {
-      let url = `https://speech.googleapis.com/v1p1beta1/operations/${name}?key=${apiKey}`;
-      
-      // If the name is a full resource path (e.g. projects/...), use it directly
-      if (String(name).includes('/')) {
-          url = `https://speech.googleapis.com/v1p1beta1/${name}?key=${apiKey}`;
-      }
+    const nameStr = String(name);
+    const baseUrl = nameStr.includes('/')
+      ? `https://speech.googleapis.com/v1p1beta1/${nameStr}`
+      : `https://speech.googleapis.com/v1p1beta1/operations/${nameStr}`;
 
-      const googleResponse = await fetch(url);
+    const fetchOp = async (url: string, headers: Record<string, string> = {}) => {
+      const googleResponse = await fetch(url, { headers });
       const contentType = googleResponse.headers.get('content-type');
-      
-      let data;
-      if (contentType && contentType.includes('application/json')) {
-        data = await googleResponse.json();
-      } else {
+      if (!contentType?.includes('application/json')) {
         const text = await googleResponse.text();
-        console.error(`Google Operations API returned non-JSON response (${googleResponse.status}):`, text);
-        throw new Error(`Google Operations API returned non-JSON response: ${text.slice(0, 100)}`);
+        throw new Error(`Google Operations API returned non-JSON (${googleResponse.status}): ${text.slice(0, 100)}`);
       }
+      const data = await googleResponse.json() as any;
+      if (!googleResponse.ok) throw new Error(data.error?.message || 'Failed to fetch operation status');
+      return data;
+    };
 
-      if (!googleResponse.ok) {
-        throw new Error(data.error?.message || 'Failed to fetch operation status');
-      }
+    // Try Vertex SA auth first
+    try {
+      const { getGCPAccessToken } = await import('./services/vertexProxy.js');
+      const token = await getGCPAccessToken();
+      const data = await fetchOp(baseUrl, { Authorization: `Bearer ${token}` });
+      return res.json(data);
+    } catch (saErr: any) {
+      console.warn('Operations SA auth failed, falling back to API key:', saErr.message);
+    }
 
+    // Fallback: plain API key
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'No auth available: set GCP_SA_KEY or GOOGLE_CLOUD_API_KEY' });
+    }
+    try {
+      const data = await fetchOp(`${baseUrl}?key=${apiKey}`);
       res.json(data);
     } catch (error: any) {
       console.error('Google Operations API Error:', error);
