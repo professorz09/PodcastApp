@@ -144,21 +144,6 @@ FORMATS to vary:
 Return ONLY a valid JSON array of 4 strings. No markdown.
     `;
   }
-  // podcast / default
-  return `
-    You are an expert YouTube strategist and copywriter.
-    Read the ENTIRE script to deeply understand the core topic, context, and main conflict or value proposition.
-    Generate 4 highly clickable, catchy, viral-style YouTube video titles.
-
-    Requirements:
-    1. Topic MUST be immediately clear.
-    2. Hook/Curiosity: intense FOMO or curiosity bait.
-    3. Strong words: "Exposed", "The Truth", "Why You're Wrong", "Secret", "Nobody Talks About This"
-    4. Under 60 characters so they don't get cut off on mobile.
-    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
-    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
-  `;
-  }
   if (style === 'phone_clean') {
     return `
 You are a YouTube copywriter for the "Phone Clean" style — clean white-background thumbnails showing an AI phone call with a shocking topic. Short, viral, makes people stop scrolling.
@@ -193,6 +178,20 @@ EXAMPLES:
 - "Does God Exist? Einstein vs. Darwin Phone Call"
     `;
   }
+  // podcast / default
+  return `
+    You are an expert YouTube strategist and copywriter.
+    Read the ENTIRE script to deeply understand the core topic, context, and main conflict or value proposition.
+    Generate 4 highly clickable, catchy, viral-style YouTube video titles.
+
+    Requirements:
+    1. Topic MUST be immediately clear.
+    2. Hook/Curiosity: intense FOMO or curiosity bait.
+    3. Strong words: "Exposed", "The Truth", "Why You're Wrong", "Secret", "Nobody Talks About This"
+    4. Under 60 characters so they don't get cut off on mobile.
+    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
+    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
+  `;
 };
 
 export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
