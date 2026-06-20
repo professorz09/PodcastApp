@@ -114,7 +114,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Try Vertex SA auth first
   try {
     const token = await getGCPAccessToken();
-    const data = await runSTT({ Authorization: `Bearer ${token}` }, (base) => base);
+    const projectId = process.env.GCP_PROJECT_ID;
+    const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (projectId) saHeaders['x-goog-user-project'] = projectId;
+    const data = await runSTT(saHeaders, (base) => base);
     return res.json(data);
   } catch (saErr: any) {
     console.warn('STT SA auth failed, falling back to API key:', saErr.message);

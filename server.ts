@@ -201,8 +201,11 @@ async function startServer() {
     try {
       const { getGCPAccessToken } = await import('./services/vertexProxy.js');
       const token = await getGCPAccessToken();
+      const projectId = process.env.GCP_PROJECT_ID;
+      const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (projectId) saHeaders['x-goog-user-project'] = projectId;
       console.log('STT: using Vertex SA auth');
-      const data = await runSTT({ Authorization: `Bearer ${token}` }, (base) => base);
+      const data = await runSTT(saHeaders, (base) => base);
       return res.json(data);
     } catch (saErr: any) {
       console.warn('STT SA auth failed, falling back to API key:', saErr.message);
@@ -249,7 +252,10 @@ async function startServer() {
     try {
       const { getGCPAccessToken } = await import('./services/vertexProxy.js');
       const token = await getGCPAccessToken();
-      const data = await fetchOp(baseUrl, { Authorization: `Bearer ${token}` });
+      const projectId = process.env.GCP_PROJECT_ID;
+      const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (projectId) saHeaders['x-goog-user-project'] = projectId;
+      const data = await fetchOp(baseUrl, saHeaders);
       return res.json(data);
     } catch (saErr: any) {
       console.warn('Operations SA auth failed, falling back to API key:', saErr.message);
@@ -298,14 +304,16 @@ async function startServer() {
     try {
       const { getGCPAccessToken } = await import('./services/vertexProxy.js');
       const token = await getGCPAccessToken();
+      const projectId = process.env.GCP_PROJECT_ID;
+      const saHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+      if (projectId) saHeaders['x-goog-user-project'] = projectId;
       console.log('Cloud TTS: using Vertex SA auth');
       const ttsResponse = await fetch(
-        'https://texttospeech.googleapis.com/v1beta1/text:synthesize',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: ttsBody,
-        }
+        'https://texttospeech.googleapis.com/v1/text:synthesize',
+        { method: 'POST', headers: saHeaders, body: ttsBody }
       );
       const data = await parseTTSResponse(ttsResponse);
       return res.json({ audioContent: data.audioContent });
@@ -320,7 +328,7 @@ async function startServer() {
     }
     try {
       const ttsResponse = await fetch(
-        `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${apiKey}`,
+        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ttsBody }
       );
       const data = await parseTTSResponse(ttsResponse);

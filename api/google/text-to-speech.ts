@@ -29,13 +29,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Try Vertex SA auth first
   try {
     const token = await getGCPAccessToken();
+    const projectId = process.env.GCP_PROJECT_ID;
+    const saHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+    if (projectId) saHeaders['x-goog-user-project'] = projectId;
     const ttsResponse = await fetch(
-      'https://texttospeech.googleapis.com/v1beta1/text:synthesize',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: ttsBody,
-      }
+      'https://texttospeech.googleapis.com/v1/text:synthesize',
+      { method: 'POST', headers: saHeaders, body: ttsBody }
     );
     const data = await parseTTSResponse(ttsResponse);
     return res.json({ audioContent: data.audioContent });
@@ -51,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const ttsResponse = await fetch(
-      `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${apiKey}`,
+      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ttsBody }
     );
     const data = await parseTTSResponse(ttsResponse);

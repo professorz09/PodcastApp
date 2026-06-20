@@ -27,7 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Try Vertex SA auth first
   try {
     const token = await getGCPAccessToken();
-    const data = await fetchOp(baseUrl, { Authorization: `Bearer ${token}` });
+    const projectId = process.env.GCP_PROJECT_ID;
+    const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (projectId) saHeaders['x-goog-user-project'] = projectId;
+    const data = await fetchOp(baseUrl, saHeaders);
     return res.json(data);
   } catch (saErr: any) {
     console.warn('Operations SA auth failed, falling back to API key:', saErr.message);
