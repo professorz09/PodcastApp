@@ -254,54 +254,61 @@ async function startServer() {
     }
   });
 
-  // ── Google Cloud Text-to-Speech (Chirp 3 HD) ────────────────────────────
+  // ── Google Cloud Text-to-Speech (Chirp 3 HD) — Vertex SA auth preferred ───
   app.post('/api/google/text-to-speech', async (req, res) => {
-    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GOOGLE_CLOUD_API_KEY is missing' });
-    }
-
     const { text, voiceName, languageCode = 'en-US' } = req.body;
     if (!text || !voiceName) {
       return res.status(400).json({ error: 'Missing text or voiceName' });
     }
 
     const fullVoiceName = `${languageCode}-Chirp3-HD-${voiceName}`;
+    const ttsBody = JSON.stringify({
+      input: { text },
+      voice: { languageCode, name: fullVoiceName },
+      audioConfig: { audioEncoding: 'MP3' },
+    });
 
+    const parseTTSResponse = async (resp: Response) => {
+      const ct = resp.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        const raw = await resp.text();
+        throw new Error(`Cloud TTS non-JSON response (${resp.status}): ${raw.slice(0, 120)}`);
+      }
+      const data = await resp.json() as any;
+      if (!resp.ok) throw new Error(data.error?.message || `Cloud TTS error ${resp.status}`);
+      if (!data.audioContent) throw new Error('No audioContent in Cloud TTS response');
+      return data;
+    };
+
+    try {
+      const { getGCPAccessToken } = await import('./services/vertexProxy.js');
+      const token = await getGCPAccessToken();
+      console.log('Cloud TTS: using Vertex SA auth');
+      const ttsResponse = await fetch(
+        'https://texttospeech.googleapis.com/v1beta1/text:synthesize',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: ttsBody,
+        }
+      );
+      const data = await parseTTSResponse(ttsResponse);
+      return res.json({ audioContent: data.audioContent });
+    } catch (saErr: any) {
+      console.warn('Cloud TTS SA auth failed, falling back to API key:', saErr.message);
+    }
+
+    // Fallback: plain API key
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'No TTS auth available: set GCP_SA_KEY or GOOGLE_CLOUD_API_KEY' });
+    }
     try {
       const ttsResponse = await fetch(
         `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            input: { text },
-            voice: { languageCode, name: fullVoiceName },
-            audioConfig: { audioEncoding: 'MP3' },
-          }),
-        }
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ttsBody }
       );
-
-      const contentType = ttsResponse.headers.get('content-type');
-      let data: any;
-      if (contentType && contentType.includes('application/json')) {
-        data = await ttsResponse.json();
-      } else {
-        const raw = await ttsResponse.text();
-        console.error(`Cloud TTS returned non-JSON (${ttsResponse.status}):`, raw.slice(0, 200));
-        throw new Error(`Cloud TTS non-JSON response: ${raw.slice(0, 100)}`);
-      }
-
-      if (!ttsResponse.ok) {
-        const msg = data.error?.message || 'Cloud TTS error';
-        console.error(`Cloud TTS Error (${ttsResponse.status}):`, msg);
-        throw new Error(msg);
-      }
-
-      if (!data.audioContent) {
-        throw new Error('No audioContent in Cloud TTS response');
-      }
-
+      const data = await parseTTSResponse(ttsResponse);
       res.json({ audioContent: data.audioContent });
     } catch (error: any) {
       console.error('Google Cloud TTS Error:', error);

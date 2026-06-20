@@ -5849,7 +5849,7 @@ Do not add explanation outside the JSON.
   };
 };
 
-// ── Chirp 3 HD — via server-side Google Cloud TTS API (GOOGLE_CLOUD_API_KEY) ──
+// ── Chirp 3 HD — via server-side Google Cloud TTS API (Vertex SA auth preferred) ──
 export const generateSpeechChirp3HD = async (
   text: string,
   voiceName: string,
