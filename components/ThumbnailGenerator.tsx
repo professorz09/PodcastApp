@@ -63,6 +63,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'explained', label: 'Explained', desc: 'Big face + topic visual', color: 'emerald' },
     { value: 'professor_jiang', label: '🎓 Prof. Jiang', desc: 'Fox News Alert — breaking news', color: 'red' },
     { value: 'phone_studio', label: '📱 Phone Studio', desc: 'Phone + celebrity face + red/white impact text', color: 'pink' },
+    { value: 'phone_clean', label: '🤍 Phone Clean', desc: 'Phone left + white bg + bold text right', color: 'slate' },
+    { value: 'phone_dual', label: '📲 Phone Dual', desc: '2 phones conversation + text center', color: 'cyan' },
   ];
 
   const hasScript = script.length > 0;
@@ -339,6 +341,10 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                             ? 'bg-emerald-600/20 border-emerald-500/60 text-white'
                             : opt.color === 'red'
                             ? 'bg-red-600/20 border-red-500/60 text-white'
+                            : opt.color === 'slate'
+                            ? 'bg-slate-600/20 border-slate-400/60 text-white'
+                            : opt.color === 'cyan'
+                            ? 'bg-cyan-600/20 border-cyan-500/60 text-white'
                             : 'bg-purple-600/20 border-purple-500/60 text-white'
                           : 'bg-white/3 border-white/8 text-gray-400 hover:bg-white/6 hover:border-white/15'
                       }`}
@@ -627,6 +633,70 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                     <p className="text-[10px] text-gray-600">
                       Real person ka naam dalo — Gemini exactly unka face match karega.
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 3: Phone Clean inputs ── */}
+              {videoStyle === 'phone_clean' && (
+                <div className="bg-[#0d0d0d] border border-slate-500/15 rounded-2xl p-5 space-y-3">
+                  <div>
+                    <p className="text-[11px] text-slate-300 uppercase tracking-widest font-semibold">Step 3 — Characters</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Phone caller (left side) aur optional creator (top-right)</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Phone Caller / Entity</label>
+                      <input
+                        type="text"
+                        value={guestName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
+                        placeholder="e.g. OpenAI, Google, Elon Musk"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-slate-400 transition-colors placeholder-gray-600"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Creator (top-right, optional)</label>
+                      <input
+                        type="text"
+                        value={hostName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
+                        placeholder="e.g. Prof. Jiang (leave blank = none)"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-slate-400 transition-colors placeholder-gray-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 3: Phone Dual inputs ── */}
+              {videoStyle === 'phone_dual' && (
+                <div className="bg-[#0d0d0d] border border-cyan-500/15 rounded-2xl p-5 space-y-3">
+                  <div>
+                    <p className="text-[11px] text-cyan-400 uppercase tracking-widest font-semibold">Step 3 — Two Characters</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Left phone (speaking) aur right phone (listening)</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Left Phone — Speaking</label>
+                      <input
+                        type="text"
+                        value={guestName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
+                        placeholder="e.g. Donald Trump, Elon Musk"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Right Phone — Listening</label>
+                      <input
+                        type="text"
+                        value={hostName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
+                        placeholder="e.g. White Alien, AI Bot, Joe Biden"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600"
+                      />
+                    </div>
                   </div>
                 </div>
               )}

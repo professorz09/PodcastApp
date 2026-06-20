@@ -30,7 +30,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_dual';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -158,6 +158,41 @@ Return ONLY a valid JSON array of 4 strings. No markdown.
     5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
     6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
   `;
+  }
+  if (style === 'phone_clean') {
+    return `
+You are a YouTube copywriter for the "Phone Clean" style — clean white-background thumbnails showing an AI phone call with a shocking topic. Short, viral, makes people stop scrolling.
+
+REQUIREMENTS:
+1. 40-60 characters max. Bold claim or question.
+2. Sounds like breaking news crossed with gossip — urgent yet clean.
+3. Reference the topic entity (person/org/brand) by name.
+4. ALWAYS write titles in English only.
+5. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES:
+- "OpenAI's Hidden Plan Nobody Told You About"
+- "Google's Secret Deal Just Got Exposed"
+- "Why Apple Is Quietly Buying This Company"
+    `;
+  }
+  if (style === 'phone_dual') {
+    return `
+You are a YouTube copywriter for the "Phone Dual" style — two characters having a shocking phone conversation about a wild topic. Think conspiracy meets comedy meets clickbait.
+
+REQUIREMENTS:
+1. 40-65 characters max. Make it a question or a confrontational claim.
+2. Name BOTH characters if possible, or make the topic the star.
+3. "Do X Exist?", "Does Y Know About Z?", "X Calls Y About Z" formats work great.
+4. ALWAYS write titles in English only.
+5. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES:
+- "Do Aliens Exist? Trump Calls To Find Out"
+- "Elon Calls Putin: What Did They Really Say?"
+- "Does God Exist? Einstein vs. Darwin Phone Call"
+    `;
+  }
 };
 
 export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
@@ -338,6 +373,38 @@ RULES:
 - Return ONLY a valid JSON array of exactly 5 strings. No markdown.
     `;
   }
+  if (style === 'phone_clean') {
+    return `
+You are a thumbnail copywriter for "Phone Clean" style — bold black text + RED BOX on a white background. The text sits on the right of a clean phone thumbnail.
+
+STYLE: 2-5 words, punchy. One key word goes in a RED BOX on the thumbnail. Think "OPENAI'S HIDDEN MISSION" where HIDDEN is in the red box.
+
+Generate 5 options — each should read like a big reveal or conspiracy:
+- Option 1: 3-word "X's Y REVEALED"
+- Option 2: "SECRET ___" or "___ EXPOSED"
+- Option 3: Short question "HIDDEN AGENDA?"
+- Option 4: 2-word shock "GAME OVER"
+- Option 5: Bold claim "THE REAL PLAN"
+
+RULES: ALL CAPS, max 5 words, English only. Return ONLY a JSON array of 5 strings.
+    `;
+  }
+  if (style === 'phone_dual') {
+    return `
+You are a thumbnail copywriter for "Phone Dual" style — two phones showing characters, giant question/claim in center.
+
+STYLE: 2-5 words MAX. Must work as a huge question OR bold revelation. Should make people think "wait, what?"
+
+Generate 5 options:
+- Option 1: Short question "DO X EXIST?"
+- Option 2: Shocking question "IS X REAL?"
+- Option 3: Bold claim "X IS REAL"
+- Option 4: Conspiracy hook "X KNOWS"
+- Option 5: Wild reveal "X EXPOSED"
+
+RULES: ALL CAPS only, max 5 words, English only. Return ONLY a JSON array of 5 strings.
+    `;
+  }
   // podcast / default
   return `
 You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT for a podcast-style thumbnail.
@@ -482,6 +549,46 @@ DESCRIPTION RULES — write the BRIEF for an AI image generator. MUST include:
 - The BIG TEXT on screen (matches thumbnailText, ALL CAPS, white + red split)
 - Background = pure black or very dark grey, cinematic.
 - Keep it 3-5 sentences, actionable for an image model.`
+
+    : videoStyle === 'phone_clean'
+    ? `STYLE — Phone Clean (White background, phone left, bold text right):
+TITLE RULES:
+- Short & punchy, reveals a hidden truth or secret. 40-60 chars.
+- Name the specific entity (company, person, tech, event) from the script.
+- BAD: "Something Shocking Is Happening" (zero info)
+- GOOD: "OpenAI's Hidden Plan Nobody Told You About"
+- GOOD: "Google's Secret Deal Just Got Exposed"
+
+THUMBNAIL TEXT RULES:
+- 2-5 words. One key word goes in a RED BOX visually. Think "OPENAI'S [HIDDEN] MISSION".
+- ALL CAPS. The boxed word should be the most shocking/secret element.
+- GOOD: "HIDDEN MISSION" / "SECRET PLAN" / "REAL AGENDA"
+
+DESCRIPTION RULES — brief for the image generator:
+- White/cream pure background
+- Left side: realistic iPhone portrait showing topic image on screen + caller name ("Speaking")
+- Right side: bold ALL CAPS typography, one key word in SOLID RED RECTANGLE with white text
+- Top right corner: optional headshot of creator/host looking concerned
+- Clean, minimal, professional feel.`
+
+    : videoStyle === 'phone_dual'
+    ? `STYLE — Phone Dual (Two phones side by side, topic text center):
+TITLE RULES:
+- Question format works best: "Do X Exist?", "Does Y Know About Z?", "X vs Y — Who's Right?"
+- Name BOTH characters if the script has them. 40-65 chars.
+- GOOD: "Do Aliens Exist? Trump Calls To Find Out"
+- GOOD: "Elon Calls Putin: What Did They Really Say?"
+
+THUMBNAIL TEXT RULES:
+- 2-4 words. Giant bold ALL CAPS center text. Works best as a question or single shocking fact.
+- GOOD: "DO ALIENS EXIST?" / "IS THIS REAL?" / "THEY KNOW"
+
+DESCRIPTION RULES — brief for the image generator:
+- Light gray/white gradient background
+- LEFT phone: Character 1 (speaking) — their photo on screen, "Speaking" green dot indicator
+- RIGHT phone: Character 2 (listening) — their photo or blue listening circle on screen
+- CENTER: Giant bold impact typography with ONE red word/phrase
+- Two phones slightly angled inward toward the text`
 
     : videoStyle === 'professor_jiang'
     ? `STYLE — Breaking News / Current Events Analysis (Fox News Alert style):
@@ -4564,6 +4671,131 @@ Reply ONLY in JSON, no markdown:
 - 16:9 aspect ratio (1920×1080)
 - No watermarks, no logos other than the small phone status icons${extraNote}`;
 
+  } else if (videoStyle === 'phone_clean') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    const callerName = (guestName || hostName || 'AI Assistant').trim();
+
+    let phoneScreenVisual = 'A dramatic, high-contrast topic-relevant image filling the entire phone screen — mysterious, glowing, cinematic';
+    let creatorDesc = hostName ? `${hostName} — photorealistic headshot, concerned or intrigued expression, professional look` : '';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{ role: 'user', parts: [{ text: `Read this script and decide what image to show on the phone screen for a YouTube thumbnail.\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nCALLER: ${callerName}\n\nReply ONLY in JSON:\n{"phoneScreen":"vivid 1-2 sentence description of the topic image on the phone screen — dramatic, topic-specific","callerNote":"one sentence about the caller entity's visual icon or logo to show as phone avatar"}` }] }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const raw = entityResponse.text?.trim() || '{}';
+        const m = raw.match(/\{[\s\S]*\}/);
+        const entities = JSON.parse(m ? m[0] : '{}');
+        if (entities.phoneScreen) phoneScreenVisual = entities.phoneScreen;
+      } catch (e) {
+        console.warn('[PhoneClean] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    const hookWords = title.trim().toUpperCase().split(/\s+/).filter(Boolean);
+    const redCount = Math.min(2, Math.max(1, Math.floor(hookWords.length / 3)));
+    const blackPart1 = hookWords.slice(0, Math.floor((hookWords.length - redCount) / 2)).join(' ');
+    const redPart    = hookWords.slice(Math.floor((hookWords.length - redCount) / 2), hookWords.length - redCount).join(' ');
+    const blackPart2 = hookWords.slice(hookWords.length - redCount).join(' ');
+
+    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN" style thumbnail.
+
+════ LAYOUT — 1920×1080, 16:9, PURE WHITE BACKGROUND ════
+
+▶ BACKGROUND: #FFFFFF — absolutely clean white, no gradients, no textures
+
+▶ LEFT SIDE (38% of frame): REALISTIC iPHONE
+- Portrait orientation, slight 5° rightward tilt, photorealistic black glossy bezel
+- Status bar: small text "${callerName}" left + "73%" right, below: green dot "● Speaking"
+- Phone SCREEN filled with: ${phoneScreenVisual}
+- Bottom of phone screen: three call buttons (mic, ●●●, red ✕)
+- Subtle drop shadow on the white background to give depth
+
+▶ RIGHT SIDE (55% of frame): BOLD IMPACT TYPOGRAPHY
+- Stack 2-3 lines, left-aligned, ultra-bold condensed ALL CAPS
+- Line arrangement:
+  "${blackPart1 || title.split(' ')[0].toUpperCase()}" → SOLID BLACK text (#000000), largest
+  "${redPart || (title.split(' ')[1] || 'HIDDEN').toUpperCase()}" → PURE WHITE text inside a SOLID RED RECTANGLE (#D0021B) — the rectangle spans the word's width + tight padding
+  "${blackPart2 || title.split(' ').slice(-1)[0].toUpperCase()}" → SOLID BLACK text (#000000)
+- Font feel: Anton / Impact / Bebas Neue — ultra-condensed, no serifs, maximum weight
+${creatorDesc ? `- Top-right corner: Small photorealistic portrait of ${creatorDesc} — head and shoulders, slightly inset, looking toward the text` : ''}
+
+════ STRICT RULES ════
+- WHITE background only — no dark areas, no gradients except the phone shadow
+- Typography must be ENORMOUS — readable even at 120px thumbnail size
+- Photorealistic iPhone — NOT flat illustration
+- Text contrast: BLACK on white = max contrast. RED box with WHITE text = max contrast.
+- 16:9 exactly. No borders, no watermarks.${extraNote}`;
+
+  } else if (videoStyle === 'phone_dual') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    const char1 = (guestName || 'Character 1').trim();
+    const char2 = (hostName || 'Character 2').trim();
+
+    let char1Screen = `${char1}'s face — photorealistic, dramatic studio lighting, calling expression`;
+    let char2Screen = `${char2}'s face — photorealistic, soft blue glow, listening expression`;
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{ role: 'user', parts: [{ text: `For a YouTube thumbnail showing TWO phones in a conversation:\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nLEFT PHONE CHARACTER (speaking): ${char1}\nRIGHT PHONE CHARACTER (listening): ${char2}\n\nReply ONLY in JSON:\n{"char1Screen":"vivid description of what appears on the LEFT phone screen — ${char1}'s visual appearance or symbolic icon","char2Screen":"vivid description of what appears on the RIGHT phone screen — ${char2}'s visual appearance or symbolic icon OR a glowing blue listening circle UI"}` }] }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const raw = entityResponse.text?.trim() || '{}';
+        const m = raw.match(/\{[\s\S]*\}/);
+        const entities = JSON.parse(m ? m[0] : '{}');
+        if (entities.char1Screen) char1Screen = entities.char1Screen;
+        if (entities.char2Screen) char2Screen = entities.char2Screen;
+      } catch (e) {
+        console.warn('[PhoneDual] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    const hookClean = title.toUpperCase().trim();
+    const hookWords2 = hookClean.split(/\s+/).filter(Boolean);
+    const midIdx = Math.ceil(hookWords2.length / 2);
+    const line1 = hookWords2.slice(0, midIdx).join(' ');
+    const line2 = hookWords2.slice(midIdx).join(' ');
+
+    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE DUAL" style thumbnail — two phones in a conversation.
+
+════ LAYOUT — 1920×1080, 16:9 ════
+
+▶ BACKGROUND: Very light gray (#f2f2f2 to #ffffff) gradient — clean, airy, minimal
+
+▶ LEFT PHONE (32% of frame): ${char1.toUpperCase()} IS SPEAKING
+- Vertical iPhone, slight clockwise tilt (~8°), photorealistic glossy black bezel
+- Status bar: "${char1}" (white text) left, "73%" right — below: green dot "● Speaking"
+- ENTIRE phone screen filled with: ${char1Screen}
+- Bottom of screen: three call buttons (mic, ●●●, red ✕ circle button)
+- Strong drop shadow on the light background
+
+▶ RIGHT PHONE (32% of frame): ${char2.toUpperCase()} IS LISTENING
+- Vertical iPhone, slight counter-clockwise tilt (~8°), photorealistic glossy black bezel
+- Status bar: "${char2}" (white text) left, "73%" right — below: blue dot "● Listening"
+- Phone screen shows: ${char2Screen}
+- Bottom of screen: three call buttons (mic, ●●●, red ✕ circle button)
+- Strong drop shadow
+
+▶ CENTER TEXT (36% of frame, dominates the composition):
+- MASSIVE ultra-bold ALL CAPS typography, stacked 2 lines:
+  Line 1: "${line1}" — PURE BLACK (#000000), weight 900+, condensed italic
+  Line 2: "${line2 || '?'}" — BRIGHT RED (#ED1C24), same weight, condensed italic, slightly larger
+- Text is centered between the two phones, slightly overlapping them for depth
+- Thin dark drop-shadow so text reads over phones
+
+════ STRICT RULES ════
+- Light/white background — NOT dark
+- Both phones must look PHOTOREALISTIC with proper screen UI
+- Text is the DOMINANT element — huge, sharp, maximum contrast
+- 16:9 aspect ratio, 1920×1080
+- No extra people outside the phone screens. No extra text.${extraNote}`;
+
   } else if (videoStyle === 'professor_jiang') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
 
@@ -4765,6 +4997,7 @@ STYLE RULES:
       model: 'gemini-3.1-flash-image',
       contents: { parts: parts },
       config: {
+        responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
         }
@@ -4808,9 +5041,9 @@ export const generateVideoBackground = async (hostName: string, guestName: strin
       model: 'gemini-3.1-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: {
+        responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
-          imageSize: "1K"
         }
       }
     });
@@ -4855,9 +5088,10 @@ export const generateSegmentImage = async (segmentText: string, context?: string
       model: 'gemini-3.1-flash-image',
       contents: { parts: [{ text: prompt }] },
       config: {
-          imageConfig: {
-              aspectRatio: "16:9"
-          }
+        responseModalities: [Modality.IMAGE],
+        imageConfig: {
+          aspectRatio: "16:9",
+        }
       }
     });
 
@@ -5209,7 +5443,7 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
   const response = await ai.models.generateContent({
     model: 'gemini-3.1-flash-image',
     contents: { parts: [{ text: prompt }] },
-    config: { imageConfig: { aspectRatio: use16x9 ? '16:9' : '1:1' } }
+    config: { responseModalities: [Modality.IMAGE], imageConfig: { aspectRatio: use16x9 ? '16:9' : '1:1' } }
   });
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -5849,7 +6083,7 @@ Do not add explanation outside the JSON.
   };
 };
 
-// ── Chirp 3 HD — via server-side Google Cloud TTS API (GOOGLE_CLOUD_API_KEY) ──
+// ── Chirp 3 HD — via server-side Google Cloud TTS API (Vertex SA auth preferred) ──
 export const generateSpeechChirp3HD = async (
   text: string,
   voiceName: string,

@@ -15,6 +15,7 @@
 //   `thinkingLevel` is present without a matching `thinkingBudget`.
 
 import { GoogleGenAI } from '@google/genai';
+import { createSign } from 'crypto';
 
 // Default location for Gemini 3.x is "global" — gemini-3.x preview
 // surfaces 404 from regional hostnames. us-central1 still works for
@@ -138,4 +139,56 @@ export async function callGemini(model: string, contents: any, genConfig: any) {
   const finalConfig = mode === 'vertex' ? translateThinkingForVertex(model, genConfig) : genConfig;
   const finalContents = mode === 'vertex' ? normalizeContents(contents) : contents;
   return ai.models.generateContent({ model, contents: finalContents, config: finalConfig });
+}
+
+// ── GCP OAuth2 access token via Service Account key ─────────────────────────
+// Token is cached in module memory (valid 1 hour; refreshed 60 s before expiry).
+let _tokenCache: { value: string; expiresAt: number } | null = null;
+
+export async function getGCPAccessToken(): Promise<string> {
+  const now = Date.now();
+  if (_tokenCache && _tokenCache.expiresAt > now + 60_000) return _tokenCache.value;
+
+  const saKey = process.env.GCP_SA_KEY;
+  if (!saKey) throw new Error('GCP_SA_KEY is not set');
+
+  let creds: any;
+  try { creds = JSON.parse(saKey); } catch { throw new Error('GCP_SA_KEY is not valid JSON'); }
+
+  const nowSec = Math.floor(now / 1000);
+  const jwtPayload = {
+    iss: creds.client_email,
+    sub: creds.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: nowSec,
+    exp: nowSec + 3600,
+    scope: 'https://www.googleapis.com/auth/cloud-platform',
+  };
+
+  const hdr = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const pay = Buffer.from(JSON.stringify(jwtPayload)).toString('base64url');
+  const signer = createSign('RSA-SHA256');
+  signer.update(`${hdr}.${pay}`);
+  const sig = signer.sign(creds.private_key, 'base64url');
+  const jwt = `${hdr}.${pay}.${sig}`;
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+
+  const tokenData = await tokenRes.json() as any;
+  if (!tokenRes.ok) {
+    throw new Error(`GCP token error: ${tokenData.error_description || tokenData.error || tokenRes.status}`);
+  }
+
+  _tokenCache = {
+    value: tokenData.access_token,
+    expiresAt: now + (tokenData.expires_in || 3600) * 1000,
+  };
+  return _tokenCache.value;
 }
