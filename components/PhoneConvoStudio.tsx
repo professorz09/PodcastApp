@@ -81,6 +81,8 @@ const BG_OPTIONS = [
   { value: 'linear:#000510,#0c1e40', label: 'Ocean Deep' },
   { value: '#1a1a2e', label: 'Dark Navy' },
   { value: '#f0f4f8', label: 'Light' },
+  { value: '#00b140', label: '🟢 Green Screen' },
+  { value: '#00ff00', label: '🟢 Chroma Green' },
 ];
 
 // ─── Conversation Styles ──────────────────────────────────────────────────────
