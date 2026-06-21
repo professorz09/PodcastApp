@@ -84,6 +84,7 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
   const [quote, setQuote] = useState('');
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [aiError, setAiError] = useState('');
+  const [bgType, setBgType] = useState<'default' | 'green' | 'chroma'>('default');
 
   // Veo 3 section
   const [veo3Loading, setVeo3Loading] = useState(false);
@@ -94,7 +95,7 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
   const getDuration = (n: number) =>
     0.3 + n * COMMENT_INTERVAL + QUOTE_OFFSET + QUOTE_FADE + HOLD_AFTER_QUOTE + 0.5;
 
-  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, t: number, comms: string[], q: string) => {
+  const drawFrame = useCallback((ctx: CanvasRenderingContext2D, t: number, comms: string[], q: string, bg: 'default' | 'green' | 'chroma' = 'default') => {
     const W = CW; const H = CH;
     const n = comms.length;
     const QUOTE_START = 0.3 + n * COMMENT_INTERVAL + QUOTE_OFFSET;
@@ -104,12 +105,21 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
 
     const bgA = easeOut(t / 0.25);
     ctx.globalAlpha = bgA;
-    const grd = ctx.createLinearGradient(0, 0, W, H);
-    grd.addColorStop(0, '#f8faff'); grd.addColorStop(1, '#e8edf8');
-    ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#6366f1'; ctx.globalAlpha = bgA * 0.05;
-    for (let r = 0; r < 10; r++) for (let c = 0; c < 18; c++) {
-      ctx.beginPath(); ctx.arc(c * 74 + 37, r * 78 + 39, 2.2, 0, Math.PI * 2); ctx.fill();
+    if (bg === 'green') {
+      ctx.fillStyle = '#00b140';
+    } else if (bg === 'chroma') {
+      ctx.fillStyle = '#00ff00';
+    } else {
+      const grd = ctx.createLinearGradient(0, 0, W, H);
+      grd.addColorStop(0, '#f8faff'); grd.addColorStop(1, '#e8edf8');
+      ctx.fillStyle = grd;
+    }
+    ctx.fillRect(0, 0, W, H);
+    if (bg === 'default') {
+      ctx.fillStyle = '#6366f1'; ctx.globalAlpha = bgA * 0.05;
+      for (let r = 0; r < 10; r++) for (let c = 0; c < 18; c++) {
+        ctx.beginPath(); ctx.arc(c * 74 + 37, r * 78 + 39, 2.2, 0, Math.PI * 2); ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
 
@@ -186,7 +196,7 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
     }
   }, []);
 
-  const startRender = useCallback((comms: string[], q: string) => {
+  const startRender = useCallback((comms: string[], q: string, bg: 'default' | 'green' | 'chroma' = 'default') => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
@@ -218,10 +228,10 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
     const start = performance.now();
     const tick = (now: number) => {
       const t = (now - start) / 1000;
-      drawFrame(ctx, t, comms, q);
+      drawFrame(ctx, t, comms, q, bg);
       setProgress(Math.min((t / TOTAL) * 100, 99));
       if (t < TOTAL) { rafRef.current = requestAnimationFrame(tick); }
-      else { drawFrame(ctx, TOTAL, comms, q); mr.stop(); }
+      else { drawFrame(ctx, TOTAL, comms, q, bg); mr.stop(); }
     };
     rafRef.current = requestAnimationFrame(tick);
   }, [drawFrame]);
@@ -239,14 +249,14 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
       ]);
       setSelectedComments(best); setQuote(q);
       heartCountsRef.current = best.map(() => Math.floor(Math.random() * 900 + 40));
-      setTimeout(() => startRender(best, q), 120);
+      setTimeout(() => startRender(best, q, bgType), 120);
     } catch (e: any) {
       setAiError(e.message || 'AI error');
       const fallback = comments.filter(c => c.length > 15 && c.length < 130).slice(0, 7);
       const fb_q = 'Every opinion matters. Every voice counts.';
       setSelectedComments(fallback); setQuote(fb_q);
       heartCountsRef.current = fallback.map(() => Math.floor(Math.random() * 900 + 40));
-      setTimeout(() => startRender(fallback, fb_q), 120);
+      setTimeout(() => startRender(fallback, fb_q, bgType), 120);
     }
   };
 
@@ -293,6 +303,27 @@ const IntroVideoMaker: React.FC<IntroVideoMakerProps> = ({ comments, transcript,
         {/* ── Idle state: two action buttons ─────────────────────────────────── */}
         {stage === 'idle' && (
           <div className="p-4 space-y-3">
+
+            {/* Background picker */}
+            <div className="rounded-2xl bg-[#0c0c1a] border border-white/6 p-4 space-y-2">
+              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Background</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'default', label: 'Default', color: 'linear-gradient(135deg,#f8faff,#e8edf8)', textDark: true },
+                  { value: 'green', label: '🟢 Green Screen', color: '#00b140', textDark: false },
+                  { value: 'chroma', label: '🟢 Chroma Green', color: '#00ff00', textDark: true },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setBgType(opt.value)}
+                    className={`rounded-xl p-3 border-2 transition-all text-center ${bgType === opt.value ? 'border-indigo-400' : 'border-white/8'}`}
+                    style={{ background: opt.color }}
+                  >
+                    <span className={`text-[11px] font-bold ${opt.textDark ? 'text-gray-700' : 'text-white'}`}>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Canvas animation button */}
             <button

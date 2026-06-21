@@ -4701,34 +4701,40 @@ Reply ONLY in JSON, no markdown:
     const redPart    = hookWords.slice(Math.floor((hookWords.length - redCount) / 2), hookWords.length - redCount).join(' ');
     const blackPart2 = hookWords.slice(hookWords.length - redCount).join(' ');
 
-    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN" style thumbnail.
+    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN" style thumbnail — exactly matching the reference style: phone on left, big text center, presenter/person on right.
 
-════ LAYOUT — 1920×1080, 16:9, PURE WHITE BACKGROUND ════
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
 
-▶ BACKGROUND: #FFFFFF — absolutely clean white, no gradients, no textures
+▶ BACKGROUND: Pure white (#FFFFFF) — clean, minimal, no textures, no gradients
 
-▶ LEFT SIDE (38% of frame): REALISTIC iPHONE
-- Portrait orientation, slight 5° rightward tilt, photorealistic black glossy bezel
-- Status bar: small text "${callerName}" left + "73%" right, below: green dot "● Speaking"
-- Phone SCREEN filled with: ${phoneScreenVisual}
-- Bottom of phone screen: three call buttons (mic, ●●●, red ✕)
-- Subtle drop shadow on the white background to give depth
+▶ LEFT SIDE (30% of frame): REALISTIC iPHONE
+- Portrait iPhone, slight 6° rightward tilt, photorealistic black glossy bezel, rounded corners
+- Status bar: small white text "${callerName}" (left, with tiny blue dot "● Speaking") + "73% 🔋" (right)
+- Phone SCREEN filled entirely with: ${phoneScreenVisual}
+- Bottom of phone screen: three call buttons (gray mic, gray ●●●, red ✕ circle)
+- Realistic drop shadow on white background for depth
 
-▶ RIGHT SIDE (55% of frame): BOLD IMPACT TYPOGRAPHY
-- Stack 2-3 lines, left-aligned, ultra-bold condensed ALL CAPS
-- Line arrangement:
-  "${blackPart1 || title.split(' ')[0].toUpperCase()}" → SOLID BLACK text (#000000), largest
-  "${redPart || (title.split(' ')[1] || 'HIDDEN').toUpperCase()}" → PURE WHITE text inside a SOLID RED RECTANGLE (#D0021B) — the rectangle spans the word's width + tight padding
-  "${blackPart2 || title.split(' ').slice(-1)[0].toUpperCase()}" → SOLID BLACK text (#000000)
-- Font feel: Anton / Impact / Bebas Neue — ultra-condensed, no serifs, maximum weight
-${creatorDesc ? `- Top-right corner: Small photorealistic portrait of ${creatorDesc} — head and shoulders, slightly inset, looking toward the text` : ''}
+▶ CENTER (35% of frame): BOLD IMPACT TYPOGRAPHY — 3 stacked lines
+  Line 1: "${blackPart1 || title.split(' ')[0].toUpperCase()}" — PURE BLACK (#000000), ultra-bold condensed, Impact/Anton style
+  Line 2: "${redPart || (title.split(' ')[1] || 'HIDDEN').toUpperCase()}" — WHITE text on a SOLID RED RECTANGLE (#CC0000) — the rectangle is a full-width banner behind this word, white text centered inside it
+  Line 3: "${blackPart2 || title.split(' ').slice(-1)[0].toUpperCase()}" — PURE BLACK (#000000), same style as Line 1
+- Text lines are tightly stacked, centered in this zone
+
+▶ RIGHT SIDE (35% of frame): ${creatorDesc ? `PRESENTER / CREATOR` : 'TOPIC VISUAL'}
+${creatorDesc
+  ? `- Photorealistic half-body or 3/4-body figure of ${creatorDesc}
+- Standing or slightly gesturing toward the text (facing left)
+- Clean cut-out on the white background — NO separate background behind them
+- Natural lighting matching the white background — casual professional look`
+  : `- A dramatic topic-relevant image or icon that represents "${callerName}" or the subject
+- Slightly faded / subtle so text stays dominant`}
 
 ════ STRICT RULES ════
-- WHITE background only — no dark areas, no gradients except the phone shadow
-- Typography must be ENORMOUS — readable even at 120px thumbnail size
-- Photorealistic iPhone — NOT flat illustration
-- Text contrast: BLACK on white = max contrast. RED box with WHITE text = max contrast.
-- 16:9 exactly. No borders, no watermarks.${extraNote}`;
+- PURE WHITE background — not gray, not gradient
+- Typography ENORMOUS — must read at thumbnail size
+- Phone photorealistic with proper iOS call UI
+- Red rectangle on Line 2 is the hero visual element — make it vivid
+- 16:9 exactly. No watermarks.${extraNote}`;
 
   } else if (videoStyle === 'phone_dual') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
