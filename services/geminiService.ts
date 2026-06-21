@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -204,6 +204,25 @@ EXAMPLES:
 - "Do Aliens Exist? Trump Calls To Find Out"
 - "Elon Calls Putin: What Did They Really Say?"
 - "Does God Exist? Einstein vs. Darwin Phone Call"
+    `;
+  }
+  if (style === 'podcast_2') {
+    return `
+You are a YouTube copywriter for real podcast channels (Joe Rogan / Lex Fridman / Andrew Huberman style) — two people sitting across each other, discussing a specific topic shown in a CENTER image insert.
+
+REQUIREMENTS:
+1. 55-75 characters. Conversational, specific, makes you curious about the discussion.
+2. MUST name the specific topic, person, or thing being discussed — never vague.
+3. Sounds like two people reacting to something: "[Person] Reacts To...", "We Tested...", "The Truth About X", "Is X Real? — [Person]'s Take"
+4. Format ideas: "[Guest Name] On [Topic]", "Why [Topic] Is [Shocking Claim]", "[Topic]: The Conversation Nobody Is Having"
+5. ALWAYS write titles in English only.
+6. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only — rewrite for the actual script topic):
+- "Joe Rogan and Guest React To Moon Landing Evidence"
+- "The Truth About COVID Vaccines — No Filter Conversation"
+- "Trump's Real Opinion On Drinking — Shocking Reveal"
+- "We Discussed XVideos, Pornhub, And The Internet's Dark Side"
     `;
   }
   if (style === 'news_dramatic') {
@@ -472,6 +491,23 @@ Generate 5 options:
 RULES: ALL CAPS only, max 5 words, English only. Return ONLY a JSON array of 5 strings.
     `;
   }
+  if (style === 'podcast_2') {
+    return `
+You are a thumbnail copywriter for the "Podcast 2" style — two hosts on either side, topic image INSERT in center with colored border. No big bold text overlay — the image insert IS the visual hook.
+
+The "thumbnail text" here describes the CENTER INSERT VISUAL (the topic image inside the colored border), not actual text on screen.
+
+Generate 5 options — each describes what should appear in the center topic insert image:
+- Option 1: The most iconic visual object related to the topic (e.g. "COVID-19 vaccine bottle closeup")
+- Option 2: A dramatic scene visual (e.g. "whiskey being poured into glass, dark moody lighting")
+- Option 3: A symbolic image (e.g. "moon surface with rainbow light beam")
+- Option 4: A controversial or surprising visual (e.g. "multiple adult platform logos side by side")
+- Option 5: A person or face collage related to the topic
+
+Each option should be 4-8 words MAX describing the topic insert image. ALL in plain English. No ALL CAPS needed.
+Return ONLY a JSON array of 5 strings. No markdown.
+    `;
+  }
   if (style === 'news_dramatic') {
     return `
 You are a thumbnail copywriter for Indian breaking news thumbnails (Career247 / ABP style). The thumbnail shows TWO stacked text blocks on the LEFT side:
@@ -722,6 +758,31 @@ THUMBNAIL TEXT RULES:
   Urgency tone: "TOO LATE" / "IT ENDS" / "POINT CROSSED"
 - Each combo must generate a DIFFERENT thumbnail text — never repeat the same phrase across the 3 combos.
 - Together = feels like a BREAKING STORY viewers CANNOT ignore.`
+
+    : videoStyle === 'podcast_2'
+    ? `STYLE — Podcast 2 (Two real hosts + center topic image insert with colored border):
+TITLE RULES:
+- Conversational, specific — sounds like two real people reacting to something. 55-75 chars.
+- NAME the specific topic, guest, or thing being discussed — never generic.
+- GOOD: "Joe Rogan and Guest React To Moon Landing Evidence"
+- GOOD: "Trump's Real Opinion On Drinking — Shocking Reveal"
+- GOOD: "The Truth About COVID Vaccines — No Filter Conversation"
+
+THUMBNAIL TEXT RULES:
+- Not actual on-screen text — describe the CENTER INSERT IMAGE visual (what goes inside the colored border box).
+- 4-8 words describing the topic-specific image that appears in the center insert.
+- Must be a clear, photorealistic, visually striking image description.
+- GOOD: "COVID-19 vaccine bottle held by gloved hand"
+- GOOD: "whiskey being poured into crystal glass"
+- GOOD: "moon surface with rainbow light beam from space"
+
+DESCRIPTION RULES — brief for the AI image generator:
+- Background: blurred podcast studio — warm/ambient lighting, studio equipment, real room feel
+- LEFT SIDE: Host/presenter — upper body, facing right toward center, microphone visible in front, natural engaged expression
+- RIGHT SIDE: Guest/celebrity — upper body, facing left toward center, microphone visible in front, reacting expression
+- CENTER: Rectangular topic image insert with thick bright colored border (green or red or cyan — pick most fitting) — photorealistic topic-specific image inside the box
+- No big text overlay on the thumbnail — the insert image is the visual hook
+- Photorealistic, looks like a real podcast production screenshot`
 
     : videoStyle === 'news_dramatic'
     ? `STYLE — News Dramatic (Career247 / ABP / India TV breaking news thumbnail):
@@ -5127,6 +5188,119 @@ ${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic ima
 - Photorealistic, cinematic quality — NOT illustrated or cartoon
 - 16:9 aspect ratio, 1920×1080
 - High contrast, sharp edges, no blur${extraNote}`;
+
+  } else if (videoStyle === 'podcast_2') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    const p2Host = (hostName || 'Podcast host').trim();
+    const p2Guest = (guestName || '').trim();
+
+    let p2InsertVisual = 'A topic-relevant photorealistic object or scene — dramatic, high-contrast, clearly tied to the script topic';
+    let p2InsertBorderColor = '#00FF00';
+    let p2HostDesc = `${p2Host} — photorealistic, natural podcast expression, upper body, facing toward the center`;
+    let p2GuestDesc = p2Guest
+      ? `${p2Guest} — photorealistic, MATCH REAL PHOTOGRAPHS of this person EXACTLY (face, hair, look), upper body, facing toward the center, engaged reacting expression`
+      : 'Second podcast guest — upper body, natural reacting expression, facing toward the center';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `You are a YouTube thumbnail art director for a real podcast channel (Joe Rogan / Lex Fridman style).
+
+SCRIPT:
+${scriptSnippet}
+
+HOST: ${p2Host}
+GUEST: ${p2Guest || '(infer from script)'}
+
+Based on the script topic, decide:
+1. CENTER INSERT IMAGE: The single most iconic, photorealistic, visually dramatic object or scene to show in the center insert box — this is the topic visual that appears between the two hosts. Should instantly communicate what the podcast is about.
+2. BORDER COLOR: The thick colored border around the insert. Pick ONE that fits the topic mood:
+   - "#00FF00" (bright green) — for science/space/nature topics
+   - "#FF0000" (bright red) — for political/controversial/shocking topics
+   - "#00E5FF" (cyan/teal) — for health/tech/medical topics
+   - "#FF6600" (orange) — for entertainment/drama topics
+3. HOST description: appearance of ${p2Host} as they would look in a podcast (clothing, expression, look)
+4. GUEST description: appearance of ${p2Guest || 'the guest'} (MUST match real photographs if real person)
+
+Reply ONLY in JSON, no markdown:
+{
+  "insertVisual": "Vivid 2-3 sentence description of the center insert image — photorealistic, topic-specific, dramatic",
+  "borderColor": "#RRGGBB hex color",
+  "hostDesc": "One sentence: ${p2Host}'s appearance (hair, clothing, expression) in the podcast",
+  "guestDesc": "One sentence: ${p2Guest || 'guest'}'s appearance (face, hair, clothing, expression) — match real photos if real person"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const p2Raw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const p2Entities = JSON.parse(p2Raw);
+        if (p2Entities.insertVisual) p2InsertVisual = p2Entities.insertVisual;
+        if (p2Entities.borderColor) p2InsertBorderColor = p2Entities.borderColor;
+        if (p2Entities.hostDesc) p2HostDesc = `${p2Host} — ${p2Entities.hostDesc}`;
+        if (p2Entities.guestDesc) {
+          p2GuestDesc = p2Guest
+            ? `${p2Guest} — ${p2Entities.guestDesc}. MATCH REAL PUBLIC PHOTOGRAPHS of ${p2Guest} EXACTLY.`
+            : p2Entities.guestDesc;
+        }
+      } catch (e) {
+        console.warn('[Podcast2] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    prompt = `You are a world-class YouTube thumbnail designer for real podcast channels (Joe Rogan Experience / Lex Fridman / Andrew Huberman style). Create a PHOTOREALISTIC thumbnail that looks like a genuine professional podcast screenshot.
+
+TOPIC: "${title}"
+HOST: ${p2Host}
+GUEST: ${p2Guest || 'podcast guest'}
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ LEFT SIDE (38% of frame): THE HOST
+- ${p2HostDesc}
+- Upper body, shoulders and head clearly visible, cropped at chest/waist level
+- Positioned on the far LEFT, facing INWARD toward the center
+- Studio microphone (black or dark grey, modern podcast mic) visible in front of them in the lower portion
+- Natural expression: engaged, curious, reacting to the topic
+- Slightly blurred warm studio background behind them (out of focus)
+
+▶ RIGHT SIDE (38% of frame): THE GUEST
+- ${p2GuestDesc}
+- Upper body, shoulders and head clearly visible, cropped at chest/waist level
+- Positioned on the far RIGHT, facing INWARD toward the center
+- Studio microphone visible in front of them in the lower portion
+- Natural expression: speaking, explaining, reacting — genuine podcast energy
+- Slightly blurred studio or home background behind them
+
+▶ CENTER INSERT (center 30% of frame, vertically centered, slight portrait or landscape orientation):
+- A RECTANGULAR IMAGE INSERT with a THICK (8-12px equivalent) SOLID COLORED BORDER in ${p2InsertBorderColor}
+- The border is crisp, bold, clearly visible against the background
+- INSIDE the border box: ${p2InsertVisual}
+- The insert photo is photorealistic, sharp, high-contrast, dramatically lit
+- The insert floats in the center, partially overlapping both the host and guest slightly at the edges
+
+▶ BACKGROUND:
+- Warm, ambient, slightly out-of-focus podcast studio environment
+- Studio equipment subtly visible: stands, cables, acoustic panels, colored lighting
+- Real room feel — NOT solid color, NOT plain backdrop
+- The background transitions naturally between the left and right sides
+
+════ STRICT RULES ════
+- NO big text overlay, NO headlines, NO captions on the image (the insert IS the hook)
+- Both people are REAL-LOOKING — photorealistic, NOT illustrated or cartoon
+- ${p2Guest ? `The guest (${p2Guest}) MUST match real public photographs of this person — face, hair, age, look` : 'The guest looks natural and credible'}
+- The CENTER INSERT must be clearly framed with the thick colored border — it stands out as a deliberate element
+- Microphones visible for both hosts — this grounds it as a real podcast
+- 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'news_dramatic') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
