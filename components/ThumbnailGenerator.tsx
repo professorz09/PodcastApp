@@ -217,17 +217,14 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     setIsGeneratingPair(true);
     setPairError(null);
     try {
-      const [pairResult, titleResult] = await Promise.all([
-        generateTitleTextPair(sourceText, videoStyle),
-        generateTitles(sourceText, videoStyle),
-      ]);
+      const pairResult = await generateTitleTextPair(sourceText, videoStyle);
       if (pairResult.length === 0) {
         setPairError('Koi pair nahi aaya — dobara try karo.');
       } else {
         onUpdateThumbnailState({
           ...thumbnailStateRef.current,
           comboPairs: pairResult,
-          titles: titleResult,
+          titles: pairResult.map(p => p.title),
           scriptSignature: computeScriptSignature(script),
         });
       }

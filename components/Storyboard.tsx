@@ -33,7 +33,7 @@ const DEFAULT_SUBTITLE: SubtitleConfig = {
 const MODEL_OPTIONS = [
   { value: 'gemini-3.5-flash', label: '⚡ Flash' },
   { value: 'gemini-3.1-flash-lite', label: '✦ Lite' },
-  { value: 'gemini-3.1-pro-preview', label: '✦ Pro' },
+  { value: 'gemini-3.1-pro', label: '✦ Pro' },
 ];
 
 const fmt = (s: number) => {
