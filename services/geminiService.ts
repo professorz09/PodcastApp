@@ -1013,14 +1013,20 @@ TITLE RULES:
 - GOOD: "When A Founder's 'I Quit' Post Shocked The Entire Country"
 
 THUMBNAIL TEXT RULES:
-- The actual shocking post/message text shown inside the social media screenshot. 2-5 words MAX.
-- Sounds like something someone posted — emotional, final, dramatic.
-- GOOD: "I Quit...", "It's Over", "I Failed You", "Goodbye Everyone", "I'm Sorry"
-- Extract from actual script events — what was the viral/famous message?
+- The actual shocking post/message shown INSIDE the social media screenshot. 2-6 words MAX.
+- Must feel like a REAL social media post someone actually wrote — TOPIC-SPECIFIC to the script.
+- NEVER use "EXPOSED" or any generic word — the text must come from the actual drama in the script.
+- Finance/Business: "We're Filing Bankruptcy", "I Lost Everything", "The Company Is Over"
+- Resignation/Quit: "I Quit...", "I Resign Today", "It's Over For Me"
+- Personal crisis: "I Failed My Family", "I Can't Do This Anymore", "I'm Sorry Everyone"
+- Political: "I Resign Effective Today", "They Forced Me Out", "This Is My Last Post"
+- Relationship: "She Left Me", "I Lied To You All", "It Was All Fake"
+- Death/Loss: "He's Gone. I Tried.", "I Couldn't Save Him"
+- Always extract from the ACTUAL turning point event in the script — what was the viral/real message?
 
 DESCRIPTION RULES — brief for the AI image generator:
 - Background: very dark charcoal/near-black with slight vignette
-- LEFT: Extreme close-up of subject person's face — very emotional (crying, praying hands, shocked). A thick BLACK CENSORSHIP BAR over their eyes containing white bold text (a censored/sensitive word related to the topic)
+- LEFT: Extreme close-up of subject person's face — very emotional (crying, praying hands, shocked). A thick BLACK CENSORSHIP BAR over their eyes containing white bold text (a topic-specific sensitive/shocking word — NOT "EXPOSED")
 - CENTER: A large TWEET/SOCIAL MEDIA POST screenshot — verified account with profile photo + name, the thumbnail text as the giant bold message inside the post (with a red underline), timestamp, engagement numbers. The screenshot has a slightly worn/grungy white appearance
 - RIGHT: A second person (narrator/reactor) — close-up face, serious concerned expression, looking at viewer
 - Overall: dark, investigative, documentary scandal feel`
@@ -1084,17 +1090,20 @@ TITLE RULES:
 - GOOD: "Pakistan Increases Defence Budget By 18%!! — War With India Near??"
 
 THUMBNAIL TEXT RULES:
-- Two stacked blocks — format: "HEADLINE | SUBHEADLINE" (pipe-separated, ALL CAPS, max 6 words each)
-- Headline (BLUE BOX): the main shocking event — "ISRAEL ATTACKS IRAN!!"
-- Subheadline (dark bg): the consequence/twist — "HUMILIATION FOR TRUMP!!"
-- Both parts MUST be topic-specific from the script — no generic fillers.
-- GOOD: "IRAN HITS US HARD!! | TRUMP IN SHOCK!!"
+- Two stacked blocks — format: "HEADLINE | SUBHEADLINE" (pipe-separated, ALL CAPS, max 5 words each)
+- Headline (BLUE BOX — top): the main shocking event in 2-4 ALL-CAPS words. Very short, punchy.
+- Subheadline (dark box — below): the consequence or reaction in 2-5 ALL-CAPS words.
+- BOTH must come from the actual script — never generic fillers like "BIG NEWS" or "BREAKING"
+- GOOD: "INDIA STRIKES BACK!! | PAKISTAN IN SHOCK!!"
+- GOOD: "MARKET CRASHES!! | DOLLAR AT 90!!"
+- GOOD: "TRUMP BANS INDIA | WAR IMMINENT??"
+- The AI will also auto-derive better topic-specific headline/subheadline from the script during image generation
 
 DESCRIPTION RULES — brief for the AI image generator:
-- LEFT 35%: Blue (#1565C0) headline box + dark sub-text block stacked below — text only, no person
-- FOREGROUND CENTER: The celebrity/political figure — large head + upper body composited OVER the background, photorealistic, expression of shock/stress/concern
-- BACKGROUND: A dramatic cinematic scene (war, explosions, fire, political events, tanks, battles, etc.) filling the right 65% and bleeding into full frame — specific to this script's topic
-- High-contrast, photorealistic, cinematic — NOT illustrated or cartoon
+- BACKGROUND: Full-frame photorealistic dramatic scene — 100% specific to this script topic (war zone, parliament, court, space, factory, protest, border — whatever fits)
+- LEFT TEXT BLOCKS: Blue filled rectangle (top) + dark rectangle (below) — both sharp-edged, bold white ALL-CAPS text, news-banner style
+- FOREGROUND CENTER: The real celebrity/politician/person from the script — VERY LARGE, overlapping text blocks AND background, composited in front of everything
+- Photorealistic, cinematic — NOT illustrated or cartoon
 - NO channel name, NO "By [Name]" text anywhere`
 
     : `STYLE — Podcast / High Energy:
@@ -5795,7 +5804,7 @@ ${cmAnnotations.length > 0 ? '- Annotation label boxes MUST have the glitchy/pix
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
     const p4Subject = (guestName || hostName || '').trim();
 
-    const p4PostText = (title || 'I Quit...').trim();
+    let p4PostText = (title || 'I Quit...').trim();
 
     let p4SubjectDesc = p4Subject
       ? `${p4Subject} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. Extreme left-side close-up, deeply emotional expression (tears, praying hands, devastated look)`
@@ -5823,14 +5832,15 @@ ${scriptSnippet}
 
 SUBJECT (person story is about): ${p4Subject || '(infer from script)'}
 HOST/NARRATOR (reactor on right): ${hostName || '(infer from script)'}
-VIRAL POST TEXT: "${p4PostText}"
+USER-SELECTED POST TEXT: "${p4PostText}"
 
 Decide:
 1. Subject's appearance and emotional expression (the person on the LEFT who the story is about)
 2. Narrator/reactor's appearance (the person on the RIGHT reacting/narrating)
 3. The social media account name and platform shown in the post screenshot
-4. The word on the BLACK CENSORSHIP BAR over the left person's eyes — should be the most sensitive/shocking word related to this script (censored with * e.g. "SU*CIDE", "BANK*RUPT", "FR**D", "FIR*D")
+4. The word on the BLACK CENSORSHIP BAR over the left person's eyes — the most sensitive/shocking word SPECIFIC to this script (censored with * e.g. "SU*CIDE", "BANK*RUPT", "FR**D", "FIR*D", "M*RDER", "RUINED", "B*OKRUPT") — NEVER use "EXPOSED" or generic words
 5. A realistic-looking timestamp for the viral post
+6. The best 2-6 word post message for the social media screenshot — if user-selected post text is good (2-6 words, feels like a real post), use it as-is. Otherwise write a better topic-specific one that captures the actual viral turning point from the script. Must sound like a real social media post, NOT a headline.
 
 Reply ONLY in JSON, no markdown:
 {
@@ -5838,8 +5848,9 @@ Reply ONLY in JSON, no markdown:
   "reactorDesc": "Description of right person's appearance + serious concerned expression",
   "accountName": "The social media account name for the post (real or made up to match topic)",
   "platform": "Twitter/X or Instagram or WhatsApp",
-  "censorText": "The word shown on the black censor bar (2-10 chars, censored with * e.g. SU*CIDE)",
-  "postTime": "A realistic timestamp (e.g. '11:25 PM · Jul 29, 2019')"
+  "censorText": "The word shown on the black censor bar (2-10 chars, censored with * — topic-specific, NEVER 'EXPOSED')",
+  "postTime": "A realistic timestamp (e.g. '11:25 PM · Jul 29, 2019')",
+  "postText": "The final 2-6 word post message shown in giant bold text inside the screenshot"
 }`
             }]
           }],
@@ -5861,6 +5872,7 @@ Reply ONLY in JSON, no markdown:
         if (p4Entities.platform) p4Platform = p4Entities.platform;
         if (p4Entities.censorText) p4CensorText = p4Entities.censorText;
         if (p4Entities.postTime) p4PostTime = p4Entities.postTime;
+        if (p4Entities.postText) p4PostText = p4Entities.postText;
       } catch (e) {
         console.warn('[Podcast4] entity extraction failed, using fallback:', e);
       }
@@ -6123,15 +6135,17 @@ ${title && title.trim() ? `- The ONLY allowed text: "${title}" — tiny, subtle,
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
     const ndCelebrity = (guestName || hostName || '').trim();
 
-    let ndBackgroundScene = 'A dramatic cinematic war scene — fighter jets, explosions, fire, and dark stormy sky — photorealistic, fills the right side and full background, intense orange and red tones';
-    let ndCelebrityDescription = ndCelebrity
-      ? `${ndCelebrity} — photorealistic, match the real public photographs of this person EXACTLY (face, age, hair, signature look). Head and upper body, expression of shock or stress`
-      : 'A prominent political figure relevant to the topic — photorealistic head and upper body, intense concerned or shocked expression';
-
+    // Parse pipe-separated headline | subheadline from title
     const ndTitleClean = (title || '').trim();
-    const ndParts = ndTitleClean.split(/\s*—\s*|\s*\|\s*/);
-    const ndHeadline = (ndParts[0] || ndTitleClean).toUpperCase();
-    const ndSubheadline = (ndParts[1] || '').toUpperCase();
+    const ndParts = ndTitleClean.split(/\s*\|\s*/);
+    let ndHeadline = (ndParts[0] || ndTitleClean).toUpperCase().trim();
+    let ndSubheadline = (ndParts[1] || '').toUpperCase().trim();
+
+    let ndBackgroundScene = 'A dramatic cinematic political/geopolitical scene — government buildings, crowds, flags, or conflict imagery — photorealistic, intense warm tones, fills the full background';
+    let ndCelebrityDescription = ndCelebrity
+      ? `${ndCelebrity} — photorealistic, match real public photographs EXACTLY. Large head + upper body, expression of shock or deep concern`
+      : 'The most prominent real person from this story — photorealistic, large head + upper body, intense expression';
+    let ndSceneMood = 'dark dramatic stormy atmosphere with warm orange glow';
 
     if (scriptSnippet) {
       onStep?.('analyzing');
@@ -6146,17 +6160,28 @@ ${title && title.trim() ? `- The ONLY allowed text: "${title}" — tiny, subtle,
 SCRIPT:
 ${scriptSnippet}
 
-TITLE: "${ndTitleClean}"
-FEATURED PERSON (face on thumbnail): ${ndCelebrity || '(infer from script)'}
+TOPIC TITLE: "${ndTitleClean}"
+FEATURED PERSON: ${ndCelebrity || '(infer from script — pick the most prominent real person in this story)'}
 
-Based on the script topic, decide:
-1. The DRAMATIC BACKGROUND SCENE: A vivid cinematic photo filling the right side + full background — war, explosions, political events, fire, buildings, battlefield, tanks — EXACTLY matching this script's topic. Be very specific.
-2. The FEATURED PERSON's appearance and expression on this thumbnail.
+Analyze the script and decide ALL of the following:
+
+1. BACKGROUND SCENE: A dramatic, photorealistic cinematic image that fills the entire frame as background. Must be 100% specific to THIS script's topic — could be war, protests, government building, courtroom, stock market crash, space scene, factory, border, hospital, parliament, etc. Describe exactly what's in the scene, the lighting, colors, mood. 2-3 vivid sentences.
+
+2. CELEBRITY/PERSON: The main person's real name, appearance (face features, hair, age, clothing), and their emotional expression. If they're a real public figure, note their signature look so the image model can match them accurately.
+
+3. HEADLINE (for BLUE BOX): A punchy 2-4 word ALL-CAPS breaking news headline capturing the MAIN EVENT from the script. Examples: "TRUMP BANS INDIA", "WAR DECLARED!!", "MARKET CRASHES", "INDIA STRIKES BACK". Extract from the script — NOT from example.
+
+4. SUBHEADLINE (for DARK BOX below blue): A punchy 2-5 word ALL-CAPS consequence or reaction from the script. Examples: "PAKISTAN IN SHOCK", "DOLLAR HITS 90", "MARKETS IN FREEFALL". Extract from the script.
+
+5. SCENE MOOD: One short phrase describing the dominant color/atmosphere of the background (e.g. "fiery orange war zone", "cold blue parliament crisis", "green jungle military", "grey urban riots")
 
 Reply ONLY in JSON, no markdown:
 {
-  "backgroundScene": "Vivid 2-3 sentence description of the dramatic scene — specific to THIS script's topic, photorealistic, cinematic, intense",
-  "celebrity": "One sentence: the person's name + their appearance (face, hair, what they're wearing) + expression (shocked/stressed/angry/concerned)"
+  "backgroundScene": "Vivid 2-3 sentence cinematic description — 100% specific to this script topic",
+  "celebrity": "Person name + appearance description + expression",
+  "headlineText": "2-4 WORD HEADLINE ALL CAPS",
+  "subheadlineText": "2-5 WORD SUBHEADLINE ALL CAPS",
+  "sceneMood": "short atmosphere phrase"
 }`
             }]
           }],
@@ -6171,50 +6196,57 @@ Reply ONLY in JSON, no markdown:
         if (ndEntities.backgroundScene) ndBackgroundScene = ndEntities.backgroundScene;
         if (ndEntities.celebrity) {
           ndCelebrityDescription = ndCelebrity
-            ? `${ndCelebrity} — ${ndEntities.celebrity}. MATCH THE REAL PUBLIC PHOTOGRAPHS of ${ndCelebrity} EXACTLY.`
+            ? `${ndCelebrity} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. ${ndEntities.celebrity}`
             : ndEntities.celebrity;
         }
+        if (ndEntities.headlineText) ndHeadline = ndEntities.headlineText.toUpperCase();
+        if (ndEntities.subheadlineText) ndSubheadline = ndEntities.subheadlineText.toUpperCase();
+        if (ndEntities.sceneMood) ndSceneMood = ndEntities.sceneMood;
       } catch (e) {
         console.warn('[NewsDramatic] entity extraction failed, using fallback:', e);
       }
     }
 
-    prompt = `You are a world-class YouTube thumbnail designer for an Indian breaking news channel (Career247 / ABP / India TV style). Create a PHOTOREALISTIC thumbnail that looks like a viral Indian news channel thumbnail.
+    prompt = `You are a world-class YouTube thumbnail designer replicating the exact visual style of viral Indian breaking news channels like Career247, ABP News, India TV. Create a PHOTOREALISTIC, CINEMATIC thumbnail.
 
-TITLE / TOPIC: "${ndTitleClean}"
+TOPIC: "${ndTitleClean}"
 
 ════ EXACT LAYOUT — 1920×1080, 16:9 ════
 
-▶ LEFT SIDE (35% of frame): STACKED TEXT BLOCKS — text only, NO person here
-- TOP BLOCK: SOLID BRIGHT BLUE rectangle (#1565C0)
-  - White bold ALL-CAPS text: "${ndHeadline}"
-  - Very large bold Impact/Arial Black font, 2-3 lines if needed, centered in the blue box
-  - Blue rectangle hugs tight around the text — strong, dense news-banner block
-- BOTTOM BLOCK (directly below the blue box): Dark charcoal/black background section
-  - White bold ALL-CAPS text: "${ndSubheadline || 'BREAKING UPDATE'}"
-  - Same bold font style, slightly smaller than top text, flush below the blue block
-- ABSOLUTELY NO channel name, NO "By [Name]" text, NO logo on the left — only the two text blocks
-
-▶ BACKGROUND (fills right 65% of frame and bleeds across entire background):
+▶ FULL BACKGROUND (entire frame):
 ${ndBackgroundScene}
-- Photorealistic, cinematic, ultra-dramatic — specific to this script's topic
-- Deep saturated colors: orange fire glow, dark stormy sky, intense reds — whatever matches the topic
-- Fills the ENTIRE right side and background, edge-to-edge
+- This photorealistic scene fills the ENTIRE 1920×1080 frame edge-to-edge — like a real news photo
+- Atmospheric: ${ndSceneMood}
+- Ultra-detailed, high dynamic range, photojournalistic quality
+- NO solid color backgrounds — every pixel of background is this scene
 
-▶ FOREGROUND CENTER (composited IN FRONT of the background):
+▶ LEFT SIDE TEXT BLOCKS (occupying left ~30% of frame, stacked vertically, center-left position):
+- BLOCK 1 — BRIGHT BLUE RECTANGLE (#1565C0 or #0D47A1):
+  - Solid bold blue filled rectangle, width ~28% of frame, tight padding
+  - Inside: "${ndHeadline}" in white bold ALL-CAPS Impact/Arial-Black font
+  - Text is very large, 2-3 lines, centered inside the blue block
+  - Blue rectangle has sharp edges — NO rounded corners, NO border, NO drop shadow
+- BLOCK 2 — DARK CHARCOAL RECTANGLE (#1a1a1a or #111111), directly below Block 1, same width:
+  - Inside: "${ndSubheadline}" in white bold ALL-CAPS font, slightly smaller than Block 1 text
+  - Same sharp-edged rectangle style, flush below Block 1 with zero gap
+- Both blocks together form a tall stacked text column on the left side
+
+▶ FEATURED PERSON (LARGE, center-left to center, IN FOREGROUND over everything):
 - ${ndCelebrityDescription}
-- LARGE head and upper body, positioned center to center-bottom of the frame
-- Composited OVER the dramatic background — person is in FRONT, background is BEHIND
-- Sharp photorealistic detail — face is the focal point
-- Expression: shocked / stressed / concerned / angry — matching the topic mood
-- Natural compositing: slight rim light or shadow so the person blends naturally
+- VERY LARGE head and upper body — person's face should be at least 40% of frame height
+- Positioned CENTER to SLIGHTLY LEFT of center — person OVERLAPS both the text blocks on the left AND the background on the right
+- The person is COMPOSITED IN FRONT of everything — text blocks are partially behind their body/arms, background is fully behind
+- Expression: INTENSE — shocked, stressed, angry, concerned, or grim — matching the news story mood
+- Photorealistic skin, hair, clothing — looks like a real photograph, NOT illustrated
+- Slight dramatic rim lighting matching the background atmosphere
+- Person's body cuts INTO both zones — this overlapping creates the Career247 style depth
 
 ════ STRICT RULES ════
-- LEFT TEXT BLOCKS: bold, dense, news-banner style — clearly legible blue rectangle + dark text block
-- PERSON is always in FOREGROUND composited over the scene — NOT inside the scene itself
-- Background scene MUST be 100% topic-specific — viewers instantly recognize the story
-- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D render
-- NO watermarks, NO channel logos, NO "By [Name]" text anywhere in the image
+- BACKGROUND: real photorealistic scene, NOT solid color, NOT generic studio — 100% topic-specific
+- TEXT BLOCKS: solid filled rectangles, sharp edges, bold legible white text, proper ABP/Career247 news style
+- PERSON: LARGE, in FOREGROUND, overlapping text AND background — this layering is CRITICAL
+- Photorealistic throughout — NOT illustrated, NOT cartoon, NOT 3D render
+- NO channel name, NO logo, NO "By [Name]", NO watermarks ANYWHERE
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'situational') {
