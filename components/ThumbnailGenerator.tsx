@@ -65,7 +65,15 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'professor_jiang', label: '🎓 Prof. Jiang', desc: 'Fox News Alert — breaking news', color: 'red' },
     { value: 'phone_studio', label: '📱 Phone Studio', desc: 'Phone + celebrity face + red/white impact text', color: 'pink' },
     { value: 'phone_clean', label: '🤍 Phone Clean', desc: 'Phone left + white bg + bold text right', color: 'slate' },
+    { value: 'phone_clean_2', label: '🎙 Phone Clean 2', desc: 'Sitting presenter + lapel mic + phone left', color: 'violet' },
     { value: 'phone_dual', label: '📲 Phone Dual', desc: '2 phones conversation + text center', color: 'cyan' },
+    { value: 'news_dramatic', label: '📰 News Dramatic', desc: 'Blue text box + celeb face + dramatic scene (Career247 style)', color: 'blue' },
+    { value: 'podcast_2', label: '🎙 Podcast 2', desc: 'Two hosts + center topic image insert (JRE/Lex Fridman style)', color: 'green' },
+    { value: 'cinematic_drama', label: '🎬 Cinematic Drama', desc: 'No/minimal text — extreme close-up face + dramatic scene (Bollywood/thriller style)', color: 'orange' },
+    { value: 'podcast_3', label: '🔴 Podcast Quote', desc: 'Red background + bold statement + yellow highlight word + speaker face (WSH style)', color: 'red' },
+    { value: 'podcast_4', label: '🧾 Viral Tweet', desc: 'Dark bg + two faces + giant social media post center (scandal/documentary style)', color: 'zinc' },
+    { value: 'corkboard_meta', label: '📌 Corkboard Meta', desc: 'Blue banner + cork board + annotated mini-thumbnail + presenter face (viral formula style)', color: 'yellow' },
+    { value: 'movie_review', label: '🎬 Cinematic Review', desc: 'Full dramatic bg + dark gold-border box with bold yellow hook (any topic — movie, book, event, brand)', color: 'amber' },
   ];
 
   const hasScript = script.length > 0;
