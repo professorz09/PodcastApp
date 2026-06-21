@@ -1676,22 +1676,51 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
               [...selectedIdxs].sort((a, b) => a - b).map((idx, n) => {
                 const c = chapters[idx];
                 if (!c) return null;
+                const dur = c.endSec - c.startSec;
                 return (
                   <div key={idx} style={{
-                    padding: '8px 10px', borderRadius: 8,
-                    background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)',
+                    padding: '10px 12px', borderRadius: 10,
+                    background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.25)',
                   }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                       <div style={{
-                        width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                        width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
                         background: '#a855f7', color: '#fff',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 10, fontWeight: 800,
                       }}>{n + 1}</div>
-                      <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: '#fff', wordBreak: 'break-word' }}>{c.title}</div>
                       <span style={{ flexShrink: 0, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)' }}>
-                        {fmtSec(c.startSec)}–{fmtSec(c.endSec)}
+                        {fmtSec(dur)}
                       </span>
+                    </div>
+
+                    {/* Timestamps + quotes */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.55)', paddingLeft: 30 }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <span style={{ color: '#86efac', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}>
+                          START {fmtSec(c.startSec)}
+                        </span>
+                        {(c.startQuote || c.summary) && (
+                          <span style={{ flex: 1, fontStyle: 'italic', color: 'rgba(255,255,255,0.45)' }}>
+                            {c.startQuote || c.summary}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <span style={{ color: '#fca5a5', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}>
+                          END {'  '}{fmtSec(c.endSec)}
+                        </span>
+                        {(c.endQuote || c.summary) && (
+                          <span style={{ flex: 1, fontStyle: 'italic', color: 'rgba(255,255,255,0.45)' }}>
+                            {c.endQuote || c.summary}
+                          </span>
+                        )}
+                      </div>
+                      {c.summary && (
+                        <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.35)' }}>↳ {c.summary}</div>
+                      )}
                     </div>
                   </div>
                 );
