@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -223,6 +223,24 @@ EXAMPLES (tone only — rewrite for the actual script topic):
 - "The Truth About COVID Vaccines — No Filter Conversation"
 - "Trump's Real Opinion On Drinking — Shocking Reveal"
 - "We Discussed XVideos, Pornhub, And The Internet's Dark Side"
+    `;
+  }
+  if (style === 'podcast_4') {
+    return `
+You are a YouTube copywriter for the "Viral Tweet / Scandal Documentary" style — dark background, two emotional faces (left & right), and a giant social media post in the center showing the shocking reveal. Used for business scandals, celebrity controversies, founder stories.
+
+REQUIREMENTS:
+1. 55-80 characters. Sounds like a documentary title or investigative exposé.
+2. MUST name the real person, brand, or event from the script.
+3. Formats: "The [X] Scandal Nobody Talked About", "When [Person] Posted This And Everything Changed", "How [Brand] Collapsed After One Tweet"
+4. ALWAYS write titles in English only.
+5. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only):
+- "The Café Coffee Day Founder's Last Tweet Before He Disappeared"
+- "How One Tweet Ended India's Biggest Coffee Chain"
+- "The Dark Truth Behind VG Siddhartha's Final Message"
+- "When A Founder's 'I Quit' Post Shocked The Entire Country"
     `;
   }
   if (style === 'podcast_3') {
@@ -545,6 +563,21 @@ Each option should be 4-8 words MAX describing the topic insert image. ALL in pl
 Return ONLY a JSON array of 5 strings. No markdown.
     `;
   }
+  if (style === 'podcast_4') {
+    return `
+You are a thumbnail copywriter for the "Viral Tweet / Scandal Documentary" style. The CENTER of the thumbnail is a giant social media post screenshot showing the shocking reveal text.
+
+The thumbnailText = the BIG DRAMATIC TEXT that appears inside the social media post — the actual shocking message that was posted.
+
+RULES:
+- 2-5 words maximum. Sounds like something a founder/celebrity actually posted/said.
+- Emotional, final, shocking — like a last message: "I Quit...", "It's Over", "I'm Sorry", "Goodbye Everyone", "I Failed You"
+- Can include ellipsis (...) for drama
+- Extract from actual script content — what was the viral/famous thing that was said or posted?
+- 5 options, varied emotional angles
+- Return ONLY a JSON array of 5 strings. No markdown.
+    `;
+  }
   if (style === 'podcast_3') {
     return `
 You are a thumbnail copywriter for the "Podcast Quote" style — deep red gradient background, speaker face RIGHT, bold statement sentence LEFT with ONE word in a YELLOW HIGHLIGHT BOX.
@@ -857,6 +890,27 @@ DESCRIPTION RULES — brief for the AI image generator:
 - CENTER: Rectangular topic image insert with thick bright colored border (green or red or cyan — pick most fitting) — photorealistic topic-specific image inside the box
 - No big text overlay on the thumbnail — the insert image is the visual hook
 - Photorealistic, looks like a real podcast production screenshot`
+
+    : videoStyle === 'podcast_4'
+    ? `STYLE — Viral Tweet / Scandal Documentary (dark background, two emotional faces, giant social media post center):
+TITLE RULES:
+- Documentary/exposé tone. Name the real person, brand, or event. 55-80 chars.
+- GOOD: "The Café Coffee Day Founder's Last Tweet Before He Disappeared"
+- GOOD: "How One Tweet Ended India's Biggest Coffee Chain"
+- GOOD: "When A Founder's 'I Quit' Post Shocked The Entire Country"
+
+THUMBNAIL TEXT RULES:
+- The actual shocking post/message text shown inside the social media screenshot. 2-5 words MAX.
+- Sounds like something someone posted — emotional, final, dramatic.
+- GOOD: "I Quit...", "It's Over", "I Failed You", "Goodbye Everyone", "I'm Sorry"
+- Extract from actual script events — what was the viral/famous message?
+
+DESCRIPTION RULES — brief for the AI image generator:
+- Background: very dark charcoal/near-black with slight vignette
+- LEFT: Extreme close-up of subject person's face — very emotional (crying, praying hands, shocked). A thick BLACK CENSORSHIP BAR over their eyes containing white bold text (a censored/sensitive word related to the topic)
+- CENTER: A large TWEET/SOCIAL MEDIA POST screenshot — verified account with profile photo + name, the thumbnail text as the giant bold message inside the post (with a red underline), timestamp, engagement numbers. The screenshot has a slightly worn/grungy white appearance
+- RIGHT: A second person (narrator/reactor) — close-up face, serious concerned expression, looking at viewer
+- Overall: dark, investigative, documentary scandal feel`
 
     : videoStyle === 'podcast_3'
     ? `STYLE — Podcast Quote (deep red background, speaker face right, bold statement left with yellow highlight word):
@@ -5423,6 +5477,126 @@ GUEST: ${p2Guest || 'podcast guest'}
 - ${p2Guest ? `The guest (${p2Guest}) MUST match real public photographs of this person — face, hair, age, look` : 'The guest looks natural and credible'}
 - The CENTER INSERT must be clearly framed with the thick colored border — it stands out as a deliberate element
 - Microphones visible for both hosts — this grounds it as a real podcast
+- 16:9 aspect ratio, 1920×1080${extraNote}`;
+
+  } else if (videoStyle === 'podcast_4') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    const p4Subject = (guestName || hostName || '').trim();
+
+    const p4PostText = (thumbnailText || 'I Quit...').trim();
+
+    let p4SubjectDesc = p4Subject
+      ? `${p4Subject} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. Extreme left-side close-up, deeply emotional expression (tears, praying hands, devastated look)`
+      : 'The main person in the story — extreme left-side close-up face, deeply emotional expression, tears or praying hands';
+    let p4ReactorDesc = hostName && guestName
+      ? `${hostName} — close-up face on the right side, serious concerned expression, looking straight at viewer`
+      : 'A serious young narrator/reactor — close-up face on the right side, furrowed brow, concerned expression, looking at camera';
+    let p4AccountName = p4Subject || 'Unknown';
+    let p4CensorText = 'CENSORED';
+    let p4PostTime = '11:25 PM · Jul 29, 2019';
+    let p4Platform = 'Twitter/X';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `You are a YouTube thumbnail art director for a scandal/documentary channel. Analyze this script and decide the visual elements.
+
+SCRIPT:
+${scriptSnippet}
+
+SUBJECT (person story is about): ${p4Subject || '(infer from script)'}
+HOST/NARRATOR (reactor on right): ${hostName || '(infer from script)'}
+VIRAL POST TEXT: "${p4PostText}"
+
+Decide:
+1. Subject's appearance and emotional expression (the person on the LEFT who the story is about)
+2. Narrator/reactor's appearance (the person on the RIGHT reacting/narrating)
+3. The social media account name and platform shown in the post screenshot
+4. The word on the BLACK CENSORSHIP BAR over the left person's eyes — should be the most sensitive/shocking word related to this script (censored with * e.g. "SU*CIDE", "BANK*RUPT", "FR**D", "FIR*D")
+5. A realistic-looking timestamp for the viral post
+
+Reply ONLY in JSON, no markdown:
+{
+  "subjectDesc": "Vivid description of left person's appearance + emotional state (crying/praying/devastated)",
+  "reactorDesc": "Description of right person's appearance + serious concerned expression",
+  "accountName": "The social media account name for the post (real or made up to match topic)",
+  "platform": "Twitter/X or Instagram or WhatsApp",
+  "censorText": "The word shown on the black censor bar (2-10 chars, censored with * e.g. SU*CIDE)",
+  "postTime": "A realistic timestamp (e.g. '11:25 PM · Jul 29, 2019')"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const p4Raw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const p4Entities = JSON.parse(p4Raw);
+        if (p4Entities.subjectDesc) {
+          p4SubjectDesc = p4Subject
+            ? `${p4Subject} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. ${p4Entities.subjectDesc}`
+            : p4Entities.subjectDesc;
+        }
+        if (p4Entities.reactorDesc) p4ReactorDesc = p4Entities.reactorDesc;
+        if (p4Entities.accountName) p4AccountName = p4Entities.accountName;
+        if (p4Entities.platform) p4Platform = p4Entities.platform;
+        if (p4Entities.censorText) p4CensorText = p4Entities.censorText;
+        if (p4Entities.postTime) p4PostTime = p4Entities.postTime;
+      } catch (e) {
+        console.warn('[Podcast4] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    prompt = `You are a world-class YouTube thumbnail designer for scandal documentary / investigative exposé channels. Create a dark, dramatic, cinematic thumbnail — style inspired by Indian business scandal channels (Think School / Dhruv Rathee / Nikhil Kamath-style investigative content).
+
+TOPIC: "${title}"
+VIRAL POST MESSAGE: "${p4PostText}"
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ BACKGROUND (full frame):
+- Near-black to very dark charcoal (#0a0a0a → #1a1a1a), slight vignette at all edges
+- Dark, heavy, serious — no color, no patterns — just deep darkness
+
+▶ LEFT SIDE (30% of frame): THE SUBJECT'S FACE
+- ${p4SubjectDesc}
+- Extreme close-up — face fills the left 30%, cropped tight (chin to forehead)
+- Expression: devastated, crying, praying hands pressed together at chin level — raw emotion
+- A THICK BLACK HORIZONTAL BAR across the eyes area (like a censorship/redaction bar)
+  - Inside the black bar: white bold ALL-CAPS text "${p4CensorText}" — worn/distressed font style
+  - The bar sits at eye level, partially covering the eyes — this is a critical visual element
+- Slightly dark/desaturated tone — moody, heavy
+
+▶ CENTER (40% of frame): THE VIRAL SOCIAL MEDIA POST
+- A large FLOATING SCREENSHOT of a ${p4Platform} post, centered, slightly tilted (~2°), taking up ~40% of frame width
+- The screenshot looks like a real ${p4Platform} post card — slightly worn/grungy white or light grey background
+- INSIDE THE SCREENSHOT:
+  - TOP: Small profile photo (logo/avatar) + account name "${p4AccountName}" + verified blue checkmark
+  - MIDDLE: The post message in GIANT BOLD dark typography: "${p4PostText}"
+  - Below the text: a SHORT THICK RED HORIZONTAL LINE underline
+  - BOTTOM: Timestamp "${p4PostTime}" + engagement stats (2K · 15K ♥ · 1.9M views) in small grey text
+- The screenshot has a subtle drop shadow and slight edge glow, floating against the dark background
+
+▶ RIGHT SIDE (30% of frame): THE NARRATOR/REACTOR'S FACE
+- ${p4ReactorDesc}
+- Extreme close-up — face fills the right 30%, cropped tight
+- Expression: serious, concerned, slightly furrowed brow — watching the viewer directly
+- Same dark moody treatment as the left face
+
+════ STRICT RULES ════
+- The BLACK CENSOR BAR with white text on the left face is a MANDATORY element — make it clearly visible
+- The social media screenshot must look like a REAL ${p4Platform} post — not a generic card
+- "${p4PostText}" must appear in VERY LARGE bold text inside the screenshot — this is the visual center of gravity
+- The RED UNDERLINE below the post text is important — thick, saturated red (#FF0000)
+- Overall color palette: near-black background, white/grey screenshot, red underline, dark faces
+- Photorealistic — NOT illustrated or cartoon
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'podcast_3') {
