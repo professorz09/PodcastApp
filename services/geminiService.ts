@@ -793,7 +793,14 @@ THUMBNAIL TEXT RULES:
 - Must ADD a new dimension, never repeat title words.
 - BAD: "LIFE RUINED" (repeats title idea)
 - GOOD (for "lost money" title) → "NO ESCAPE" / "TRUTH HIDDEN" / "TOO LATE NOW"
-- Together they hint at a story bigger than either alone.`
+- Together they hint at a story bigger than either alone.
+
+DESCRIPTION RULES — brief for the AI image generator:
+- ONE person only, RIGHT SIDE of frame, mid-shot, looking slightly left toward the text
+- Describe EXACTLY who this person is from the script (age, gender, build, clothing, emotional state — e.g. "stressed 35-year-old Indian man in plain shirt, looking down defeated")
+- BACKGROUND: dark moody color matching the emotion (deep charcoal, dark red, dark teal) — NOT white, NOT generic
+- TEXT: thumbnailText in bold ALL CAPS LEFT SIDE, 2-3 lines, yellow or white on dark background
+- Include 1 topic-specific prop if relevant (e.g. "laptop showing red loss graph", "torn documents on table", "empty wallet")`
 
     : videoStyle === 'debate'
     ? `STYLE — Debate / Two Sides:
@@ -807,7 +814,14 @@ TITLE RULES:
 THUMBNAIL TEXT RULES:
 - 2-4 words. CONFRONTATIONAL CAPS. Name one side's verdict or the clash itself.
 - BAD: "BIG FIGHT" (generic)
-- GOOD: "BINDRA EXPOSED" / "DELHI WINS" / "BOTH WRONG"`
+- GOOD: "BINDRA EXPOSED" / "DELHI WINS" / "BOTH WRONG"
+
+DESCRIPTION RULES — brief for the AI image generator:
+- TWO people on OPPOSITE SIDES of frame, facing each other, confrontational energy
+- Name BOTH people from the script exactly (e.g. "Sandeep Maheshwari on left, Vivek Bindra on right")
+- CENTER: thumbnailText in BOLD CAPS between them, 1-2 lines, red or yellow
+- Background: dark dramatic (red/orange split or dark grey), high energy tension
+- Expression: both looking intense/confrontational — like they're about to clash`
 
     : videoStyle === 'explained'
     ? `STYLE — Explained / Educational YouTube:
@@ -821,7 +835,14 @@ TITLE RULES:
 THUMBNAIL TEXT RULES:
 - 2-4 words CAPS. NAME the core concept or drop the most shocking fact.
 - BAD: "MUST WATCH" (says nothing)
-- GOOD: "48 LAWS" / "WAR TRUTH" / "REAL REASON" / "HIDDEN TRUTH"`
+- GOOD: "48 LAWS" / "WAR TRUTH" / "REAL REASON" / "HIDDEN TRUTH"
+
+DESCRIPTION RULES — brief for the AI image generator:
+- ONE large person/face RIGHT SIDE of frame, mid-shot or close-up, photorealistic
+- NAME the exact person from the script (or describe type if unnamed: "stressed 40-year-old Indian man in suit")
+- BACKGROUND: dark dramatic (charcoal, deep blue, or topic-specific color) + relevant topic visual element behind/beside them
+- TEXT: thumbnailText in bold CAPS LEFT SIDE, 2-3 lines, white or yellow
+- Add the key visual prop or scene from the script (e.g. "book cover in hand", "map of Israel-Hamas behind them", "stock chart on screen behind")`
 
     : videoStyle === 'phone_studio'
     ? `STYLE — Phone Studio (Phone Screen + Celebrity Face + Big Red/White Text):
@@ -937,7 +958,14 @@ THUMBNAIL TEXT RULES:
   Power-shift tone: "[WINNER] WINS" / "[LOSER] FALLS" / "[COUNTRY] RISES"
   Urgency tone: "TOO LATE" / "IT ENDS" / "POINT CROSSED"
 - Each combo must generate a DIFFERENT thumbnail text — never repeat the same phrase across the 3 combos.
-- Together = feels like a BREAKING STORY viewers CANNOT ignore.`
+- Together = feels like a BREAKING STORY viewers CANNOT ignore.
+
+DESCRIPTION RULES — brief for the AI image generator:
+- Fox News Alert chyron style: bold red BREAKING NEWS banner at bottom, dark blue/grey background
+- LARGE face of the real political figure/analyst from this script — named specifically (e.g. "Trump, 78, silver hair, dark suit, shocked expression")
+- Behind them: topic-specific background image (e.g. "US-China trade war map", "burning Ukrainian city", "Federal Reserve building")
+- thumbnailText as a bold chyron bar at the bottom — white text on dark red rectangle
+- High contrast, news broadcast aesthetic`
 
     : videoStyle === 'podcast_2'
     ? `STYLE — Podcast 2 (Two real hosts + center topic image insert with colored border):
@@ -957,12 +985,11 @@ THUMBNAIL TEXT RULES:
 - GOOD: "moon surface with rainbow light beam from space"
 
 DESCRIPTION RULES — brief for the AI image generator:
-- Background: blurred podcast studio — warm/ambient lighting, studio equipment, real room feel
-- LEFT SIDE: Host/presenter — upper body, facing right toward center, microphone visible in front, natural engaged expression
-- RIGHT SIDE: Guest/celebrity — upper body, facing left toward center, microphone visible in front, reacting expression
-- CENTER: Rectangular topic image insert with thick bright colored border (green or red or cyan — pick most fitting) — photorealistic topic-specific image inside the box
-- No big text overlay on the thumbnail — the insert image is the visual hook
-- Photorealistic, looks like a real podcast production screenshot`
+- Background: blurred warm podcast studio with equipment
+- LEFT SIDE: Name the real host from the script (e.g. "Joe Rogan, bald, black t-shirt, facing right with mic")
+- RIGHT SIDE: Name the real guest from the script (e.g. "Elon Musk, dark suit, facing left with mic, reacting expression")
+- CENTER INSERT: Thick colored border box with a SPECIFIC topic image inside — describe the exact image from this script topic (e.g. "Tesla Cybertruck in flames", "COVID-19 vaccine vial glowing", "glowing moon surface with data server")
+- Border color: green (science/space), red (political/war), cyan (health/tech), orange (entertainment) — pick based on topic`
 
     : videoStyle === 'movie_review'
     ? `STYLE — Cinematic Review (full dramatic background image + dark gold-border box with bold yellow hook text on left):
@@ -980,10 +1007,10 @@ THUMBNAIL TEXT RULES:
 - Extract from the actual topic/sentiment in the script.
 
 DESCRIPTION RULES — brief for the AI image generator:
-- BACKGROUND: Full-frame dramatic cinematic image — movie still, event scene, character portrait, historical moment — specific to THIS script topic, photorealistic, fills entire 16:9 frame.
-- LEFT-CENTER: Dark semi-transparent rounded rectangle (black ~85% opacity, thin GOLD border outline). Inside: small white caps topic label at top, LARGE BOLD YELLOW hook text (2-3 lines) center, small white content-type label at bottom (MOVIE REVIEW / BOOK REVIEW / DEEP DIVE / FULL STORY / etc.)
-- No separate host/reviewer face cutout.
-- Cinematic color grade matching the topic's mood.`
+- BACKGROUND: Describe the EXACT scene from this specific topic (e.g. "Ranbir Kapoor as Ram in Ramayana epic temple scene, golden hour lighting" OR "Steve Jobs in black turtleneck on Apple stage, spotlight" — NOT generic)
+- LEFT-CENTER: Dark semi-transparent box with GOLD border. Inside TOP: topic name in small white caps. MIDDLE: thumbnailText in LARGE BOLD YELLOW. BOTTOM: content type label (MOVIE REVIEW / DEEP DIVE / FULL STORY / etc.)
+- No host/reviewer face — background scene only
+- Cinematic color grade matching THIS topic's specific mood`
 
     : videoStyle === 'corkboard_meta'
     ? `STYLE — Corkboard Meta (blue top banner + cork board bg + annotated thumbnail pinned + presenter face right):
@@ -1026,10 +1053,10 @@ THUMBNAIL TEXT RULES:
 
 DESCRIPTION RULES — brief for the AI image generator:
 - Background: very dark charcoal/near-black with slight vignette
-- LEFT: Extreme close-up of subject person's face — very emotional (crying, praying hands, shocked). A thick BLACK CENSORSHIP BAR over their eyes containing white bold text (a topic-specific sensitive/shocking word — NOT "EXPOSED")
-- CENTER: A large TWEET/SOCIAL MEDIA POST screenshot — verified account with profile photo + name, the thumbnail text as the giant bold message inside the post (with a red underline), timestamp, engagement numbers. The screenshot has a slightly worn/grungy white appearance
-- RIGHT: A second person (narrator/reactor) — close-up face, serious concerned expression, looking at viewer
-- Overall: dark, investigative, documentary scandal feel`
+- LEFT: Name the actual subject person from the script (e.g. "V.G. Siddhartha, founder of Café Coffee Day — close-up face, tears, devastated expression"). Thick BLACK CENSOR BAR over eyes with topic-specific word (NOT "EXPOSED" — e.g. "BANKRUPT", "SU*CIDE", "RUINED")
+- CENTER: Large social media post screenshot — real account name from script, thumbnailText as GIANT BOLD post message, red underline, realistic timestamp
+- RIGHT: Name the narrator/reactor from the script if known, otherwise "serious young narrator, concerned expression"
+- Overall: dark, investigative, documentary scandal feel — name all real people and events from script`
 
     : videoStyle === 'podcast_3'
     ? `STYLE — Podcast Quote (deep red background, speaker face right, bold statement left with yellow highlight word):
@@ -1049,11 +1076,11 @@ THUMBNAIL TEXT RULES:
 - GOOD: "[Just Buy This.]"
 
 DESCRIPTION RULES — brief for the AI image generator:
-- Background: deep rich crimson red gradient (#8B0000 → #CC0000), darker at corners/edges, lighter in center-right behind the face
-- LEFT 45%: The big statement sentence — normal white text for most words, ONE word in SOLID YELLOW RECTANGLE with bold black text. Large font, 3-4 lines, dominant presence. Below the text: a small italic attribution line "- [Speaker Name]" with a curved arrow pointing right toward the face.
-- Optional: If finance/crypto topic, a subtle candlestick chart or data visualization overlaid lightly on the red background (semi-transparent)
-- RIGHT 55%: Speaker/guest — upper body portrait, professional, facing slightly left toward the text, microphone visible at bottom, photorealistic clean cutout on the red background
-- No channel logo or watermark`
+- Background: deep rich crimson red gradient (#8B0000 → #CC0000)
+- LEFT 45%: thumbnailText as big statement — white text with ONE word in SOLID YELLOW BOX. Below: "- [Speaker's real name from script] →" italic attribution line
+- Optional topic prop: if finance/crypto, faint candlestick chart behind text; if health, subtle medical visual; if politics, faint flag
+- RIGHT 55%: Name the actual speaker/guest from the script (e.g. "Raoul Pal, grey-haired economist, serious expression, podcast microphone visible"). Photorealistic, clean cutout on red background
+- No logo or watermark. Describe any topic-specific element that makes this visually unique to the script`
 
     : videoStyle === 'cinematic_drama'
     ? `STYLE — Cinematic Drama (Bollywood / thriller / drama — NO text or MINIMAL text, pure visual storytelling):
@@ -1072,13 +1099,11 @@ THUMBNAIL TEXT RULES:
 - DEFAULT to "" (empty) unless a quote or single word would dramatically add to the visual.
 
 DESCRIPTION RULES — brief for the AI image generator:
-- ZERO TEXT OVERLAY unless thumbnailText specifies a quote — no titles, no captions
-- Multi-layer cinematic composition: foreground extreme close-up face + middle scene + cinematic background
-- RIGHT SIDE (or full frame): EXTREME CLOSE-UP of the main character/person — beaten, emotional, intense, mystical — fills right half or entire frame
-- LEFT or BACKGROUND: A dramatic action scene, prop, or group of people — telling the story visually
-- Cinematic color grade: rich, saturated, high-contrast (golden yellows, deep blues, warm oranges, blood reds)
-- Photorealistic, looks like a Bollywood/Hollywood movie poster or film still
-- Style: if comedy contrast, add laughing group on one side vs suffering face on the other`
+- ZERO TEXT unless thumbnailText has a quote — if so, tiny white text top-left corner only
+- RIGHT SIDE: EXTREME CLOSE-UP of the main character from this script — name them specifically (e.g. "Ranbir Kapoor, intense bloodshot eyes, bruised face, dark lighting"). Face fills 40-50% of frame
+- BACKGROUND/LEFT: Describe the exact topic-specific dramatic scene from the script (e.g. "Punjab drug mafia dealing scene in a dark alley at night", "courtroom with judges", "battlefield with tanks")
+- Cinematic color grade specific to this topic's mood (e.g. "teal-orange Bollywood poster grade", "cold blue thriller grade", "warm golden drama grade")
+- Multi-layer depth: foreground face + middle scene + background environment — photorealistic film still quality`
 
     : videoStyle === 'news_dramatic'
     ? `STYLE — News Dramatic (Career247 / ABP / India TV breaking news thumbnail):
@@ -1100,11 +1125,11 @@ THUMBNAIL TEXT RULES:
 - The AI will also auto-derive better topic-specific headline/subheadline from the script during image generation
 
 DESCRIPTION RULES — brief for the AI image generator:
-- BACKGROUND: Full-frame photorealistic dramatic scene — 100% specific to this script topic (war zone, parliament, court, space, factory, protest, border — whatever fits)
-- LEFT TEXT BLOCKS: Blue filled rectangle (top) + dark rectangle (below) — both sharp-edged, bold white ALL-CAPS text, news-banner style
-- FOREGROUND CENTER: The real celebrity/politician/person from the script — VERY LARGE, overlapping text blocks AND background, composited in front of everything
-- Photorealistic, cinematic — NOT illustrated or cartoon
-- NO channel name, NO "By [Name]" text anywhere`
+- BACKGROUND: Describe the EXACT topic-specific scene from this script (e.g. "Indian Air Force jets firing missiles at night over Pakistani border, orange explosion clouds", "US Congress in chaos, senators shouting, American flags", "burning Ukrainian town with black smoke")
+- LEFT TEXT BLOCKS: Blue (#1565C0) rectangle on top with headline, dark charcoal rectangle below with subheadline — both sharp-edged, bold white ALL-CAPS
+- FOREGROUND CENTER: Name the REAL person from this script (e.g. "Donald Trump, 78, silver hair, dark suit, shocked open-mouthed expression") — VERY LARGE, overlapping both text blocks and background
+- Photorealistic, cinematic quality — NOT illustrated
+- NO channel name, NO "By [Name]" text`
 
     : `STYLE — Podcast / High Energy:
 TITLE RULES:
@@ -1130,18 +1155,20 @@ ${styleGuide}
 1. SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real from the script: a person, a country, a number, an event, a year.
 2. Each of the 3 combos must approach the SAME topic from a DIFFERENT ANGLE:
    - Combo 1: Lead with the SHOCKING OUTCOME / consequence
-   - Combo 2: Lead with the MYSTERY / hidden reason ("Real Reason", "The Truth Nobody Says", "What Nobody Mentions")  
+   - Combo 2: Lead with the MYSTERY / hidden reason ("Real Reason", "The Truth Nobody Says", "What Nobody Mentions")
    - Combo 3: Lead with the PERSONAL STAKES for the viewer ("What This Means For You", "Why You Should Care", "Your Life Changes")
 3. Thumbnail text MUST complement the title — NEVER echo the same words.
 4. DO NOT copy or reuse example phrases verbatim — all examples in the style guide above are only to show FORMAT and TONE. Your output must be freshly written from the actual script content.
 5. Each of the 3 thumbnail texts must be DIFFERENT from each other — vary the words, angle, and emotional hook.
 6. Language: ALWAYS write titles and thumbnail text in English only — do NOT use Hindi, Hinglish, or any other language, regardless of the script language.
-7. For each combo, also write a "description" — a precise visual thumbnail brief for an AI image generator. Include:
-   - Background: exact color/mood (e.g. "deep charcoal black", "crimson red with vignette", "pure white")
-   - Person/subject: who, where in frame, pose, expression (e.g. "single stressed Indian man, right side, mid-shot, looking down defeated")
-   - Text placement: where and how the thumbnailText appears (e.g. "bold yellow ALL CAPS on left side, 2 lines")
-   - Any props or key visual elements specific to this topic (e.g. "pile of cash on table", "burning document", "country flags in background")
-   - Keep it 2-4 sentences, actionable and specific.
+7. For each combo, write a "description" — a STYLE-SPECIFIC and SCRIPT-SPECIFIC visual brief for an AI image generator. CRITICAL RULES for the description:
+   a. FOLLOW THE DESCRIPTION RULES from the style guide above for layout structure (which element goes where, what colors, what format).
+   b. Make EVERY detail 100% specific to THIS script — NEVER use generic placeholders:
+      - NAME the actual real person/celebrity from the script (e.g. "Donald Trump, 78, silver hair, dark suit" — NOT "a political figure")
+      - DESCRIBE the exact topic-specific scene (e.g. "Indian fighter jets firing over Pakistani border at night, orange explosion glow" — NOT "a dramatic scene")
+      - SPECIFY the exact thumbnail text and where it appears per the style's layout
+      - ADD topic-specific props/elements that make this thumbnail unique to THIS script
+   c. Keep it 3-5 sentences, actionable and specific enough that an image model can execute it without guessing.
 8. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "...", "description": "..."}, ...]
 
 SCRIPT TO ANALYZE:
@@ -5077,25 +5104,28 @@ KEY VISUAL RULES:
           contents: [{
             role: 'user',
             parts: [{
-              text: `You are a thumbnail art director for the "Phone Studio" YouTube style — a viral format where a vertical phone (showing an AI chat about the topic) sits on the LEFT and a celebrity's face fills the RIGHT, with huge red+white text in the middle.
+              text: `You are a thumbnail art director for the "Phone Studio" YouTube style — viral format: vertical phone FAR LEFT showing topic image, large celebrity face CENTER-RIGHT, huge red+white hook text in the middle.
 
-SCRIPT EXCERPT:
+SCRIPT:
 ${scriptSnippet}
 
-CELEBRITY (featured person whose face goes on the right): ${celebrityName || '(unspecified — infer from script)'}
-HOOK TEXT (will appear huge on screen): "${title}"
-${topicName ? `TOPIC (user-specified — use this to decide the phone screen visual): ${topicName}` : ''}
+CELEBRITY (person whose face is large on the right): ${celebrityName || '(infer from script — who is the most prominent person?)'}
+HOOK TEXT: "${title}"
+${topicName ? `TOPIC: ${topicName}` : ''}
 
-Decide the SINGLE most viral image to display ON THE PHONE SCREEN — one bold photo/illustration that visually represents the topic. Examples:
-- For "Do Aliens Exist?" → a glowing alien grey face, sci-fi neon
-- For "Shift Data Centers To Moon" → a glowing moon with server racks, deep space stars
-- For "War Phase Won" → a dramatic battlefield with explosions and tanks
-- For "Trump Beats Powell" → a federal reserve building crumbling with dollar bills flying
+Decide:
+1. PHONE SCREEN VISUAL: The single most dramatic, topic-specific image to fill the phone screen. Must instantly tell the viewer what the video is about. Be hyper-specific to THIS script — not generic.
+   - India-Pakistan war script → "Indian fighter jets firing missiles over Pakistani border at night, orange explosion plumes, dramatic aerial view"
+   - Bitcoin crash script → "Bitcoin symbol shattering like glass, red market chart plummeting, dark dramatic lighting"
+   - Political scandal → "specific politician's leaked document on screen, stamped 'CLASSIFIED' in red"
+   - Not: generic battlefield / generic chart — SPECIFIC to this exact topic
+
+2. CELEBRITY DESCRIPTION: Real name, their signature appearance (exact hair, age look, clothing style they're known for), and the emotional expression that fits this topic mood. This must match their real public photographs.
 
 Reply ONLY in JSON, no markdown:
 {
-  "phoneScreen": "One vivid 1-2 sentence description of the topic image showing on the phone screen — photorealistic, dramatic, fills the screen",
-  "celebrity": "One sentence pinning the celebrity's appearance — face, age, hair, what they're wearing, expression matching the topic mood"
+  "phoneScreen": "Vivid 2-3 sentence description of the topic image on phone screen — 100% specific to this script, photorealistic, dramatic",
+  "celebrity": "Full description: name, exact appearance (hair, age, typical clothing), expression for this topic"
 }`
             }]
           }],
@@ -5128,42 +5158,48 @@ Reply ONLY in JSON, no markdown:
 
 ════ EXACT LAYOUT — 1920×1080, 16:9 ════
 
-▶ LEFT SIDE (≈ 35% of frame): A REALISTIC IPHONE-STYLE SMARTPHONE
+▶ LEFT SIDE (left 0–28% of frame): A REALISTIC IPHONE-STYLE SMARTPHONE
 - Vertical phone, slight tilt (~-4°), photorealistic glossy black bezel, rounded corners
-- Status bar at top: small white text "${celebrityName || 'Speaker'}" (left, with tiny pulse dot indicating "Speaking") and battery "73%" on the right
+- Phone is FULL HEIGHT — top of phone near top edge, bottom near bottom edge of frame
+- Status bar at top: small white text "${celebrityName || 'Speaker'}" (left, with tiny pulse dot "● Speaking") and "73% 🔋" on the right
 - The ENTIRE phone screen is filled with this image: ${phoneScreenVisual}
-- At the bottom of the phone screen: a small red circular X close button (the "end call" button)
-- The phone sits against the dark background, dramatic side-light glinting on the bezel
+- Image on screen must be vivid, dramatic, topic-specific — it is the visual story of the script
+- At the bottom of the phone screen: a small red circular X close button (end call button)
+- Subtle side-light glinting on the bezel
 
-▶ RIGHT SIDE (≈ 50% of frame): THE CELEBRITY FACE
+▶ CELEBRITY FACE — LARGE, CENTER-DOMINANT (fills center-right ~35% to 100% of frame):
 - ${celebrityDescription}
-- Head-and-shoulders, sharp focus, looking slightly toward the text (i.e. toward the left/center)
-- Cinematic studio lighting — slight rim light, dramatic mood matching the topic
-- A small name label tag floating near the face: "${celebrityName || 'SPEAKER'}" — white text, thin pointer line from the label to the person
+- Face and upper body positioned CENTER to RIGHT — their face should be the LARGEST element
+- The celebrity's body starts from about 35% of the frame width, extending to the right edge
+- Face should be at roughly 60-65% of frame width — LARGE, prominent, not squeezed to the side
+- Looking TOWARD the left/center (toward the phone and text)
+- Cinematic studio lighting — sharp focus, dramatic rim light matching topic mood
+- A small floating name label near their shoulder: "${celebrityName || 'SPEAKER'}" in white text with thin pointer line
+- Person visually DOMINATES the right half — this is the emotional anchor of the thumbnail
 
-▶ CENTER / OVERLAY — THE MASSIVE HOOK TEXT:
-- The text "${hookClean}" rendered HUGE, dominating the middle of the frame, overlapping slightly onto the phone area
-- Font: ultra-bold, condensed italic display sans-serif (Anton / Bebas Neue / Impact extended-italic feel), ALL CAPS, slight rightward tilt
-- Color split: "${whitePart}" in PURE WHITE, "${redPart}" in BRIGHT RED (#ED1C24) — this is the visual stinger
-- Stack on 2-3 lines if needed, left-aligned, hugging the right edge of the phone
-- Slight subtle dark drop-shadow under the text so it stays readable against the celebrity face
-- NO additional text elements anywhere else
+▶ CENTER OVERLAY — THE MASSIVE HOOK TEXT (overlapping phone right edge and celebrity left body):
+- The text "${hookClean}" rendered HUGE, between the phone and celebrity (roughly 22%–58% of frame width)
+- Font: ultra-bold condensed italic display sans-serif (Anton / Impact / Bebas Neue extended-italic), ALL CAPS, slight rightward lean
+- Color split: "${whitePart}" in PURE WHITE, "${redPart}" in BRIGHT RED (#ED1C24)
+- Stack on 2-3 lines, left-aligned to the phone's right edge
+- Slight dark drop-shadow for readability against the celebrity face
+- Text overlaps BOTH the phone (right edge) and the celebrity body (left portion) — this overlap creates the layered depth
 
 ▶ BACKGROUND:
 - SOLID PURE BLACK (#0a0a0a) — absolutely uniform, no variation
-- ZERO texture, ZERO pattern, ZERO bokeh, ZERO grain, ZERO gradients, ZERO studio elements
-- ZERO additional objects, props, shapes, lines, or decorative graphics
-- The ONLY things that exist in this image are: (1) the phone on the left, (2) the celebrity face/shoulders on the right, (3) the big hook text in the center
-- Think of a black backdrop in a photography studio — flat, featureless, infinite
+- ZERO texture, ZERO pattern, ZERO bokeh, ZERO grain, ZERO gradients
+- Only 3 things exist: (1) phone on far left, (2) celebrity face center-right, (3) hook text in the middle
+- Think photography studio black backdrop — flat, featureless, infinite
 
 ════ STRICT RULES ════
-- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D-rendered look
-- The celebrity face MUST be recognizable as ${celebrityName || 'the named figure'} — match real reference photos
-- Phone screen visual MUST match the topic of the script
-- Big text is the most readable element — high contrast, sharp edges
-- BACKGROUND IS PURE SOLID BLACK — any texture, pattern, gradient, or background element is FORBIDDEN
+- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D-rendered
+- Celebrity face MUST fill a large area — they are NOT a small figure on the side; they dominate the right 65% of the frame
+- Celebrity MUST be recognizable as ${celebrityName || 'the named figure'} — match real reference photos exactly
+- Phone screen visual MUST match the script topic — viewers must immediately understand what the video is about
+- Hook text is bold, high-contrast, sharp — white + red split as specified
+- BACKGROUND IS PURE SOLID BLACK — any texture, gradient, or extra element is FORBIDDEN
 - 16:9 aspect ratio (1920×1080)
-- No watermarks, no logos other than the small phone status icons${extraNote}`;
+- No watermarks, no logos${extraNote}`;
 
   } else if (videoStyle === 'phone_clean') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
