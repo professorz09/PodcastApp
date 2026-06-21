@@ -1013,14 +1013,20 @@ TITLE RULES:
 - GOOD: "When A Founder's 'I Quit' Post Shocked The Entire Country"
 
 THUMBNAIL TEXT RULES:
-- The actual shocking post/message text shown inside the social media screenshot. 2-5 words MAX.
-- Sounds like something someone posted — emotional, final, dramatic.
-- GOOD: "I Quit...", "It's Over", "I Failed You", "Goodbye Everyone", "I'm Sorry"
-- Extract from actual script events — what was the viral/famous message?
+- The actual shocking post/message shown INSIDE the social media screenshot. 2-6 words MAX.
+- Must feel like a REAL social media post someone actually wrote — TOPIC-SPECIFIC to the script.
+- NEVER use "EXPOSED" or any generic word — the text must come from the actual drama in the script.
+- Finance/Business: "We're Filing Bankruptcy", "I Lost Everything", "The Company Is Over"
+- Resignation/Quit: "I Quit...", "I Resign Today", "It's Over For Me"
+- Personal crisis: "I Failed My Family", "I Can't Do This Anymore", "I'm Sorry Everyone"
+- Political: "I Resign Effective Today", "They Forced Me Out", "This Is My Last Post"
+- Relationship: "She Left Me", "I Lied To You All", "It Was All Fake"
+- Death/Loss: "He's Gone. I Tried.", "I Couldn't Save Him"
+- Always extract from the ACTUAL turning point event in the script — what was the viral/real message?
 
 DESCRIPTION RULES — brief for the AI image generator:
 - Background: very dark charcoal/near-black with slight vignette
-- LEFT: Extreme close-up of subject person's face — very emotional (crying, praying hands, shocked). A thick BLACK CENSORSHIP BAR over their eyes containing white bold text (a censored/sensitive word related to the topic)
+- LEFT: Extreme close-up of subject person's face — very emotional (crying, praying hands, shocked). A thick BLACK CENSORSHIP BAR over their eyes containing white bold text (a topic-specific sensitive/shocking word — NOT "EXPOSED")
 - CENTER: A large TWEET/SOCIAL MEDIA POST screenshot — verified account with profile photo + name, the thumbnail text as the giant bold message inside the post (with a red underline), timestamp, engagement numbers. The screenshot has a slightly worn/grungy white appearance
 - RIGHT: A second person (narrator/reactor) — close-up face, serious concerned expression, looking at viewer
 - Overall: dark, investigative, documentary scandal feel`
@@ -5795,7 +5801,7 @@ ${cmAnnotations.length > 0 ? '- Annotation label boxes MUST have the glitchy/pix
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
     const p4Subject = (guestName || hostName || '').trim();
 
-    const p4PostText = (title || 'I Quit...').trim();
+    let p4PostText = (title || 'I Quit...').trim();
 
     let p4SubjectDesc = p4Subject
       ? `${p4Subject} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. Extreme left-side close-up, deeply emotional expression (tears, praying hands, devastated look)`
@@ -5823,14 +5829,15 @@ ${scriptSnippet}
 
 SUBJECT (person story is about): ${p4Subject || '(infer from script)'}
 HOST/NARRATOR (reactor on right): ${hostName || '(infer from script)'}
-VIRAL POST TEXT: "${p4PostText}"
+USER-SELECTED POST TEXT: "${p4PostText}"
 
 Decide:
 1. Subject's appearance and emotional expression (the person on the LEFT who the story is about)
 2. Narrator/reactor's appearance (the person on the RIGHT reacting/narrating)
 3. The social media account name and platform shown in the post screenshot
-4. The word on the BLACK CENSORSHIP BAR over the left person's eyes — should be the most sensitive/shocking word related to this script (censored with * e.g. "SU*CIDE", "BANK*RUPT", "FR**D", "FIR*D")
+4. The word on the BLACK CENSORSHIP BAR over the left person's eyes — the most sensitive/shocking word SPECIFIC to this script (censored with * e.g. "SU*CIDE", "BANK*RUPT", "FR**D", "FIR*D", "M*RDER", "RUINED", "B*OKRUPT") — NEVER use "EXPOSED" or generic words
 5. A realistic-looking timestamp for the viral post
+6. The best 2-6 word post message for the social media screenshot — if user-selected post text is good (2-6 words, feels like a real post), use it as-is. Otherwise write a better topic-specific one that captures the actual viral turning point from the script. Must sound like a real social media post, NOT a headline.
 
 Reply ONLY in JSON, no markdown:
 {
@@ -5838,8 +5845,9 @@ Reply ONLY in JSON, no markdown:
   "reactorDesc": "Description of right person's appearance + serious concerned expression",
   "accountName": "The social media account name for the post (real or made up to match topic)",
   "platform": "Twitter/X or Instagram or WhatsApp",
-  "censorText": "The word shown on the black censor bar (2-10 chars, censored with * e.g. SU*CIDE)",
-  "postTime": "A realistic timestamp (e.g. '11:25 PM · Jul 29, 2019')"
+  "censorText": "The word shown on the black censor bar (2-10 chars, censored with * — topic-specific, NEVER 'EXPOSED')",
+  "postTime": "A realistic timestamp (e.g. '11:25 PM · Jul 29, 2019')",
+  "postText": "The final 2-6 word post message shown in giant bold text inside the screenshot"
 }`
             }]
           }],
@@ -5861,6 +5869,7 @@ Reply ONLY in JSON, no markdown:
         if (p4Entities.platform) p4Platform = p4Entities.platform;
         if (p4Entities.censorText) p4CensorText = p4Entities.censorText;
         if (p4Entities.postTime) p4PostTime = p4Entities.postTime;
+        if (p4Entities.postText) p4PostText = p4Entities.postText;
       } catch (e) {
         console.warn('[Podcast4] entity extraction failed, using fallback:', e);
       }
