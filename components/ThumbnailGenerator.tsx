@@ -73,7 +73,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'podcast_3', label: '🔴 Podcast Quote', desc: 'Red background + bold statement + yellow highlight word + speaker face (WSH style)', color: 'red' },
     { value: 'podcast_4', label: '🧾 Viral Tweet', desc: 'Dark bg + two faces + giant social media post center (scandal/documentary style)', color: 'zinc' },
     { value: 'corkboard_meta', label: '📌 Corkboard Meta', desc: 'Blue banner + cork board + annotated mini-thumbnail + presenter face (viral formula style)', color: 'yellow' },
-    { value: 'movie_review', label: '🎬 Movie Review', desc: 'Full movie still bg + dark gold-border box with bold yellow hook text (PJ/review style)', color: 'amber' },
+    { value: 'movie_review', label: '🎬 Cinematic Review', desc: 'Full dramatic bg + dark gold-border box with bold yellow hook (any topic — movie, book, event, brand)', color: 'amber' },
   ];
 
   const hasScript = script.length > 0;

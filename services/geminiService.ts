@@ -227,20 +227,20 @@ EXAMPLES (tone only — rewrite for the actual script topic):
   }
   if (style === 'movie_review') {
     return `
-You are a YouTube copywriter for a Bollywood/Hindi movie review channel (PJ / Filmy Bandhu / Sucharita Tyagi style). Titles are opinionated, punchy, Hindi-English mix, honest reactions to films.
+You are a YouTube copywriter for a cinematic review/analysis channel — works for ANY topic (movies, books, events, brands, people, documentaries, sports). Titles are opinionated, punchy, Hindi-English mix or pure English, honest hot takes.
 
 REQUIREMENTS:
 1. 45-70 characters. Sounds like a reviewer's raw honest reaction — can be in Hindi, English, or Hinglish.
-2. MUST name the actual film from the script.
-3. Formats: "[Film Name] Review: [Reaction]", "[Film Name] — [Bold Opinion]", "[Emoji] [Film] [Reaction]"
-4. Can use emojis and colloquial expressions.
+2. MUST name the actual topic (film, book, brand, event, person) from the script.
+3. Can use emojis and colloquial expressions.
+4. Works for: movie review, book review, event breakdown, brand story, sports moment, documentary reaction.
 5. Return ONLY a valid JSON array of 4 strings. No markdown.
 
 EXAMPLES (tone only):
 - "Krishnavataram Review: Dhoka Hua Mere Saath 💔"
-- "Ramayana Movie — Not Indian Enough? My Honest Take 😱"
-- "Dhurandhar Review: Pappi Lo Aap Meri 😂🔥"
-- "Jolly LLB 3 Review: WTF Bhai Rula Diya 🔥"
+- "Jolly LLB 3: WTF Bhai Rula Diya 🔥"
+- "Apple's Biggest Failure — Full Story Explained 🤯"
+- "IPL 2025 Final: Paisa Vasool Tha Yaar 🏏"
     `;
   }
   if (style === 'corkboard_meta') {
@@ -601,24 +601,23 @@ Return ONLY a JSON array of 5 strings. No markdown.
   }
   if (style === 'movie_review') {
     return `
-You are a thumbnail copywriter for a Bollywood movie review channel. The thumbnail shows a cinematic movie still as the full background with a dark semi-transparent box with GOLD BORDER on the left containing the review hook.
+You are a thumbnail copywriter for a cinematic review/analysis channel. The thumbnail shows a dramatic full-frame background image (movie still, event scene, person, etc.) with a dark GOLD-BORDER box on the left containing the bold yellow hook text.
 
-The thumbnailText = the BOLD YELLOW HOOK TEXT inside the dark box — the reviewer's punchy reaction/opinion about the film. Can be Hindi, English, or Hinglish. Can include 1-2 emojis.
+The thumbnailText = the BOLD YELLOW HOOK TEXT inside the dark gold-border box — the raw honest reaction/opinion. Can be Hindi, English, or Hinglish. Can include 1-2 emojis.
 
 RULES:
-- 3-6 words. Raw, honest, expressive reviewer reaction.
+- 3-6 words. Raw, expressive, emotional reaction or punchy opinion.
+- Works for ANY topic — film, book, event, brand, person, sports, documentary.
 - This goes in LARGE BOLD YELLOW inside the dark box — it's the emotional anchor.
-- Can be funny, shocking, disappointed, hyped — whatever the review tone is.
-- MUST relate to the actual film from the script.
-- 5 options, varied tones (love, hate, shocked, funny, emotional)
+- 5 options, varied tones (loved it, hated it, shocked, funny, emotional)
 - Return ONLY a JSON array of 5 strings. No markdown.
 
 EXAMPLES (tone only):
 - "DHOKA HUA 💔 MERE SATH"
 - "NOT INDIAN 😱 ENOUGH"
-- "PAPPI LO AAP MERI 😂"
 - "WTF BHAI 🔥 RULA DIYA"
 - "PAISA VASOOL HAI YAR"
+- "MIND BLOWN 🤯 SERIOUSLY"
     `;
   }
   if (style === 'corkboard_meta') {
@@ -966,24 +965,25 @@ DESCRIPTION RULES — brief for the AI image generator:
 - Photorealistic, looks like a real podcast production screenshot`
 
     : videoStyle === 'movie_review'
-    ? `STYLE — Movie Review (full cinematic movie still background + dark gold-border box with hook text on left):
+    ? `STYLE — Cinematic Review (full dramatic background image + dark gold-border box with bold yellow hook text on left):
 TITLE RULES:
-- Opinionated, punchy Bollywood reviewer tone. NAME the actual film. 45-70 chars.
-- Can be Hindi/English/Hinglish. Can use emojis.
+- Opinionated, punchy tone. NAME the specific topic (film, book, brand, event, person). 45-70 chars.
+- Can be Hindi/English/Hinglish. Can use emojis. Works for any topic, not just movies.
 - GOOD: "Krishnavataram Review: Dhoka Hua Mere Saath 💔"
 - GOOD: "Ramayana Movie — Not Indian Enough? My Honest Take 😱"
 - GOOD: "Jolly LLB 3 Review: WTF Bhai Rula Diya 🔥"
+- GOOD (non-movie): "Apple's Biggest Failure — Full Story 🤯"
 
 THUMBNAIL TEXT RULES:
-- 3-6 words of the reviewer's raw reaction in LARGE BOLD YELLOW inside a dark box. Can be Hindi/Hinglish + emoji.
-- GOOD: "DHOKA HUA 💔 MERE SATH" / "WTF BHAI 🔥 RULA DIYA" / "PAISA VASOOL HAI YAR"
-- Extract from the actual film/review sentiment in the script.
+- 3-6 words raw reaction/hook in LARGE BOLD YELLOW inside a dark gold-border box. Can be Hindi/Hinglish + emoji.
+- GOOD: "DHOKA HUA 💔 MERE SATH" / "WTF BHAI 🔥 RULA DIYA" / "NOT INDIAN 😱 ENOUGH"
+- Extract from the actual topic/sentiment in the script.
 
 DESCRIPTION RULES — brief for the AI image generator:
-- BACKGROUND: Full-frame cinematic movie still from the film being reviewed — photorealistic, dramatic, fills entire 16:9 frame. One or two characters from the film in action/emotion.
-- LEFT-CENTER: Dark semi-transparent rounded rectangle (black ~85% opacity, thin GOLD/YELLOW border outline). Inside the box: small white caps movie title at top, LARGE BOLD YELLOW hook text (2-3 lines) in center, small "MOVIE REVIEW" white text at bottom.
-- No separate reviewer face cutout — the movie scene IS the full background.
-- Cinematic color grade matching the film's tone.`
+- BACKGROUND: Full-frame dramatic cinematic image — movie still, event scene, character portrait, historical moment — specific to THIS script topic, photorealistic, fills entire 16:9 frame.
+- LEFT-CENTER: Dark semi-transparent rounded rectangle (black ~85% opacity, thin GOLD border outline). Inside: small white caps topic label at top, LARGE BOLD YELLOW hook text (2-3 lines) center, small white content-type label at bottom (MOVIE REVIEW / BOOK REVIEW / DEEP DIVE / FULL STORY / etc.)
+- No separate host/reviewer face cutout.
+- Cinematic color grade matching the topic's mood.`
 
     : videoStyle === 'corkboard_meta'
     ? `STYLE — Corkboard Meta (blue top banner + cork board bg + annotated thumbnail pinned + presenter face right):
@@ -5594,12 +5594,13 @@ GUEST: ${p2Guest || 'podcast guest'}
 
   } else if (videoStyle === 'movie_review') {
     const scriptSnippet = scriptText?.slice(0, 1500) || '';
-    const mrFilmName = (topicName || guestName || '').trim();
+    const mrTopicName = (topicName || guestName || '').trim();
     const mrHookText = (thumbnailText || title || '').trim();
 
-    let mrBackgroundScene = 'A dramatic cinematic scene from a Bollywood film — lead actor in character costume, intense expression, vivid cinematic lighting, fills the entire frame';
-    let mrFilmLabel = mrFilmName || 'MOVIE';
-    let mrColorGrade = 'Rich cinematic grade — deep warm tones, high contrast, Bollywood epic feel';
+    let mrBackgroundScene = 'A dramatic cinematic scene — powerful character in action, intense expression, vivid cinematic lighting, fills the entire frame with rich detail';
+    let mrTopLabel = mrTopicName || 'REVIEW';
+    let mrBottomLabel = 'REVIEW';
+    let mrColorGrade = 'Rich cinematic grade — deep warm tones, high contrast, dramatic feel';
 
     if (scriptSnippet) {
       onStep?.('analyzing');
@@ -5609,23 +5610,27 @@ GUEST: ${p2Guest || 'podcast guest'}
           contents: [{
             role: 'user',
             parts: [{
-              text: `You are a Bollywood movie review thumbnail art director.
+              text: `You are a YouTube thumbnail art director for a cinematic review/analysis channel.
 
-SCRIPT/REVIEW:
+SCRIPT:
 ${scriptSnippet}
 
-FILM NAME: ${mrFilmName || '(infer from script)'}
-REVIEWER HOOK: "${mrHookText}"
+TOPIC: ${mrTopicName || '(infer from script)'}
+HOOK: "${mrHookText}"
+
+This style works for ANY topic — movie review, book review, documentary, event, business story, sports moment, etc.
 
 Decide:
-1. BACKGROUND SCENE: What cinematic movie still/scene should fill the entire thumbnail background? Describe the character(s), their costume/look, expression, and setting from this specific film. Be very visual and specific.
-2. FILM LABEL: The short film name or producer name shown at the top of the dark box (e.g. "KRISHNAVATARAM", "NAMIT MALHOTRA'S", "DHURANDHAR", "JOLLY LLB 3")
-3. COLOR GRADE: The cinematic color mood matching this film's tone (e.g. "warm golden mythological glow", "dark moody crime thriller", "teal-orange action blockbuster", "blue-grey temple drama")
+1. BACKGROUND SCENE: A dramatic, photorealistic cinematic image that fills the entire frame — related to this specific topic. Could be a movie still, a dramatic event photo, a character in costume, a historical moment, a sports action shot, or any vivid scene directly tied to the script topic.
+2. TOP LABEL: The short topic name shown at the top of the dark box (e.g. a film name, brand name, event name, person's name — 1-4 words ALL CAPS)
+3. BOTTOM LABEL: What type of content this is — shown at the bottom of the dark box (e.g. "MOVIE REVIEW", "BOOK REVIEW", "DEEP DIVE", "FULL STORY", "EXPLAINED", "DOCUMENTARY", "ANALYSIS" — pick the best fit for the script)
+4. COLOR GRADE: The cinematic color mood matching this topic's feel
 
 Reply ONLY in JSON, no markdown:
 {
-  "backgroundScene": "Vivid 2-3 sentence description of the movie still/scene filling the background — specific characters, costume, expression, setting from THIS film",
-  "filmLabel": "Short film/producer name for the box label (ALL CAPS, 1-4 words)",
+  "backgroundScene": "Vivid 2-3 sentence description of the dramatic cinematic image filling the background — specific to THIS topic",
+  "topLabel": "Short topic name (ALL CAPS, 1-4 words)",
+  "bottomLabel": "Content type label (1-2 words ALL CAPS, e.g. MOVIE REVIEW, BOOK REVIEW, DEEP DIVE, FULL STORY, EXPLAINED)",
   "colorGrade": "Cinematic color grade description"
 }`
             }]
@@ -5639,43 +5644,44 @@ Reply ONLY in JSON, no markdown:
         })();
         const mrEntities = JSON.parse(mrRaw);
         if (mrEntities.backgroundScene) mrBackgroundScene = mrEntities.backgroundScene;
-        if (mrEntities.filmLabel) mrFilmLabel = mrEntities.filmLabel;
+        if (mrEntities.topLabel) mrTopLabel = mrEntities.topLabel;
+        if (mrEntities.bottomLabel) mrBottomLabel = mrEntities.bottomLabel;
         if (mrEntities.colorGrade) mrColorGrade = mrEntities.colorGrade;
       } catch (e) {
         console.warn('[MovieReview] entity extraction failed, using fallback:', e);
       }
     }
 
-    prompt = `You are a world-class YouTube thumbnail designer for a Bollywood/Hindi movie review channel (PJ / Filmy Bandhu style). Create a CINEMATIC MOVIE REVIEW thumbnail.
+    prompt = `You are a world-class YouTube thumbnail designer for a cinematic review/analysis channel. Create a powerful thumbnail using a dramatic full-frame background image with a dark gold-border overlay box.
 
-FILM: ${mrFilmLabel}
+TOPIC: ${mrTopLabel}
 HOOK TEXT: "${mrHookText}"
 
 ════ EXACT LAYOUT — 1920×1080, 16:9 ════
 
 ▶ BACKGROUND (entire frame — 100% of image):
 ${mrBackgroundScene}
-- This movie still fills the ENTIRE 16:9 frame — edge to edge, top to bottom
-- Photorealistic, cinematic — looks like a real movie frame/poster
+- Fills the ENTIRE 16:9 frame — edge to edge, top to bottom
+- Photorealistic, cinematic — rich detail, dramatic lighting
 - Color grade: ${mrColorGrade}
-- Rich, dramatic, visually arresting — the kind of image that stops the scroll
+- Visually arresting — the kind of image that immediately stops the scroll
 
-▶ CENTER-LEFT OVERLAY BOX (positioned left-center, ~35% of frame width):
-- A DARK SEMI-TRANSPARENT ROUNDED RECTANGLE — background: near-black (#0d0d0d) at ~85% opacity
-- BORDER: A thin (2-3px) GOLD/YELLOW (#C8A84B / #D4AF37) outline around the entire rectangle — the gold border is a KEY design element
-- Slight padding inside the box (20-25px)
+▶ CENTER-LEFT OVERLAY BOX (positioned left-center, ~38% of frame width):
+- A DARK SEMI-TRANSPARENT ROUNDED RECTANGLE — near-black (#0d0d0d) at ~85% opacity
+- BORDER: A thin (2-3px) GOLD (#D4AF37) outline around the entire rectangle — the gold border is a KEY design element, must be clearly visible
+- Padding inside the box (~20-25px all sides)
 - INSIDE THE BOX (top to bottom):
-  1. TOP: "${mrFilmLabel}" — small white ALL CAPS text, thin font weight, subtle, about 14px equivalent. Sits just above the main hook text.
-  2. MIDDLE: "${mrHookText}" — LARGE BOLD YELLOW (#F5C518 / gold-yellow) text, 2-3 lines, heavy bold weight (like a film title font). This is the dominant element inside the box.
-  3. BOTTOM: "MOVIE REVIEW" — small white ALL CAPS text, thin font weight, sits below the hook text.
+  1. TOP: "${mrTopLabel}" — small white ALL CAPS text, thin font weight, subtle
+  2. MIDDLE: "${mrHookText}" — LARGE BOLD YELLOW (#F5C518) text, 2-3 lines, heavy bold weight. This is the dominant element inside the box — big, impactful.
+  3. BOTTOM: "${mrBottomLabel}" — small white ALL CAPS text, thin font weight
 
 ════ STRICT RULES ════
-- The BACKGROUND is a real movie scene — NOT a solid color, NOT a gradient, NOT a studio
-- The DARK BOX with GOLD BORDER is on the LEFT-CENTER — it MUST have the thin gold outline clearly visible
-- The hook text "${mrHookText}" MUST appear in LARGE BOLD YELLOW inside the box — this is the most readable element
-- The box is semi-transparent — you can faintly see the movie scene through it
-- NO separate reviewer face — no cutout, no host portrait
-- Photorealistic cinematic quality — looks like a real movie still
+- BACKGROUND must be a real dramatic photorealistic scene — NOT solid color, NOT studio, NOT plain
+- DARK BOX with GOLD BORDER must be left-center positioned — gold outline clearly visible
+- Hook text MUST appear in LARGE BOLD YELLOW — this is the most critical text element
+- Box is semi-transparent — the background scene is faintly visible through it
+- NO separate host/reviewer face cutout
+- Photorealistic cinematic quality throughout
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'corkboard_meta') {
