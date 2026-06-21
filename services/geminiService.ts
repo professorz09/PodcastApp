@@ -5595,7 +5595,7 @@ GUEST: ${p2Guest || 'podcast guest'}
   } else if (videoStyle === 'movie_review') {
     const scriptSnippet = scriptText?.slice(0, 1500) || '';
     const mrTopicName = (topicName || guestName || '').trim();
-    const mrHookText = (thumbnailText || title || '').trim();
+    const mrHookText = (title || '').trim();
 
     let mrBackgroundScene = 'A dramatic cinematic scene — powerful character in action, intense expression, vivid cinematic lighting, fills the entire frame with rich detail';
     let mrTopLabel = mrTopicName || 'REVIEW';
@@ -5688,7 +5688,7 @@ ${mrBackgroundScene}
     const cmPresenter = (hostName || '').trim();
 
     // Parse banner text: [YELLOW] white part
-    const cmRaw = (thumbnailText || title || '').trim();
+    const cmRaw = (title || '').trim();
     const cmBracketMatch = cmRaw.match(/\[([^\]]+)\]/);
     const cmYellowWord = cmBracketMatch ? cmBracketMatch[1] : cmRaw.split(' ')[0];
     const cmWhitePart = cmBracketMatch
@@ -5795,7 +5795,7 @@ ${cmAnnotations.length > 0 ? '- Annotation label boxes MUST have the glitchy/pix
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
     const p4Subject = (guestName || hostName || '').trim();
 
-    const p4PostText = (thumbnailText || 'I Quit...').trim();
+    const p4PostText = (title || 'I Quit...').trim();
 
     let p4SubjectDesc = p4Subject
       ? `${p4Subject} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. Extreme left-side close-up, deeply emotional expression (tears, praying hands, devastated look)`
@@ -5915,7 +5915,7 @@ VIRAL POST MESSAGE: "${p4PostText}"
     const p3Speaker = (guestName || hostName || 'the speaker').trim();
 
     // Parse statement: extract [BRACKETED] word and split sentence
-    const p3Raw = (thumbnailText || title || '').trim();
+    const p3Raw = (title || '').trim();
     const p3BracketMatch = p3Raw.match(/\[([^\]]+)\]/);
     const p3HighlightWord = p3BracketMatch ? p3BracketMatch[1] : '';
     const p3FullStatement = p3Raw.replace(/\[|\]/g, '');
@@ -6081,8 +6081,8 @@ Reply ONLY in JSON, no markdown:
       }
     }
 
-    const cdTextLine = thumbnailText && thumbnailText.trim()
-      ? `\n▶ MINIMAL TEXT (if any):\n- ONLY this small element: "${thumbnailText}" — rendered in plain white text, top-left corner, small size, as if a character quote or subtitle. Keep it subtle — it should NOT dominate.\n`
+    const cdTextLine = title && title.trim()
+      ? `\n▶ MINIMAL TEXT (if any):\n- ONLY this small element: "${title}" — rendered in plain white text, top-left corner, small size, as if a character quote or subtitle. Keep it subtle — it should NOT dominate.\n`
       : '';
 
     prompt = `You are a world-class Bollywood/cinematic YouTube thumbnail designer. Create a PHOTOREALISTIC, CINEMATIC thumbnail with ZERO or minimal text — the visuals tell the entire story.
@@ -6112,7 +6112,7 @@ ${cdTextLine}
 
 ════ STRICT RULES ════
 - ZERO large text overlay — NO title, NO caption boxes, NO channel name
-${thumbnailText && thumbnailText.trim() ? `- The ONLY allowed text: "${thumbnailText}" — tiny, subtle, top corner` : '- ABSOLUTELY NO text anywhere on the image'}
+${title && title.trim() ? `- The ONLY allowed text: "${title}" — tiny, subtle, top corner` : '- ABSOLUTELY NO text anywhere on the image'}
 - Photorealistic — NOT illustrated, NOT 3D cartoon, NOT anime (unless script demands it)
 - Multi-layer depth: foreground / middle / background all populated with story elements
 - The thumbnail must be FULLY UNDERSTOOD without reading any text — pure visual storytelling
