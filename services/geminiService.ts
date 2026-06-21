@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -223,6 +223,25 @@ EXAMPLES (tone only — rewrite for the actual script topic):
 - "The Truth About COVID Vaccines — No Filter Conversation"
 - "Trump's Real Opinion On Drinking — Shocking Reveal"
 - "We Discussed XVideos, Pornhub, And The Internet's Dark Side"
+    `;
+  }
+  if (style === 'cinematic_drama') {
+    return `
+You are a YouTube copywriter for cinematic drama / Bollywood / thriller content — thumbnails with ZERO or minimal text. The visual tells the whole story.
+
+REQUIREMENTS:
+1. 55-80 characters. Cinematic, story-driven. Sounds like a movie title or dramatic reveal.
+2. MUST name the specific person, film, event, or drama from the script.
+3. Evokes emotion: mystery, danger, betrayal, shock, humor contrast.
+4. Formats: "[Name]'s Shocking Secret", "What Nobody Knew About [Event]", "[X] vs [Y] — The Real Story", "When [X] Happened..."
+5. ALWAYS write titles in English only.
+6. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only):
+- "Ranbir Kapoor Destroys Avatar & Avengers — Here's Why"
+- "The Dark Truth Behind Punjab's Drug Mafia Nobody Talks About"
+- "When The Trolley Problem Met God — Nobody Expected This"
+- "Superman Meets Bollywood — The Craziest Crossover Yet"
     `;
   }
   if (style === 'news_dramatic') {
@@ -508,6 +527,22 @@ Each option should be 4-8 words MAX describing the topic insert image. ALL in pl
 Return ONLY a JSON array of 5 strings. No markdown.
     `;
   }
+  if (style === 'cinematic_drama') {
+    return `
+You are a thumbnail visual director for the "Cinematic Drama" style — NO text or MINIMAL text on thumbnail. The entire story is told through dramatic visuals, extreme close-ups, and multi-layer compositing.
+
+"thumbnailText" here = ONE optional short element (a quote in quotes, a single word, or EMPTY). Not a headline — just the rare piece of text that belongs naturally in the scene.
+
+Generate 5 options:
+- Option 1: Leave empty "" — pure visual, no text at all
+- Option 2: A short 2-4 word QUOTE in "quotes" as if a character said it (e.g. "God said pull")
+- Option 3: A single dramatic word/name label (e.g. "EXPOSED" or a character name)
+- Option 4: Leave empty "" — another pure visual variation
+- Option 5: A very short ironic/funny contrast label (e.g. "Meanwhile..." or "But why?")
+
+RULES: If text, keep it 1-4 words MAX. English only. Return ONLY a JSON array of 5 strings.
+    `;
+  }
   if (style === 'news_dramatic') {
     return `
 You are a thumbnail copywriter for Indian breaking news thumbnails (Career247 / ABP style). The thumbnail shows TWO stacked text blocks on the LEFT side:
@@ -783,6 +818,31 @@ DESCRIPTION RULES — brief for the AI image generator:
 - CENTER: Rectangular topic image insert with thick bright colored border (green or red or cyan — pick most fitting) — photorealistic topic-specific image inside the box
 - No big text overlay on the thumbnail — the insert image is the visual hook
 - Photorealistic, looks like a real podcast production screenshot`
+
+    : videoStyle === 'cinematic_drama'
+    ? `STYLE — Cinematic Drama (Bollywood / thriller / drama — NO text or MINIMAL text, pure visual storytelling):
+TITLE RULES:
+- Cinematic, story-driven, sounds like a film title or dramatic reveal. 55-80 chars.
+- MUST name the specific person, film, or event from the script.
+- GOOD: "Ranbir Kapoor Destroys Avatar & Avengers — Here's Why"
+- GOOD: "The Dark Truth Behind Punjab's Drug Mafia Nobody Talks About"
+- GOOD: "When God Said Pull The Lever — The Trolley Problem Explained"
+
+THUMBNAIL TEXT RULES:
+- This is NOT a headline. It is either EMPTY or a single short element that appears naturally in the visual.
+- Option A: "" (empty — pure visual thumbnail, zero text)
+- Option B: A short QUOTE in "quotes" as a character would say it: e.g. "God said pull"
+- Option C: A single dramatic word if absolutely needed: "EXPOSED"
+- DEFAULT to "" (empty) unless a quote or single word would dramatically add to the visual.
+
+DESCRIPTION RULES — brief for the AI image generator:
+- ZERO TEXT OVERLAY unless thumbnailText specifies a quote — no titles, no captions
+- Multi-layer cinematic composition: foreground extreme close-up face + middle scene + cinematic background
+- RIGHT SIDE (or full frame): EXTREME CLOSE-UP of the main character/person — beaten, emotional, intense, mystical — fills right half or entire frame
+- LEFT or BACKGROUND: A dramatic action scene, prop, or group of people — telling the story visually
+- Cinematic color grade: rich, saturated, high-contrast (golden yellows, deep blues, warm oranges, blood reds)
+- Photorealistic, looks like a Bollywood/Hollywood movie poster or film still
+- Style: if comedy contrast, add laughing group on one side vs suffering face on the other`
 
     : videoStyle === 'news_dramatic'
     ? `STYLE — News Dramatic (Career247 / ABP / India TV breaking news thumbnail):
@@ -5300,6 +5360,110 @@ GUEST: ${p2Guest || 'podcast guest'}
 - ${p2Guest ? `The guest (${p2Guest}) MUST match real public photographs of this person — face, hair, age, look` : 'The guest looks natural and credible'}
 - The CENTER INSERT must be clearly framed with the thick colored border — it stands out as a deliberate element
 - Microphones visible for both hosts — this grounds it as a real podcast
+- 16:9 aspect ratio, 1920×1080${extraNote}`;
+
+  } else if (videoStyle === 'cinematic_drama') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    const cdProtagonist = (guestName || hostName || '').trim();
+
+    let cdFaceDesc = cdProtagonist
+      ? `${cdProtagonist} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. Extreme close-up, right side of frame, filling 40-50% of frame, intense beaten/emotional/mystical expression`
+      : 'A dramatic intense face — extreme close-up, right side of frame, expression of pain/determination/shock/mystery';
+    let cdBackgroundScene = 'A dramatic cinematic outdoor scene — action, confrontation, or symbolic elements specific to the topic, filling the left side and background';
+    let cdColorGrade = 'Rich golden-hour warmth with deep blue shadows, high contrast cinematic grade';
+    let cdForegroundProp = '';
+    let cdMinimalText = (title || '').trim().split(/\s*—\s*/)[0] || '';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `You are a Bollywood/cinematic YouTube thumbnail art director. Your thumbnails have ZERO text — the entire story is told through dramatic visuals.
+
+SCRIPT:
+${scriptSnippet}
+
+TITLE: "${title}"
+MAIN PERSON (extreme close-up face on right): ${cdProtagonist || '(infer from script)'}
+
+Design a cinematic multi-layer thumbnail. Decide:
+1. FACE/PROTAGONIST: Who is the extreme close-up face? Describe their appearance and expression vividly.
+2. BACKGROUND SCENE: What dramatic scene fills the left side and background? (fight, confrontation, burning, laughing group, conspiracy, nature scene — match script topic exactly)
+3. FOREGROUND PROP (optional): Is there any dramatic prop in the very foreground? (a burning movie poster, a gun held out, a hand showing something — only if it strongly tells the story)
+4. COLOR GRADE: The overall cinematic color mood (e.g. "golden harvest fields with deep blue sky", "dark moody navy with blood red accents", "bright outdoor daylight with warm orange tones")
+5. COMEDY OR DRAMA?: Is this primarily comedy (bright, laughing, absurd contrast) or serious drama (dark, violent, emotional)?
+
+Reply ONLY in JSON, no markdown:
+{
+  "faceDesc": "Vivid description of the extreme close-up face — who, expression, makeup/wounds/look",
+  "backgroundScene": "Vivid 2-3 sentence description of the dramatic background scene (left side + full background)",
+  "foregroundProp": "One sentence describing any dramatic prop in the very foreground (or empty string if none)",
+  "colorGrade": "Cinematic color grade description (e.g. 'golden fields + deep blue sky', 'dark shadows + blood red')",
+  "mood": "comedy" or "drama"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const cdRaw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const cdEntities = JSON.parse(cdRaw);
+        if (cdEntities.faceDesc) {
+          cdFaceDesc = cdProtagonist
+            ? `${cdProtagonist} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. ${cdEntities.faceDesc}`
+            : cdEntities.faceDesc;
+        }
+        if (cdEntities.backgroundScene) cdBackgroundScene = cdEntities.backgroundScene;
+        if (cdEntities.foregroundProp) cdForegroundProp = cdEntities.foregroundProp;
+        if (cdEntities.colorGrade) cdColorGrade = cdEntities.colorGrade;
+      } catch (e) {
+        console.warn('[CinematicDrama] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    const cdTextLine = thumbnailText && thumbnailText.trim()
+      ? `\n▶ MINIMAL TEXT (if any):\n- ONLY this small element: "${thumbnailText}" — rendered in plain white text, top-left corner, small size, as if a character quote or subtitle. Keep it subtle — it should NOT dominate.\n`
+      : '';
+
+    prompt = `You are a world-class Bollywood/cinematic YouTube thumbnail designer. Create a PHOTOREALISTIC, CINEMATIC thumbnail with ZERO or minimal text — the visuals tell the entire story.
+
+TOPIC: "${title}"
+
+════ COMPOSITION — 1920×1080, 16:9 ════
+
+▶ RIGHT SIDE (40-50% of frame): EXTREME CLOSE-UP FACE — THE EMOTIONAL ANCHOR
+- ${cdFaceDesc}
+- Extreme close-up: face fills the right 40-50% of the frame — eyes, nose, mouth fully visible, cropped just below chin
+- Expression MUST be intense and story-telling: beaten/bloodied, mystical/glowing eyes, crying, laughing, shocked, determined
+- Photorealistic skin texture, dramatic rim lighting (warm or cold based on mood)
+- This face IS the emotional hook — the viewer must feel something immediately
+
+▶ LEFT SIDE + BACKGROUND (60% of frame behind the face): THE DRAMATIC SCENE
+- ${cdBackgroundScene}
+- Multiple figures or elements composited in a naturalistic scene — NOT a studio background
+- Rich depth: foreground elements → middle ground characters → background sky/environment
+- The background scene extends behind the close-up face as well (the face is composited OVER it)
+${cdForegroundProp ? `\n▶ VERY FOREGROUND PROP (closest to viewer, partially in frame):\n- ${cdForegroundProp}\n- Slightly out of focus at very front, dramatic effect — a hand, an object, bleeding into frame from edge` : ''}
+${cdTextLine}
+▶ COLOR GRADE & MOOD:
+- ${cdColorGrade}
+- High contrast, richly saturated — think Bollywood movie poster or A24 film still
+- Deep shadows with punchy highlights — NOT flat or washed out
+
+════ STRICT RULES ════
+- ZERO large text overlay — NO title, NO caption boxes, NO channel name
+${thumbnailText && thumbnailText.trim() ? `- The ONLY allowed text: "${thumbnailText}" — tiny, subtle, top corner` : '- ABSOLUTELY NO text anywhere on the image'}
+- Photorealistic — NOT illustrated, NOT 3D cartoon, NOT anime (unless script demands it)
+- Multi-layer depth: foreground / middle / background all populated with story elements
+- The thumbnail must be FULLY UNDERSTOOD without reading any text — pure visual storytelling
+- Cinematic quality — looks like a frame from a high-budget Bollywood or thriller film
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'news_dramatic') {
