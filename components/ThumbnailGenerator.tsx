@@ -67,6 +67,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'phone_clean', label: '🤍 Phone Clean', desc: 'Phone left + white bg + bold text right', color: 'slate' },
     { value: 'phone_clean_2', label: '🎙 Phone Clean 2', desc: 'Sitting presenter + lapel mic + phone left', color: 'violet' },
     { value: 'phone_dual', label: '📲 Phone Dual', desc: '2 phones conversation + text center', color: 'cyan' },
+    { value: 'news_dramatic', label: '📰 News Dramatic', desc: 'Blue text box + celeb face + dramatic scene (Career247 style)', color: 'blue' },
   ];
 
   const hasScript = script.length > 0;

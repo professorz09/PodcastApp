@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -204,6 +204,24 @@ EXAMPLES:
 - "Do Aliens Exist? Trump Calls To Find Out"
 - "Elon Calls Putin: What Did They Really Say?"
 - "Does God Exist? Einstein vs. Darwin Phone Call"
+    `;
+  }
+  if (style === 'news_dramatic') {
+    return `
+You are a YouTube copywriter for Indian breaking news channels (Career247 / ABP / India TV style) — dramatic, urgent, shocking headlines that go viral. The thumbnail shows a BLUE text box on the left + dramatic background scene + celebrity face foreground.
+
+REQUIREMENTS:
+1. 55-75 characters. Hard-hitting, factual but dramatic. Names the SPECIFIC event, country, leader, or policy.
+2. Format: "[Shocking Event]!! — [Consequence/Twist]" or "[Country/Person] [Shocking Action]!! — [Why It Matters]"
+3. MUST name the real entity from the script (person, country, conflict, event) — never vague.
+4. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
+5. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only — rewrite for the actual script topic):
+- "Israel Attacks Iran!! — Humiliation For Trump!!"
+- "Moscow Burning!! — Why Black Rain On Putin??"
+- "Iran Hits US Air Force Hard!! — Shocking Images Show Damage!!"
+- "Pakistan Increases Defence Budget By 18%!! — War With India Near??"
     `;
   }
   // podcast / default
@@ -454,6 +472,24 @@ Generate 5 options:
 RULES: ALL CAPS only, max 5 words, English only. Return ONLY a JSON array of 5 strings.
     `;
   }
+  if (style === 'news_dramatic') {
+    return `
+You are a thumbnail copywriter for Indian breaking news thumbnails (Career247 / ABP style). The thumbnail shows TWO stacked text blocks on the LEFT side:
+- Block 1 (SOLID BLUE BOX): The main shocking headline — 3-6 words ALL CAPS
+- Block 2 (dark background): The secondary twist/consequence — 3-6 words ALL CAPS
+
+Generate 5 paired options. Each option = "HEADLINE | SUBHEADLINE" (pipe-separated, both ALL CAPS).
+
+RULES:
+- Both parts must be topic-specific — extracted from the actual script. NO generic phrases.
+- Headline = the main shocking event (e.g. "ISRAEL ATTACKS IRAN!!")
+- Subheadline = the consequence or second twist (e.g. "HUMILIATION FOR TRUMP!!")
+- Max 6 words each part. ALL CAPS. English only.
+- GOOD: "MOSCOW BURNING!! | BLACK RAIN ON PUTIN??"
+- GOOD: "IRAN HITS US HARD!! | TRUMP IN SHOCK!!"
+- Return ONLY a JSON array of 5 strings in format "HEADLINE | SUBHEADLINE". No markdown.
+    `;
+  }
   // podcast / default
   return `
 You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT for a podcast-style thumbnail.
@@ -686,6 +722,29 @@ THUMBNAIL TEXT RULES:
   Urgency tone: "TOO LATE" / "IT ENDS" / "POINT CROSSED"
 - Each combo must generate a DIFFERENT thumbnail text — never repeat the same phrase across the 3 combos.
 - Together = feels like a BREAKING STORY viewers CANNOT ignore.`
+
+    : videoStyle === 'news_dramatic'
+    ? `STYLE — News Dramatic (Career247 / ABP / India TV breaking news thumbnail):
+TITLE RULES:
+- Hard-hitting breaking news headline. NAME the specific event + person + consequence. 55-75 chars.
+- Format: "[Shocking Event]!! — [Consequence/Twist]" works perfectly.
+- GOOD: "Israel Attacks Iran!! — Humiliation For Trump!!"
+- GOOD: "Moscow Burning!! — Why Black Rain On Putin??"
+- GOOD: "Pakistan Increases Defence Budget By 18%!! — War With India Near??"
+
+THUMBNAIL TEXT RULES:
+- Two stacked blocks — format: "HEADLINE | SUBHEADLINE" (pipe-separated, ALL CAPS, max 6 words each)
+- Headline (BLUE BOX): the main shocking event — "ISRAEL ATTACKS IRAN!!"
+- Subheadline (dark bg): the consequence/twist — "HUMILIATION FOR TRUMP!!"
+- Both parts MUST be topic-specific from the script — no generic fillers.
+- GOOD: "IRAN HITS US HARD!! | TRUMP IN SHOCK!!"
+
+DESCRIPTION RULES — brief for the AI image generator:
+- LEFT 35%: Blue (#1565C0) headline box + dark sub-text block stacked below — text only, no person
+- FOREGROUND CENTER: The celebrity/political figure — large head + upper body composited OVER the background, photorealistic, expression of shock/stress/concern
+- BACKGROUND: A dramatic cinematic scene (war, explosions, fire, political events, tanks, battles, etc.) filling the right 65% and bleeding into full frame — specific to this script's topic
+- High-contrast, photorealistic, cinematic — NOT illustrated or cartoon
+- NO channel name, NO "By [Name]" text anywhere`
 
     : `STYLE — Podcast / High Energy:
 TITLE RULES:
@@ -5068,6 +5127,104 @@ ${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic ima
 - Photorealistic, cinematic quality — NOT illustrated or cartoon
 - 16:9 aspect ratio, 1920×1080
 - High contrast, sharp edges, no blur${extraNote}`;
+
+  } else if (videoStyle === 'news_dramatic') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    const ndCelebrity = (guestName || hostName || '').trim();
+
+    let ndBackgroundScene = 'A dramatic cinematic war scene — fighter jets, explosions, fire, and dark stormy sky — photorealistic, fills the right side and full background, intense orange and red tones';
+    let ndCelebrityDescription = ndCelebrity
+      ? `${ndCelebrity} — photorealistic, match the real public photographs of this person EXACTLY (face, age, hair, signature look). Head and upper body, expression of shock or stress`
+      : 'A prominent political figure relevant to the topic — photorealistic head and upper body, intense concerned or shocked expression';
+
+    const ndTitleClean = (title || '').trim();
+    const ndParts = ndTitleClean.split(/\s*—\s*|\s*\|\s*/);
+    const ndHeadline = (ndParts[0] || ndTitleClean).toUpperCase();
+    const ndSubheadline = (ndParts[1] || '').toUpperCase();
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `You are a YouTube thumbnail art director for an Indian breaking news channel (Career247 / ABP / India TV style).
+
+SCRIPT:
+${scriptSnippet}
+
+TITLE: "${ndTitleClean}"
+FEATURED PERSON (face on thumbnail): ${ndCelebrity || '(infer from script)'}
+
+Based on the script topic, decide:
+1. The DRAMATIC BACKGROUND SCENE: A vivid cinematic photo filling the right side + full background — war, explosions, political events, fire, buildings, battlefield, tanks — EXACTLY matching this script's topic. Be very specific.
+2. The FEATURED PERSON's appearance and expression on this thumbnail.
+
+Reply ONLY in JSON, no markdown:
+{
+  "backgroundScene": "Vivid 2-3 sentence description of the dramatic scene — specific to THIS script's topic, photorealistic, cinematic, intense",
+  "celebrity": "One sentence: the person's name + their appearance (face, hair, what they're wearing) + expression (shocked/stressed/angry/concerned)"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const ndRaw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const ndEntities = JSON.parse(ndRaw);
+        if (ndEntities.backgroundScene) ndBackgroundScene = ndEntities.backgroundScene;
+        if (ndEntities.celebrity) {
+          ndCelebrityDescription = ndCelebrity
+            ? `${ndCelebrity} — ${ndEntities.celebrity}. MATCH THE REAL PUBLIC PHOTOGRAPHS of ${ndCelebrity} EXACTLY.`
+            : ndEntities.celebrity;
+        }
+      } catch (e) {
+        console.warn('[NewsDramatic] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    prompt = `You are a world-class YouTube thumbnail designer for an Indian breaking news channel (Career247 / ABP / India TV style). Create a PHOTOREALISTIC thumbnail that looks like a viral Indian news channel thumbnail.
+
+TITLE / TOPIC: "${ndTitleClean}"
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ LEFT SIDE (35% of frame): STACKED TEXT BLOCKS — text only, NO person here
+- TOP BLOCK: SOLID BRIGHT BLUE rectangle (#1565C0)
+  - White bold ALL-CAPS text: "${ndHeadline}"
+  - Very large bold Impact/Arial Black font, 2-3 lines if needed, centered in the blue box
+  - Blue rectangle hugs tight around the text — strong, dense news-banner block
+- BOTTOM BLOCK (directly below the blue box): Dark charcoal/black background section
+  - White bold ALL-CAPS text: "${ndSubheadline || 'BREAKING UPDATE'}"
+  - Same bold font style, slightly smaller than top text, flush below the blue block
+- ABSOLUTELY NO channel name, NO "By [Name]" text, NO logo on the left — only the two text blocks
+
+▶ BACKGROUND (fills right 65% of frame and bleeds across entire background):
+${ndBackgroundScene}
+- Photorealistic, cinematic, ultra-dramatic — specific to this script's topic
+- Deep saturated colors: orange fire glow, dark stormy sky, intense reds — whatever matches the topic
+- Fills the ENTIRE right side and background, edge-to-edge
+
+▶ FOREGROUND CENTER (composited IN FRONT of the background):
+- ${ndCelebrityDescription}
+- LARGE head and upper body, positioned center to center-bottom of the frame
+- Composited OVER the dramatic background — person is in FRONT, background is BEHIND
+- Sharp photorealistic detail — face is the focal point
+- Expression: shocked / stressed / concerned / angry — matching the topic mood
+- Natural compositing: slight rim light or shadow so the person blends naturally
+
+════ STRICT RULES ════
+- LEFT TEXT BLOCKS: bold, dense, news-banner style — clearly legible blue rectangle + dark text block
+- PERSON is always in FOREGROUND composited over the scene — NOT inside the scene itself
+- Background scene MUST be 100% topic-specific — viewers instantly recognize the story
+- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D render
+- NO watermarks, NO channel logos, NO "By [Name]" text anywhere in the image
+- 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'situational') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
