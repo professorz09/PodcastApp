@@ -5549,9 +5549,7 @@ GUEST: ${p2Guest || 'podcast guest'}
 
     const cmScriptSnippet = scriptText?.slice(0, 600) || '';
     let cmMiniThumbDesc = 'A podcast-style thumbnail: two hosts (older man left with glasses, younger man right) facing each other, bold white text center with one RED highlighted word, black background — classic DOAC/diary-of-a-CEO style';
-    let cmAnnotation1 = 'Subject';
-    let cmAnnotation2 = 'Hook';
-    let cmAnnotation3 = 'Caption';
+    let cmAnnotations: string[] = [];
 
     if (cmScriptSnippet) {
       onStep?.('analyzing');
@@ -5565,15 +5563,16 @@ GUEST: ${p2Guest || 'podcast guest'}
 Title: "${title}"
 
 For a "thumbnail breakdown" YouTube video, decide:
-1. What mini thumbnail to pin on the cork board (which channel's style / what it shows)
-2. What 3 annotation labels to put on the mini thumbnail (what elements are being highlighted — customize to the topic)
+1. What mini thumbnail to pin on the cork board — which channel style / what it shows / what the hook text inside it says (make it directly relevant to the script topic)
+2. Should annotation labels appear? Only add them if they genuinely help explain the topic. They are OPTIONAL.
+   If yes, provide 2-3 labels that are SPECIFIC to what's being taught in this script (not generic "Subject/Hook/Caption" unless those are what the script teaches).
+   If the script is not about thumbnail/content strategy, use labels that fit the actual topic being shown on the mini thumbnail.
 
 Reply ONLY in JSON:
 {
-  "miniThumbDesc": "Short description of the smaller thumbnail pinned on the cork board (which style/channel it mimics, what two people, what text is shown)",
-  "label1": "First annotation label text (2-3 words max, e.g. 'Subject', 'The Hook', 'Face')",
-  "label2": "Second annotation label text (2-3 words max, e.g. 'Hook Text', 'Formula', 'Pattern')",
-  "label3": "Third annotation label text (2-3 words max, e.g. 'Caption', 'Color', 'Layout')"
+  "miniThumbDesc": "Description of the smaller pinned thumbnail — make it topic-specific",
+  "showLabels": true or false,
+  "labels": ["label1 text", "label2 text", "label3 text"] (2-3 short 2-3 word labels, or empty array if showLabels is false)
 }`
             }]
           }],
@@ -5586,13 +5585,20 @@ Reply ONLY in JSON:
         })();
         const cmEntities = JSON.parse(cmEntityRaw);
         if (cmEntities.miniThumbDesc) cmMiniThumbDesc = cmEntities.miniThumbDesc;
-        if (cmEntities.label1) cmAnnotation1 = cmEntities.label1;
-        if (cmEntities.label2) cmAnnotation2 = cmEntities.label2;
-        if (cmEntities.label3) cmAnnotation3 = cmEntities.label3;
+        if (cmEntities.showLabels && Array.isArray(cmEntities.labels)) {
+          cmAnnotations = cmEntities.labels.slice(0, 3).filter(Boolean);
+        }
       } catch (e) {
         console.warn('[CorkboardMeta] entity extraction failed, using fallback:', e);
       }
     }
+
+    const cmLabelsBlock = cmAnnotations.length > 0
+      ? `- Three ANNOTATION LABELS floating near the mini thumbnail, each in a GLITCHY/PIXELATED RED-ORANGE rectangle with white bold text:
+  ${cmAnnotations.map((l, i) => `- Label "${l}" with a thin red arrow pointing to a relevant element of the mini thumbnail`).join('\n  ')}
+- The glitchy label boxes have a pixelated/degraded border effect — like a digital glitch filter
+- Thin red lines/arrows connecting each label to its target`
+      : `- NO annotation labels — the pinned thumbnail stands alone on the cork board, clean and simple`;
 
     prompt = `You are a world-class YouTube thumbnail designer for meta/educational content creators. Create a thumbnail that looks like a PROFESSIONAL CONTENT STRATEGY video thumbnail — "cork board with annotated thumbnail pinned to it" style.
 
@@ -5617,11 +5623,7 @@ BANNER TITLE: "${cmYellowWord}" (yellow box) + "${cmWhitePart}" (white text)
 - Slight tilt (~3° clockwise), realistic drop shadow beneath it
 - A RED PUSHPIN at the top-center of the mini thumbnail, pressed into the cork
 - The mini thumbnail content: ${cmMiniThumbDesc}
-- Three ANNOTATION LABELS floating near the mini thumbnail, each in a GLITCHY/PIXELATED RED-ORANGE rectangle with white bold text:
-  - Label "${cmAnnotation1}" with a thin red arrow/line pointing to the LEFT PERSON in the mini thumbnail
-  - Label "${cmAnnotation2}" with a thin red arrow/line pointing to the TEXT/HOOK area of the mini thumbnail
-  - Label "${cmAnnotation3}" with a thin red arrow/line pointing to the BOTTOM of the mini thumbnail
-- The glitchy label boxes have a pixelated/degraded border effect — like a digital glitch filter
+${cmLabelsBlock}
 
 ▶ RIGHT SIDE (40% of frame):
 - ${cmPresenterDesc}
@@ -5632,9 +5634,8 @@ BANNER TITLE: "${cmYellowWord}" (yellow box) + "${cmWhitePart}" (white text)
 ════ STRICT RULES ════
 - TOP BANNER = YELLOW BOX + WHITE TEXT on BRIGHT BLUE — this is the most important text element
 - Cork board texture MUST look realistic — warm grain, natural material, not a flat color
-- The red pushpin is a small but important detail — it makes the mini thumbnail look truly "pinned"
-- Annotation labels MUST have the glitchy/pixelated red-orange border effect — they should NOT look like clean rectangles
-- Red arrows/lines connecting labels to their targets must be clearly visible
+- The red pushpin pressed into the cork at the top of the mini thumbnail is mandatory
+${cmAnnotations.length > 0 ? '- Annotation label boxes MUST have the glitchy/pixelated red-orange border effect — NOT clean rectangles\n- Red arrows/lines must visibly connect each label to its target' : '- No annotation labels — keep it clean'}
 - Photorealistic — NOT cartoon or illustrated
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
