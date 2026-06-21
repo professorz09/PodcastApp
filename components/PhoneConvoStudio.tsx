@@ -14,6 +14,8 @@ import {
   detectPodcastSpeakers,
   generateIntroFromTranscript,
   generateSpeech,
+  generateTitleTextPair,
+  generateThumbnail,
   PodcastTranscriptSeg,
   PodcastCutRange,
   PodcastChapter,
@@ -971,6 +973,15 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   const [selectedIdxs, setSelectedIdxs] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Combo + Thumbnail state
+  const [comboPairs, setComboPairs] = useState<{ title: string; thumbnailText: string; description: string }[]>([]);
+  const [comboLoading, setComboLoading] = useState(false);
+  const [comboError, setComboError] = useState<string | null>(null);
+  const [selectedCombo, setSelectedCombo] = useState<{ title: string; thumbnailText: string; description: string } | null>(null);
+  const [thumbLoading, setThumbLoading] = useState(false);
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [thumbStep, setThumbStep] = useState<string>('');
+
   const toggleChapter = (i: number) => {
     setSelectedIdxs(prev => {
       if (prev.includes(i)) return prev.filter(x => x !== i);
@@ -1180,6 +1191,52 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
         // person/verb/topic are auto-detected — left undefined so Gemini extracts
       } : {}),
     });
+  };
+
+  // ── Combo + Thumbnail handlers ─────────────────────────────────────────────
+  const handleGenerateCombo = async () => {
+    if (!segments.length) { setComboError('Transcript load karo pehle'); return; }
+    setComboLoading(true);
+    setComboError(null);
+    try {
+      const srcText = segments.map(s => s.text).join(' ').slice(0, 3500);
+      const result = await generateTitleTextPair(srcText, 'podcast');
+      if (!result.length) { setComboError('Koi combo nahi aaya — dobara try karo'); return; }
+      setComboPairs(result);
+      setSelectedCombo(result[0]);
+    } catch (e: any) {
+      setComboError(e?.message || 'Combo generation fail hua');
+    } finally {
+      setComboLoading(false);
+    }
+  };
+
+  const handleGenerateThumbnail = async () => {
+    if (!selectedCombo) return;
+    setThumbLoading(true);
+    setThumbUrl(null);
+    setThumbStep('Generating…');
+    try {
+      const srcText = segments.map(s => s.text).join(' ').slice(0, 3500);
+      const url = await generateThumbnail(
+        selectedCombo.title,
+        podcastHost || supporterName || 'Host',
+        podcastGuests[0] || criticName || 'Guest',
+        undefined,
+        selectedCombo.description,
+        step => setThumbStep(step),
+        'podcast',
+        srcText,
+        podcastTitle || undefined,
+      );
+      setThumbUrl(url);
+      setThumbStep('');
+    } catch (e: any) {
+      setThumbStep('');
+      setComboError(e?.message || 'Thumbnail generation fail hua');
+    } finally {
+      setThumbLoading(false);
+    }
   };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
@@ -1750,6 +1807,92 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
                   : `${selectedIdxs.length} selected chapters`
             }
           />
+
+          {/* ── Combo + Thumbnail card ── */}
+          <div style={{ borderRadius: 12, border: '1px solid rgba(234,179,8,0.25)', background: 'rgba(234,179,8,0.05)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#fde68a', letterSpacing: '0.04em' }}>⚡ Title + Thumbnail Combo</div>
+              <button
+                onClick={handleGenerateCombo}
+                disabled={comboLoading || !segments.length}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '5px 10px', borderRadius: 8, border: 'none',
+                  background: comboLoading ? 'rgba(234,179,8,0.2)' : '#ca8a04',
+                  color: '#fff', fontSize: 11, fontWeight: 700,
+                  cursor: comboLoading ? 'default' : 'pointer', fontFamily: 'inherit',
+                  opacity: !segments.length ? 0.4 : 1,
+                }}
+              >
+                {comboLoading
+                  ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                  : comboPairs.length > 0 ? '↺ Regenerate' : '⚡ Generate Combo'}
+              </button>
+            </div>
+
+            {comboError && <div style={{ fontSize: 11, color: '#fca5a5' }}>{comboError}</div>}
+
+            {comboPairs.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {comboPairs.map((pair, idx) => {
+                  const isSel = selectedCombo?.title === pair.title;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setSelectedCombo(pair)}
+                      style={{
+                        padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                        border: `1.5px solid ${isSel ? '#ca8a04' : 'rgba(255,255,255,0.08)'}`,
+                        background: isSel ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.02)',
+                        transition: 'all 0.12s',
+                      }}
+                    >
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{pair.title}</div>
+                      <div style={{ fontSize: 10, color: '#fbbf24', fontWeight: 700, letterSpacing: '0.05em' }}>{pair.thumbnailText}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {selectedCombo && (
+              <div style={{ borderTop: '1px solid rgba(234,179,8,0.15)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {thumbUrl ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <img src={thumbUrl} alt="thumbnail" style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <a
+                        href={thumbUrl}
+                        download="thumbnail.jpg"
+                        style={{ flex: 1, textAlign: 'center', padding: '7px', borderRadius: 8, background: '#ca8a04', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}
+                      >⬇ Download</a>
+                      <button
+                        onClick={handleGenerateThumbnail}
+                        disabled={thumbLoading}
+                        style={{ flex: 1, padding: '7px', borderRadius: 8, border: '1px solid rgba(234,179,8,0.3)', background: 'rgba(234,179,8,0.05)', color: '#fde68a', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >↺ Regenerate</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleGenerateThumbnail}
+                    disabled={thumbLoading}
+                    style={{
+                      padding: '10px', borderRadius: 10, border: 'none',
+                      background: thumbLoading ? 'rgba(234,179,8,0.3)' : 'linear-gradient(135deg,#ca8a04,#d97706)',
+                      color: '#fff', fontSize: 12, fontWeight: 800,
+                      cursor: thumbLoading ? 'default' : 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    {thumbLoading
+                      ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {thumbStep || 'Generating Thumbnail…'}</>
+                      : <>🖼 Generate Thumbnail</>}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Grounding toggle */}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', cursor: 'pointer' }}>
