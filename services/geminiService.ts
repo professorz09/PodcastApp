@@ -4429,7 +4429,7 @@ Return ONLY a structured list — no commentary, no explanation. Be extremely sp
   return text.trim();
 };
 
-export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'analyzing' | 'generating') => void, videoStyle?: string, scriptText?: string): Promise<string> => {
+export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'analyzing' | 'generating') => void, videoStyle?: string, scriptText?: string, topicName?: string): Promise<string> => {
   const ai = getAi();
 
   let professorImagePart: any = null;
@@ -4593,6 +4593,7 @@ ${scriptSnippet}
 
 CELEBRITY (featured person whose face goes on the right): ${celebrityName || '(unspecified — infer from script)'}
 HOOK TEXT (will appear huge on screen): "${title}"
+${topicName ? `TOPIC (user-specified — use this to decide the phone screen visual): ${topicName}` : ''}
 
 Decide the SINGLE most viral image to display ON THE PHONE SCREEN — one bold photo/illustration that visually represents the topic. Examples:
 - For "Do Aliens Exist?" → a glowing alien grey face, sci-fi neon
@@ -4700,49 +4701,56 @@ Reply ONLY in JSON, no markdown:
     const redPart    = hookWords.slice(Math.floor((hookWords.length - redCount) / 2), hookWords.length - redCount).join(' ');
     const blackPart2 = hookWords.slice(hookWords.length - redCount).join(' ');
 
-    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN" style thumbnail.
+    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN" style thumbnail — exactly matching the reference style: phone on left, big text center, presenter/person on right.
 
-════ LAYOUT — 1920×1080, 16:9, PURE WHITE BACKGROUND ════
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
 
-▶ BACKGROUND: #FFFFFF — absolutely clean white, no gradients, no textures
+▶ BACKGROUND: Pure white (#FFFFFF) — clean, minimal, no textures, no gradients
 
-▶ LEFT SIDE (38% of frame): REALISTIC iPHONE
-- Portrait orientation, slight 5° rightward tilt, photorealistic black glossy bezel
-- Status bar: small text "${callerName}" left + "73%" right, below: green dot "● Speaking"
-- Phone SCREEN filled with: ${phoneScreenVisual}
-- Bottom of phone screen: three call buttons (mic, ●●●, red ✕)
-- Subtle drop shadow on the white background to give depth
+▶ LEFT SIDE (30% of frame): REALISTIC iPHONE
+- Portrait iPhone, slight 6° rightward tilt, photorealistic black glossy bezel, rounded corners
+- Status bar: small white text "${callerName}" (left, with tiny blue dot "● Speaking") + "73% 🔋" (right)
+- Phone SCREEN filled entirely with: ${phoneScreenVisual}
+- Bottom of phone screen: three call buttons (gray mic, gray ●●●, red ✕ circle)
+- Realistic drop shadow on white background for depth
 
-▶ RIGHT SIDE (55% of frame): BOLD IMPACT TYPOGRAPHY
-- Stack 2-3 lines, left-aligned, ultra-bold condensed ALL CAPS
-- Line arrangement:
-  "${blackPart1 || title.split(' ')[0].toUpperCase()}" → SOLID BLACK text (#000000), largest
-  "${redPart || (title.split(' ')[1] || 'HIDDEN').toUpperCase()}" → PURE WHITE text inside a SOLID RED RECTANGLE (#D0021B) — the rectangle spans the word's width + tight padding
-  "${blackPart2 || title.split(' ').slice(-1)[0].toUpperCase()}" → SOLID BLACK text (#000000)
-- Font feel: Anton / Impact / Bebas Neue — ultra-condensed, no serifs, maximum weight
-${creatorDesc ? `- Top-right corner: Small photorealistic portrait of ${creatorDesc} — head and shoulders, slightly inset, looking toward the text` : ''}
+▶ CENTER (35% of frame): BOLD IMPACT TYPOGRAPHY — 3 stacked lines
+  Line 1: "${blackPart1 || title.split(' ')[0].toUpperCase()}" — PURE BLACK (#000000), ultra-bold condensed, Impact/Anton style
+  Line 2: "${redPart || (title.split(' ')[1] || 'HIDDEN').toUpperCase()}" — WHITE text on a SOLID RED RECTANGLE (#CC0000) — the rectangle is a full-width banner behind this word, white text centered inside it
+  Line 3: "${blackPart2 || title.split(' ').slice(-1)[0].toUpperCase()}" — PURE BLACK (#000000), same style as Line 1
+- Text lines are tightly stacked, centered in this zone
+
+▶ RIGHT SIDE (35% of frame): ${creatorDesc ? `PRESENTER / CREATOR` : 'TOPIC VISUAL'}
+${creatorDesc
+  ? `- Photorealistic half-body or 3/4-body figure of ${creatorDesc}
+- Standing or slightly gesturing toward the text (facing left)
+- Clean cut-out on the white background — NO separate background behind them
+- Natural lighting matching the white background — casual professional look`
+  : `- A dramatic topic-relevant image or icon that represents "${callerName}" or the subject
+- Slightly faded / subtle so text stays dominant`}
 
 ════ STRICT RULES ════
-- WHITE background only — no dark areas, no gradients except the phone shadow
-- Typography must be ENORMOUS — readable even at 120px thumbnail size
-- Photorealistic iPhone — NOT flat illustration
-- Text contrast: BLACK on white = max contrast. RED box with WHITE text = max contrast.
-- 16:9 exactly. No borders, no watermarks.${extraNote}`;
+- PURE WHITE background — not gray, not gradient
+- Typography ENORMOUS — must read at thumbnail size
+- Phone photorealistic with proper iOS call UI
+- Red rectangle on Line 2 is the hero visual element — make it vivid
+- 16:9 exactly. No watermarks.${extraNote}`;
 
   } else if (videoStyle === 'phone_dual') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
     const char1 = (guestName || 'Character 1').trim();
     const char2 = (hostName || 'Character 2').trim();
 
-    let char1Screen = `${char1}'s face — photorealistic, dramatic studio lighting, calling expression`;
-    let char2Screen = `${char2}'s face — photorealistic, soft blue glow, listening expression`;
+    let char1Screen = `${char1}'s face filling the screen — photorealistic, dramatic studio lighting, intense expression, pointing or gesturing, microphone visible`;
+    let char2Screen = `${char2}'s face — photorealistic, soft neutral lighting, thoughtful listening expression, looking slightly off-screen`;
+    let char2IsPerson = true;
 
     if (scriptSnippet) {
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
           model: 'gemini-3.5-flash',
-          contents: [{ role: 'user', parts: [{ text: `For a YouTube thumbnail showing TWO phones in a conversation:\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nLEFT PHONE CHARACTER (speaking): ${char1}\nRIGHT PHONE CHARACTER (listening): ${char2}\n\nReply ONLY in JSON:\n{"char1Screen":"vivid description of what appears on the LEFT phone screen — ${char1}'s visual appearance or symbolic icon","char2Screen":"vivid description of what appears on the RIGHT phone screen — ${char2}'s visual appearance or symbolic icon OR a glowing blue listening circle UI"}` }] }],
+          contents: [{ role: 'user', parts: [{ text: `For a YouTube thumbnail showing TWO phones in a conversation:\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nLEFT PHONE (speaking): ${char1}\nRIGHT PHONE (listening/topic): ${char2}\n\nDecide: is the RIGHT phone showing a REAL PERSON's face, or a TOPIC/COUNTRY/CONCEPT image?\n- If "${char2}" is a real public figure → show their face photorealistically\n- If "${char2}" is a country, topic, brand, concept → show a dramatic recognizable image (e.g. Chinese flag + Shanghai skyline, Moon with stars, etc.)\n\nReply ONLY in JSON:\n{"char1Screen":"vivid 1-2 sentence description of ${char1}'s face/appearance on the dark phone screen — intense, photorealistic","char2Screen":"vivid 1-2 sentence description of what fills the RIGHT phone screen (either face or topic image)","char2IsPerson":true}` }] }],
           config: { responseMimeType: 'application/json' },
         });
         const raw = entityResponse.text?.trim() || '{}';
@@ -4750,50 +4758,65 @@ ${creatorDesc ? `- Top-right corner: Small photorealistic portrait of ${creatorD
         const entities = JSON.parse(m ? m[0] : '{}');
         if (entities.char1Screen) char1Screen = entities.char1Screen;
         if (entities.char2Screen) char2Screen = entities.char2Screen;
+        if (entities.char2IsPerson !== undefined) char2IsPerson = !!entities.char2IsPerson;
       } catch (e) {
         console.warn('[PhoneDual] entity extraction failed, using fallback:', e);
       }
     }
 
-    const hookClean = title.toUpperCase().trim();
+    // Text layout matching reference: "[Speaker]:" / "[KEY WORD in RED BOX]" / "[rest]"
+    const hookClean = title.trim();
     const hookWords2 = hookClean.split(/\s+/).filter(Boolean);
-    const midIdx = Math.ceil(hookWords2.length / 2);
-    const line1 = hookWords2.slice(0, midIdx).join(' ');
-    const line2 = hookWords2.slice(midIdx).join(' ');
+    // First line: speaker name + colon. Middle: key word(s) in red box. Last: rest of claim.
+    const speakerLine = char1.toUpperCase() + ':';
+    let redWord = hookWords2[0]?.toUpperCase() || title.toUpperCase();
+    let restLine = hookWords2.slice(1).join(' ').toUpperCase() || '';
+    // If title has 3+ words, put middle word(s) in red box
+    if (hookWords2.length >= 3) {
+      const mid = Math.floor(hookWords2.length / 2);
+      redWord = hookWords2.slice(0, mid).join(' ').toUpperCase();
+      restLine = hookWords2.slice(mid).join(' ').toUpperCase();
+    }
 
-    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE DUAL" style thumbnail — two phones in a conversation.
+    prompt = `You are a world-class YouTube thumbnail designer creating a viral "PHONE DUAL" style thumbnail — exactly matching the reference style where two phones flank bold center text on a white background.
 
-════ LAYOUT — 1920×1080, 16:9 ════
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
 
-▶ BACKGROUND: Very light gray (#f2f2f2 to #ffffff) gradient — clean, airy, minimal
+▶ BACKGROUND: Pure white to very light gray (#ffffff → #f2f2f2) — clean, minimal, airy
 
-▶ LEFT PHONE (32% of frame): ${char1.toUpperCase()} IS SPEAKING
-- Vertical iPhone, slight clockwise tilt (~8°), photorealistic glossy black bezel
-- Status bar: "${char1}" (white text) left, "73%" right — below: green dot "● Speaking"
-- ENTIRE phone screen filled with: ${char1Screen}
-- Bottom of screen: three call buttons (mic, ●●●, red ✕ circle button)
-- Strong drop shadow on the light background
+▶ LEFT PHONE (30% of frame, left side): ${char1.toUpperCase()} IS SPEAKING
+- DARK/BLACK iPhone — photorealistic glossy black bezel, rounded corners
+- Status bar: small white text "09:41" top-left, "73% 🔋" top-right
+- Below status bar: "${char1}" in white bold, below it green dot "● Speaking"
+- ENTIRE dark phone screen filled edge-to-edge with: ${char1Screen}
+- Bottom call buttons: mic icon (gray circle), ••• (gray circle), red ✕ circle (hang up)
+- Phone tilts very slightly clockwise (~5°). Strong realistic drop shadow.
 
-▶ RIGHT PHONE (32% of frame): ${char2.toUpperCase()} IS LISTENING
-- Vertical iPhone, slight counter-clockwise tilt (~8°), photorealistic glossy black bezel
-- Status bar: "${char2}" (white text) left, "73%" right — below: blue dot "● Listening"
-- Phone screen shows: ${char2Screen}
-- Bottom of screen: three call buttons (mic, ●●●, red ✕ circle button)
-- Strong drop shadow
+▶ RIGHT PHONE (30% of frame, right side): ${char2.toUpperCase()} IS LISTENING
+- WHITE/SILVER iPhone — photorealistic white or silver bezel, rounded corners — NOT black
+- Status bar: small dark text "09:41" top-left, "73% 🔋" top-right (dark text on light background)
+- Below status bar: "${char2}" in dark bold text, below it blue dot "● Listening" in blue text
+- Phone screen: ${char2IsPerson ? `${char2Screen} — face filling most of the screen with neutral background` : `${char2Screen} — fills the entire screen dramatically`}
+- Bottom call buttons: mic icon (gray circle), ••• (gray circle), red ✕ circle (hang up)
+- Phone tilts very slightly counter-clockwise (~5°). Strong realistic drop shadow.
 
-▶ CENTER TEXT (36% of frame, dominates the composition):
-- MASSIVE ultra-bold ALL CAPS typography, stacked 2 lines:
-  Line 1: "${line1}" — PURE BLACK (#000000), weight 900+, condensed italic
-  Line 2: "${line2 || '?'}" — BRIGHT RED (#ED1C24), same weight, condensed italic, slightly larger
-- Text is centered between the two phones, slightly overlapping them for depth
-- Thin dark drop-shadow so text reads over phones
+▶ CENTER TEXT (40% of frame, dominant):
+EXACT 3-LAYER TYPOGRAPHY matching reference style:
+
+TOP LINE: "${speakerLine}" — huge ultra-bold condensed black (#000000) serif/impact font, weight 900
+MIDDLE BAND: A solid RED RECTANGLE (#CC0000 to #ED1C24) spanning ~60-70% of the text column width, containing "${redWord}" in crisp white bold letters centered inside the rectangle — this is the KEY visual element
+BOTTOM LINE: "${restLine}" — huge ultra-bold condensed black (#000000) same style as top line
+
+- All text is stacked vertically, centered between the two phones
+- Text slightly overlaps both phones for depth
+- Very subtle black drop shadow on text for legibility
 
 ════ STRICT RULES ════
-- Light/white background — NOT dark
-- Both phones must look PHOTOREALISTIC with proper screen UI
-- Text is the DOMINANT element — huge, sharp, maximum contrast
-- 16:9 aspect ratio, 1920×1080
-- No extra people outside the phone screens. No extra text.${extraNote}`;
+- Background MUST be white/near-white — NOT dark, NOT gray
+- Left phone = BLACK bezel. Right phone = WHITE/SILVER bezel. This contrast is critical.
+- The red rectangle for the middle word is MANDATORY — it's the hero element
+- Both phones photorealistic with proper iOS call UI visible
+- 16:9 aspect ratio, 1920×1080, no extra text or watermarks${extraNote}`;
 
   } else if (videoStyle === 'professor_jiang') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';

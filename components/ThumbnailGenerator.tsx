@@ -34,6 +34,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     comboPairs = [],
     hostName = '',
     guestName = '',
+    topicName = '',
     thumbnailUrl,
     referenceImage,
     extraInstructions = '',
@@ -198,7 +199,8 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
         textForThumbnail, hostName, guestName, refImgData, extraInstructions,
         (step) => setLoadingStep(step),
         videoStyle,
-        scriptTextForGen
+        scriptTextForGen,
+        topicName
       );
       onUpdateThumbnailState({ ...thumbnailStateRef.current, thumbnailUrl: url });
     } catch (error: any) {
@@ -614,25 +616,109 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 </div>
               )}
 
-              {/* ── STEP 3: Celebrity (Phone Studio only) ── */}
+              {/* ── STEP 3: Phone Studio — Celebrity + Topic + Combo + Generate ── */}
               {videoStyle === 'phone_studio' && (
-                <div className="bg-[#0d0d0d] border border-pink-500/15 rounded-2xl p-5 space-y-3">
+                <div className="bg-[#0d0d0d] border border-pink-500/25 rounded-2xl p-5 space-y-4">
                   <div>
-                    <p className="text-[11px] text-pink-400 uppercase tracking-widest font-semibold">Step 3 — Celebrity / Featured Person</p>
-                    <p className="text-xs text-gray-600 mt-0.5">Jiska face thumbnail ke right side pe aayega — phone se "talk" kar raha hoga</p>
+                    <p className="text-[11px] text-pink-400 uppercase tracking-widest font-semibold">Step 3 — Phone Studio Setup</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Celebrity face (right) aur phone screen topic (left) — dono set karo</p>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-gray-500 font-medium">Celebrity name</label>
-                    <input
-                      type="text"
-                      value={guestName}
-                      onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
-                      placeholder="e.g. Joe Rogan, Trump, Elon Musk, Robert Greene"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-pink-500 transition-colors placeholder-gray-600"
-                    />
-                    <p className="text-[10px] text-gray-600">
-                      Real person ka naam dalo — Gemini exactly unka face match karega.
-                    </p>
+
+                  {/* Celebrity + Topic inputs */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Celebrity / Featured Person</label>
+                      <input
+                        type="text"
+                        value={guestName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
+                        placeholder="e.g. Trump, Elon Musk, Joe Rogan"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-pink-500 transition-colors placeholder-gray-600"
+                      />
+                      <p className="text-[10px] text-gray-600">Right side pe face aayega</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-500 font-medium">Topic (phone screen)</label>
+                      <input
+                        type="text"
+                        value={topicName}
+                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, topicName: e.target.value })}
+                        placeholder="e.g. Aliens, Moon Base, War"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-pink-400 transition-colors placeholder-gray-600"
+                      />
+                      <p className="text-[10px] text-gray-600">Left phone screen pe kya dikhega</p>
+                    </div>
+                  </div>
+
+                  {/* Mini Combo — Title + Thumbnail Text */}
+                  <div className="border-t border-white/5 pt-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-yellow-400/90 font-semibold flex items-center gap-1.5 uppercase tracking-widest">
+                        <Zap size={11} className="text-yellow-400" /> Title + Thumbnail Text Combo
+                      </p>
+                      <button
+                        onClick={handleGeneratePair}
+                        disabled={isGeneratingPair || !hasEitherSource}
+                        className="flex items-center gap-1.5 bg-yellow-500/20 hover:bg-yellow-500/35 border border-yellow-400/40 text-yellow-300 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
+                      >
+                        {isGeneratingPair ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                        {comboPairs.length > 0 ? 'Regenerate' : 'Generate'}
+                      </button>
+                    </div>
+
+                    {isGeneratingPair ? (
+                      <div className="flex items-center gap-2 text-gray-500 py-2">
+                        <Loader2 className="animate-spin" size={13} />
+                        <span className="text-xs">Combos ban rahe hain...</span>
+                      </div>
+                    ) : comboPairs.length > 0 ? (
+                      <div className="space-y-2">
+                        {comboPairs.map((pair, idx) => {
+                          const isSelected = selectedTitle === pair.title && selectedThumbnailText === pair.thumbnailText;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => handleSelectPair(pair)}
+                              className={`cursor-pointer rounded-xl border p-3 transition-all space-y-1 ${
+                                isSelected
+                                  ? 'bg-yellow-600/20 border-yellow-400/60'
+                                  : 'bg-white/3 border-white/8 hover:bg-white/6 hover:border-white/15'
+                              }`}
+                            >
+                              <p className="text-xs text-gray-400 leading-snug">{pair.title}</p>
+                              <p className={`text-sm font-black tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>{pair.thumbnailText}</p>
+                              {isSelected && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-semibold">
+                                  <Check size={9} /> Selected
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : pairError ? (
+                      <p className="text-xs text-red-400">{pairError}</p>
+                    ) : (
+                      <p className="text-xs text-gray-600">"Generate" dabao → title + thumbnail text combo milega</p>
+                    )}
+                  </div>
+
+                  {/* Generate Thumbnail button inside card */}
+                  <div className="border-t border-white/5 pt-4">
+                    <button
+                      onClick={handleGenerateThumbnail}
+                      disabled={isLoading || !canGenerate}
+                      className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
+                    >
+                      {isLoading ? (
+                        <><Loader2 className="animate-spin" size={16} /> Generating...</>
+                      ) : (
+                        <><Image size={16} /> Generate Phone Studio Thumbnail</>
+                      )}
+                    </button>
+                    {!canGenerate && (
+                      <p className="text-center text-[10px] text-gray-600 mt-2">Pehle combo select karo ya title/text likho</p>
+                    )}
                   </div>
                 </div>
               )}
