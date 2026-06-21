@@ -4429,7 +4429,7 @@ Return ONLY a structured list — no commentary, no explanation. Be extremely sp
   return text.trim();
 };
 
-export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'analyzing' | 'generating') => void, videoStyle?: string, scriptText?: string): Promise<string> => {
+export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'analyzing' | 'generating') => void, videoStyle?: string, scriptText?: string, topicName?: string): Promise<string> => {
   const ai = getAi();
 
   let professorImagePart: any = null;
@@ -4593,6 +4593,7 @@ ${scriptSnippet}
 
 CELEBRITY (featured person whose face goes on the right): ${celebrityName || '(unspecified — infer from script)'}
 HOOK TEXT (will appear huge on screen): "${title}"
+${topicName ? `TOPIC (user-specified — use this to decide the phone screen visual): ${topicName}` : ''}
 
 Decide the SINGLE most viral image to display ON THE PHONE SCREEN — one bold photo/illustration that visually represents the topic. Examples:
 - For "Do Aliens Exist?" → a glowing alien grey face, sci-fi neon

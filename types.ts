@@ -122,6 +122,7 @@ export interface ThumbnailState {
   comboPairs?: { title: string; thumbnailText: string; description?: string }[];
   hostName: string;
   guestName: string;
+  topicName?: string;
   thumbnailUrl: string | null;
   referenceImage: { data: string, mimeType: string, url: string } | null;
   videoStyle?: 'situational' | 'debate' | 'podcast';
