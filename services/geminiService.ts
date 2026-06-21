@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_dual';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -159,15 +159,34 @@ You are a YouTube copywriter for the "Phone Clean" style — clean white-backgro
 
 REQUIREMENTS:
 1. 40-60 characters max. Bold claim or question.
-2. Sounds like breaking news crossed with gossip — urgent yet clean.
-3. Reference the topic entity (person/org/brand) by name.
-4. ALWAYS write titles in English only.
-5. Return ONLY a valid JSON array of 4 strings. No markdown.
+2. Read the FULL script to extract the EXACT topic, person, brand, or event — never be generic.
+3. MUST name the specific entity (person/org/brand/event) from the script.
+4. Sounds like a revealing expose or insider scoop about that specific topic.
+5. ALWAYS write titles in English only.
+6. Return ONLY a valid JSON array of 4 strings. No markdown.
 
-EXAMPLES:
+EXAMPLES (tone only — rewrite for the actual script topic):
 - "OpenAI's Hidden Plan Nobody Told You About"
 - "Google's Secret Deal Just Got Exposed"
 - "Why Apple Is Quietly Buying This Company"
+    `;
+  }
+  if (style === 'phone_clean_2') {
+    return `
+You are a YouTube copywriter for the "Phone Clean 2" style — clean white-background thumbnail, phone on left, sitting presenter with lapel mic on right, bold topic text in center.
+
+REQUIREMENTS:
+1. 40-60 characters max. Direct, punchy, reveals something SPECIFIC.
+2. Read the FULL script to extract the EXACT topic, person, brand, country, or event — never generic.
+3. MUST name the specific entity from the script — make the viewer feel they're getting insider info.
+4. Format ideas: "X's Secret Plan", "The Truth About X", "Why X Is Doing This", "X Just Revealed This"
+5. ALWAYS write titles in English only.
+6. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only — rewrite for the actual script topic):
+- "The Real Reason Tesla Fired Half Its Engineers"
+- "India's Secret Space Plan Nobody Told You About"
+- "Why Sam Altman's Plan Will Change Everything"
     `;
   }
   if (style === 'phone_dual') {
@@ -383,16 +402,38 @@ RULES:
   }
   if (style === 'phone_clean') {
     return `
-You are a thumbnail copywriter for "Phone Clean" style — bold black text + RED BOX on a white background. The text sits on the right of a clean phone thumbnail.
+You are a thumbnail copywriter for "Phone Clean" style — bold black text + RED BOX on a white background. The text sits in the center of a clean phone thumbnail.
 
-STYLE: 2-5 words, punchy. One key word goes in a RED BOX on the thumbnail. Think "OPENAI'S HIDDEN MISSION" where HIDDEN is in the red box.
+STYLE: 2-5 words ALL CAPS, punchy. One key word goes in a SOLID RED RECTANGLE. Must be TOPIC-SPECIFIC — extracted from the script.
+BAD: "GAME OVER" (generic, could mean anything)
+GOOD (for OpenAI script): "OPENAI'S HIDDEN PLAN" with HIDDEN in red box
+GOOD (for India space script): "INDIA GOES MARS" with MARS in red box
 
-Generate 5 options — each should read like a big reveal or conspiracy:
-- Option 1: 3-word "X's Y REVEALED"
-- Option 2: "SECRET ___" or "___ EXPOSED"
-- Option 3: Short question "HIDDEN AGENDA?"
-- Option 4: 2-word shock "GAME OVER"
-- Option 5: Bold claim "THE REAL PLAN"
+Generate 5 options — each MUST reference the actual topic/entity from the script:
+- Option 1: "X's [RED WORD] REVEALED" — name the entity
+- Option 2: "[RED WORD] EXPOSED" — the shocking thing
+- Option 3: Short question about the topic
+- Option 4: 2-3 word declaration about the script topic
+- Option 5: Bold claim specific to this script
+
+RULES: ALL CAPS, max 5 words, English only. Return ONLY a JSON array of 5 strings.
+    `;
+  }
+  if (style === 'phone_clean_2') {
+    return `
+You are a thumbnail copywriter for "Phone Clean 2" style — sitting presenter with lapel mic on right, phone on left, BOLD TEXT center on white background. One key word appears in a RED RECTANGLE.
+
+STYLE: 2-5 words ALL CAPS. Must be TOPIC-SPECIFIC — read the script and name the actual person/brand/event/country.
+BAD: "THE REAL PLAN" (generic, no info)
+GOOD (for Tesla script): "TESLA'S REAL PLAN" with REAL in red box
+GOOD (for India script): "INDIA'S SECRET EXPOSED" with SECRET in red box
+
+Generate 5 options — each MUST be specific to the script's topic:
+- Option 1: "[ENTITY]'S [RED WORD]" — entity name + key concept
+- Option 2: "[RED WORD] EXPOSED" — shocking reveal
+- Option 3: "WHY [ENTITY] [VERB]?" — question format
+- Option 4: Short verdict about the topic
+- Option 5: Bold 2-word claim from the script
 
 RULES: ALL CAPS, max 5 words, English only. Return ONLY a JSON array of 5 strings.
     `;
@@ -559,25 +600,47 @@ DESCRIPTION RULES — write the BRIEF for an AI image generator. MUST include:
 - Keep it 3-5 sentences, actionable for an image model.`
 
     : videoStyle === 'phone_clean'
-    ? `STYLE — Phone Clean (White background, phone left, bold text right):
+    ? `STYLE — Phone Clean (White background, phone left, bold text center-right):
 TITLE RULES:
-- Short & punchy, reveals a hidden truth or secret. 40-60 chars.
-- Name the specific entity (company, person, tech, event) from the script.
-- BAD: "Something Shocking Is Happening" (zero info)
-- GOOD: "OpenAI's Hidden Plan Nobody Told You About"
-- GOOD: "Google's Secret Deal Just Got Exposed"
+- Short & punchy, reveals a hidden truth or secret about the SPECIFIC topic in the script. 40-60 chars.
+- MUST name the exact entity (company, person, tech, country, event) from the script — no generic titles.
+- BAD: "Something Shocking Is Happening" (zero info, could be anything)
+- GOOD (for OpenAI script): "OpenAI's Hidden Plan Nobody Told You About"
+- GOOD (for India space script): "India's Secret Space Mission Just Got Exposed"
 
 THUMBNAIL TEXT RULES:
-- 2-5 words. One key word goes in a RED BOX visually. Think "OPENAI'S [HIDDEN] MISSION".
-- ALL CAPS. The boxed word should be the most shocking/secret element.
-- GOOD: "HIDDEN MISSION" / "SECRET PLAN" / "REAL AGENDA"
+- 2-5 words ALL CAPS. One key word goes in a SOLID RED RECTANGLE. Extract from the script topic.
+- The boxed word = the most shocking/secret element FROM THIS SCRIPT.
+- BAD: "HIDDEN AGENDA" (generic) — GOOD: "OPENAI'S [HIDDEN] PLAN" / "INDIA'S [SECRET] MISSION"
 
 DESCRIPTION RULES — brief for the image generator:
-- White/cream pure background
-- Left side: realistic iPhone portrait showing topic image on screen + caller name ("Speaking")
-- Right side: bold ALL CAPS typography, one key word in SOLID RED RECTANGLE with white text
-- Top right corner: optional headshot of creator/host looking concerned
+- Pure white background (#FFFFFF)
+- Left: realistic iPhone with topic-specific image on screen + caller name "Speaking"
+- Center: bold ALL CAPS 3-line text, one line in SOLID RED RECTANGLE with white text
+- Right: half-body presenter figure with concerned/intrigued expression facing left
 - Clean, minimal, professional feel.`
+
+    : videoStyle === 'phone_clean_2'
+    ? `STYLE — Phone Clean 2 (White background, phone left, SITTING presenter with LAPEL MIC right):
+TITLE RULES:
+- 40-60 chars. Direct, reveals insider info about the SPECIFIC topic from the script.
+- MUST name the exact entity from the script — never vague or generic.
+- BAD: "The Truth Nobody Knows" (no entity, zero info)
+- GOOD (for Tesla script): "The Real Reason Tesla Fired Half Its Engineers"
+- GOOD (for India script): "India's Secret Plan That America Fears"
+
+THUMBNAIL TEXT RULES:
+- 2-5 words ALL CAPS. One key word in SOLID RED RECTANGLE. Must be TOPIC-SPECIFIC.
+- Extract the most shocking element from THIS script's topic.
+- BAD: "THE REAL PLAN" (generic) — GOOD: "TESLA'S [REAL] PLAN" / "INDIA [GOES] NUCLEAR"
+
+DESCRIPTION RULES — brief for the image generator:
+- Pure white background (#FFFFFF), clean minimal
+- Left: realistic iPhone portrait with topic-specific image on screen + caller name "Speaking"
+- Center: bold ALL CAPS 3-line impact text, middle line in SOLID RED RECTANGLE
+- Right: SITTING presenter in chair/stool — upper body, clip-on LAPEL MIC visible on shirt/lapel, facing left toward text, confident expression
+- Lapel mic detail: small silver/black clip microphone on chest, realistic and clearly visible
+- No separate background behind the presenter — clean cut-out on white`
 
     : videoStyle === 'phone_dual'
     ? `STYLE — Phone Dual (Two phones side by side, topic text center):
@@ -4744,6 +4807,74 @@ ${creatorDesc
 - Phone photorealistic with proper iOS call UI
 - Red rectangle on Line 2 is the hero visual element — make it vivid
 - 16:9 exactly. No watermarks.${extraNote}`;
+
+  } else if (videoStyle === 'phone_clean_2') {
+    const scriptSnippet = scriptText?.slice(0, 2000) || '';
+    const callerName = (guestName || hostName || 'AI Assistant').trim();
+    const presenterDesc = hostName
+      ? `${hostName} — photorealistic upper body, SEATED in a chair or stool, clip-on lapel microphone clearly visible on shirt/lapel near chest, confident expression, looking slightly left toward camera`
+      : 'a professional presenter — seated in a chair, clip-on lapel microphone visible on shirt, confident expression, facing slightly left';
+
+    let phoneScreenVisual = 'A dramatic, high-contrast topic-relevant image filling the entire phone screen — cinematic, specific to the topic';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{ role: 'user', parts: [{ text: `Read this script and decide what image to show on the phone screen for a YouTube thumbnail.\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nCALLER: ${callerName}\n\nReply ONLY in JSON:\n{"phoneScreen":"vivid 1-2 sentence description of the topic image on the phone screen — dramatic, topic-specific, cinematic"}` }] }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const raw = entityResponse.text?.trim() || '{}';
+        const m = raw.match(/\{[\s\S]*\}/);
+        const entities = JSON.parse(m ? m[0] : '{}');
+        if (entities.phoneScreen) phoneScreenVisual = entities.phoneScreen;
+      } catch (e) {
+        console.warn('[PhoneClean2] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    const hookWords = title.trim().toUpperCase().split(/\s+/).filter(Boolean);
+    const redCount = Math.min(2, Math.max(1, Math.floor(hookWords.length / 3)));
+    const blackPart1 = hookWords.slice(0, Math.floor((hookWords.length - redCount) / 2)).join(' ');
+    const redPart    = hookWords.slice(Math.floor((hookWords.length - redCount) / 2), hookWords.length - redCount).join(' ');
+    const blackPart2 = hookWords.slice(hookWords.length - redCount).join(' ');
+
+    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN 2" style thumbnail — white background, phone on left, big bold text center, SEATED presenter with LAPEL MIC on right.
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ BACKGROUND: Pure white (#FFFFFF) — completely clean, no textures, no shadows on background
+
+▶ LEFT SIDE (28% of frame): REALISTIC iPHONE
+- Portrait iPhone, slight 6° rightward tilt, photorealistic black glossy bezel, rounded corners
+- Status bar: small white text "${callerName}" (left, tiny blue dot "● Speaking") + "73% 🔋" (right)
+- Phone SCREEN filled entirely with: ${phoneScreenVisual}
+- Bottom of phone screen: three call buttons (gray mic, gray ●●●, red ✕ circle)
+- Realistic drop shadow for depth
+
+▶ CENTER (37% of frame): BOLD IMPACT TYPOGRAPHY — 3 stacked lines
+  Line 1: "${blackPart1 || hookWords.slice(0, 2).join(' ')}" — PURE BLACK (#000000), ultra-bold condensed, Impact/Anton style, enormous size
+  Line 2: "${redPart || hookWords[Math.floor(hookWords.length / 2)]}" — WHITE text inside a SOLID RED RECTANGLE (#CC0000) — full-width banner, white text centered
+  Line 3: "${blackPart2 || hookWords.slice(-2).join(' ')}" — PURE BLACK (#000000), same size as Line 1
+- All 3 lines tightly stacked, centered in this zone, massive readable size
+
+▶ RIGHT SIDE (35% of frame): SEATED PRESENTER WITH LAPEL MIC
+- Photorealistic upper-body shot of ${presenterDesc}
+- SEATED position — person is in a chair or on a stool, NOT standing
+- LAPEL MICROPHONE: small silver/black clip-on mic attached to shirt collar/lapel area, clearly visible, realistic detail — this is a key element
+- Person faces slightly LEFT toward the center text, looking at camera with engaged confident expression
+- Clean cut-out on the pure white background — NO separate background behind them
+- Casual-professional attire: button shirt or jacket, the lapel mic clipped on the chest/collar
+
+════ STRICT RULES ════
+- PURE WHITE background — absolutely no gray, no gradient
+- Typography ENORMOUS — dominant visual element, must be readable at small thumbnail size
+- Seated presenter is essential — NOT standing, NOT half-body standing pose
+- Lapel mic must be clearly visible and realistic — not hidden, not tiny
+- Phone photorealistic with proper iOS call UI elements
+- Red rectangle (Line 2) is the hero accent — bold, vivid red
+- 16:9 exactly. No watermarks. No logos.${extraNote}`;
 
   } else if (videoStyle === 'phone_dual') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';

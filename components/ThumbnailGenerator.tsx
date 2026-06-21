@@ -65,6 +65,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'professor_jiang', label: '🎓 Prof. Jiang', desc: 'Fox News Alert — breaking news', color: 'red' },
     { value: 'phone_studio', label: '📱 Phone Studio', desc: 'Phone + celebrity face + red/white impact text', color: 'pink' },
     { value: 'phone_clean', label: '🤍 Phone Clean', desc: 'Phone left + white bg + bold text right', color: 'slate' },
+    { value: 'phone_clean_2', label: '🎙 Phone Clean 2', desc: 'Sitting presenter + lapel mic + phone left', color: 'violet' },
     { value: 'phone_dual', label: '📲 Phone Dual', desc: '2 phones conversation + text center', color: 'cyan' },
   ];
 
