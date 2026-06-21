@@ -22,7 +22,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const response = await callGemini(model, contents, genConfig);
-    return res.json(response);
+    // `text` is a prototype getter — explicitly include it so it survives JSON serialization
+    return res.json({ ...response, text: response.text ?? null });
   } catch (error: any) {
     console.error('Gemini proxy error:', error);
     const msg = error?.message || 'Gemini API call failed';
