@@ -70,6 +70,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'news_dramatic', label: '📰 News Dramatic', desc: 'Blue text box + celeb face + dramatic scene (Career247 style)', color: 'blue' },
     { value: 'podcast_2', label: '🎙 Podcast 2', desc: 'Two hosts + center topic image insert (JRE/Lex Fridman style)', color: 'green' },
     { value: 'cinematic_drama', label: '🎬 Cinematic Drama', desc: 'No/minimal text — extreme close-up face + dramatic scene (Bollywood/thriller style)', color: 'orange' },
+    { value: 'podcast_3', label: '🔴 Podcast Quote', desc: 'Red background + bold statement + yellow highlight word + speaker face (WSH style)', color: 'red' },
   ];
 
   const hasScript = script.length > 0;

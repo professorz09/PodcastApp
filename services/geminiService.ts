@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -223,6 +223,24 @@ EXAMPLES (tone only — rewrite for the actual script topic):
 - "The Truth About COVID Vaccines — No Filter Conversation"
 - "Trump's Real Opinion On Drinking — Shocking Reveal"
 - "We Discussed XVideos, Pornhub, And The Internet's Dark Side"
+    `;
+  }
+  if (style === 'podcast_3') {
+    return `
+You are a YouTube copywriter for the "Podcast Quote" style — deep red background, speaker's face on right, a bold statement sentence on the left with ONE key word highlighted in a YELLOW BOX. Used by financial/opinion podcasts (crypto, investing, life advice).
+
+REQUIREMENTS:
+1. 55-75 characters. Sounds like something a guest actually SAID — a direct quote or bold opinion.
+2. MUST be specific to the actual topic/person from the script — name the speaker or the claim.
+3. Formats: "[Person]: [Shocking Statement]", "[Claim] — [Person]", conversational opinion.
+4. ALWAYS write in English only.
+5. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only):
+- "Scaramucci Said Bitcoin Is Complete Bullsh*t — Here's Why He Changed"
+- "Raoul Pal: Impatience Is Literally Keeping You Broke"
+- "Matt Hougan Says Just Buy This One Thing And Wait"
+- "They Are Actively Trying To Steal Your Crypto — Here's How"
     `;
   }
   if (style === 'cinematic_drama') {
@@ -527,6 +545,27 @@ Each option should be 4-8 words MAX describing the topic insert image. ALL in pl
 Return ONLY a JSON array of 5 strings. No markdown.
     `;
   }
+  if (style === 'podcast_3') {
+    return `
+You are a thumbnail copywriter for the "Podcast Quote" style — deep red gradient background, speaker face RIGHT, bold statement sentence LEFT with ONE word in a YELLOW HIGHLIGHT BOX.
+
+The thumbnailText = the BIG STATEMENT SENTENCE that appears on the left. Format using [BRACKETS] around the ONE word that gets the yellow box highlight.
+
+RULES:
+- Write a bold 4-8 word statement or quote — sounds like the guest actually said it
+- ONE key word wrapped in [BRACKETS] — the most shocking/impactful/interesting word
+- That bracketed word gets a SOLID YELLOW RECTANGLE with BLACK text — this is the visual hook
+- Rest of the sentence is in large white text
+- Examples:
+  - "Bitcoin is [BULLSH*T]"
+  - "They want to [STEAL] your Crypto!"
+  - "Impatience keeps you [Broke.]"
+  - "[Just Buy This.]"
+- Extract the most shocking claim/word from the actual script topic — never generic
+- 5 options, each a different angle on the script's main claim
+- Return ONLY a JSON array of 5 strings. No markdown.
+    `;
+  }
   if (style === 'cinematic_drama') {
     return `
 You are a thumbnail visual director for the "Cinematic Drama" style — NO text or MINIMAL text on thumbnail. The entire story is told through dramatic visuals, extreme close-ups, and multi-layer compositing.
@@ -818,6 +857,30 @@ DESCRIPTION RULES — brief for the AI image generator:
 - CENTER: Rectangular topic image insert with thick bright colored border (green or red or cyan — pick most fitting) — photorealistic topic-specific image inside the box
 - No big text overlay on the thumbnail — the insert image is the visual hook
 - Photorealistic, looks like a real podcast production screenshot`
+
+    : videoStyle === 'podcast_3'
+    ? `STYLE — Podcast Quote (deep red background, speaker face right, bold statement left with yellow highlight word):
+TITLE RULES:
+- Sounds like the guest actually said something shocking. 55-75 chars. Name the speaker + claim.
+- GOOD: "Scaramucci Said Bitcoin Is Complete Bullsh*t — Here's Why He Changed"
+- GOOD: "Raoul Pal: Impatience Is Literally Keeping You Broke"
+- GOOD: "They Are Actively Trying To Steal Your Crypto — Here's How"
+
+THUMBNAIL TEXT RULES:
+- A 4-8 word bold statement sentence with [BRACKETS] around ONE key word that gets the YELLOW BOX.
+- The bracketed word = the most shocking/impactful element of the sentence.
+- Extract from the actual script topic — never generic.
+- GOOD: "Bitcoin is [BULLSH*T]"
+- GOOD: "They want to [STEAL] your Crypto!"
+- GOOD: "Impatience keeps you [Broke.]"
+- GOOD: "[Just Buy This.]"
+
+DESCRIPTION RULES — brief for the AI image generator:
+- Background: deep rich crimson red gradient (#8B0000 → #CC0000), darker at corners/edges, lighter in center-right behind the face
+- LEFT 45%: The big statement sentence — normal white text for most words, ONE word in SOLID YELLOW RECTANGLE with bold black text. Large font, 3-4 lines, dominant presence. Below the text: a small italic attribution line "- [Speaker Name]" with a curved arrow pointing right toward the face.
+- Optional: If finance/crypto topic, a subtle candlestick chart or data visualization overlaid lightly on the red background (semi-transparent)
+- RIGHT 55%: Speaker/guest — upper body portrait, professional, facing slightly left toward the text, microphone visible at bottom, photorealistic clean cutout on the red background
+- No channel logo or watermark`
 
     : videoStyle === 'cinematic_drama'
     ? `STYLE — Cinematic Drama (Bollywood / thriller / drama — NO text or MINIMAL text, pure visual storytelling):
@@ -5360,6 +5423,110 @@ GUEST: ${p2Guest || 'podcast guest'}
 - ${p2Guest ? `The guest (${p2Guest}) MUST match real public photographs of this person — face, hair, age, look` : 'The guest looks natural and credible'}
 - The CENTER INSERT must be clearly framed with the thick colored border — it stands out as a deliberate element
 - Microphones visible for both hosts — this grounds it as a real podcast
+- 16:9 aspect ratio, 1920×1080${extraNote}`;
+
+  } else if (videoStyle === 'podcast_3') {
+    const p3Speaker = (guestName || hostName || 'the speaker').trim();
+
+    // Parse statement: extract [BRACKETED] word and split sentence
+    const p3Raw = (thumbnailText || title || '').trim();
+    const p3BracketMatch = p3Raw.match(/\[([^\]]+)\]/);
+    const p3HighlightWord = p3BracketMatch ? p3BracketMatch[1] : '';
+    const p3FullStatement = p3Raw.replace(/\[|\]/g, '');
+    const p3BeforeHighlight = p3BracketMatch
+      ? p3Raw.substring(0, p3Raw.indexOf('[')).replace(/\[|\]/g, '').trim()
+      : '';
+    const p3AfterHighlight = p3BracketMatch
+      ? p3Raw.substring(p3Raw.indexOf(']') + 1).replace(/\[|\]/g, '').trim()
+      : '';
+
+    let p3SpeakerDesc = p3Speaker !== 'the speaker'
+      ? `${p3Speaker} — MATCH REAL PUBLIC PHOTOGRAPHS of ${p3Speaker} EXACTLY. Upper body portrait, professional, facing slightly left toward the text, microphone at bottom`
+      : 'A confident professional expert — upper body portrait, facing slightly left, microphone at bottom, natural expression';
+
+    let p3ChartOverlay = '';
+    const scriptSnippet = scriptText?.slice(0, 800) || '';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `SCRIPT EXCERPT: ${scriptSnippet}
+SPEAKER: ${p3Speaker}
+STATEMENT: "${p3FullStatement}"
+
+Is this topic finance/crypto/investing/economics? If yes, what chart or data visual would work as a subtle background overlay?
+Also describe the speaker's exact appearance.
+
+Reply ONLY in JSON:
+{
+  "speakerDesc": "One sentence: speaker's appearance (hair, age, clothing style, expression — natural podcast look)",
+  "chartOverlay": "If finance topic: describe a chart (e.g. 'red and green candlestick chart trending upward with yellow moving average lines') — otherwise empty string"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const p3EntityRaw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const p3Entities = JSON.parse(p3EntityRaw);
+        if (p3Entities.speakerDesc) {
+          p3SpeakerDesc = p3Speaker !== 'the speaker'
+            ? `${p3Speaker} — ${p3Entities.speakerDesc}. MATCH REAL PUBLIC PHOTOGRAPHS of ${p3Speaker} EXACTLY.`
+            : p3Entities.speakerDesc;
+        }
+        if (p3Entities.chartOverlay) p3ChartOverlay = p3Entities.chartOverlay;
+      } catch (e) {
+        console.warn('[Podcast3] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    prompt = `You are a world-class YouTube thumbnail designer for financial and opinion podcasts ("When Shift Happens" / Lex Fridman / Real Vision style). Create a clean, powerful, professional thumbnail with a DEEP RED BACKGROUND.
+
+SPEAKER: ${p3Speaker}
+STATEMENT: "${p3FullStatement}"
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ BACKGROUND (full frame):
+- Deep rich crimson red gradient — brighter/lighter red in the center-right (behind the face), darker toward the left and all corners
+- Color: center #CC2020 → edges #550000, smooth radial vignette
+- Clean, bold, professional — NOT textured, NOT grungy
+${p3ChartOverlay ? `- Subtle OVERLAY on left side: ${p3ChartOverlay} — semi-transparent (30-40% opacity) layered on the red background, gives financial/data context without overwhelming the text` : ''}
+
+▶ LEFT SIDE (45% of frame): THE BOLD STATEMENT
+- Render the sentence in LARGE, CLEAN, BOLD typography — like a direct quote from the speaker
+- Font: heavy bold sans-serif (similar to bold Helvetica/DM Sans/Nunito) — NOT Impact, NOT condensed
+${p3HighlightWord ? `- The word(s) "${p3HighlightWord}" rendered inside a SOLID YELLOW RECTANGLE (#FFD700 or #FFEB00) with BOLD BLACK text — the yellow box is the visual stinger
+- "${p3BeforeHighlight}" in white before the yellow box (on its own line or inline)
+- "${p3AfterHighlight}" in white after the yellow box
+- The yellow box word POPS off the red background — this is the most eye-catching element` : `- Full statement "${p3FullStatement}" in large white bold text, 2-4 lines, left-aligned`}
+- Text is 3-4 lines total, left-aligned, starting about 1/4 from the left edge
+- Text takes up the middle-left 40% of the frame vertically
+- BELOW the statement text (lower left): A small italic attribution line — "- ${p3Speaker}" in white italic script font, with a small curved arrow (→ or ↓) pointing toward the person on the right
+
+▶ RIGHT SIDE (55% of frame): THE SPEAKER
+- ${p3SpeakerDesc}
+- Clean photorealistic cutout — person placed against the red background naturally
+- Upper body clearly visible: head, shoulders, chest, slightly cropped at mid-torso
+- A professional studio microphone (dark/black, modern podcast mic) visible at the bottom in front of them
+- Expression: calm, confident, assertive — as if they just delivered the statement
+- Soft warm rim light on one side, matching the red background mood
+
+════ STRICT RULES ════
+- The YELLOW HIGHLIGHT BOX is the most critical element — must be clearly visible, sharp, clean rectangle
+- Background is SOLID RED GRADIENT — absolutely no photos, no scenes, no studio blur behind
+${p3ChartOverlay ? '- Chart overlay is SEMI-TRANSPARENT — text and person must remain fully readable over it' : ''}
+- NO large channel watermark or logo — only if the speaker/channel specifically requires it
+- Person must be photorealistic and recognizable as ${p3Speaker}
+- Typography is clean professional sans-serif — NOT grungy, NOT handwritten (except the small attribution line)
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'cinematic_drama') {
