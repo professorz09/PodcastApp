@@ -17,7 +17,16 @@ const callGemini = async (model: string, contents: any, config?: any): Promise<a
     }
     throw new Error(msg);
   }
-  return response.json();
+  const data = await response.json();
+  // `text` is a prototype getter on GenerateContentResponse — it doesn't survive
+  // JSON serialization through the Vertex proxy. Reconstruct it from candidates
+  // so every caller can rely on response.text reliably.
+  if (data.text == null) {
+    const parts: any[] = data.candidates?.[0]?.content?.parts ?? [];
+    const extracted = parts.map((p: any) => p.text ?? '').join('').trim();
+    if (extracted) data.text = extracted;
+  }
+  return data;
 };
 
 const mockAi = {
