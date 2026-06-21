@@ -4731,15 +4731,18 @@ Reply ONLY in JSON, no markdown:
 - NO additional text elements anywhere else
 
 ▶ BACKGROUND:
-- Pure black to very dark charcoal (#0a0a0a → #1a1a1a) with a soft vignette
-- NO patterns, NO gradients other than vignette, NO additional graphics
-- Cinematic, moody, completely focused on the phone + face + text
+- SOLID PURE BLACK (#0a0a0a) — absolutely uniform, no variation
+- ZERO texture, ZERO pattern, ZERO bokeh, ZERO grain, ZERO gradients, ZERO studio elements
+- ZERO additional objects, props, shapes, lines, or decorative graphics
+- The ONLY things that exist in this image are: (1) the phone on the left, (2) the celebrity face/shoulders on the right, (3) the big hook text in the center
+- Think of a black backdrop in a photography studio — flat, featureless, infinite
 
 ════ STRICT RULES ════
 - Photorealistic — NOT illustrated, NOT cartoon, NOT 3D-rendered look
 - The celebrity face MUST be recognizable as ${celebrityName || 'the named figure'} — match real reference photos
 - Phone screen visual MUST match the topic of the script
 - Big text is the most readable element — high contrast, sharp edges
+- BACKGROUND IS PURE SOLID BLACK — any texture, pattern, gradient, or background element is FORBIDDEN
 - 16:9 aspect ratio (1920×1080)
 - No watermarks, no logos other than the small phone status icons${extraNote}`;
 
