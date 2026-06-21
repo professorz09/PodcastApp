@@ -5077,25 +5077,28 @@ KEY VISUAL RULES:
           contents: [{
             role: 'user',
             parts: [{
-              text: `You are a thumbnail art director for the "Phone Studio" YouTube style — a viral format where a vertical phone (showing an AI chat about the topic) sits on the LEFT and a celebrity's face fills the RIGHT, with huge red+white text in the middle.
+              text: `You are a thumbnail art director for the "Phone Studio" YouTube style — viral format: vertical phone FAR LEFT showing topic image, large celebrity face CENTER-RIGHT, huge red+white hook text in the middle.
 
-SCRIPT EXCERPT:
+SCRIPT:
 ${scriptSnippet}
 
-CELEBRITY (featured person whose face goes on the right): ${celebrityName || '(unspecified — infer from script)'}
-HOOK TEXT (will appear huge on screen): "${title}"
-${topicName ? `TOPIC (user-specified — use this to decide the phone screen visual): ${topicName}` : ''}
+CELEBRITY (person whose face is large on the right): ${celebrityName || '(infer from script — who is the most prominent person?)'}
+HOOK TEXT: "${title}"
+${topicName ? `TOPIC: ${topicName}` : ''}
 
-Decide the SINGLE most viral image to display ON THE PHONE SCREEN — one bold photo/illustration that visually represents the topic. Examples:
-- For "Do Aliens Exist?" → a glowing alien grey face, sci-fi neon
-- For "Shift Data Centers To Moon" → a glowing moon with server racks, deep space stars
-- For "War Phase Won" → a dramatic battlefield with explosions and tanks
-- For "Trump Beats Powell" → a federal reserve building crumbling with dollar bills flying
+Decide:
+1. PHONE SCREEN VISUAL: The single most dramatic, topic-specific image to fill the phone screen. Must instantly tell the viewer what the video is about. Be hyper-specific to THIS script — not generic.
+   - India-Pakistan war script → "Indian fighter jets firing missiles over Pakistani border at night, orange explosion plumes, dramatic aerial view"
+   - Bitcoin crash script → "Bitcoin symbol shattering like glass, red market chart plummeting, dark dramatic lighting"
+   - Political scandal → "specific politician's leaked document on screen, stamped 'CLASSIFIED' in red"
+   - Not: generic battlefield / generic chart — SPECIFIC to this exact topic
+
+2. CELEBRITY DESCRIPTION: Real name, their signature appearance (exact hair, age look, clothing style they're known for), and the emotional expression that fits this topic mood. This must match their real public photographs.
 
 Reply ONLY in JSON, no markdown:
 {
-  "phoneScreen": "One vivid 1-2 sentence description of the topic image showing on the phone screen — photorealistic, dramatic, fills the screen",
-  "celebrity": "One sentence pinning the celebrity's appearance — face, age, hair, what they're wearing, expression matching the topic mood"
+  "phoneScreen": "Vivid 2-3 sentence description of the topic image on phone screen — 100% specific to this script, photorealistic, dramatic",
+  "celebrity": "Full description: name, exact appearance (hair, age, typical clothing), expression for this topic"
 }`
             }]
           }],
@@ -5128,42 +5131,48 @@ Reply ONLY in JSON, no markdown:
 
 ════ EXACT LAYOUT — 1920×1080, 16:9 ════
 
-▶ LEFT SIDE (≈ 35% of frame): A REALISTIC IPHONE-STYLE SMARTPHONE
+▶ LEFT SIDE (left 0–28% of frame): A REALISTIC IPHONE-STYLE SMARTPHONE
 - Vertical phone, slight tilt (~-4°), photorealistic glossy black bezel, rounded corners
-- Status bar at top: small white text "${celebrityName || 'Speaker'}" (left, with tiny pulse dot indicating "Speaking") and battery "73%" on the right
+- Phone is FULL HEIGHT — top of phone near top edge, bottom near bottom edge of frame
+- Status bar at top: small white text "${celebrityName || 'Speaker'}" (left, with tiny pulse dot "● Speaking") and "73% 🔋" on the right
 - The ENTIRE phone screen is filled with this image: ${phoneScreenVisual}
-- At the bottom of the phone screen: a small red circular X close button (the "end call" button)
-- The phone sits against the dark background, dramatic side-light glinting on the bezel
+- Image on screen must be vivid, dramatic, topic-specific — it is the visual story of the script
+- At the bottom of the phone screen: a small red circular X close button (end call button)
+- Subtle side-light glinting on the bezel
 
-▶ RIGHT SIDE (≈ 50% of frame): THE CELEBRITY FACE
+▶ CELEBRITY FACE — LARGE, CENTER-DOMINANT (fills center-right ~35% to 100% of frame):
 - ${celebrityDescription}
-- Head-and-shoulders, sharp focus, looking slightly toward the text (i.e. toward the left/center)
-- Cinematic studio lighting — slight rim light, dramatic mood matching the topic
-- A small name label tag floating near the face: "${celebrityName || 'SPEAKER'}" — white text, thin pointer line from the label to the person
+- Face and upper body positioned CENTER to RIGHT — their face should be the LARGEST element
+- The celebrity's body starts from about 35% of the frame width, extending to the right edge
+- Face should be at roughly 60-65% of frame width — LARGE, prominent, not squeezed to the side
+- Looking TOWARD the left/center (toward the phone and text)
+- Cinematic studio lighting — sharp focus, dramatic rim light matching topic mood
+- A small floating name label near their shoulder: "${celebrityName || 'SPEAKER'}" in white text with thin pointer line
+- Person visually DOMINATES the right half — this is the emotional anchor of the thumbnail
 
-▶ CENTER / OVERLAY — THE MASSIVE HOOK TEXT:
-- The text "${hookClean}" rendered HUGE, dominating the middle of the frame, overlapping slightly onto the phone area
-- Font: ultra-bold, condensed italic display sans-serif (Anton / Bebas Neue / Impact extended-italic feel), ALL CAPS, slight rightward tilt
-- Color split: "${whitePart}" in PURE WHITE, "${redPart}" in BRIGHT RED (#ED1C24) — this is the visual stinger
-- Stack on 2-3 lines if needed, left-aligned, hugging the right edge of the phone
-- Slight subtle dark drop-shadow under the text so it stays readable against the celebrity face
-- NO additional text elements anywhere else
+▶ CENTER OVERLAY — THE MASSIVE HOOK TEXT (overlapping phone right edge and celebrity left body):
+- The text "${hookClean}" rendered HUGE, between the phone and celebrity (roughly 22%–58% of frame width)
+- Font: ultra-bold condensed italic display sans-serif (Anton / Impact / Bebas Neue extended-italic), ALL CAPS, slight rightward lean
+- Color split: "${whitePart}" in PURE WHITE, "${redPart}" in BRIGHT RED (#ED1C24)
+- Stack on 2-3 lines, left-aligned to the phone's right edge
+- Slight dark drop-shadow for readability against the celebrity face
+- Text overlaps BOTH the phone (right edge) and the celebrity body (left portion) — this overlap creates the layered depth
 
 ▶ BACKGROUND:
 - SOLID PURE BLACK (#0a0a0a) — absolutely uniform, no variation
-- ZERO texture, ZERO pattern, ZERO bokeh, ZERO grain, ZERO gradients, ZERO studio elements
-- ZERO additional objects, props, shapes, lines, or decorative graphics
-- The ONLY things that exist in this image are: (1) the phone on the left, (2) the celebrity face/shoulders on the right, (3) the big hook text in the center
-- Think of a black backdrop in a photography studio — flat, featureless, infinite
+- ZERO texture, ZERO pattern, ZERO bokeh, ZERO grain, ZERO gradients
+- Only 3 things exist: (1) phone on far left, (2) celebrity face center-right, (3) hook text in the middle
+- Think photography studio black backdrop — flat, featureless, infinite
 
 ════ STRICT RULES ════
-- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D-rendered look
-- The celebrity face MUST be recognizable as ${celebrityName || 'the named figure'} — match real reference photos
-- Phone screen visual MUST match the topic of the script
-- Big text is the most readable element — high contrast, sharp edges
-- BACKGROUND IS PURE SOLID BLACK — any texture, pattern, gradient, or background element is FORBIDDEN
+- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D-rendered
+- Celebrity face MUST fill a large area — they are NOT a small figure on the side; they dominate the right 65% of the frame
+- Celebrity MUST be recognizable as ${celebrityName || 'the named figure'} — match real reference photos exactly
+- Phone screen visual MUST match the script topic — viewers must immediately understand what the video is about
+- Hook text is bold, high-contrast, sharp — white + red split as specified
+- BACKGROUND IS PURE SOLID BLACK — any texture, gradient, or extra element is FORBIDDEN
 - 16:9 aspect ratio (1920×1080)
-- No watermarks, no logos other than the small phone status icons${extraNote}`;
+- No watermarks, no logos${extraNote}`;
 
   } else if (videoStyle === 'phone_clean') {
     const scriptSnippet = scriptText?.slice(0, 2000) || '';
