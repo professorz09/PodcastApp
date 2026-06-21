@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4' | 'corkboard_meta';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -223,6 +223,24 @@ EXAMPLES (tone only — rewrite for the actual script topic):
 - "The Truth About COVID Vaccines — No Filter Conversation"
 - "Trump's Real Opinion On Drinking — Shocking Reveal"
 - "We Discussed XVideos, Pornhub, And The Internet's Dark Side"
+    `;
+  }
+  if (style === 'corkboard_meta') {
+    return `
+You are a YouTube copywriter for meta educational content — "how thumbnails/videos go viral", "what makes content work", YouTube strategy breakdowns. The thumbnail shows a cork board with an annotated thumbnail pinned to it.
+
+REQUIREMENTS:
+1. 50-70 characters. Sounds like you're revealing a YouTube/content creation formula or secret.
+2. MUST be topic-specific — name what formula, strategy, or concept is being broken down.
+3. Formats: "The [X] Formula", "Why [X] Goes Viral", "How [Channel] Gets [Y] Views", "The Secret Behind [X]"
+4. ALWAYS write titles in English only.
+5. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only):
+- "The Viral Formula Behind Every 10M View Podcast Thumbnail"
+- "Why DOAC Thumbnails Always Go Viral — Broken Down"
+- "The Secret Structure Behind Every Successful YouTube Hook"
+- "How MrBeast Designs Thumbnails That Get Billions Of Views"
     `;
   }
   if (style === 'podcast_4') {
@@ -563,6 +581,22 @@ Each option should be 4-8 words MAX describing the topic insert image. ALL in pl
 Return ONLY a JSON array of 5 strings. No markdown.
     `;
   }
+  if (style === 'corkboard_meta') {
+    return `
+You are a thumbnail copywriter for the "Corkboard Meta" style — a cork bulletin board background with a smaller YouTube thumbnail PINNED to it, with annotation labels pointing to its elements.
+
+The thumbnailText = the TWO-WORD TITLE shown in the BLUE TOP BANNER. Format: "[YELLOW WORD] White Word"
+— first word gets a YELLOW BOX, remaining words are white on the blue banner.
+
+RULES:
+- 2-4 words total that work as a big bold banner title
+- First word in [YELLOW BOX] format using [BRACKETS]: "[Viral] Formula", "[Secret] Structure", "[Hidden] Formula"
+- Choose words that evoke a "formula revealed" feeling
+- Extract from the actual topic/script
+- 5 options, varied angles
+- Return ONLY a JSON array of 5 strings with FIRST WORD in [BRACKETS]. No markdown.
+    `;
+  }
   if (style === 'podcast_4') {
     return `
 You are a thumbnail copywriter for the "Viral Tweet / Scandal Documentary" style. The CENTER of the thumbnail is a giant social media post screenshot showing the shocking reveal text.
@@ -890,6 +924,25 @@ DESCRIPTION RULES — brief for the AI image generator:
 - CENTER: Rectangular topic image insert with thick bright colored border (green or red or cyan — pick most fitting) — photorealistic topic-specific image inside the box
 - No big text overlay on the thumbnail — the insert image is the visual hook
 - Photorealistic, looks like a real podcast production screenshot`
+
+    : videoStyle === 'corkboard_meta'
+    ? `STYLE — Corkboard Meta (blue top banner + cork board bg + annotated thumbnail pinned + presenter face right):
+TITLE RULES:
+- Meta educational / formula-reveal tone. 50-70 chars. Names what's being broken down.
+- GOOD: "The Viral Formula Behind Every 10M View Podcast Thumbnail"
+- GOOD: "Why DOAC Thumbnails Always Go Viral — Broken Down"
+- GOOD: "How MrBeast Designs Thumbnails That Get Billions Of Views"
+
+THUMBNAIL TEXT RULES:
+- 2-4 words for the BLUE TOP BANNER. First word in [BRACKETS] gets YELLOW BOX on blue.
+- GOOD: "[Viral] Formula", "[Secret] Structure", "[Hidden] Blueprint", "[Real] Strategy"
+
+DESCRIPTION RULES — brief for the AI image generator:
+- TOP BANNER: Bright blue horizontal bar full width, top 12% of frame — holds the banner title (yellow box first word + white bold remaining words)
+- BACKGROUND (below banner): Cork/bulletin board texture — warm tan/brown, natural cork material, realistic texture fills entire remaining frame
+- CENTER-LEFT: A smaller YOUTUBE THUMBNAIL pinned to the cork board with a red pushpin at the top center — the mini thumbnail shows two podcast hosts with bold text overlay (any podcast style). The mini thumbnail is slightly tilted (~3°)
+- ANNOTATION LABELS on the mini thumbnail: 3 glitchy/pixelated red-orange label boxes with white text — "Subject" (pointing to left person), "Hook" (pointing to text), "Caption" (pointing to bottom) — connected by thin red lines/arrows to their targets
+- RIGHT SIDE (40%): Presenter face — young professional, thoughtful expression, chin on hand or pointing gesture, looking at the cork board area, clean cut-out against the cork texture`
 
     : videoStyle === 'podcast_4'
     ? `STYLE — Viral Tweet / Scandal Documentary (dark background, two emotional faces, giant social media post center):
@@ -5477,6 +5530,112 @@ GUEST: ${p2Guest || 'podcast guest'}
 - ${p2Guest ? `The guest (${p2Guest}) MUST match real public photographs of this person — face, hair, age, look` : 'The guest looks natural and credible'}
 - The CENTER INSERT must be clearly framed with the thick colored border — it stands out as a deliberate element
 - Microphones visible for both hosts — this grounds it as a real podcast
+- 16:9 aspect ratio, 1920×1080${extraNote}`;
+
+  } else if (videoStyle === 'corkboard_meta') {
+    const cmPresenter = (hostName || '').trim();
+
+    // Parse banner text: [YELLOW] white part
+    const cmRaw = (thumbnailText || title || '').trim();
+    const cmBracketMatch = cmRaw.match(/\[([^\]]+)\]/);
+    const cmYellowWord = cmBracketMatch ? cmBracketMatch[1] : cmRaw.split(' ')[0];
+    const cmWhitePart = cmBracketMatch
+      ? cmRaw.replace(/\[[^\]]+\]\s*/, '').trim()
+      : cmRaw.split(' ').slice(1).join(' ');
+
+    const cmPresenterDesc = cmPresenter
+      ? `${cmPresenter} — MATCH REAL PHOTOGRAPHS EXACTLY. Thoughtful expression, chin on hand or pointing gesture, looking left toward the cork board`
+      : 'A confident young male presenter — short brown hair, casual-smart attire, thoughtful chin-on-hand pose, looking left toward the pinned thumbnail';
+
+    const cmScriptSnippet = scriptText?.slice(0, 600) || '';
+    let cmMiniThumbDesc = 'A podcast-style thumbnail: two hosts (older man left with glasses, younger man right) facing each other, bold white text center with one RED highlighted word, black background — classic DOAC/diary-of-a-CEO style';
+    let cmAnnotation1 = 'Subject';
+    let cmAnnotation2 = 'Hook';
+    let cmAnnotation3 = 'Caption';
+
+    if (cmScriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `Script topic: ${cmScriptSnippet}
+Title: "${title}"
+
+For a "thumbnail breakdown" YouTube video, decide:
+1. What mini thumbnail to pin on the cork board (which channel's style / what it shows)
+2. What 3 annotation labels to put on the mini thumbnail (what elements are being highlighted — customize to the topic)
+
+Reply ONLY in JSON:
+{
+  "miniThumbDesc": "Short description of the smaller thumbnail pinned on the cork board (which style/channel it mimics, what two people, what text is shown)",
+  "label1": "First annotation label text (2-3 words max, e.g. 'Subject', 'The Hook', 'Face')",
+  "label2": "Second annotation label text (2-3 words max, e.g. 'Hook Text', 'Formula', 'Pattern')",
+  "label3": "Third annotation label text (2-3 words max, e.g. 'Caption', 'Color', 'Layout')"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const cmEntityRaw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const cmEntities = JSON.parse(cmEntityRaw);
+        if (cmEntities.miniThumbDesc) cmMiniThumbDesc = cmEntities.miniThumbDesc;
+        if (cmEntities.label1) cmAnnotation1 = cmEntities.label1;
+        if (cmEntities.label2) cmAnnotation2 = cmEntities.label2;
+        if (cmEntities.label3) cmAnnotation3 = cmEntities.label3;
+      } catch (e) {
+        console.warn('[CorkboardMeta] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    prompt = `You are a world-class YouTube thumbnail designer for meta/educational content creators. Create a thumbnail that looks like a PROFESSIONAL CONTENT STRATEGY video thumbnail — "cork board with annotated thumbnail pinned to it" style.
+
+TOPIC: "${title}"
+BANNER TITLE: "${cmYellowWord}" (yellow box) + "${cmWhitePart}" (white text)
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ TOP BANNER (full width, top 12% of frame):
+- BRIGHT BLUE horizontal bar (#1565C0 to #1E88E5) spanning the entire top
+- LEFT PORTION: The word "${cmYellowWord}" inside a SOLID YELLOW RECTANGLE (#FFD700) with BOLD BLACK text — large, dominant
+- RIGHT OF YELLOW BOX: "${cmWhitePart}" in LARGE BOLD WHITE text — same font weight, same size
+- The banner looks like a TV chyron / news ticker — clean, bold, impactful
+
+▶ BACKGROUND (below the banner, fills rest of frame):
+- CORK BULLETIN BOARD texture — realistic warm tan/brown cork material
+- Natural cork surface: slight grain, organic texture, warm amber tones
+- The cork fills the entire background area below the banner
+
+▶ CENTER-LEFT (the pinned element):
+- A SMALLER YOUTUBE THUMBNAIL (about 35% of frame width) pinned to the cork board
+- Slight tilt (~3° clockwise), realistic drop shadow beneath it
+- A RED PUSHPIN at the top-center of the mini thumbnail, pressed into the cork
+- The mini thumbnail content: ${cmMiniThumbDesc}
+- Three ANNOTATION LABELS floating near the mini thumbnail, each in a GLITCHY/PIXELATED RED-ORANGE rectangle with white bold text:
+  - Label "${cmAnnotation1}" with a thin red arrow/line pointing to the LEFT PERSON in the mini thumbnail
+  - Label "${cmAnnotation2}" with a thin red arrow/line pointing to the TEXT/HOOK area of the mini thumbnail
+  - Label "${cmAnnotation3}" with a thin red arrow/line pointing to the BOTTOM of the mini thumbnail
+- The glitchy label boxes have a pixelated/degraded border effect — like a digital glitch filter
+
+▶ RIGHT SIDE (40% of frame):
+- ${cmPresenterDesc}
+- Upper body visible, head and shoulders
+- Clean, well-lit, photorealistic
+- Natural against the cork board background
+
+════ STRICT RULES ════
+- TOP BANNER = YELLOW BOX + WHITE TEXT on BRIGHT BLUE — this is the most important text element
+- Cork board texture MUST look realistic — warm grain, natural material, not a flat color
+- The red pushpin is a small but important detail — it makes the mini thumbnail look truly "pinned"
+- Annotation labels MUST have the glitchy/pixelated red-orange border effect — they should NOT look like clean rectangles
+- Red arrows/lines connecting labels to their targets must be clearly visible
+- Photorealistic — NOT cartoon or illustrated
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'podcast_4') {
