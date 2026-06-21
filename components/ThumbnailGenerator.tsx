@@ -792,6 +792,79 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 </div>
               )}
 
+              {/* ── STEP 3: Universal People / Context (all other styles) ── */}
+              {(() => {
+                type PeopleConfig = {
+                  p1Label: string; p1Placeholder: string;
+                  p2Label?: string; p2Placeholder?: string;
+                  topicLabel?: string; topicPlaceholder?: string;
+                };
+                const peopleConfig: Partial<Record<ThumbnailVideoStyle, PeopleConfig>> = {
+                  situational:     { p1Label: 'Featured Person (optional)', p1Placeholder: 'e.g. Nikhil Kamath, Ankit Baiyanpuria...' },
+                  debate:          { p1Label: 'Person A (Left)', p1Placeholder: 'e.g. Sandeep Maheshwari', p2Label: 'Person B (Right)', p2Placeholder: 'e.g. Vivek Bindra' },
+                  explained:       { p1Label: 'Expert / Host (optional)', p1Placeholder: 'e.g. Dhruv Rathee, or leave blank' },
+                  professor_jiang: { p1Label: 'Featured Leader / Analyst (optional)', p1Placeholder: 'e.g. Trump, Modi, Powell...' },
+                  news_dramatic:   { p1Label: 'Featured Person / Leader (optional)', p1Placeholder: 'e.g. Trump, Modi, Elon Musk...' },
+                  podcast_2:       { p1Label: 'Host', p1Placeholder: 'e.g. Joe Rogan', p2Label: 'Guest', p2Placeholder: 'e.g. Elon Musk' },
+                  cinematic_drama: { p1Label: 'Main Character (optional)', p1Placeholder: 'e.g. Ranbir Kapoor, or leave blank' },
+                  podcast_3:       { p1Label: 'Speaker / Guest Name (optional)', p1Placeholder: 'e.g. Raoul Pal, Scaramucci...' },
+                  podcast_4:       { p1Label: 'Subject — Left Face (optional)', p1Placeholder: 'e.g. V.G. Siddhartha, Byju...', p2Label: 'Narrator — Right Face (optional)', p2Placeholder: 'e.g. host name, or leave blank' },
+                  corkboard_meta:  { p1Label: 'Presenter (optional)', p1Placeholder: 'e.g. channel host name, or leave blank' },
+                  movie_review:    { p1Label: 'Topic / Film / Event (optional)', p1Placeholder: 'e.g. Ramayana, Apple, India-Pakistan War...', topicLabel: 'Topic / Film / Event', topicPlaceholder: 'e.g. Ramayana, Apple, Bitcoin...' },
+                  phone_clean_2:   { p1Label: 'Phone Caller / Entity', p1Placeholder: 'e.g. OpenAI, Google, Elon Musk', p2Label: 'Creator (optional)', p2Placeholder: 'e.g. Prof. Jiang, or leave blank' },
+                };
+                const cfg = peopleConfig[videoStyle];
+                if (!cfg) return null;
+                const isMovieReview = videoStyle === 'movie_review';
+                return (
+                  <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
+                    <div>
+                      <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 3 — People / Context</p>
+                      <p className="text-xs text-gray-600 mt-0.5">Optional — blank chhodo toh script se auto-detect hoga</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {isMovieReview ? (
+                        <div className="col-span-2 space-y-1.5">
+                          <label className="text-xs text-gray-500 font-medium">Topic / Film / Event (optional)</label>
+                          <input
+                            type="text"
+                            value={topicName}
+                            onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, topicName: e.target.value })}
+                            placeholder="e.g. Ramayana, Apple, India-Pakistan War..."
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-colors placeholder-gray-600"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-1.5">
+                            <label className="text-xs text-gray-500 font-medium">{cfg.p1Label}</label>
+                            <input
+                              type="text"
+                              value={guestName}
+                              onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
+                              placeholder={cfg.p1Placeholder}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-colors placeholder-gray-600"
+                            />
+                          </div>
+                          {cfg.p2Label && (
+                            <div className="space-y-1.5">
+                              <label className="text-xs text-gray-500 font-medium">{cfg.p2Label}</label>
+                              <input
+                                type="text"
+                                value={hostName}
+                                onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
+                                placeholder={cfg.p2Placeholder}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-colors placeholder-gray-600"
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* ── STEP 4: Style + Extra Instructions ── */}
               <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
                 <div>
