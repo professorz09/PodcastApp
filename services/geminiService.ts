@@ -39,7 +39,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4' | 'corkboard_meta';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4' | 'corkboard_meta' | 'movie_review';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -223,6 +223,24 @@ EXAMPLES (tone only — rewrite for the actual script topic):
 - "The Truth About COVID Vaccines — No Filter Conversation"
 - "Trump's Real Opinion On Drinking — Shocking Reveal"
 - "We Discussed XVideos, Pornhub, And The Internet's Dark Side"
+    `;
+  }
+  if (style === 'movie_review') {
+    return `
+You are a YouTube copywriter for a Bollywood/Hindi movie review channel (PJ / Filmy Bandhu / Sucharita Tyagi style). Titles are opinionated, punchy, Hindi-English mix, honest reactions to films.
+
+REQUIREMENTS:
+1. 45-70 characters. Sounds like a reviewer's raw honest reaction — can be in Hindi, English, or Hinglish.
+2. MUST name the actual film from the script.
+3. Formats: "[Film Name] Review: [Reaction]", "[Film Name] — [Bold Opinion]", "[Emoji] [Film] [Reaction]"
+4. Can use emojis and colloquial expressions.
+5. Return ONLY a valid JSON array of 4 strings. No markdown.
+
+EXAMPLES (tone only):
+- "Krishnavataram Review: Dhoka Hua Mere Saath 💔"
+- "Ramayana Movie — Not Indian Enough? My Honest Take 😱"
+- "Dhurandhar Review: Pappi Lo Aap Meri 😂🔥"
+- "Jolly LLB 3 Review: WTF Bhai Rula Diya 🔥"
     `;
   }
   if (style === 'corkboard_meta') {
@@ -581,6 +599,28 @@ Each option should be 4-8 words MAX describing the topic insert image. ALL in pl
 Return ONLY a JSON array of 5 strings. No markdown.
     `;
   }
+  if (style === 'movie_review') {
+    return `
+You are a thumbnail copywriter for a Bollywood movie review channel. The thumbnail shows a cinematic movie still as the full background with a dark semi-transparent box with GOLD BORDER on the left containing the review hook.
+
+The thumbnailText = the BOLD YELLOW HOOK TEXT inside the dark box — the reviewer's punchy reaction/opinion about the film. Can be Hindi, English, or Hinglish. Can include 1-2 emojis.
+
+RULES:
+- 3-6 words. Raw, honest, expressive reviewer reaction.
+- This goes in LARGE BOLD YELLOW inside the dark box — it's the emotional anchor.
+- Can be funny, shocking, disappointed, hyped — whatever the review tone is.
+- MUST relate to the actual film from the script.
+- 5 options, varied tones (love, hate, shocked, funny, emotional)
+- Return ONLY a JSON array of 5 strings. No markdown.
+
+EXAMPLES (tone only):
+- "DHOKA HUA 💔 MERE SATH"
+- "NOT INDIAN 😱 ENOUGH"
+- "PAPPI LO AAP MERI 😂"
+- "WTF BHAI 🔥 RULA DIYA"
+- "PAISA VASOOL HAI YAR"
+    `;
+  }
   if (style === 'corkboard_meta') {
     return `
 You are a thumbnail copywriter for the "Corkboard Meta" style — a cork bulletin board background with a smaller YouTube thumbnail PINNED to it, with annotation labels pointing to its elements.
@@ -924,6 +964,26 @@ DESCRIPTION RULES — brief for the AI image generator:
 - CENTER: Rectangular topic image insert with thick bright colored border (green or red or cyan — pick most fitting) — photorealistic topic-specific image inside the box
 - No big text overlay on the thumbnail — the insert image is the visual hook
 - Photorealistic, looks like a real podcast production screenshot`
+
+    : videoStyle === 'movie_review'
+    ? `STYLE — Movie Review (full cinematic movie still background + dark gold-border box with hook text on left):
+TITLE RULES:
+- Opinionated, punchy Bollywood reviewer tone. NAME the actual film. 45-70 chars.
+- Can be Hindi/English/Hinglish. Can use emojis.
+- GOOD: "Krishnavataram Review: Dhoka Hua Mere Saath 💔"
+- GOOD: "Ramayana Movie — Not Indian Enough? My Honest Take 😱"
+- GOOD: "Jolly LLB 3 Review: WTF Bhai Rula Diya 🔥"
+
+THUMBNAIL TEXT RULES:
+- 3-6 words of the reviewer's raw reaction in LARGE BOLD YELLOW inside a dark box. Can be Hindi/Hinglish + emoji.
+- GOOD: "DHOKA HUA 💔 MERE SATH" / "WTF BHAI 🔥 RULA DIYA" / "PAISA VASOOL HAI YAR"
+- Extract from the actual film/review sentiment in the script.
+
+DESCRIPTION RULES — brief for the AI image generator:
+- BACKGROUND: Full-frame cinematic movie still from the film being reviewed — photorealistic, dramatic, fills entire 16:9 frame. One or two characters from the film in action/emotion.
+- LEFT-CENTER: Dark semi-transparent rounded rectangle (black ~85% opacity, thin GOLD/YELLOW border outline). Inside the box: small white caps movie title at top, LARGE BOLD YELLOW hook text (2-3 lines) in center, small "MOVIE REVIEW" white text at bottom.
+- No separate reviewer face cutout — the movie scene IS the full background.
+- Cinematic color grade matching the film's tone.`
 
     : videoStyle === 'corkboard_meta'
     ? `STYLE — Corkboard Meta (blue top banner + cork board bg + annotated thumbnail pinned + presenter face right):
@@ -5530,6 +5590,92 @@ GUEST: ${p2Guest || 'podcast guest'}
 - ${p2Guest ? `The guest (${p2Guest}) MUST match real public photographs of this person — face, hair, age, look` : 'The guest looks natural and credible'}
 - The CENTER INSERT must be clearly framed with the thick colored border — it stands out as a deliberate element
 - Microphones visible for both hosts — this grounds it as a real podcast
+- 16:9 aspect ratio, 1920×1080${extraNote}`;
+
+  } else if (videoStyle === 'movie_review') {
+    const scriptSnippet = scriptText?.slice(0, 1500) || '';
+    const mrFilmName = (topicName || guestName || '').trim();
+    const mrHookText = (thumbnailText || title || '').trim();
+
+    let mrBackgroundScene = 'A dramatic cinematic scene from a Bollywood film — lead actor in character costume, intense expression, vivid cinematic lighting, fills the entire frame';
+    let mrFilmLabel = mrFilmName || 'MOVIE';
+    let mrColorGrade = 'Rich cinematic grade — deep warm tones, high contrast, Bollywood epic feel';
+
+    if (scriptSnippet) {
+      onStep?.('analyzing');
+      try {
+        const entityResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `You are a Bollywood movie review thumbnail art director.
+
+SCRIPT/REVIEW:
+${scriptSnippet}
+
+FILM NAME: ${mrFilmName || '(infer from script)'}
+REVIEWER HOOK: "${mrHookText}"
+
+Decide:
+1. BACKGROUND SCENE: What cinematic movie still/scene should fill the entire thumbnail background? Describe the character(s), their costume/look, expression, and setting from this specific film. Be very visual and specific.
+2. FILM LABEL: The short film name or producer name shown at the top of the dark box (e.g. "KRISHNAVATARAM", "NAMIT MALHOTRA'S", "DHURANDHAR", "JOLLY LLB 3")
+3. COLOR GRADE: The cinematic color mood matching this film's tone (e.g. "warm golden mythological glow", "dark moody crime thriller", "teal-orange action blockbuster", "blue-grey temple drama")
+
+Reply ONLY in JSON, no markdown:
+{
+  "backgroundScene": "Vivid 2-3 sentence description of the movie still/scene filling the background — specific characters, costume, expression, setting from THIS film",
+  "filmLabel": "Short film/producer name for the box label (ALL CAPS, 1-4 words)",
+  "colorGrade": "Cinematic color grade description"
+}`
+            }]
+          }],
+          config: { responseMimeType: 'application/json' },
+        });
+        const mrRaw = (() => {
+          const raw = entityResponse.text?.trim() || '{}';
+          const m = raw.match(/\{[\s\S]*\}/);
+          return m ? m[0] : '{}';
+        })();
+        const mrEntities = JSON.parse(mrRaw);
+        if (mrEntities.backgroundScene) mrBackgroundScene = mrEntities.backgroundScene;
+        if (mrEntities.filmLabel) mrFilmLabel = mrEntities.filmLabel;
+        if (mrEntities.colorGrade) mrColorGrade = mrEntities.colorGrade;
+      } catch (e) {
+        console.warn('[MovieReview] entity extraction failed, using fallback:', e);
+      }
+    }
+
+    prompt = `You are a world-class YouTube thumbnail designer for a Bollywood/Hindi movie review channel (PJ / Filmy Bandhu style). Create a CINEMATIC MOVIE REVIEW thumbnail.
+
+FILM: ${mrFilmLabel}
+HOOK TEXT: "${mrHookText}"
+
+════ EXACT LAYOUT — 1920×1080, 16:9 ════
+
+▶ BACKGROUND (entire frame — 100% of image):
+${mrBackgroundScene}
+- This movie still fills the ENTIRE 16:9 frame — edge to edge, top to bottom
+- Photorealistic, cinematic — looks like a real movie frame/poster
+- Color grade: ${mrColorGrade}
+- Rich, dramatic, visually arresting — the kind of image that stops the scroll
+
+▶ CENTER-LEFT OVERLAY BOX (positioned left-center, ~35% of frame width):
+- A DARK SEMI-TRANSPARENT ROUNDED RECTANGLE — background: near-black (#0d0d0d) at ~85% opacity
+- BORDER: A thin (2-3px) GOLD/YELLOW (#C8A84B / #D4AF37) outline around the entire rectangle — the gold border is a KEY design element
+- Slight padding inside the box (20-25px)
+- INSIDE THE BOX (top to bottom):
+  1. TOP: "${mrFilmLabel}" — small white ALL CAPS text, thin font weight, subtle, about 14px equivalent. Sits just above the main hook text.
+  2. MIDDLE: "${mrHookText}" — LARGE BOLD YELLOW (#F5C518 / gold-yellow) text, 2-3 lines, heavy bold weight (like a film title font). This is the dominant element inside the box.
+  3. BOTTOM: "MOVIE REVIEW" — small white ALL CAPS text, thin font weight, sits below the hook text.
+
+════ STRICT RULES ════
+- The BACKGROUND is a real movie scene — NOT a solid color, NOT a gradient, NOT a studio
+- The DARK BOX with GOLD BORDER is on the LEFT-CENTER — it MUST have the thin gold outline clearly visible
+- The hook text "${mrHookText}" MUST appear in LARGE BOLD YELLOW inside the box — this is the most readable element
+- The box is semi-transparent — you can faintly see the movie scene through it
+- NO separate reviewer face — no cutout, no host portrait
+- Photorealistic cinematic quality — looks like a real movie still
 - 16:9 aspect ratio, 1920×1080${extraNote}`;
 
   } else if (videoStyle === 'corkboard_meta') {
