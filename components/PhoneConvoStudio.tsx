@@ -415,6 +415,7 @@ interface IntroFlowProps {
 const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel }) => {
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
+  const [bgColor, setBgColor] = useState('#ffffff');
   const [steps, setSteps] = useState<Record<IntroStepKey, { status: IntroStepStatus; detail?: string; error?: string }>>({
     text:   { status: 'pending' },
     tts:    { status: 'pending' },
@@ -647,7 +648,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
           const state: StudioState = {
             phones: [introPhone],
             script: [turn],
-            background: { type: 'color', value: '#ffffff' },
+            background: { type: 'color', value: bgColor },
             deviceSpacing: 50,
             deviceScale: 100,
             startTime: '09:41',
@@ -741,6 +742,36 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
       {open && (
         <div style={{ padding: '4px 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Background picker — only when not running */}
+          {!running && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Background
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                {([
+                  { value: '#ffffff', label: 'White' },
+                  { value: '#00b140', label: '🟢 Green Screen' },
+                  { value: '#00ff00', label: '🟢 Chroma' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setBgColor(opt.value)}
+                    style={{
+                      padding: '7px 4px', borderRadius: 8, border: `2px solid ${bgColor === opt.value ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
+                      background: opt.value, cursor: 'pointer', fontFamily: 'inherit',
+                      fontSize: 10, fontWeight: 700,
+                      color: opt.value === '#ffffff' ? '#374151' : '#ffffff',
+                      transition: 'border-color 0.15s',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Generate button — visible when nothing has started yet OR when allDone (to regenerate) */}
           {(allPending || allDone) && (
             <button
