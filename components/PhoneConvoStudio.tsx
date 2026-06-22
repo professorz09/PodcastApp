@@ -25,7 +25,7 @@ import {
   generateProportionalWordTimings,
 } from '../services/googleCloudService';
 import { toast } from './Toast';
-import { DebateSegment } from '../types';
+import { DebateSegment, PhoneStudioSourceClip } from '../types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -917,6 +917,9 @@ interface PodcastFlowProps {
     extraFocus: string;
     useGrounding: boolean;
     variant: PodcastVariant;
+    // Source clips the user picked (only when specific chapters were selected) —
+    // used to prepend the "Original Clip" in the final video's YouTube chapters.
+    sourceClips: PhoneStudioSourceClip[];
     // Clip Reaction extras (only used when variant === 'clip_take')
     analystName?: string;
     personInClip?: string;
@@ -1174,6 +1177,14 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
         return;
       }
     }
+    // Source clips → only when SPECIFIC chapters were picked. The final video
+    // prepends these original clips before the reaction, so their source-range
+    // duration drives the YouTube-chapter offset downstream. (Full-episode
+    // selection isn't a "clip" — you don't prepend the whole podcast.)
+    const sourceClips: PhoneStudioSourceClip[] = selectedIdxs.length === 0
+      ? []
+      : picked.map(c => ({ title: c.title, startSec: c.startSec, endSec: c.endSec }));
+
     await onGenerate({
       podcastUrl: podcastUrl.trim(),
       chapters: picked,
@@ -1186,6 +1197,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       extraFocus: extraFocus.trim(),
       useGrounding,
       variant,
+      sourceClips,
       ...(isClip ? {
         analystName: analystName.trim(),
         // person/verb/topic are auto-detected — left undefined so Gemini extracts
@@ -2314,17 +2326,28 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
 
 interface Props {
   mainScript: DebateSegment[];
+  /** Source clips the user picked in the New Phone Studio "select chapters" step.
+   *  Prepended as "Original Clip" rows in the YouTube Chapters output. */
+  sourceClips?: PhoneStudioSourceClip[];
   /** Embedded mode: render ONLY the script-generator UI (used inside DebateInput's "New Phone Studio" tab). */
   embedded?: boolean;
   /** Fired when the embedded generator finishes — caller commits the script (and routes to PHONE_STUDIO). */
-  onGeneratorComplete?: (turns: ScriptTurn[], phones: PhoneConfig[]) => void;
+  onGeneratorComplete?: (
+    turns: ScriptTurn[],
+    phones: PhoneConfig[],
+    meta?: { sourceClips?: PhoneStudioSourceClip[] },
+  ) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const PhoneConvoStudio: React.FC<Props> = ({ mainScript, embedded = false, onGeneratorComplete }) => {
+const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClipsProp, embedded = false, onGeneratorComplete }) => {
   const [phones, setPhones]   = useState<PhoneConfig[]>([]);
   const [script, setScript]   = useState<ScriptTurn[]>([]);
+  // Source clips → seeded from the prop (standalone studio), or set directly by
+  // the rare non-embedded generate path. Drives the "Original Clip" prepend.
+  const [sourceClips, setSourceClips] = useState<PhoneStudioSourceClip[]>(sourceClipsProp ?? []);
+  useEffect(() => { if (sourceClipsProp) setSourceClips(sourceClipsProp); }, [sourceClipsProp]);
   const [bg, setBg]           = useState('#f0f4f8');
   const [bgImageUrl, setBgImageUrlRaw] = useState<string | null>(null);
   // Always revoke the previous blob URL before swapping in a new one.
@@ -3034,6 +3057,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
     extraFocus: string;
     useGrounding: boolean;
     variant: PodcastVariant;
+    sourceClips: PhoneStudioSourceClip[];
     analystName?: string;
     personInClip?: string;
     actionVerb?: string;
@@ -3079,9 +3103,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         });
 
         if (embedded && onGeneratorComplete) {
-          onGeneratorComplete(newScript, newPhones);
+          onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips });
           toast.success(`✓ ${newScript.length} turns clip-reaction ready!`);
         } else {
+          setSourceClips(args.sourceClips);
           setPhones(newPhones);
           setScript(newScript);
           setTab('visual');
@@ -3141,9 +3166,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
       });
 
       if (embedded && onGeneratorComplete) {
-        onGeneratorComplete(newScript, newPhones);
+        onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips });
         toast.success(`✓ ${newScript.length} turns deep-analysis ready! Script Editor me jaa raha hai…`);
       } else {
+        setSourceClips(args.sourceClips);
         setPhones(newPhones);
         setScript(newScript);
         setTab('visual');
@@ -3850,109 +3876,142 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 {/* ── YouTube Chapters ── */}
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 12 }}>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>⏱ YouTube Chapters</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>AI topic-based chapters — YouTube description mein paste karo</div>
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <button
-                      onClick={async () => {
-                        if (!script.length || chaptersGenerating) return;
-                        setChaptersGenerating(true);
-                        try {
-                          const turns = script.map(t => {
-                            const phone = phones.find(p => p.id === t.phoneId);
-                            return { text: t.text, speaker: phone?.name ?? t.phoneId, durationMs: t.durationMs };
-                          });
-                          const result = await generateScriptChapters(turns);
-                          setChapters(result);
-                          toast.success(`✓ ${result.length} chapters generate ho gaye!`);
-                        } catch (e: any) {
-                          toast.error(`Chapters error: ${e.message}`);
-                        } finally {
-                          setChaptersGenerating(false);
-                        }
-                      }}
-                      disabled={!script.length || chaptersGenerating}
-                      style={{
-                        flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none',
-                        background: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#7c3aed,#6d28d9)',
-                        color: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.3)' : '#fff',
-                        fontSize: 11, fontWeight: 700, cursor: (!script.length || chaptersGenerating) ? 'default' : 'pointer',
-                        fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                      }}
-                    >
-                      {chaptersGenerating
-                        ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
-                        : '✨ Generate Chapters'}
-                    </button>
-                    {chapters.length > 0 && (
-                      <button
-                        onClick={() => {
-                          const fmt = (ms: number) => {
-                            const s = Math.floor(ms / 1000);
-                            const m = Math.floor(s / 60);
-                            const sec = s % 60;
-                            return `(${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')})`;
-                          };
-                          const text = chapters.map(c => `${fmt(c.startMs)} ${c.title}`).join('\n');
-                          navigator.clipboard.writeText(text)
-                            .then(() => toast.success('✓ Chapters copy ho gaye!'))
-                            .catch(() => toast.error('Copy failed'));
-                        }}
-                        style={{
-                          padding: '7px 12px', borderRadius: 8,
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          background: '#1e293b', color: '#94a3b8',
-                          fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                        } as React.CSSProperties}
-                      >
-                        📋 Copy
-                      </button>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>
+                    AI topic-based chapters — YouTube description mein paste karo
+                    {sourceClips.length > 0 && (
+                      <> · <span style={{ color: '#fbbf24' }}>🎬 Original clip pehle, reaction uske baad (auto-offset)</span></>
                     )}
                   </div>
 
-                  {/* Chapter list */}
-                  {chapters.length > 0 ? (
-                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden' }}>
-                      {chapters.map((ch, i) => {
-                        const fmtMs = (ms: number) => {
-                          const s = Math.floor(ms / 1000);
-                          const m = Math.floor(s / 60);
-                          const sec = s % 60;
-                          return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-                        };
-                        return (
-                          <div key={i} style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
-                            borderBottom: i < chapters.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                          }}>
-                            {/* Time range badge */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                              <span style={{ color: '#818cf8', fontFamily: 'monospace', fontSize: 11, fontWeight: 700 }}>
-                                ({fmtMs(ch.startMs)})
-                              </span>
-                              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9 }}>→</span>
-                              <span style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', fontSize: 10 }}>
-                                ({fmtMs(ch.endMs)})
-                              </span>
-                            </div>
-                            {/* Title */}
-                            <span style={{ flex: 1, fontSize: 11, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {ch.title}
-                            </span>
-                            {/* Duration */}
-                            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', flexShrink: 0, fontFamily: 'monospace' }}>
-                              {Math.round((ch.endMs - ch.startMs) / 1000)}s
-                            </span>
+                  {(() => {
+                    // ── Build combined chapter list ──────────────────────────────
+                    // Source clip(s) get laid out from 0:00 using each clip's own
+                    // source-range duration; reaction chapters then shift after
+                    // them — matching the final "clip + reaction" video order.
+                    const fmtMs = (ms: number) => {
+                      const s = Math.floor(ms / 1000);
+                      const m = Math.floor(s / 60);
+                      const sec = s % 60;
+                      return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+                    };
+
+                    type DisplayChapter = { startMs: number; endMs: number; title: string; isClip: boolean };
+                    const clipBlocks: DisplayChapter[] = [];
+                    let acc = 0;
+                    for (const c of sourceClips) {
+                      const durMs = Math.max(0, Math.round((c.endSec - c.startSec) * 1000));
+                      clipBlocks.push({ startMs: acc, endMs: acc + durMs, title: `🎬 Original Clip — ${c.title}`, isClip: true });
+                      acc += durMs;
+                    }
+                    const totalClipMs = acc;
+                    const reactionBlocks: DisplayChapter[] = chapters.map(ch => ({
+                      startMs: ch.startMs + totalClipMs,
+                      endMs: ch.endMs + totalClipMs,
+                      title: ch.title,
+                      isClip: false,
+                    }));
+                    const displayChapters = [...clipBlocks, ...reactionBlocks];
+                    const hasReaction = chapters.length > 0;
+                    const hasAny = displayChapters.length > 0;
+
+                    return (
+                      <>
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                          <button
+                            onClick={async () => {
+                              if (!script.length || chaptersGenerating) return;
+                              setChaptersGenerating(true);
+                              try {
+                                const turns = script.map(t => {
+                                  const phone = phones.find(p => p.id === t.phoneId);
+                                  return { text: t.text, speaker: phone?.name ?? t.phoneId, durationMs: t.durationMs };
+                                });
+                                const result = await generateScriptChapters(turns);
+                                setChapters(result);
+                                toast.success(`✓ ${result.length} chapters generate ho gaye!`);
+                              } catch (e: any) {
+                                toast.error(`Chapters error: ${e.message}`);
+                              } finally {
+                                setChaptersGenerating(false);
+                              }
+                            }}
+                            disabled={!script.length || chaptersGenerating}
+                            style={{
+                              flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none',
+                              background: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#7c3aed,#6d28d9)',
+                              color: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.3)' : '#fff',
+                              fontSize: 11, fontWeight: 700, cursor: (!script.length || chaptersGenerating) ? 'default' : 'pointer',
+                              fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            }}
+                          >
+                            {chaptersGenerating
+                              ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                              : hasReaction ? '↺ Regenerate Chapters' : '✨ Generate Chapters'}
+                          </button>
+                          {hasAny && (
+                            <button
+                              onClick={() => {
+                                const text = displayChapters.map(c => `(${fmtMs(c.startMs)}) ${c.title}`).join('\n');
+                                navigator.clipboard.writeText(text)
+                                  .then(() => toast.success('✓ Chapters copy ho gaye!'))
+                                  .catch(() => toast.error('Copy failed'));
+                              }}
+                              style={{
+                                padding: '7px 12px', borderRadius: 8,
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: '#1e293b', color: '#94a3b8',
+                                fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                              } as React.CSSProperties}
+                            >
+                              📋 Copy
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Chapter list */}
+                        {hasAny ? (
+                          <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden' }}>
+                            {displayChapters.map((ch, i) => (
+                              <div key={i} style={{
+                                display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                                background: ch.isClip ? 'rgba(251,191,36,0.06)' : 'transparent',
+                                borderBottom: i < displayChapters.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                              }}>
+                                {/* Time range badge */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                  <span style={{ color: ch.isClip ? '#fbbf24' : '#818cf8', fontFamily: 'monospace', fontSize: 11, fontWeight: 700 }}>
+                                    ({fmtMs(ch.startMs)})
+                                  </span>
+                                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9 }}>→</span>
+                                  <span style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', fontSize: 10 }}>
+                                    ({fmtMs(ch.endMs)})
+                                  </span>
+                                </div>
+                                {/* Title */}
+                                <span style={{ flex: 1, fontSize: 11, color: ch.isClip ? '#fde68a' : '#e2e8f0', fontWeight: ch.isClip ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {ch.title}
+                                </span>
+                                {/* Duration */}
+                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', flexShrink: 0, fontFamily: 'monospace' }}>
+                                  {Math.round((ch.endMs - ch.startMs) / 1000)}s
+                                </span>
+                              </div>
+                            ))}
+                            {sourceClips.length > 0 && !hasReaction && (
+                              <div style={{ padding: '8px 10px', fontSize: 9, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', borderTop: '1px dashed rgba(255,255,255,0.06)' }}>
+                                ↑ Yeh original clip hai. "Generate Chapters" dabao — reaction chapters iske baad add ho jayenge.
+                              </div>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
-                      {script.length ? '↑ "Generate Chapters" dabao — AI topic groups banana hai' : 'Script load karo pehle'}
-                    </div>
-                  )}
+                        ) : (
+                          <div style={{ textAlign: 'center', padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
+                            {script.length ? '↑ "Generate Chapters" dabao — AI topic groups banana hai' : 'Script load karo pehle'}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
               </div>

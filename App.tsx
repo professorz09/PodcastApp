@@ -16,7 +16,7 @@ const PhoneConvoStudio = lazy(() => import('./components/PhoneConvoStudio'));
 const IgSongStudio     = lazy(() => import('./components/IgSongStudio'));
 import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
-import { AppState, DebateConfig, DebateSegment, ThumbnailState, YoutubeImportData } from './types';
+import { AppState, DebateConfig, DebateSegment, PhoneStudioSourceClip, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
 import { Key, ExternalLink, RotateCcw, AlertTriangle, X } from 'lucide-react';
 import { ToastContainer, toast } from './components/Toast';
@@ -44,6 +44,9 @@ const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IMPORT);
   const [youtubeData, setYoutubeData] = useState<YoutubeImportData | null>(null);
   const [script, setScript] = useState<DebateSegment[]>([]);
+  // Source clips picked in the New Phone Studio "select chapters" step — carried
+  // to the standalone Phone Studio so YouTube Chapters can prepend the original clip.
+  const [phoneSourceClips, setPhoneSourceClips] = useState<PhoneStudioSourceClip[]>([]);
   const [thumbnailState, setThumbnailState] = useState<ThumbnailState>({
     titles: [],
     selectedTitle: '',
@@ -537,7 +540,7 @@ Return JSON only (no markdown):
       )}
 
       {appState === AppState.PHONE_STUDIO && (
-        <PhoneConvoStudio mainScript={script} />
+        <PhoneConvoStudio mainScript={script} sourceClips={phoneSourceClips} />
       )}
 
       {appState === AppState.IG_SONG_STUDIO && (
@@ -552,8 +555,9 @@ Return JSON only (no markdown):
           initialFileName={youtubeData?.contextFileName}
           initialCommentsContent={youtubeData?.commentsFileContent}
           initialCommentsFileName={youtubeData?.commentsFileName}
-          onPhoneStudioReady={(segments) => {
+          onPhoneStudioReady={(segments, meta) => {
             setScript(segments);
+            setPhoneSourceClips(meta?.sourceClips ?? []);
             setScriptStyle('phone_studio');
             setAppState(AppState.SCRIPT);
             toast.success('✓ Script ready — Script Editor me review karo, fir Phone Studio open karo');

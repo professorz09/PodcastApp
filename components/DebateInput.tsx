@@ -1,6 +1,6 @@
 import React, { useState, useRef, lazy, Suspense } from 'react';
 import { toast } from './Toast';
-import { DebateConfig, DebateSegment } from '../types';
+import { DebateConfig, DebateSegment, PhoneStudioSourceClip } from '../types';
 import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Zap, Brain, Activity, Video, BookOpen, Smartphone, Link2, Scissors, Loader2 } from 'lucide-react';
 import type { PhoneConvoStyle, TranscriptChunk } from '../services/geminiService';
 import { splitTranscriptByTopics } from '../services/geminiService';
@@ -16,7 +16,7 @@ interface DebateInputProps {
   initialCommentsContent?: string;
   initialCommentsFileName?: string;
   /** Fired by the "New Phone Studio" tab once its embedded generator commits a script. Caller routes to PHONE_STUDIO. */
-  onPhoneStudioReady?: (script: DebateSegment[]) => void;
+  onPhoneStudioReady?: (script: DebateSegment[], meta?: { sourceClips?: PhoneStudioSourceClip[] }) => void;
 }
 
 const DebateInput: React.FC<DebateInputProps> = ({
@@ -378,7 +378,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
               <PhoneConvoStudio
                 mainScript={[]}
                 embedded
-                onGeneratorComplete={(turns, phones) => {
+                onGeneratorComplete={(turns, phones, meta) => {
                   // Convert ScriptTurn[] → DebateSegment[] for the rest of the app pipeline.
                   const phoneToSpeaker = new Map(phones.map(p => [p.id, p.name]));
                   const segments: DebateSegment[] = turns.map(t => ({
@@ -390,7 +390,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     wordTimings: t.wordTimings?.map(w => ({ word: w.word, start: w.startTime, end: w.endTime })),
                   }));
                   if (onPhoneStudioReady) {
-                    onPhoneStudioReady(segments);
+                    onPhoneStudioReady(segments, meta);
                   } else {
                     toast.error('Phone Studio route configured nahi hai — app ko reload karo.');
                   }
