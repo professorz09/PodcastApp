@@ -4633,8 +4633,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
             {/* ── ① Optional Intro Video ── */}
             {podcastSegments.length > 0 && (
-              <div style={{ borderRadius: 14, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.04)', padding: 12 }}>
-                <div style={{ fontSize: 11, color: '#c4b5fd', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>① Intro Video (Optional)</div>
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(196,181,253,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, paddingLeft: 2 }}>① Intro Video <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.25)' }}>(optional)</span></div>
                 <IntroFlow
                   segments={podcastSegments}
                   podcastTitle={podcastTitle}
@@ -4649,7 +4649,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             {/* ── ② Raw Clip (Source Video Clip) ── */}
             {uploadedVideoForClip && sourceClips.length > 0 && (
               <div style={{ borderRadius: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', padding: 12 }}>
-                <div style={{ fontSize: 11, color: '#fca5a5', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>② Raw Clip (Source Video)</div>
+                <div style={{ fontSize: 11, color: '#fca5a5', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>② Raw Clip</div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>
                   Uploaded video se selected chapter ka segment trim karke download karo.
                 </div>
@@ -4740,10 +4740,12 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             )}
 
             {/* ── ③ Discussion Animation ── */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 1 }} />
 
             {/* Info card */}
-            <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>③ Discussion — 1080p MP4</div>
+            <div style={{ borderRadius: 14, border: '1px solid rgba(239,68,68,0.15)', background: 'rgba(255,255,255,0.025)', padding: 14 }}>
+              <div style={{ fontSize: 11, color: 'rgba(252,165,165,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>③ Discussion</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>1080p MP4</div>
               {[
                 `Format: MP4 (H.264 · AAC)  ·  1920×1080`,
                 `Quality: 8 Mbps High Bitrate`,
@@ -4799,10 +4801,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             </button>
 
             {/* ── Full 3-Part Video Combine ── */}
-            <div style={{ borderRadius: 14, border: '1px solid rgba(255,165,0,0.25)', background: 'rgba(255,165,0,0.04)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', letterSpacing: '0.06em' }}>🎥 FULL 3-PART VIDEO</div>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 1 }} />
+            <div style={{ borderRadius: 14, border: '1px solid rgba(251,191,36,0.25)', background: 'rgba(251,191,36,0.04)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>🎥 Full Video</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>Combine All 3 Parts</div>
+              </div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-                Teen parts combine karke ek final video banao. Pehle har part download karo, phir yahan select karo.
+                Upar se teen parts download karo, phir yahan select karke ek final video banao.
               </div>
 
               {/* Hidden file inputs */}
@@ -4812,9 +4818,9 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
               {/* Part selectors */}
               {[
-                { label: '① Intro', hint: 'Settings → Optional Intro Video se download karo', file: introPart, ref: introPartRef, clear: () => setIntroPart(null), optional: true },
-                { label: '② Raw Clip', hint: 'Settings → Source Video Clip se download karo', file: rawClipPart, ref: rawClipPartRef, clear: () => setRawClipPart(null), optional: false },
-                { label: '③ Discussion', hint: 'Upar EXPORT button se download karo', file: discussionPart, ref: discussionPartRef, clear: () => setDiscussionPart(null), optional: false },
+                { label: '① Intro', hint: '① section (upar) se download karo', file: introPart, ref: introPartRef, clear: () => setIntroPart(null), optional: true },
+                { label: '② Raw Clip', hint: '② section (upar) se download karo', file: rawClipPart, ref: rawClipPartRef, clear: () => setRawClipPart(null), optional: false },
+                { label: '③ Discussion', hint: '③ EXPORT button (upar) se download karo', file: discussionPart, ref: discussionPartRef, clear: () => setDiscussionPart(null), optional: false },
               ].map(({ label, hint, file, ref, clear, optional }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ minWidth: 80, fontSize: 11, fontWeight: 700, color: file ? '#fbbf24' : 'rgba(255,255,255,0.4)' }}>{label}{optional && <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.25)' }}> (opt)</span>}</div>
