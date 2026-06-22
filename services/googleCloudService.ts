@@ -28,12 +28,14 @@ export const generateProportionalWordTimings = (
 
 export const transcribeAudioGoogleCloud = async (
   audioBlob: Blob,
-  languageCode: string = 'en-US'
+  languageCode: string = 'en-US',
+  onProgress?: (step: string) => void,
 ): Promise<{ word: string; start: number; end: number }[]> => {
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
   const audioContext = new AudioContextClass();
 
   try {
+    onProgress?.('Audio decode kar raha hai…');
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
@@ -48,21 +50,27 @@ export const transcribeAudioGoogleCloud = async (
     // Google STT recommends 16kHz mono.  At 16kHz/mono, a 45 s WAV chunk is
     // only ~1.4 MB raw → ~1.9 MB base64, well under the 10 MB inline limit.
     const TARGET_RATE = 16000;
+    onProgress?.('16kHz mono me resample kar raha hai…');
     const resampled = await resampleMono(audioBuffer, TARGET_RATE);
     console.log(`Resampled to ${TARGET_RATE}Hz mono: duration=${resampled.duration.toFixed(2)}s`);
 
     // ── Chunk into 55 s pieces (safe margin under 60 s sync limit) ──────────
+    // Google STT v1 inline audio: hard limit is 60 s / 10 MB per sync request.
+    // For anything longer, the service switches to longrunningrecognize automatically.
+    // We stay well under with 55 s chunks to avoid the edge case.
     const CHUNK_DURATION = 55;
     let allTimings: { word: string; start: number; end: number }[] = [];
 
     if (resampled.duration > CHUNK_DURATION) {
-      const chunks = Math.ceil(resampled.duration / CHUNK_DURATION);
-      console.log(`Splitting into ${chunks} chunks of ≤${CHUNK_DURATION}s`);
+      const totalChunks = Math.ceil(resampled.duration / CHUNK_DURATION);
+      console.log(`Splitting into ${totalChunks} chunks of ≤${CHUNK_DURATION}s`);
 
-      for (let i = 0; i < chunks; i++) {
+      for (let i = 0; i < totalChunks; i++) {
         const startTime = i * CHUNK_DURATION;
         const endTime = Math.min((i + 1) * CHUNK_DURATION, resampled.duration);
-        console.log(`Chunk ${i + 1}/${chunks}: ${startTime.toFixed(1)}-${endTime.toFixed(1)}s`);
+        const m = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+        console.log(`Chunk ${i + 1}/${totalChunks}: ${startTime.toFixed(1)}-${endTime.toFixed(1)}s`);
+        onProgress?.(`Google STT — chunk ${i + 1}/${totalChunks} (${m(startTime)}–${m(endTime)}) transcribe ho raha hai…`);
 
         const chunkBuffer = extractChunk(resampled, startTime, endTime);
         const chunkBlob = audioBufferToWav(chunkBuffer);
@@ -73,6 +81,7 @@ export const transcribeAudioGoogleCloud = async (
         });
       }
     } else {
+      onProgress?.('Google STT — transcribing…');
       const blob = audioBufferToWav(resampled);
       allTimings = await transcribeChunk(blob, TARGET_RATE, languageCode);
     }

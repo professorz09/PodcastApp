@@ -1152,52 +1152,39 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
     setUploadedVideoFile(file);
     setUploadedVideoUrl(blobUrl);
     setVideoTranscribing(true);
-    setVideoTranscribeStep('Audio track decode kar raha hai…');
+    setVideoTranscribeStep('Video load ho raha hai…');
     try {
-      // Web Audio API can decode audio from most video containers (MP4/WebM/MOV)
-      const arrayBuffer = await file.arrayBuffer();
-      const audioCtx = new AudioContext();
-      let audioBuffer: AudioBuffer;
-      try {
-        audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      } finally {
-        if (audioCtx.state !== 'closed') await audioCtx.close();
-      }
+      // ── Step 1: Read video duration via <video> element (fast — no full decode) ──
+      const videoDuration = await new Promise<number>((res, rej) => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.src = blobUrl;
+        v.onloadedmetadata = () => res(isFinite(v.duration) ? v.duration : 0);
+        v.onerror = () => rej(new Error('Video metadata load nahi hua'));
+        setTimeout(() => rej(new Error('Video load timeout')), 15_000);
+      });
 
-      // Convert AudioBuffer → WAV Blob for STT
-      const sr = audioBuffer.sampleRate;
-      const numCh = audioBuffer.numberOfChannels;
-      const frameCount = audioBuffer.length;
-      const pcm = new Float32Array(frameCount);
-      // Mix down to mono
-      for (let ch = 0; ch < numCh; ch++) {
-        const chData = audioBuffer.getChannelData(ch);
-        for (let i = 0; i < frameCount; i++) pcm[i] += chData[i] / numCh;
-      }
-      // Build WAV
-      const wavHeader = new ArrayBuffer(44);
-      const view = new DataView(wavHeader);
-      const writeStr = (off: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
-      const pcm16 = new Int16Array(frameCount);
-      for (let i = 0; i < frameCount; i++) pcm16[i] = Math.max(-1, Math.min(1, pcm[i])) * 32767;
-      const dataLen = pcm16.byteLength;
-      writeStr(0, 'RIFF'); view.setUint32(4, 36 + dataLen, true);
-      writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
-      view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-      view.setUint32(24, sr, true); view.setUint32(28, sr * 2, true);
-      view.setUint16(32, 2, true); view.setUint16(34, 16, true);
-      writeStr(36, 'data'); view.setUint32(40, dataLen, true);
-      const wavBlob = new Blob([wavHeader, pcm16.buffer], { type: 'audio/wav' });
+      const totalChunks = Math.ceil((videoDuration || 300) / 55);
+      setVideoTranscribeStep(
+        `Transcription shuru ho rahi hai — ${fmtSec(videoDuration)} audio, ${totalChunks} chunks…`
+      );
 
-      setVideoTranscribeStep(`Google STT se transcribe kar raha hai… (${fmtSec(audioBuffer.duration)} audio)`);
-      const wordTimings = await transcribeAudioGoogleCloud(wavBlob, 'en-US');
+      // ── Step 2: Pass file DIRECTLY to transcribeAudioGoogleCloud ──
+      // File extends Blob — the service calls decodeAudioData internally,
+      // resamples to 16kHz mono, and chunks into ≤55 s pieces automatically.
+      // (Previously we were decoding here AND in the service — double the memory.)
+      const wordTimings = await transcribeAudioGoogleCloud(
+        file,
+        'en-US',
+        (step) => setVideoTranscribeStep(step),
+      );
       if (!wordTimings.length) throw new Error('Koi transcript nahi mila — video mein clear audio hai?');
 
       const segs = wordTimingsToSegments(wordTimings);
       setSegments(segs);
       if (!podcastTitle.trim()) setPodcastTitle(file.name.replace(/\.[^.]+$/, ''));
       setPhase('cuts');
-      toast.success(`✓ Video transcript ready! ${segs.length} segments, ${fmtSec(segs[segs.length - 1].start + (segs[segs.length - 1].duration || 0))}`);
+      toast.success(`✓ Video transcript ready! ${segs.length} segments, ${fmtSec(videoDuration)}`);
     } catch (e: any) {
       URL.revokeObjectURL(blobUrl);
       setUploadedVideoFile(null);
@@ -4083,55 +4070,80 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                           const endSec = c.endSec;
                           const file = uploadedVideoForClip;
 
-                          // Build hidden video element
+                          // Build hidden video element — must be in DOM for Firefox audio
                           const video = document.createElement('video');
                           video.src = uploadedVideoUrlForClip ?? URL.createObjectURL(file);
                           video.muted = false;
                           video.playsInline = true;
-                          await new Promise<void>((res, rej) => { video.onloadedmetadata = () => res(); video.onerror = () => rej(new Error('Video load nahi hua')); });
+                          video.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px';
+                          document.body.appendChild(video);
 
-                          // Use captureStream + MediaRecorder (real-time — plays in background)
-                          const fps = 30;
-                          const stream: MediaStream = (video as any).captureStream(fps);
-                          const chunks: Blob[] = [];
-                          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-                            ? 'video/webm;codecs=vp9,opus'
-                            : MediaRecorder.isTypeSupported('video/webm')
-                              ? 'video/webm'
-                              : 'video/mp4';
-                          const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
-                          recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+                          try {
+                            await new Promise<void>((res, rej) => {
+                              video.onloadedmetadata = () => res();
+                              video.onerror = () => rej(new Error('Video load nahi hua'));
+                              setTimeout(() => rej(new Error('Video load timeout')), 20_000);
+                            });
 
-                          await new Promise<void>((resolve, reject) => {
-                            recorder.onstop = () => {
-                              const blob = new Blob(chunks, { type: mimeType });
-                              const a = document.createElement('a');
-                              a.href = URL.createObjectURL(blob);
-                              const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                              a.download = `clip-${c.title.replace(/[^a-z0-9]/gi, '-').slice(0, 40)}.${ext}`;
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              resolve();
-                            };
-                            recorder.onerror = (e: Event) => reject(new Error('Recording failed'));
+                            // captureStream — Chrome uses captureStream(), Firefox uses mozCaptureStream()
+                            const captureFn = (video as any).captureStream?.bind(video)
+                              ?? (video as any).mozCaptureStream?.bind(video);
+                            if (!captureFn) throw new Error('Is browser me video capture support nahi hai — Chrome ya Edge use karo');
 
-                            recorder.start(200);
-                            video.currentTime = startSec;
-                            video.onseeked = () => { video.play(); };
+                            const fps = 30;
+                            const stream: MediaStream = captureFn(fps);
 
-                            const durSec = endSec - startSec;
-                            const tick = setInterval(() => {
-                              const elapsed = video.currentTime - startSec;
-                              setClipProgress(Math.min(99, Math.round((elapsed / durSec) * 100)));
-                              if (video.currentTime >= endSec) {
-                                clearInterval(tick);
-                                video.pause();
-                                recorder.stop();
-                              }
-                            }, 250);
-                          });
-                          toast.success('✓ Video clip download ho gayi!');
+                            // Verify audio track is present
+                            if (!stream.getAudioTracks().length) {
+                              throw new Error('Video mein audio track nahi mila — ensure video has audio');
+                            }
+
+                            const chunks: Blob[] = [];
+                            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+                              ? 'video/webm;codecs=vp9,opus'
+                              : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+                                ? 'video/webm;codecs=vp8,opus'
+                                : MediaRecorder.isTypeSupported('video/webm')
+                                  ? 'video/webm'
+                                  : 'video/mp4';
+                            const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
+                            recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+
+                            await new Promise<void>((resolve, reject) => {
+                              recorder.onstop = () => {
+                                const blob = new Blob(chunks, { type: mimeType });
+                                const a = document.createElement('a');
+                                a.href = URL.createObjectURL(blob);
+                                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                                a.download = `clip-${c.title.replace(/[^a-z0-9]/gi, '-').slice(0, 40)}.${ext}`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                resolve();
+                              };
+                              recorder.onerror = () => reject(new Error('Recording error aya'));
+
+                              recorder.start(200);
+                              video.currentTime = startSec;
+                              video.onseeked = () => { video.play().catch(() => {}); };
+
+                              const durSec = endSec - startSec;
+                              const tick = setInterval(() => {
+                                const elapsed = video.currentTime - startSec;
+                                setClipProgress(Math.min(99, Math.round((elapsed / durSec) * 100)));
+                                if (video.currentTime >= endSec) {
+                                  clearInterval(tick);
+                                  video.pause();
+                                  if (recorder.state !== 'inactive') recorder.stop();
+                                }
+                              }, 250);
+                            });
+
+                            toast.success('✓ Video clip download ho gayi!');
+                          } finally {
+                            video.pause();
+                            document.body.removeChild(video);
+                          }
                         } catch (e: any) {
                           toast.error(e.message || 'Clip trim failed');
                         } finally {
