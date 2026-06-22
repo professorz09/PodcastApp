@@ -2639,6 +2639,13 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [clipProgress, setClipProgress] = useState(0);
   const [addLetterbox, setAddLetterbox] = useState(false);
 
+  // Podcast metadata — stored when podcast generate is called so IntroFlow
+  // stays accessible in the Export tab even after the generator steps are gone.
+  const [podcastSegments, setPodcastSegments] = useState<PodcastTranscriptSeg[]>([]);
+  const [podcastTitle, setPodcastTitle] = useState('');
+  const [podcastHost, setPodcastHost] = useState('');
+  const [podcastGuests, setPodcastGuests] = useState<string[]>([]);
+
   // Full 3-part video combine
   const [combining, setCombining] = useState(false);
   const [combineProgress, setCombineProgress] = useState(0);
@@ -3455,6 +3462,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
     topicHeading?: string;
   }) => {
     setGenerating(true);
+
+    // Persist podcast metadata so Export tab can render IntroFlow + clip trim
+    // even after the generator steps are no longer visible.
+    setPodcastSegments(args.segments);
+    setPodcastTitle(args.podcastTitle);
+    setPodcastHost(args.podcastHost);
+    setPodcastGuests(args.podcastGuests);
+
     try {
       // ── Clip Reaction (single-speaker) ───────────────────────────────────
       if (args.variant === 'clip_take') {
@@ -4616,9 +4631,119 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         {tab === 'export' && (
           <div style={{ padding: 14, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+            {/* ── ① Optional Intro Video ── */}
+            {podcastSegments.length > 0 && (
+              <div style={{ borderRadius: 14, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.04)', padding: 12 }}>
+                <div style={{ fontSize: 11, color: '#c4b5fd', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>① Intro Video (Optional)</div>
+                <IntroFlow
+                  segments={podcastSegments}
+                  podcastTitle={podcastTitle}
+                  podcastHost={podcastHost}
+                  podcastGuests={podcastGuests}
+                  selectedRanges={sourceClips.length > 0 ? sourceClips.map(c => ({ startSec: c.startSec, endSec: c.endSec })) : undefined}
+                  selectionLabel={sourceClips.length > 0 ? sourceClips[0].title : undefined}
+                />
+              </div>
+            )}
+
+            {/* ── ② Raw Clip (Source Video Clip) ── */}
+            {uploadedVideoForClip && sourceClips.length > 0 && (
+              <div style={{ borderRadius: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', padding: 12 }}>
+                <div style={{ fontSize: 11, color: '#fca5a5', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>② Raw Clip (Source Video)</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>
+                  Uploaded video se selected chapter ka segment trim karke download karo.
+                </div>
+                {/* Letterbox toggle */}
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Black Border (Letterbox)</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Upar/niche ~8% black bars</div>
+                  </div>
+                  <div onClick={() => setAddLetterbox(p => !p)} style={{ width: 36, height: 20, borderRadius: 50, position: 'relative', cursor: 'pointer', flexShrink: 0, background: addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
+                    <div style={{ position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', left: addLetterbox ? 18 : 2, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+                  </div>
+                </label>
+                {/* Clip info */}
+                {sourceClips.map((c, i) => (
+                  <div key={i} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', marginBottom: i < sourceClips.length - 1 ? 5 : 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{c.title}</div>
+                    <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.45)' }}>{fmtTime(c.startSec * 1000)} → {fmtTime(c.endSec * 1000)} <span style={{ color: 'rgba(255,255,255,0.25)' }}>({fmtTime((c.endSec - c.startSec) * 1000)})</span></div>
+                  </div>
+                ))}
+                <button
+                  disabled={clipping}
+                  onClick={async () => {
+                    if (clipping || !uploadedVideoForClip || !sourceClips.length) return;
+                    setClipping(true); setClipProgress(0);
+                    try {
+                      const c = sourceClips[0];
+                      const video = document.createElement('video');
+                      video.src = uploadedVideoUrlForClip ?? URL.createObjectURL(uploadedVideoForClip);
+                      video.muted = false; video.playsInline = true;
+                      video.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px';
+                      document.body.appendChild(video);
+                      try {
+                        await new Promise<void>((res, rej) => { video.onloadedmetadata = () => res(); video.onerror = () => rej(new Error('Video load nahi hua')); setTimeout(() => rej(new Error('Timeout')), 20_000); });
+                        const captureFn = (video as any).captureStream?.bind(video) ?? (video as any).mozCaptureStream?.bind(video);
+                        if (!captureFn) throw new Error('Is browser me capture support nahi — Chrome use karo');
+                        const rawStream: MediaStream = captureFn(30);
+                        if (!rawStream.getAudioTracks().length) throw new Error('Audio track nahi mila');
+                        let recordStream = rawStream;
+                        let letterboxCanvas: HTMLCanvasElement | null = null;
+                        let letterboxRafId: number | null = null;
+                        if (addLetterbox) {
+                          const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
+                          letterboxCanvas = document.createElement('canvas');
+                          letterboxCanvas.width = vw; letterboxCanvas.height = vh;
+                          const ctx2d = letterboxCanvas.getContext('2d')!;
+                          const barH = Math.round(vh * 0.08), drawH = vh - barH * 2;
+                          const drawFrame = () => { ctx2d.fillStyle = '#000'; ctx2d.fillRect(0, 0, vw, vh); ctx2d.drawImage(video, 0, barH, vw, drawH); letterboxRafId = requestAnimationFrame(drawFrame); };
+                          drawFrame();
+                          const cs = letterboxCanvas.captureStream(30);
+                          rawStream.getAudioTracks().forEach((t: MediaStreamTrack) => cs.addTrack(t));
+                          recordStream = cs;
+                        }
+                        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
+                        const recorder = new MediaRecorder(recordStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
+                        const chunks: Blob[] = [];
+                        recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+                        await new Promise<void>((resolve, reject) => {
+                          recorder.onstop = () => {
+                            if (letterboxRafId !== null) cancelAnimationFrame(letterboxRafId);
+                            const blob = new Blob(chunks, { type: mimeType });
+                            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                            a.download = `clip-${c.title.replace(/[^a-z0-9]/gi,'-').slice(0,40)}.${ext}`;
+                            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                            resolve();
+                          };
+                          recorder.onerror = () => reject(new Error('Recording error'));
+                          recorder.start(200);
+                          video.currentTime = c.startSec;
+                          video.onseeked = () => { video.play().catch(() => {}); };
+                          const durSec = c.endSec - c.startSec;
+                          const tick = setInterval(() => {
+                            setClipProgress(Math.min(99, Math.round(((video.currentTime - c.startSec) / durSec) * 100)));
+                            if (video.currentTime >= c.endSec) { clearInterval(tick); video.pause(); if (recorder.state !== 'inactive') recorder.stop(); }
+                          }, 250);
+                        });
+                        toast.success('✓ Raw clip download ho gayi!');
+                      } finally { video.pause(); document.body.removeChild(video); }
+                    } catch (e: any) { toast.error(e.message || 'Clip trim failed'); }
+                    finally { setClipping(false); setClipProgress(0); }
+                  }}
+                  style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: clipping ? 'rgba(239,68,68,0.3)' : '#ef4444', color: '#fff', fontSize: 12, fontWeight: 800, cursor: clipping ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  {clipping ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Trim ho rahi hai… {clipProgress}%</> : <><Download size={13} /> Trim & Download Raw Clip ({sourceClips[0] ? fmtTime((sourceClips[0].endSec - sourceClips[0].startSec) * 1000) : ''})</>}
+                </button>
+              </div>
+            )}
+
+            {/* ── ③ Discussion Animation ── */}
+
             {/* Info card */}
             <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>Export — 1080p MP4</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>③ Discussion — 1080p MP4</div>
               {[
                 `Format: MP4 (H.264 · AAC)  ·  1920×1080`,
                 `Quality: 8 Mbps High Bitrate`,
