@@ -2639,6 +2639,17 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [clipProgress, setClipProgress] = useState(0);
   const [addLetterbox, setAddLetterbox] = useState(false);
 
+  // Full 3-part video combine
+  const [combining, setCombining] = useState(false);
+  const [combineProgress, setCombineProgress] = useState(0);
+  const [combineStatus, setCombineStatus] = useState('');
+  const [introPart, setIntroPart] = useState<File | null>(null);
+  const [rawClipPart, setRawClipPart] = useState<File | null>(null);
+  const [discussionPart, setDiscussionPart] = useState<File | null>(null);
+  const introPartRef = useRef<HTMLInputElement>(null);
+  const rawClipPartRef = useRef<HTMLInputElement>(null);
+  const discussionPartRef = useRef<HTMLInputElement>(null);
+
   const totalDuration = script.reduce((a, b) => a + b.durationMs, 0);
 
   // ── Sync main app script → PhoneConvoStudio ───────────────────────────────
@@ -2943,6 +2954,157 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const activeTurn = timelineItems.find(it => currentTime >= it.start && currentTime < it.end);
 
   // ── Export ────────────────────────────────────────────────────────────────
+
+  // ── Full 3-part video combine (Intro + Raw Clip + Discussion) ─────────────
+  const combineVideoBlobs = async (
+    blobs: Blob[],
+    onStatus: (s: string) => void,
+    onProgress: (p: number) => void,
+  ): Promise<Blob> => {
+    const W = 1920, H = 1080, FPS = 30;
+
+    // Get duration of each blob
+    const getDuration = (blob: Blob): Promise<number> =>
+      new Promise((res, rej) => {
+        const v = document.createElement('video');
+        v.src = URL.createObjectURL(blob);
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); res(isFinite(v.duration) ? v.duration : 0); };
+        v.onerror = () => { URL.revokeObjectURL(v.src); rej(new Error('Video duration read nahi hua')); };
+        setTimeout(() => rej(new Error('Duration read timeout')), 15_000);
+      });
+
+    onStatus('Duration read ho rahi hai…');
+    const durations = await Promise.all(blobs.map(getDuration));
+    const totalDuration = durations.reduce((a, b) => a + b, 0);
+
+    // Canvas + AudioContext → merged MediaStream → MediaRecorder
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d')!;
+    const actx = new AudioContext();
+    const audioDest = actx.createMediaStreamDestination();
+    const canvasStream = canvas.captureStream(FPS);
+    audioDest.stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+      ? 'video/webm;codecs=vp9,opus'
+      : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+        ? 'video/webm;codecs=vp8,opus'
+        : 'video/webm';
+    const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 192_000 });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.start(200);
+
+    let accumulatedSec = 0;
+
+    for (let i = 0; i < blobs.length; i++) {
+      const partLabel = i === 0 && blobs.length === 3 ? 'Intro' : i === blobs.length - 2 ? 'Raw Clip' : 'Discussion';
+      onStatus(`Part ${i + 1}/${blobs.length} (${partLabel}) play ho rahi hai — real-time…`);
+
+      const blobUrl = URL.createObjectURL(blobs[i]);
+      const startAcc = accumulatedSec;
+      const partDur = durations[i];
+
+      await new Promise<void>((resolve, reject) => {
+        const video = document.createElement('video');
+        video.src = blobUrl;
+        video.crossOrigin = 'anonymous';
+        video.playsInline = true;
+        document.body.appendChild(video);
+
+        let audioSrc: MediaElementAudioSourceNode | null = null;
+        let rafId: number;
+
+        const cleanup = () => {
+          cancelAnimationFrame(rafId);
+          try { audioSrc?.disconnect(); } catch {}
+          try { document.body.removeChild(video); } catch {}
+          URL.revokeObjectURL(blobUrl);
+        };
+
+        const draw = () => {
+          ctx.drawImage(video, 0, 0, W, H);
+          const progress = (startAcc + (video.currentTime || 0)) / totalDuration;
+          onProgress(Math.min(0.99, progress));
+          rafId = requestAnimationFrame(draw);
+        };
+
+        video.onloadeddata = () => {
+          try {
+            audioSrc = actx.createMediaElementSource(video);
+            audioSrc.connect(audioDest);
+          } catch {}
+          draw();
+          video.play().catch(reject);
+        };
+
+        video.onended = () => {
+          accumulatedSec += partDur;
+          cleanup();
+          resolve();
+        };
+
+        video.onerror = () => {
+          cleanup();
+          reject(new Error(`Part ${i + 1} load nahi hua`));
+        };
+
+        setTimeout(() => { cleanup(); reject(new Error(`Part ${i + 1} timeout`)); }, (partDur + 30) * 1_000);
+      });
+    }
+
+    await new Promise<void>(resolve => {
+      recorder.onstop = () => resolve();
+      if (recorder.state !== 'inactive') recorder.stop();
+    });
+    await actx.close().catch(() => {});
+
+    onProgress(1);
+    return new Blob(chunks, { type: mimeType });
+  };
+
+  const handleCombineFullVideo = async () => {
+    const parts = [introPart, rawClipPart, discussionPart].filter(Boolean) as File[];
+    if (parts.length < 2) {
+      toast.error('Kam se kam 2 parts select karo (Raw Clip + Discussion)');
+      return;
+    }
+    if (!rawClipPart && !discussionPart) {
+      toast.error('Raw Clip ya Discussion select karo');
+      return;
+    }
+
+    setCombining(true);
+    setCombineProgress(0);
+    setCombineStatus('Shuru ho raha hai…');
+
+    try {
+      const blobsToMerge: Blob[] = [introPart, rawClipPart, discussionPart].filter(Boolean) as File[];
+      const finalBlob = await combineVideoBlobs(
+        blobsToMerge,
+        (s) => setCombineStatus(s),
+        (p) => setCombineProgress(Math.round(p * 100)),
+      );
+
+      const url = URL.createObjectURL(finalBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `full-video-${Date.now()}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success('✓ Full video download ho gayi!');
+    } catch (e: any) {
+      toast.error(e.message || 'Full video combine failed');
+    } finally {
+      setCombining(false);
+      setCombineProgress(0);
+      setCombineStatus('');
+    }
+  };
 
   const handleExport = useCallback(async () => {
     if (!script.length) { toast.error('Script empty hai'); return; }
@@ -4510,6 +4672,73 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 : <><Download size={17} /> EXPORT 1080p MP4</>
               }
             </button>
+
+            {/* ── Full 3-Part Video Combine ── */}
+            <div style={{ borderRadius: 14, border: '1px solid rgba(255,165,0,0.25)', background: 'rgba(255,165,0,0.04)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', letterSpacing: '0.06em' }}>🎥 FULL 3-PART VIDEO</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+                Teen parts combine karke ek final video banao. Pehle har part download karo, phir yahan select karo.
+              </div>
+
+              {/* Hidden file inputs */}
+              <input ref={introPartRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) setIntroPart(f); e.target.value = ''; }} />
+              <input ref={rawClipPartRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) setRawClipPart(f); e.target.value = ''; }} />
+              <input ref={discussionPartRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) setDiscussionPart(f); e.target.value = ''; }} />
+
+              {/* Part selectors */}
+              {[
+                { label: '① Intro', hint: 'Settings → Optional Intro Video se download karo', file: introPart, ref: introPartRef, clear: () => setIntroPart(null), optional: true },
+                { label: '② Raw Clip', hint: 'Settings → Source Video Clip se download karo', file: rawClipPart, ref: rawClipPartRef, clear: () => setRawClipPart(null), optional: false },
+                { label: '③ Discussion', hint: 'Upar EXPORT button se download karo', file: discussionPart, ref: discussionPartRef, clear: () => setDiscussionPart(null), optional: false },
+              ].map(({ label, hint, file, ref, clear, optional }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ minWidth: 80, fontSize: 11, fontWeight: 700, color: file ? '#fbbf24' : 'rgba(255,255,255,0.4)' }}>{label}{optional && <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.25)' }}> (opt)</span>}</div>
+                  {file ? (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                      <span style={{ fontSize: 10, color: '#fbbf24', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                      <button onClick={clear} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 13, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}>✕</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => ref.current?.click()} style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.12)', background: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                      📂 Select — {hint}
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* Progress bar */}
+              {combining && (
+                <div style={{ borderRadius: 10, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11 }}>
+                    <span style={{ color: '#fbbf24', fontWeight: 600 }}>{combineStatus}</span>
+                    <span style={{ color: '#fbbf24', fontFamily: 'monospace', fontWeight: 700 }}>{combineProgress}%</span>
+                  </div>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
+                    <div style={{ height: '100%', borderRadius: 4, width: `${combineProgress}%`, background: 'linear-gradient(90deg,#f59e0b,#fbbf24)', transition: 'width 0.3s' }} />
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>Real-time playback — clip ki duration jitna waqt lagega</div>
+                </div>
+              )}
+
+              <button
+                onClick={handleCombineFullVideo}
+                disabled={combining || (!rawClipPart && !discussionPart)}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: 12, border: 'none',
+                  background: combining || (!rawClipPart && !discussionPart) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)',
+                  color: '#000', fontWeight: 800, fontSize: 13,
+                  cursor: combining || (!rawClipPart && !discussionPart) ? 'default' : 'pointer',
+                  fontFamily: 'inherit',
+                  opacity: combining || (!rawClipPart && !discussionPart) ? 0.4 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {combining
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Combine ho rahi hai… {combineProgress}%</>
+                  : <>🎥 Combine &amp; Download Full Video</>
+                }
+              </button>
+            </div>
           </div>
         )}
 
