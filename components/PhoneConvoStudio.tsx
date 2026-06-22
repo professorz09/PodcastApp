@@ -415,7 +415,6 @@ interface IntroFlowProps {
 }
 
 const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel }) => {
-  const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [bgColor, setBgColor] = useState('#ffffff');
   const [steps, setSteps] = useState<Record<IntroStepKey, { status: IntroStepStatus; detail?: string; error?: string }>>({
@@ -711,186 +710,106 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   };
 
   const allDone = STEP_ORDER.every(k => steps[k].status === 'done');
-  const allPending = STEP_ORDER.every(k => steps[k].status === 'pending');
-  const startedAny = !allPending;
+
+  // Auto-download as soon as render completes
+  const prevAllDoneRef = useRef(false);
+  useEffect(() => {
+    if (allDone && !prevAllDoneRef.current && videoRef.current) {
+      handleDownload();
+    }
+    prevAllDoneRef.current = allDone;
+  }, [allDone]);
+
+  const runningStep = INTRO_STEPS.find(s => steps[s.key].status === 'running');
+  const failedStep  = INTRO_STEPS.find(s => steps[s.key].status === 'failed');
 
   return (
     <div style={{
       borderRadius: 12,
       border: '1px solid rgba(168,85,247,0.25)',
       background: 'linear-gradient(135deg, rgba(168,85,247,0.06), rgba(124,58,237,0.04))',
-      overflow: 'hidden',
+      padding: '10px 12px',
     }}>
-      {/* Header */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10,
-          background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-        }}
-      >
-        <span style={{ fontSize: 20, flexShrink: 0 }}>🎤</span>
+      {/* Header row: icon + label + compact bg color chips */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 18, flexShrink: 0 }}>🎤</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>
-            Optional Intro Video <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>(separate MP4 download)</span>
-          </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1, wordBreak: 'break-word' }}>
-            {selectionLabel ? <>From <b style={{ color: '#c4b5fd' }}>{selectionLabel}</b> → </> : null}
-            "In this clip {detectedHost || podcastHost || 'host'}{podcastGuests?.[0] ? ` and ${podcastGuests[0]}` : ''} talk about…" → audio → 1080p MP4
-          </div>
-        </div>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{open ? '▾' : '▸'}</span>
-      </button>
-
-      {open && (
-        <div style={{ padding: '4px 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Background picker — only when not running */}
-          {!running && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Background
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                {([
-                  { value: '#ffffff', label: 'White' },
-                  { value: '#00b140', label: '🟢 Green Screen' },
-                  { value: '#00ff00', label: '🟢 Chroma' },
-                ] as const).map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setBgColor(opt.value)}
-                    style={{
-                      padding: '7px 4px', borderRadius: 8, border: `2px solid ${bgColor === opt.value ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
-                      background: opt.value, cursor: 'pointer', fontFamily: 'inherit',
-                      fontSize: 10, fontWeight: 700,
-                      color: opt.value === '#ffffff' ? '#374151' : '#ffffff',
-                      transition: 'border-color 0.15s',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>Intro Video</div>
+          {!segments.length ? (
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+              Pehle podcast generate karo (Script tab)
             </div>
-          )}
-
-          {/* Generate button — visible when nothing has started yet OR when allDone (to regenerate) */}
-          {(allPending || allDone) && (
-            <button
-              onClick={() => runFrom('text')}
-              disabled={running || !segments.length}
-              style={{
-                padding: '11px', borderRadius: 10, border: 'none',
-                background: running ? 'rgba(168,85,247,0.4)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
-                color: '#fff', fontSize: 13, fontWeight: 800,
-                cursor: running ? 'default' : 'pointer', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: !segments.length ? 0.4 : 1,
-              }}
-            >
-              {running
-                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Pipeline chal raha hai…</>
-                : allDone ? '🔁 Re-generate Intro' : '🎤 Generate Intro'}
-            </button>
-          )}
-
-          {/* Steps panel — shown once pipeline has started */}
-          {startedAny && (
-            <div style={{
-              borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)',
-              background: 'rgba(0,0,0,0.3)', padding: 8, display: 'flex', flexDirection: 'column', gap: 6,
-            }}>
-              {INTRO_STEPS.map((s, i) => {
-                const st = steps[s.key];
-                const icon =
-                  st.status === 'done' ? '✓' :
-                  st.status === 'failed' ? '✗' :
-                  st.status === 'running' ? '⋯' : '○';
-                const color =
-                  st.status === 'done' ? '#86efac' :
-                  st.status === 'failed' ? '#fca5a5' :
-                  st.status === 'running' ? '#fde68a' : 'rgba(255,255,255,0.3)';
-                return (
-                  <div key={s.key} style={{
-                    padding: '6px 8px', borderRadius: 7,
-                    background: st.status === 'running' ? 'rgba(253,230,138,0.06)'
-                              : st.status === 'failed'  ? 'rgba(239,68,68,0.06)'
-                              : st.status === 'done'    ? 'rgba(34,197,94,0.05)'
-                              : 'transparent',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{
-                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'rgba(255,255,255,0.06)', color, fontSize: 11, fontWeight: 800,
-                      }}>
-                        {st.status === 'running'
-                          ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                          : icon}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: st.status === 'pending' ? 'rgba(255,255,255,0.4)' : '#fff', wordBreak: 'break-word' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.35)', marginRight: 5 }}>{i + 1}.</span>
-                        {s.label}
-                      </span>
-                      {st.status === 'failed' && (
-                        <button
-                          onClick={() => runFrom(s.key)}
-                          disabled={running}
-                          style={{
-                            flexShrink: 0, whiteSpace: 'nowrap',
-                            padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(252,165,165,0.4)',
-                            background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 10, fontWeight: 700,
-                            cursor: running ? 'default' : 'pointer', fontFamily: 'inherit',
-                          }}
-                        >↻ Retry</button>
-                      )}
-                    </div>
-                    {st.detail && (
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginLeft: 26, marginTop: 2 }}>
-                        {st.detail}
-                      </div>
-                    )}
-                    {st.error && (
-                      <div style={{ fontSize: 10, color: '#fca5a5', marginLeft: 26, marginTop: 2 }}>
-                        ⚠ {st.error}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          ) : (
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+              {selectionLabel ? <><b style={{ color: '#c4b5fd' }}>{selectionLabel}</b> · </> : null}
+              Auto-generate → auto-download
             </div>
-          )}
-
-          {/* Intro text preview */}
-          {introText && (
-            <div style={{
-              padding: '8px 10px', borderRadius: 8,
-              background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)',
-            }}>
-              <div style={{ fontSize: 9, color: 'rgba(196,181,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
-                Generated Intro
-              </div>
-              <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, fontStyle: 'italic' }}>
-                "{introText}"
-              </div>
-            </div>
-          )}
-
-          {/* Download button */}
-          {allDone && videoRef.current && (
-            <button
-              onClick={handleDownload}
-              style={{
-                padding: '11px', borderRadius: 10, border: 'none',
-                background: 'linear-gradient(135deg,#10b981,#059669)',
-                color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              <Download size={14} /> Download Intro MP4
-            </button>
           )}
         </div>
+        {/* Background color chips (only when idle + segments available) */}
+        {segments.length > 0 && !running && (
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {([
+              { v: '#ffffff', t: 'White' },
+              { v: '#00b140', t: 'Green Screen' },
+              { v: '#00ff00', t: 'Chroma Key' },
+            ] as const).map(({ v, t }) => (
+              <button
+                key={v}
+                onClick={() => setBgColor(v)}
+                title={t}
+                style={{
+                  width: 20, height: 20, borderRadius: 5, background: v, cursor: 'pointer', padding: 0,
+                  border: `2px solid ${bgColor === v ? '#a855f7' : 'rgba(255,255,255,0.15)'}`,
+                  transition: 'border-color 0.15s', flexShrink: 0,
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Running status */}
+      {running && runningStep && (
+        <div style={{ fontSize: 11, color: '#fde68a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+          {runningStep.label}{steps[runningStep.key].detail ? ` — ${steps[runningStep.key].detail}` : '…'}
+        </div>
+      )}
+
+      {/* Error + retry */}
+      {failedStep && !running && (
+        <div style={{ fontSize: 11, color: '#fca5a5', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ flex: 1 }}>⚠ {steps[failedStep.key].error || `${failedStep.label} failed`}</span>
+          <button
+            onClick={() => runFrom(failedStep.key)}
+            style={{
+              padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(252,165,165,0.4)',
+              background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 10, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+            }}
+          >↻ Retry</button>
+        </div>
+      )}
+
+      {/* Main action button */}
+      {segments.length > 0 && (
+        <button
+          onClick={() => runFrom('text')}
+          disabled={running}
+          style={{
+            width: '100%', padding: '10px', borderRadius: 10, border: 'none',
+            background: running ? 'rgba(168,85,247,0.35)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
+            color: '#fff', fontSize: 13, fontWeight: 800,
+            cursor: running ? 'default' : 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          {running
+            ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+            : allDone ? '🔁 Re-generate & Download' : '🎤 Generate & Download Intro'
+          }
+        </button>
       )}
     </div>
   );
@@ -4631,20 +4550,18 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         {tab === 'export' && (
           <div style={{ padding: 14, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-            {/* ── ① Optional Intro Video ── */}
-            {podcastSegments.length > 0 && (
-              <div>
-                <div style={{ fontSize: 10, color: 'rgba(196,181,253,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, paddingLeft: 2 }}>① Intro Video <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.25)' }}>(optional)</span></div>
-                <IntroFlow
-                  segments={podcastSegments}
-                  podcastTitle={podcastTitle}
-                  podcastHost={podcastHost}
-                  podcastGuests={podcastGuests}
-                  selectedRanges={sourceClips.length > 0 ? sourceClips.map(c => ({ startSec: c.startSec, endSec: c.endSec })) : undefined}
-                  selectionLabel={sourceClips.length > 0 ? sourceClips[0].title : undefined}
-                />
-              </div>
-            )}
+            {/* ── ① Intro Video — always visible, disabled hint inside when no segments ── */}
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(196,181,253,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, paddingLeft: 2 }}>① Intro Video <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.25)' }}>(optional)</span></div>
+              <IntroFlow
+                segments={podcastSegments}
+                podcastTitle={podcastTitle}
+                podcastHost={podcastHost}
+                podcastGuests={podcastGuests}
+                selectedRanges={sourceClips.length > 0 ? sourceClips.map(c => ({ startSec: c.startSec, endSec: c.endSec })) : undefined}
+                selectionLabel={sourceClips.length > 0 ? sourceClips[0].title : undefined}
+              />
+            </div>
 
             {/* ── ② Raw Clip (Source Video Clip) ── */}
             {uploadedVideoForClip && sourceClips.length > 0 && (
