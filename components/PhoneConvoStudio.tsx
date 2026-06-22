@@ -25,7 +25,7 @@ import {
   generateProportionalWordTimings,
 } from '../services/googleCloudService';
 import { toast } from './Toast';
-import { DebateSegment } from '../types';
+import { DebateSegment, PhoneStudioSourceClip } from '../types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -917,6 +917,12 @@ interface PodcastFlowProps {
     extraFocus: string;
     useGrounding: boolean;
     variant: PodcastVariant;
+    // Source clips the user picked (only when specific chapters were selected) —
+    // used to prepend the "Original Clip" in the final video's YouTube chapters.
+    sourceClips: PhoneStudioSourceClip[];
+    // Uploaded video file — set when user uploads a local video instead of YouTube URL.
+    // Used to trim+download the raw clip in the settings tab.
+    videoFile?: File;
     // Clip Reaction extras (only used when variant === 'clip_take')
     analystName?: string;
     personInClip?: string;
@@ -972,6 +978,13 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedIdxs, setSelectedIdxs] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Video upload state
+  const [uploadedVideoFile, setUploadedVideoFile] = useState<File | null>(null);
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
+  const [videoTranscribing, setVideoTranscribing] = useState(false);
+  const [videoTranscribeStep, setVideoTranscribeStep] = useState('');
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   // Combo + Thumbnail state
   const [comboPairs, setComboPairs] = useState<{ title: string; thumbnailText: string; description: string }[]>([]);
@@ -1111,6 +1124,78 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
     toast.success(`✓ ${segs.length} segments file se load hue`);
   };
 
+  // ── 1c. Video file upload — extract audio → Google STT → transcript ────────
+  const wordTimingsToSegments = (timings: { word: string; start: number; end: number }[]): PodcastTranscriptSeg[] => {
+    if (!timings.length) return [];
+    const segs: PodcastTranscriptSeg[] = [];
+    let batch: { word: string; start: number; end: number }[] = [];
+    for (let i = 0; i < timings.length; i++) {
+      batch.push(timings[i]);
+      const isLast = i === timings.length - 1;
+      const nextGap = isLast ? Infinity : timings[i + 1].start - timings[i].end;
+      const endsWithPunct = /[.!?,;]$/.test(timings[i].word);
+      const shouldSplit = isLast || nextGap > 0.6 || (endsWithPunct && batch.length >= 6) || batch.length >= 18;
+      if (shouldSplit && batch.length) {
+        const text = batch.map(w => w.word).join(' ');
+        const start = batch[0].start;
+        const duration = batch[batch.length - 1].end - start;
+        segs.push({ text, start, duration });
+        batch = [];
+      }
+    }
+    return segs;
+  };
+
+  const handleVideoUpload = async (file: File) => {
+    if (!file) return;
+    const blobUrl = URL.createObjectURL(file);
+    setUploadedVideoFile(file);
+    setUploadedVideoUrl(blobUrl);
+    setVideoTranscribing(true);
+    setVideoTranscribeStep('Video load ho raha hai…');
+    try {
+      // ── Step 1: Read video duration via <video> element (fast — no full decode) ──
+      const videoDuration = await new Promise<number>((res, rej) => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.src = blobUrl;
+        v.onloadedmetadata = () => res(isFinite(v.duration) ? v.duration : 0);
+        v.onerror = () => rej(new Error('Video metadata load nahi hua'));
+        setTimeout(() => rej(new Error('Video load timeout')), 15_000);
+      });
+
+      const totalChunks = Math.ceil((videoDuration || 300) / 55);
+      setVideoTranscribeStep(
+        `Transcription shuru ho rahi hai — ${fmtSec(videoDuration)} audio, ${totalChunks} chunks…`
+      );
+
+      // ── Step 2: Pass file DIRECTLY to transcribeAudioGoogleCloud ──
+      // File extends Blob — the service calls decodeAudioData internally,
+      // resamples to 16kHz mono, and chunks into ≤55 s pieces automatically.
+      // (Previously we were decoding here AND in the service — double the memory.)
+      const wordTimings = await transcribeAudioGoogleCloud(
+        file,
+        'en-US',
+        (step) => setVideoTranscribeStep(step),
+      );
+      if (!wordTimings.length) throw new Error('Koi transcript nahi mila — video mein clear audio hai?');
+
+      const segs = wordTimingsToSegments(wordTimings);
+      setSegments(segs);
+      if (!podcastTitle.trim()) setPodcastTitle(file.name.replace(/\.[^.]+$/, ''));
+      setPhase('cuts');
+      toast.success(`✓ Video transcript ready! ${segs.length} segments, ${fmtSec(videoDuration)}`);
+    } catch (e: any) {
+      URL.revokeObjectURL(blobUrl);
+      setUploadedVideoFile(null);
+      setUploadedVideoUrl(null);
+      toast.error(e.message || 'Video transcription failed');
+    } finally {
+      setVideoTranscribing(false);
+      setVideoTranscribeStep('');
+    }
+  };
+
   // ── 2. Cuts management ─────────────────────────────────────────────────────
   const handleAddCut = () => {
     const s = parseTsInput(cutStartTxt);
@@ -1174,6 +1259,14 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
         return;
       }
     }
+    // Source clips → only when SPECIFIC chapters were picked. The final video
+    // prepends these original clips before the reaction, so their source-range
+    // duration drives the YouTube-chapter offset downstream. (Full-episode
+    // selection isn't a "clip" — you don't prepend the whole podcast.)
+    const sourceClips: PhoneStudioSourceClip[] = selectedIdxs.length === 0
+      ? []
+      : picked.map(c => ({ title: c.title, startSec: c.startSec, endSec: c.endSec }));
+
     await onGenerate({
       podcastUrl: podcastUrl.trim(),
       chapters: picked,
@@ -1186,6 +1279,8 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       extraFocus: extraFocus.trim(),
       useGrounding,
       variant,
+      sourceClips,
+      videoFile: uploadedVideoFile ?? undefined,
       ...(isClip ? {
         analystName: analystName.trim(),
         // person/verb/topic are auto-detected — left undefined so Gemini extracts
@@ -1385,6 +1480,67 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
           >
             📄 Transcript File Upload (.json / .srt / .txt)
           </button>
+
+          {/* ── Video File Upload — Audio → STT → Transcript ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ya video</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+          </div>
+
+          <input
+            ref={videoFileInputRef}
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/*"
+            style={{ display: 'none' }}
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) handleVideoUpload(f);
+              e.target.value = '';
+            }}
+          />
+
+          {videoTranscribing ? (
+            <div style={{
+              padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)',
+              background: 'rgba(239,68,68,0.07)', display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#fca5a5', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>Video Processing…</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{videoTranscribeStep}</div>
+              </div>
+            </div>
+          ) : uploadedVideoFile ? (
+            <div style={{
+              padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(34,197,94,0.3)',
+              background: 'rgba(34,197,94,0.06)', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ fontSize: 16 }}>🎬</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}>Video Uploaded</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadedVideoFile.name}</div>
+              </div>
+              <button onClick={() => videoFileInputRef.current?.click()} style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit' }}>Change</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => videoFileInputRef.current?.click()}
+              style={{
+                padding: '12px', borderRadius: 12,
+                border: '2px dashed rgba(239,68,68,0.4)',
+                background: 'rgba(239,68,68,0.04)', color: '#fca5a5',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🎬</span>
+              <div style={{ textAlign: 'left' }}>
+                <div>Video Upload karo (.mp4 / .webm / .mov)</div>
+                <div style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Audio → Google STT → Transcript → Chapters</div>
+              </div>
+            </button>
+          )}
         </>
       )}
 
@@ -1392,9 +1548,12 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       {phase === 'cuts' && (
         <>
           <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}>✓ Transcript Ready</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}>
+              {uploadedVideoFile ? '🎬 Video + ' : ''}✓ Transcript Ready
+            </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
               {segments.length} segments · Total {fmtSec(totalSec)}
+              {uploadedVideoFile && <span style={{ color: '#86efac', marginLeft: 6 }}>· {uploadedVideoFile.name}</span>}
             </div>
           </div>
 
@@ -2314,17 +2473,28 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
 
 interface Props {
   mainScript: DebateSegment[];
+  /** Source clips the user picked in the New Phone Studio "select chapters" step.
+   *  Prepended as "Original Clip" rows in the YouTube Chapters output. */
+  sourceClips?: PhoneStudioSourceClip[];
   /** Embedded mode: render ONLY the script-generator UI (used inside DebateInput's "New Phone Studio" tab). */
   embedded?: boolean;
   /** Fired when the embedded generator finishes — caller commits the script (and routes to PHONE_STUDIO). */
-  onGeneratorComplete?: (turns: ScriptTurn[], phones: PhoneConfig[]) => void;
+  onGeneratorComplete?: (
+    turns: ScriptTurn[],
+    phones: PhoneConfig[],
+    meta?: { sourceClips?: PhoneStudioSourceClip[] },
+  ) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const PhoneConvoStudio: React.FC<Props> = ({ mainScript, embedded = false, onGeneratorComplete }) => {
+const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClipsProp, embedded = false, onGeneratorComplete }) => {
   const [phones, setPhones]   = useState<PhoneConfig[]>([]);
   const [script, setScript]   = useState<ScriptTurn[]>([]);
+  // Source clips → seeded from the prop (standalone studio), or set directly by
+  // the rare non-embedded generate path. Drives the "Original Clip" prepend.
+  const [sourceClips, setSourceClips] = useState<PhoneStudioSourceClip[]>(sourceClipsProp ?? []);
+  useEffect(() => { if (sourceClipsProp) setSourceClips(sourceClipsProp); }, [sourceClipsProp]);
   const [bg, setBg]           = useState('#f0f4f8');
   const [bgImageUrl, setBgImageUrlRaw] = useState<string | null>(null);
   // Always revoke the previous blob URL before swapping in a new one.
@@ -2387,6 +2557,12 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, embedded = false, onGen
   const [exporting, setExporting]       = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatus, setExportStatus] = useState('');
+
+  // Uploaded video file (from New Phone Studio video-upload path)
+  const [uploadedVideoForClip, setUploadedVideoForClip] = useState<File | null>(null);
+  const [uploadedVideoUrlForClip, setUploadedVideoUrlForClip] = useState<string | null>(null);
+  const [clipping, setClipping] = useState(false);
+  const [clipProgress, setClipProgress] = useState(0);
 
   const totalDuration = script.reduce((a, b) => a + b.durationMs, 0);
 
@@ -3034,6 +3210,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
     extraFocus: string;
     useGrounding: boolean;
     variant: PodcastVariant;
+    sourceClips: PhoneStudioSourceClip[];
+    videoFile?: File;
     analystName?: string;
     personInClip?: string;
     actionVerb?: string;
@@ -3079,9 +3257,15 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         });
 
         if (embedded && onGeneratorComplete) {
-          onGeneratorComplete(newScript, newPhones);
+          onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips });
           toast.success(`✓ ${newScript.length} turns clip-reaction ready!`);
         } else {
+          setSourceClips(args.sourceClips);
+          if (args.videoFile) {
+            setUploadedVideoForClip(args.videoFile);
+            const url = URL.createObjectURL(args.videoFile);
+            setUploadedVideoUrlForClip(url);
+          }
           setPhones(newPhones);
           setScript(newScript);
           setTab('visual');
@@ -3141,9 +3325,15 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
       });
 
       if (embedded && onGeneratorComplete) {
-        onGeneratorComplete(newScript, newPhones);
+        onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips });
         toast.success(`✓ ${newScript.length} turns deep-analysis ready! Script Editor me jaa raha hai…`);
       } else {
+        setSourceClips(args.sourceClips);
+        if (args.videoFile) {
+          setUploadedVideoForClip(args.videoFile);
+          const url = URL.createObjectURL(args.videoFile);
+          setUploadedVideoUrlForClip(url);
+        }
         setPhones(newPhones);
         setScript(newScript);
         setTab('visual');
@@ -3847,112 +4037,295 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   );
                 })()}
 
+                {/* ── Source Video Clip (only when user uploaded a video) ── */}
+                {uploadedVideoForClip && sourceClips.length > 0 && (
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.05)', padding: 12 }}>
+                    <div style={{ fontSize: 11, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>🎬 Source Video Clip</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>
+                      Uploaded video se selected chapter ka segment trim karke download karo. Yeh "middle part" hoga final 3-part video mein.
+                    </div>
+                    {/* Clip list */}
+                    {sourceClips.map((c, i) => (
+                      <div key={i} style={{
+                        padding: '8px 10px', borderRadius: 8,
+                        background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
+                        marginBottom: i < sourceClips.length - 1 ? 6 : 0,
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{c.title}</div>
+                        <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.5)' }}>
+                          {fmtSec(c.startSec)} → {fmtSec(c.endSec)}
+                          <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.3)' }}>({fmtSec(c.endSec - c.startSec)})</span>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      disabled={clipping}
+                      onClick={async () => {
+                        if (clipping || !uploadedVideoForClip || !sourceClips.length) return;
+                        setClipping(true);
+                        setClipProgress(0);
+                        try {
+                          const c = sourceClips[0];
+                          const startSec = c.startSec;
+                          const endSec = c.endSec;
+                          const file = uploadedVideoForClip;
+
+                          // Build hidden video element — must be in DOM for Firefox audio
+                          const video = document.createElement('video');
+                          video.src = uploadedVideoUrlForClip ?? URL.createObjectURL(file);
+                          video.muted = false;
+                          video.playsInline = true;
+                          video.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px';
+                          document.body.appendChild(video);
+
+                          try {
+                            await new Promise<void>((res, rej) => {
+                              video.onloadedmetadata = () => res();
+                              video.onerror = () => rej(new Error('Video load nahi hua'));
+                              setTimeout(() => rej(new Error('Video load timeout')), 20_000);
+                            });
+
+                            // captureStream — Chrome uses captureStream(), Firefox uses mozCaptureStream()
+                            const captureFn = (video as any).captureStream?.bind(video)
+                              ?? (video as any).mozCaptureStream?.bind(video);
+                            if (!captureFn) throw new Error('Is browser me video capture support nahi hai — Chrome ya Edge use karo');
+
+                            const fps = 30;
+                            const stream: MediaStream = captureFn(fps);
+
+                            // Verify audio track is present
+                            if (!stream.getAudioTracks().length) {
+                              throw new Error('Video mein audio track nahi mila — ensure video has audio');
+                            }
+
+                            const chunks: Blob[] = [];
+                            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+                              ? 'video/webm;codecs=vp9,opus'
+                              : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+                                ? 'video/webm;codecs=vp8,opus'
+                                : MediaRecorder.isTypeSupported('video/webm')
+                                  ? 'video/webm'
+                                  : 'video/mp4';
+                            const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
+                            recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+
+                            await new Promise<void>((resolve, reject) => {
+                              recorder.onstop = () => {
+                                const blob = new Blob(chunks, { type: mimeType });
+                                const a = document.createElement('a');
+                                a.href = URL.createObjectURL(blob);
+                                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                                a.download = `clip-${c.title.replace(/[^a-z0-9]/gi, '-').slice(0, 40)}.${ext}`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                resolve();
+                              };
+                              recorder.onerror = () => reject(new Error('Recording error aya'));
+
+                              recorder.start(200);
+                              video.currentTime = startSec;
+                              video.onseeked = () => { video.play().catch(() => {}); };
+
+                              const durSec = endSec - startSec;
+                              const tick = setInterval(() => {
+                                const elapsed = video.currentTime - startSec;
+                                setClipProgress(Math.min(99, Math.round((elapsed / durSec) * 100)));
+                                if (video.currentTime >= endSec) {
+                                  clearInterval(tick);
+                                  video.pause();
+                                  if (recorder.state !== 'inactive') recorder.stop();
+                                }
+                              }, 250);
+                            });
+
+                            toast.success('✓ Video clip download ho gayi!');
+                          } finally {
+                            video.pause();
+                            document.body.removeChild(video);
+                          }
+                        } catch (e: any) {
+                          toast.error(e.message || 'Clip trim failed');
+                        } finally {
+                          setClipping(false);
+                          setClipProgress(0);
+                        }
+                      }}
+                      style={{
+                        marginTop: 10, width: '100%',
+                        padding: '10px', borderRadius: 10, border: 'none',
+                        background: clipping ? 'rgba(239,68,68,0.3)' : '#ef4444',
+                        color: '#fff', fontSize: 12, fontWeight: 800,
+                        cursor: clipping ? 'default' : 'pointer', fontFamily: 'inherit',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      }}
+                    >
+                      {clipping
+                        ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Clip trim ho rahi hai… {clipProgress}%</>
+                        : <><Download size={13} /> Trim & Download Clip ({sourceClips[0] ? fmtSec(sourceClips[0].endSec - sourceClips[0].startSec) : ''})</>}
+                    </button>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 6, lineHeight: 1.4 }}>
+                      Real-time recording — clip ki duratio jitna time lagega. Audio + Video dono honge.
+                    </div>
+                    {/* 3-Part video guide */}
+                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>📋 Final 3-Part Video Guide (CapCut/DaVinci)</div>
+                      {[
+                        { n: 1, icon: '🎤', label: 'Intro', desc: 'Optional Intro MP4 ↑ (from Settings → Optional Intro Video)' },
+                        { n: 2, icon: '🎬', label: 'Raw Clip', desc: 'Trimmed podcast clip (download karo ↑)' },
+                        { n: 3, icon: '📱', label: 'Discussion', desc: 'Phone Studio animation (Export tab se download karo)' },
+                      ].map(s => (
+                        <div key={s.n} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: s.n < 3 ? 5 : 0 }}>
+                          <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(239,68,68,0.2)', color: '#fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>{s.n}</div>
+                          <div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{s.icon} {s.label}: </span>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{s.desc}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* ── YouTube Chapters ── */}
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 12 }}>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 4 }}>⏱ YouTube Chapters</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>AI topic-based chapters — YouTube description mein paste karo</div>
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <button
-                      onClick={async () => {
-                        if (!script.length || chaptersGenerating) return;
-                        setChaptersGenerating(true);
-                        try {
-                          const turns = script.map(t => {
-                            const phone = phones.find(p => p.id === t.phoneId);
-                            return { text: t.text, speaker: phone?.name ?? t.phoneId, durationMs: t.durationMs };
-                          });
-                          const result = await generateScriptChapters(turns);
-                          setChapters(result);
-                          toast.success(`✓ ${result.length} chapters generate ho gaye!`);
-                        } catch (e: any) {
-                          toast.error(`Chapters error: ${e.message}`);
-                        } finally {
-                          setChaptersGenerating(false);
-                        }
-                      }}
-                      disabled={!script.length || chaptersGenerating}
-                      style={{
-                        flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none',
-                        background: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#7c3aed,#6d28d9)',
-                        color: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.3)' : '#fff',
-                        fontSize: 11, fontWeight: 700, cursor: (!script.length || chaptersGenerating) ? 'default' : 'pointer',
-                        fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                      }}
-                    >
-                      {chaptersGenerating
-                        ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
-                        : '✨ Generate Chapters'}
-                    </button>
-                    {chapters.length > 0 && (
-                      <button
-                        onClick={() => {
-                          const fmt = (ms: number) => {
-                            const s = Math.floor(ms / 1000);
-                            const m = Math.floor(s / 60);
-                            const sec = s % 60;
-                            return `(${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')})`;
-                          };
-                          const text = chapters.map(c => `${fmt(c.startMs)} ${c.title}`).join('\n');
-                          navigator.clipboard.writeText(text)
-                            .then(() => toast.success('✓ Chapters copy ho gaye!'))
-                            .catch(() => toast.error('Copy failed'));
-                        }}
-                        style={{
-                          padding: '7px 12px', borderRadius: 8,
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          background: '#1e293b', color: '#94a3b8',
-                          fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                        } as React.CSSProperties}
-                      >
-                        📋 Copy
-                      </button>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>
+                    AI topic-based chapters — YouTube description mein paste karo
+                    {sourceClips.length > 0 && (
+                      <> · <span style={{ color: '#fbbf24' }}>🎬 Original clip pehle, reaction uske baad (auto-offset)</span></>
                     )}
                   </div>
 
-                  {/* Chapter list */}
-                  {chapters.length > 0 ? (
-                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden' }}>
-                      {chapters.map((ch, i) => {
-                        const fmtMs = (ms: number) => {
-                          const s = Math.floor(ms / 1000);
-                          const m = Math.floor(s / 60);
-                          const sec = s % 60;
-                          return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-                        };
-                        return (
-                          <div key={i} style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
-                            borderBottom: i < chapters.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                          }}>
-                            {/* Time range badge */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                              <span style={{ color: '#818cf8', fontFamily: 'monospace', fontSize: 11, fontWeight: 700 }}>
-                                ({fmtMs(ch.startMs)})
-                              </span>
-                              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9 }}>→</span>
-                              <span style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', fontSize: 10 }}>
-                                ({fmtMs(ch.endMs)})
-                              </span>
-                            </div>
-                            {/* Title */}
-                            <span style={{ flex: 1, fontSize: 11, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {ch.title}
-                            </span>
-                            {/* Duration */}
-                            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', flexShrink: 0, fontFamily: 'monospace' }}>
-                              {Math.round((ch.endMs - ch.startMs) / 1000)}s
-                            </span>
+                  {(() => {
+                    // ── Build combined chapter list ──────────────────────────────
+                    // Source clip(s) get laid out from 0:00 using each clip's own
+                    // source-range duration; reaction chapters then shift after
+                    // them — matching the final "clip + reaction" video order.
+                    const fmtMs = (ms: number) => {
+                      const s = Math.floor(ms / 1000);
+                      const m = Math.floor(s / 60);
+                      const sec = s % 60;
+                      return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+                    };
+
+                    type DisplayChapter = { startMs: number; endMs: number; title: string; isClip: boolean };
+                    const clipBlocks: DisplayChapter[] = [];
+                    let acc = 0;
+                    for (const c of sourceClips) {
+                      const durMs = Math.max(0, Math.round((c.endSec - c.startSec) * 1000));
+                      clipBlocks.push({ startMs: acc, endMs: acc + durMs, title: `🎬 Original Clip — ${c.title}`, isClip: true });
+                      acc += durMs;
+                    }
+                    const totalClipMs = acc;
+                    const reactionBlocks: DisplayChapter[] = chapters.map(ch => ({
+                      startMs: ch.startMs + totalClipMs,
+                      endMs: ch.endMs + totalClipMs,
+                      title: ch.title,
+                      isClip: false,
+                    }));
+                    const displayChapters = [...clipBlocks, ...reactionBlocks];
+                    const hasReaction = chapters.length > 0;
+                    const hasAny = displayChapters.length > 0;
+
+                    return (
+                      <>
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                          <button
+                            onClick={async () => {
+                              if (!script.length || chaptersGenerating) return;
+                              setChaptersGenerating(true);
+                              try {
+                                const turns = script.map(t => {
+                                  const phone = phones.find(p => p.id === t.phoneId);
+                                  return { text: t.text, speaker: phone?.name ?? t.phoneId, durationMs: t.durationMs };
+                                });
+                                const result = await generateScriptChapters(turns);
+                                setChapters(result);
+                                toast.success(`✓ ${result.length} chapters generate ho gaye!`);
+                              } catch (e: any) {
+                                toast.error(`Chapters error: ${e.message}`);
+                              } finally {
+                                setChaptersGenerating(false);
+                              }
+                            }}
+                            disabled={!script.length || chaptersGenerating}
+                            style={{
+                              flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none',
+                              background: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#7c3aed,#6d28d9)',
+                              color: (!script.length || chaptersGenerating) ? 'rgba(255,255,255,0.3)' : '#fff',
+                              fontSize: 11, fontWeight: 700, cursor: (!script.length || chaptersGenerating) ? 'default' : 'pointer',
+                              fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            }}
+                          >
+                            {chaptersGenerating
+                              ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                              : hasReaction ? '↺ Regenerate Chapters' : '✨ Generate Chapters'}
+                          </button>
+                          {hasAny && (
+                            <button
+                              onClick={() => {
+                                const text = displayChapters.map(c => `(${fmtMs(c.startMs)}) ${c.title}`).join('\n');
+                                navigator.clipboard.writeText(text)
+                                  .then(() => toast.success('✓ Chapters copy ho gaye!'))
+                                  .catch(() => toast.error('Copy failed'));
+                              }}
+                              style={{
+                                padding: '7px 12px', borderRadius: 8,
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: '#1e293b', color: '#94a3b8',
+                                fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                              } as React.CSSProperties}
+                            >
+                              📋 Copy
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Chapter list */}
+                        {hasAny ? (
+                          <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden' }}>
+                            {displayChapters.map((ch, i) => (
+                              <div key={i} style={{
+                                display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                                background: ch.isClip ? 'rgba(251,191,36,0.06)' : 'transparent',
+                                borderBottom: i < displayChapters.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                              }}>
+                                {/* Time range badge */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                                  <span style={{ color: ch.isClip ? '#fbbf24' : '#818cf8', fontFamily: 'monospace', fontSize: 11, fontWeight: 700 }}>
+                                    ({fmtMs(ch.startMs)})
+                                  </span>
+                                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9 }}>→</span>
+                                  <span style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace', fontSize: 10 }}>
+                                    ({fmtMs(ch.endMs)})
+                                  </span>
+                                </div>
+                                {/* Title */}
+                                <span style={{ flex: 1, fontSize: 11, color: ch.isClip ? '#fde68a' : '#e2e8f0', fontWeight: ch.isClip ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {ch.title}
+                                </span>
+                                {/* Duration */}
+                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', flexShrink: 0, fontFamily: 'monospace' }}>
+                                  {Math.round((ch.endMs - ch.startMs) / 1000)}s
+                                </span>
+                              </div>
+                            ))}
+                            {sourceClips.length > 0 && !hasReaction && (
+                              <div style={{ padding: '8px 10px', fontSize: 9, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', borderTop: '1px dashed rgba(255,255,255,0.06)' }}>
+                                ↑ Yeh original clip hai. "Generate Chapters" dabao — reaction chapters iske baad add ho jayenge.
+                              </div>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
-                      {script.length ? '↑ "Generate Chapters" dabao — AI topic groups banana hai' : 'Script load karo pehle'}
-                    </div>
-                  )}
+                        ) : (
+                          <div style={{ textAlign: 'center', padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
+                            {script.length ? '↑ "Generate Chapters" dabao — AI topic groups banana hai' : 'Script load karo pehle'}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
               </div>

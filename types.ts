@@ -113,6 +113,17 @@ export interface DebateSegment {
   };
 }
 
+/**
+ * A source-podcast clip the user selected to react to (from the New Phone Studio
+ * "select chapters" step). Carried through to the standalone Phone Studio so the
+ * YouTube Chapters output can prepend the original clip(s) before the reaction.
+ */
+export interface PhoneStudioSourceClip {
+  title: string;
+  startSec: number; // start time in the ORIGINAL source video
+  endSec: number;   // end time in the ORIGINAL source video
+}
+
 export interface ThumbnailState {
   extraInstructions?: string;
   titles: string[];
