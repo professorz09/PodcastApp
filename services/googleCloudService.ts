@@ -75,7 +75,11 @@ export const transcribeAudioGoogleCloud = async (
         const chunkBuffer = extractChunk(resampled, startTime, endTime);
         const chunkBlob = audioBufferToWav(chunkBuffer);
 
-        const chunkTimings = await transcribeChunk(chunkBlob, TARGET_RATE, languageCode);
+        const chunkTimings = await withChunkRetry(
+          () => transcribeChunk(chunkBlob, TARGET_RATE, languageCode),
+          `Chunk ${i + 1}/${totalChunks}`,
+          onProgress,
+        );
         chunkTimings.forEach(t => {
           allTimings.push({ word: t.word, start: t.start + startTime, end: t.end + startTime });
         });
@@ -83,7 +87,11 @@ export const transcribeAudioGoogleCloud = async (
     } else {
       onProgress?.('Google STT — transcribing…');
       const blob = audioBufferToWav(resampled);
-      allTimings = await transcribeChunk(blob, TARGET_RATE, languageCode);
+      allTimings = await withChunkRetry(
+        () => transcribeChunk(blob, TARGET_RATE, languageCode),
+        'Chunk 1/1',
+        onProgress,
+      );
     }
 
     return allTimings;
@@ -174,6 +182,26 @@ const audioBufferToWav = (buffer: AudioBuffer): Blob => {
   }
 
   return new Blob([bufferArr], { type: 'audio/wav' });
+};
+
+// ── Per-chunk retry wrapper (3 attempts, 2s/4s backoff) ───────────────────
+const withChunkRetry = async <T>(
+  fn: () => Promise<T>,
+  label: string,
+  onProgress?: (step: string) => void,
+): Promise<T> => {
+  const MAX = 3;
+  for (let attempt = 1; attempt <= MAX; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      if (attempt === MAX) throw err;
+      const waitMs = attempt * 2000;
+      onProgress?.(`${label} failed (attempt ${attempt}/${MAX}) — ${waitMs / 1000}s baad retry…`);
+      await new Promise(r => setTimeout(r, waitMs));
+    }
+  }
+  throw new Error('unreachable');
 };
 
 // ── Send a WAV blob to the Flask/Node STT endpoint ────────────────────────

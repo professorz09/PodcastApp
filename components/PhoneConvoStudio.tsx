@@ -985,6 +985,10 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   const [videoTranscribing, setVideoTranscribing] = useState(false);
   const [videoTranscribeStep, setVideoTranscribeStep] = useState('');
   const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const [videoTranscribeFailed, setVideoTranscribeFailed] = useState(false);
+  const [videoTranscribeError, setVideoTranscribeError] = useState('');
+  const [companionTranscriptFile, setCompanionTranscriptFile] = useState<File | null>(null);
+  const companionTranscriptInputRef = useRef<HTMLInputElement>(null);
 
   // Combo + Thumbnail state
   const [comboPairs, setComboPairs] = useState<{ title: string; thumbnailText: string; description: string }[]>([]);
@@ -1148,6 +1152,19 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
 
   const handleVideoUpload = async (file: File) => {
     if (!file) return;
+    setVideoTranscribeFailed(false);
+    setVideoTranscribeError('');
+
+    // If companion transcript attached — skip STT, just store video for later clipping
+    if (companionTranscriptFile) {
+      const blobUrl = URL.createObjectURL(file);
+      setUploadedVideoFile(file);
+      setUploadedVideoUrl(blobUrl);
+      toast.success('📄 Companion transcript use ho raha hai — STT skip!');
+      await handleTranscriptFile(companionTranscriptFile);
+      return;
+    }
+
     const blobUrl = URL.createObjectURL(file);
     setUploadedVideoFile(file);
     setUploadedVideoUrl(blobUrl);
@@ -1186,9 +1203,9 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       setPhase('cuts');
       toast.success(`✓ Video transcript ready! ${segs.length} segments, ${fmtSec(videoDuration)}`);
     } catch (e: any) {
-      URL.revokeObjectURL(blobUrl);
-      setUploadedVideoFile(null);
-      setUploadedVideoUrl(null);
+      // Keep uploadedVideoFile set so user can retry without re-uploading
+      setVideoTranscribeFailed(true);
+      setVideoTranscribeError(e.message || 'Video transcription failed');
       toast.error(e.message || 'Video transcription failed');
     } finally {
       setVideoTranscribing(false);
@@ -1499,6 +1516,17 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
               e.target.value = '';
             }}
           />
+          <input
+            ref={companionTranscriptInputRef}
+            type="file"
+            accept=".json,.srt,.txt"
+            style={{ display: 'none' }}
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) { setCompanionTranscriptFile(f); toast.success(`📄 Transcript attached: ${f.name}`); }
+              e.target.value = '';
+            }}
+          />
 
           {videoTranscribing ? (
             <div style={{
@@ -1509,6 +1537,32 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>Video Processing…</div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{videoTranscribeStep}</div>
+              </div>
+            </div>
+          ) : videoTranscribeFailed && uploadedVideoFile ? (
+            <div style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.45)', background: 'rgba(239,68,68,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 14 }}>⚠️</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5' }}>Transcription Failed</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{videoTranscribeError}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => handleVideoUpload(uploadedVideoFile)}
+                  style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                >🔄 Retry STT</button>
+                {!companionTranscriptFile && (
+                  <button
+                    onClick={() => companionTranscriptInputRef.current?.click()}
+                    style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >📄 Transcript Attach</button>
+                )}
+                <button
+                  onClick={() => { setVideoTranscribeFailed(false); setVideoTranscribeError(''); setUploadedVideoFile(null); setUploadedVideoUrl(null); }}
+                  style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+                >✕</button>
               </div>
             </div>
           ) : uploadedVideoFile ? (
@@ -1540,6 +1594,26 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
                 <div style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Audio → Google STT → Transcript → Chapters</div>
               </div>
             </button>
+          )}
+
+          {/* Companion transcript — optional, skips STT */}
+          {!videoTranscribing && (
+            companionTranscriptFile ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.25)', background: 'rgba(34,197,94,0.05)' }}>
+                <span style={{ fontSize: 12 }}>📄</span>
+                <div style={{ flex: 1, minWidth: 0, fontSize: 10, color: '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {companionTranscriptFile.name} <span style={{ color: 'rgba(255,255,255,0.35)' }}>(STT skip hoga)</span>
+                </div>
+                <button onClick={() => setCompanionTranscriptFile(null)} style={{ flexShrink: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 14, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => companionTranscriptInputRef.current?.click()}
+                style={{ width: '100%', padding: '7px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.28)', fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                📄 Transcript pehle se hai? Attach karo — STT skip hoga (.json / .srt / .txt)
+              </button>
+            )
           )}
         </>
       )}
@@ -2563,6 +2637,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [uploadedVideoUrlForClip, setUploadedVideoUrlForClip] = useState<string | null>(null);
   const [clipping, setClipping] = useState(false);
   const [clipProgress, setClipProgress] = useState(0);
+  const [addLetterbox, setAddLetterbox] = useState(false);
 
   const totalDuration = script.reduce((a, b) => a + b.durationMs, 0);
 
@@ -4041,9 +4116,25 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 {uploadedVideoForClip && sourceClips.length > 0 && (
                   <div style={{ borderRadius: 12, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.05)', padding: 12 }}>
                     <div style={{ fontSize: 11, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>🎬 Source Video Clip</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>
                       Uploaded video se selected chapter ka segment trim karke download karo. Yeh "middle part" hoga final 3-part video mein.
                     </div>
+                    {/* Letterbox toggle */}
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, cursor: 'pointer' }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Black Border (Letterbox)</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Upar/niche ~8% black bars add karo clip mein</div>
+                      </div>
+                      <div
+                        onClick={() => setAddLetterbox(p => !p)}
+                        style={{
+                          width: 36, height: 20, borderRadius: 50, position: 'relative', cursor: 'pointer', flexShrink: 0,
+                          background: addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s',
+                        }}
+                      >
+                        <div style={{ position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', left: addLetterbox ? 18 : 2, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+                      </div>
+                    </label>
                     {/* Clip list */}
                     {sourceClips.map((c, i) => (
                       <div key={i} style={{
@@ -4091,11 +4182,36 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                             if (!captureFn) throw new Error('Is browser me video capture support nahi hai — Chrome ya Edge use karo');
 
                             const fps = 30;
-                            const stream: MediaStream = captureFn(fps);
+                            const rawStream: MediaStream = captureFn(fps);
 
                             // Verify audio track is present
-                            if (!stream.getAudioTracks().length) {
+                            if (!rawStream.getAudioTracks().length) {
                               throw new Error('Video mein audio track nahi mila — ensure video has audio');
+                            }
+
+                            // Optional canvas letterbox: draw black bars top+bottom ~8%
+                            let recordStream = rawStream;
+                            let letterboxCanvas: HTMLCanvasElement | null = null;
+                            let letterboxRafId: number | null = null;
+                            if (addLetterbox) {
+                              const vw = video.videoWidth || 1280;
+                              const vh = video.videoHeight || 720;
+                              letterboxCanvas = document.createElement('canvas');
+                              letterboxCanvas.width = vw;
+                              letterboxCanvas.height = vh;
+                              const ctx2d = letterboxCanvas.getContext('2d')!;
+                              const barH = Math.round(vh * 0.08);
+                              const drawH = vh - barH * 2;
+                              const drawFrame = () => {
+                                ctx2d.fillStyle = '#000';
+                                ctx2d.fillRect(0, 0, vw, vh);
+                                ctx2d.drawImage(video, 0, barH, vw, drawH);
+                                letterboxRafId = requestAnimationFrame(drawFrame);
+                              };
+                              drawFrame();
+                              const canvasStream = letterboxCanvas.captureStream(fps);
+                              rawStream.getAudioTracks().forEach((t: MediaStreamTrack) => canvasStream.addTrack(t));
+                              recordStream = canvasStream;
                             }
 
                             const chunks: Blob[] = [];
@@ -4106,11 +4222,12 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                                 : MediaRecorder.isTypeSupported('video/webm')
                                   ? 'video/webm'
                                   : 'video/mp4';
-                            const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
+                            const recorder = new MediaRecorder(recordStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
                             recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
 
                             await new Promise<void>((resolve, reject) => {
                               recorder.onstop = () => {
+                                if (letterboxRafId !== null) cancelAnimationFrame(letterboxRafId);
                                 const blob = new Blob(chunks, { type: mimeType });
                                 const a = document.createElement('a');
                                 a.href = URL.createObjectURL(blob);
