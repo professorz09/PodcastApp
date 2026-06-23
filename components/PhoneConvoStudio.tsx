@@ -415,7 +415,7 @@ interface IntroFlowProps {
 
 const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel, onBlobReady, buttonOnly }) => {
   const [running, setRunning] = useState(false);
-  const [bgColor, setBgColor] = useState('#ffffff');
+  const bgColor = '#ffffff';
   const [steps, setSteps] = useState<Record<IntroStepKey, { status: IntroStepStatus; detail?: string; error?: string }>>({
     text:   { status: 'pending' },
     tts:    { status: 'pending' },
@@ -736,16 +736,6 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {/* Bg color chips — only when idle + segments ready */}
-        {segments.length > 0 && !running && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Bg:</span>
-            {([{ v: '#ffffff', t: 'White' }, { v: '#00b140', t: 'Green Screen' }, { v: '#00ff00', t: 'Chroma Key' }] as const).map(({ v, t }) => (
-              <button key={v} onClick={() => setBgColor(v)} title={t} style={{ width: 18, height: 18, borderRadius: 4, background: v, cursor: 'pointer', padding: 0, border: `2px solid ${bgColor === v ? '#a855f7' : 'rgba(255,255,255,0.1)'}`, transition: 'border-color 0.15s', flexShrink: 0 }} />
-            ))}
-          </div>
-        )}
-
         {/* Main button */}
         <button
           onClick={() => !btnDisabled && runFrom('text')}
@@ -846,27 +836,6 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             </div>
           )}
         </div>
-        {/* Background color chips (only when idle + segments available) */}
-        {segments.length > 0 && !running && (
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-            {([
-              { v: '#ffffff', t: 'White' },
-              { v: '#00b140', t: 'Green Screen' },
-              { v: '#00ff00', t: 'Chroma Key' },
-            ] as const).map(({ v, t }) => (
-              <button
-                key={v}
-                onClick={() => setBgColor(v)}
-                title={t}
-                style={{
-                  width: 20, height: 20, borderRadius: 5, background: v, cursor: 'pointer', padding: 0,
-                  border: `2px solid ${bgColor === v ? '#a855f7' : 'rgba(255,255,255,0.15)'}`,
-                  transition: 'border-color 0.15s', flexShrink: 0,
-                }}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Running status */}
