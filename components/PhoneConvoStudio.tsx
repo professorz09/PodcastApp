@@ -407,14 +407,12 @@ interface IntroFlowProps {
   podcastTitle: string;
   podcastHost: string;
   podcastGuests: string[];
-  // Time range (seconds) covering ONLY the selected chapters. When provided,
-  // the intro is generated from this slice of the transcript — NOT the whole
-  // episode — so the topic matches what the user actually picked.
   selectedRanges?: { startSec: number; endSec: number }[];
   selectionLabel?: string;
+  onBlobReady?: (blob: Blob) => void;
 }
 
-const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel }) => {
+const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel, onBlobReady }) => {
   const [running, setRunning] = useState(false);
   const [bgColor, setBgColor] = useState('#ffffff');
   const [steps, setSteps] = useState<Record<IntroStepKey, { status: IntroStepStatus; detail?: string; error?: string }>>({
@@ -711,11 +709,12 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
   const allDone = STEP_ORDER.every(k => steps[k].status === 'done');
 
-  // Auto-download as soon as render completes
+  // Auto-download + notify parent as soon as render completes
   const prevAllDoneRef = useRef(false);
   useEffect(() => {
     if (allDone && !prevAllDoneRef.current && videoRef.current) {
       handleDownload();
+      onBlobReady?.(videoRef.current.blob);
     }
     prevAllDoneRef.current = allDone;
   }, [allDone]);
@@ -2569,12 +2568,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [combining, setCombining] = useState(false);
   const [combineProgress, setCombineProgress] = useState(0);
   const [combineStatus, setCombineStatus] = useState('');
-  const [introPart, setIntroPart] = useState<File | null>(null);
-  const [rawClipPart, setRawClipPart] = useState<File | null>(null);
-  const [discussionPart, setDiscussionPart] = useState<File | null>(null);
-  const introPartRef = useRef<HTMLInputElement>(null);
-  const rawClipPartRef = useRef<HTMLInputElement>(null);
-  const discussionPartRef = useRef<HTMLInputElement>(null);
+  // Intro blob — set by IntroFlow via onBlobReady callback
+  const [introVideoBlob, setIntroVideoBlob] = useState<Blob | null>(null);
 
   const totalDuration = script.reduce((a, b) => a + b.durationMs, 0);
 
@@ -2881,6 +2876,122 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
 
   // ── Export ────────────────────────────────────────────────────────────────
 
+  // Render discussion animation to an in-memory Blob (same pipeline as handleExport)
+  const renderDiscussionToBlob = async (
+    onStatus: (s: string) => void,
+    onProgress: (pct: number) => void,
+  ): Promise<Blob> => {
+    if (!script.length) throw new Error('Script empty hai');
+    if (!('VideoEncoder' in window)) throw new Error('Browser WebCodecs support nahi karta — Chrome/Edge use karo');
+
+    const W = 1920, H = 1080, FPS = 30;
+    const totalMs = script.reduce((s, t) => s + t.durationMs, 0);
+    const totalSec = totalMs / 1000;
+
+    const TARGET_SR = 24_000;
+    let actx: AudioContext;
+    try { actx = new AudioContext({ sampleRate: TARGET_SR }); }
+    catch { actx = new AudioContext(); }
+    const sampleRate = actx.sampleRate;
+    const totalSamples = Math.ceil(totalSec * sampleRate);
+    const mixed = new Float32Array(totalSamples);
+    let offsetMs = 0;
+    const totalAudioTurns = script.filter(t => t.audioUrl).length || 1;
+    let decodedCount = 0;
+
+    onStatus('Audio decode ho raha hai…');
+    for (let i = 0; i < script.length; i++) {
+      const t = script[i];
+      if (t.audioUrl) {
+        try {
+          const ab = await (await fetch(t.audioUrl)).arrayBuffer();
+          const buf = await actx.decodeAudioData(ab);
+          const startSample = Math.floor(offsetMs / 1000 * sampleRate);
+          const ch = buf.getChannelData(0);
+          const writeLen = Math.min(ch.length, totalSamples - startSample);
+          for (let j = 0; j < writeLen; j++) mixed[startSample + j] += ch[j];
+          decodedCount++;
+          if (decodedCount % 5 === 0 || decodedCount === totalAudioTurns) {
+            onStatus(`Audio decode: ${decodedCount}/${totalAudioTurns}`);
+            await new Promise(r => setTimeout(r, 0));
+          }
+        } catch {}
+      }
+      offsetMs += t.durationMs;
+    }
+    await actx.close();
+
+    onStatus('Discussion render ho rahi hai…');
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = W; exportCanvas.height = H;
+    const state = buildState();
+    const exportRenderer = new CanvasRenderer(exportCanvas, state);
+
+    const blob = await renderVideoOffline({
+      canvas: exportCanvas,
+      audioChannels: [mixed],
+      sampleRate,
+      duration: totalSec,
+      fps: FPS,
+      bitrate: 8_000_000,
+      width: W,
+      height: H,
+      renderCallback: (_time, _level, _vid, offCtx) => {
+        exportRenderer.currentTime = _time * 1000;
+        exportRenderer.audioLevel = _level;
+        exportRenderer.drawFrame();
+        offCtx.drawImage(exportCanvas, 0, 0, W, H);
+      },
+      onProgress: p => onProgress(Math.round(p * 100)),
+    }) as Blob | void;
+
+    if (!blob) throw new Error('Discussion render empty return hua');
+    return blob;
+  };
+
+  // Trim raw clip from uploaded video to an in-memory Blob
+  const trimClipToBlob = (
+    clip: { startSec: number; endSec: number },
+    onProgress: (pct: number) => void,
+  ): Promise<Blob> => new Promise((resolve, reject) => {
+    if (!uploadedVideoForClip) { reject(new Error('Video upload nahi hua')); return; }
+    const video = document.createElement('video');
+    video.src = uploadedVideoUrlForClip ?? URL.createObjectURL(uploadedVideoForClip);
+    video.muted = false; video.playsInline = true;
+    video.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px';
+    document.body.appendChild(video);
+
+    video.onloadedmetadata = () => {
+      const captureFn = (video as any).captureStream?.bind(video) ?? (video as any).mozCaptureStream?.bind(video);
+      if (!captureFn) { document.body.removeChild(video); reject(new Error('captureStream support nahi')); return; }
+      const rawStream: MediaStream = captureFn(30);
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm';
+      const recorder = new MediaRecorder(rawStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        document.body.removeChild(video);
+        resolve(new Blob(chunks, { type: mimeType }));
+      };
+      recorder.onerror = () => { document.body.removeChild(video); reject(new Error('Clip recorder error')); };
+      recorder.start(200);
+      video.currentTime = clip.startSec;
+      video.onseeked = () => { video.play().catch(() => {}); };
+      const durSec = clip.endSec - clip.startSec;
+      const tick = setInterval(() => {
+        onProgress(Math.min(99, Math.round(((video.currentTime - clip.startSec) / durSec) * 100)));
+        if (video.currentTime >= clip.endSec) {
+          clearInterval(tick);
+          video.pause();
+          if (recorder.state !== 'inactive') recorder.stop();
+        }
+      }, 250);
+    };
+    video.onerror = () => { document.body.removeChild(video); reject(new Error('Video load nahi hua')); };
+    setTimeout(() => { try { document.body.removeChild(video); } catch {} reject(new Error('Clip trim timeout')); }, 300_000);
+  });
+
   // ── Full 3-part video combine (Intro + Raw Clip + Discussion) ─────────────
   const combineVideoBlobs = async (
     blobs: Blob[],
@@ -2992,26 +3103,50 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   };
 
   const handleCombineFullVideo = async () => {
-    const parts = [introPart, rawClipPart, discussionPart].filter(Boolean) as File[];
-    if (parts.length < 2) {
-      toast.error('Kam se kam 2 parts select karo (Raw Clip + Discussion)');
-      return;
-    }
-    if (!rawClipPart && !discussionPart) {
-      toast.error('Raw Clip ya Discussion select karo');
-      return;
-    }
+    if (!script.length) { toast.error('Pehle script generate karo'); return; }
 
     setCombining(true);
     setCombineProgress(0);
     setCombineStatus('Shuru ho raha hai…');
 
     try {
-      const blobsToMerge: Blob[] = [introPart, rawClipPart, discussionPart].filter(Boolean) as File[];
+      const blobsToMerge: Blob[] = [];
+
+      // ① Intro — use already-generated blob if available
+      if (introVideoBlob) {
+        setCombineStatus('① Intro ready hai ✓');
+        blobsToMerge.push(introVideoBlob);
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      // ② Raw Clip — trim from uploaded video in memory
+      if (uploadedVideoForClip && sourceClips.length > 0) {
+        setCombineStatus('② Raw clip trim ho rahi hai…');
+        const clipBlob = await trimClipToBlob(
+          sourceClips[0],
+          p => { setCombineStatus(`② Raw clip trim ho rahi hai… ${p}%`); setCombineProgress(Math.round(p * 0.2)); },
+        );
+        blobsToMerge.push(clipBlob);
+      }
+
+      // ③ Discussion — render in memory via WebCodecs
+      setCombineStatus('③ Discussion render ho rahi hai…');
+      const discussionBlob = await renderDiscussionToBlob(
+        s => setCombineStatus(`③ ${s}`),
+        p => setCombineProgress(20 + Math.round(p * 0.5)),
+      );
+      blobsToMerge.push(discussionBlob);
+
+      if (blobsToMerge.length < 1) {
+        throw new Error('Koi part nahi mila combine karne ke liye');
+      }
+
+      // Combine
+      setCombineStatus('Parts combine ho rahi hain…');
       const finalBlob = await combineVideoBlobs(
         blobsToMerge,
-        (s) => setCombineStatus(s),
-        (p) => setCombineProgress(Math.round(p * 100)),
+        s => setCombineStatus(s),
+        p => setCombineProgress(70 + Math.round(p * 30)),
       );
 
       const url = URL.createObjectURL(finalBlob);
@@ -4560,6 +4695,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 podcastGuests={podcastGuests}
                 selectedRanges={sourceClips.length > 0 ? sourceClips.map(c => ({ startSec: c.startSec, endSec: c.endSec })) : undefined}
                 selectionLabel={sourceClips.length > 0 ? sourceClips[0].title : undefined}
+                onBlobReady={blob => setIntroVideoBlob(blob)}
               />
             </div>
 
@@ -4717,40 +4853,48 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               }
             </button>
 
-            {/* ── Full 3-Part Video Combine ── */}
+            {/* ── 🎥 Full Video — auto-generate & download ── */}
             <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 1 }} />
             <div style={{ borderRadius: 14, border: '1px solid rgba(251,191,36,0.25)', background: 'rgba(251,191,36,0.04)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div>
                 <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>🎥 Full Video</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>Combine All 3 Parts</div>
-              </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-                Upar se teen parts download karo, phir yahan select karke ek final video banao.
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>Generate & Download</div>
               </div>
 
-              {/* Hidden file inputs */}
-              <input ref={introPartRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) setIntroPart(f); e.target.value = ''; }} />
-              <input ref={rawClipPartRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) setRawClipPart(f); e.target.value = ''; }} />
-              <input ref={discussionPartRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) setDiscussionPart(f); e.target.value = ''; }} />
-
-              {/* Part selectors */}
+              {/* Part status rows — auto-detected */}
               {[
-                { label: '① Intro', hint: '① section (upar) se download karo', file: introPart, ref: introPartRef, clear: () => setIntroPart(null), optional: true },
-                { label: '② Raw Clip', hint: '② section (upar) se download karo', file: rawClipPart, ref: rawClipPartRef, clear: () => setRawClipPart(null), optional: false },
-                { label: '③ Discussion', hint: '③ EXPORT button (upar) se download karo', file: discussionPart, ref: discussionPartRef, clear: () => setDiscussionPart(null), optional: false },
-              ].map(({ label, hint, file, ref, clear, optional }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ minWidth: 80, fontSize: 11, fontWeight: 700, color: file ? '#fbbf24' : 'rgba(255,255,255,0.4)' }}>{label}{optional && <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.25)' }}> (opt)</span>}</div>
-                  {file ? (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                      <span style={{ fontSize: 10, color: '#fbbf24', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                      <button onClick={clear} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 13, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}>✕</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => ref.current?.click()} style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.12)', background: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                      📂 Select — {hint}
-                    </button>
-                  )}
+                {
+                  label: '① Intro',
+                  optional: true,
+                  ready: !!introVideoBlob,
+                  detail: introVideoBlob
+                    ? `✓ Ready (${(introVideoBlob.size / 1024 / 1024).toFixed(1)} MB)`
+                    : podcastSegments.length > 0
+                      ? '① Generate Intro button se pehle banao'
+                      : 'Podcast generate nahi hua — skip hoga',
+                },
+                {
+                  label: '② Raw Clip',
+                  optional: false,
+                  ready: !!(uploadedVideoForClip && sourceClips.length > 0),
+                  detail: (uploadedVideoForClip && sourceClips.length > 0)
+                    ? `✓ ${sourceClips[0].title} (${fmtTime((sourceClips[0].endSec - sourceClips[0].startSec) * 1000)}) — auto trim`
+                    : 'Video upload nahi hua — skip hoga',
+                },
+                {
+                  label: '③ Discussion',
+                  optional: false,
+                  ready: script.length > 0,
+                  detail: script.length > 0
+                    ? `✓ ${script.length} turns · ${fmtTime(totalDuration)} — auto render`
+                    : 'Script empty hai',
+                },
+              ].map(({ label, optional, ready, detail }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ minWidth: 82, fontSize: 11, fontWeight: 700, color: ready ? '#fbbf24' : 'rgba(255,255,255,0.3)', paddingTop: 1 }}>
+                    {label}{optional && <span style={{ fontWeight: 400, fontSize: 9, color: 'rgba(255,255,255,0.25)' }}> opt</span>}
+                  </div>
+                  <div style={{ fontSize: 10, color: ready ? 'rgba(251,191,36,0.8)' : 'rgba(255,255,255,0.25)', flex: 1, lineHeight: 1.4 }}>{detail}</div>
                 </div>
               ))}
 
@@ -4758,32 +4902,32 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               {combining && (
                 <div style={{ borderRadius: 10, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', padding: '10px 12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11 }}>
-                    <span style={{ color: '#fbbf24', fontWeight: 600 }}>{combineStatus}</span>
-                    <span style={{ color: '#fbbf24', fontFamily: 'monospace', fontWeight: 700 }}>{combineProgress}%</span>
+                    <span style={{ color: '#fbbf24', fontWeight: 600, flex: 1, marginRight: 8 }}>{combineStatus}</span>
+                    <span style={{ color: '#fbbf24', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}>{combineProgress}%</span>
                   </div>
                   <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
                     <div style={{ height: '100%', borderRadius: 4, width: `${combineProgress}%`, background: 'linear-gradient(90deg,#f59e0b,#fbbf24)', transition: 'width 0.3s' }} />
                   </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>Real-time playback — clip ki duration jitna waqt lagega</div>
                 </div>
               )}
 
               <button
                 onClick={handleCombineFullVideo}
-                disabled={combining || (!rawClipPart && !discussionPart)}
+                disabled={combining || !script.length}
                 style={{
-                  width: '100%', padding: '12px', borderRadius: 12, border: 'none',
-                  background: combining || (!rawClipPart && !discussionPart) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)',
-                  color: '#000', fontWeight: 800, fontSize: 13,
-                  cursor: combining || (!rawClipPart && !discussionPart) ? 'default' : 'pointer',
+                  width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+                  background: combining || !script.length ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)',
+                  color: '#000', fontWeight: 800, fontSize: 14,
+                  cursor: combining || !script.length ? 'default' : 'pointer',
                   fontFamily: 'inherit',
-                  opacity: combining || (!rawClipPart && !discussionPart) ? 0.4 : 1,
+                  opacity: combining || !script.length ? 0.4 : 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: combining || !script.length ? 'none' : '0 6px 20px rgba(251,191,36,0.3)',
                 }}
               >
                 {combining
-                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Combine ho rahi hai… {combineProgress}%</>
-                  : <>🎥 Combine &amp; Download Full Video</>
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {combineStatus || `Generating… ${combineProgress}%`}</>
+                  : <>🎥 Generate &amp; Download Full Video</>
                 }
               </button>
             </div>
