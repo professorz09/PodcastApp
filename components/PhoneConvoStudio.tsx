@@ -723,9 +723,17 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   const runningStep = INTRO_STEPS.find(s => steps[s.key].status === 'running');
   const failedStep  = INTRO_STEPS.find(s => steps[s.key].status === 'failed');
 
-  // ── buttonOnly mode: just the button + minimal status, no card wrapper ──
+  // ── buttonOnly mode: compact button + step-by-step progress below ──────────
   if (buttonOnly) {
     const btnDisabled = running || !segments.length;
+    const startedAny = STEP_ORDER.some(k => steps[k].status !== 'pending');
+
+    // All 4 pipeline steps + a virtual "Download" step shown after render completes
+    const displaySteps: { label: string; status: IntroStepStatus | 'done'; detail?: string; error?: string; key: string }[] = [
+      ...INTRO_STEPS.map(s => ({ ...s, ...steps[s.key] })),
+      { key: 'download', label: '⬇️ Download ready', status: allDone ? 'done' : 'pending', detail: undefined, error: undefined },
+    ];
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {/* Bg color chips — only when idle + segments ready */}
@@ -737,6 +745,8 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             ))}
           </div>
         )}
+
+        {/* Main button */}
         <button
           onClick={() => !btnDisabled && runFrom('text')}
           disabled={btnDisabled}
@@ -750,8 +760,8 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             boxShadow: !segments.length || running ? 'none' : '0 6px 20px rgba(168,85,247,0.3)',
           }}
         >
-          {running && runningStep
-            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {runningStep.label}{steps[runningStep.key].detail ? ` — ${steps[runningStep.key].detail}` : '…'}</>
+          {running
+            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
             : !segments.length
               ? <>🎤 Generate &amp; Download Intro</>
               : allDone
@@ -759,10 +769,54 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
                 : <>🎤 Generate &amp; Download Intro</>
           }
         </button>
-        {failedStep && !running && (
-          <div style={{ fontSize: 10, color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ flex: 1 }}>⚠ {steps[failedStep.key].error || `${failedStep.label} failed`}</span>
-            <button onClick={() => runFrom(failedStep.key)} style={{ padding: '2px 7px', borderRadius: 5, border: '1px solid rgba(252,165,165,0.4)', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>↻ Retry</button>
+
+        {/* Step-by-step progress — shown once pipeline starts */}
+        {startedAny && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 4px' }}>
+            {displaySteps.map(s => {
+              const st = s.status;
+              const isDone    = st === 'done';
+              const isRunning = st === 'running';
+              const isFailed  = st === 'failed';
+              const isPending = st === 'pending';
+              const dotColor  = isDone ? '#86efac' : isRunning ? '#fde68a' : isFailed ? '#fca5a5' : 'rgba(255,255,255,0.18)';
+              return (
+                <div key={s.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                  {/* Dot / spinner */}
+                  <span style={{
+                    flexShrink: 0, marginTop: 1,
+                    width: 14, height: 14, borderRadius: '50%',
+                    background: isDone ? 'rgba(134,239,172,0.15)' : isRunning ? 'rgba(253,230,138,0.12)' : isFailed ? 'rgba(252,165,165,0.12)' : 'rgba(255,255,255,0.04)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: `1.5px solid ${dotColor}`,
+                  }}>
+                    {isRunning
+                      ? <Loader2 size={8} style={{ animation: 'spin 1s linear infinite', color: '#fde68a' }} />
+                      : <span style={{ fontSize: 8, fontWeight: 800, color: dotColor, lineHeight: 1 }}>
+                          {isDone ? '✓' : isFailed ? '✗' : ''}
+                        </span>
+                    }
+                  </span>
+                  {/* Label + detail */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, color: isPending ? 'rgba(255,255,255,0.25)' : isDone ? 'rgba(255,255,255,0.6)' : isRunning ? '#fde68a' : '#fca5a5', lineHeight: 1.3 }}>
+                      {s.label}
+                      {s.detail && isRunning && <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>— {s.detail}</span>}
+                    </div>
+                    {isFailed && s.error && (
+                      <div style={{ fontSize: 9, color: 'rgba(252,165,165,0.6)', marginTop: 1 }}>⚠ {s.error}</div>
+                    )}
+                  </div>
+                  {/* Retry on failure */}
+                  {isFailed && !running && s.key !== 'download' && (
+                    <button
+                      onClick={() => runFrom(s.key as IntroStepKey)}
+                      style={{ flexShrink: 0, padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(252,165,165,0.35)', background: 'rgba(239,68,68,0.12)', color: '#fca5a5', fontSize: 8, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >↻</button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
