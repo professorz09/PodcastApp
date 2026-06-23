@@ -6710,55 +6710,48 @@ export const generateIntroFromTranscript = async (args: {
   const hostHint = (podcastHost || '').trim();
   const guestsHint = (podcastGuests || []).filter(Boolean).join(', ');
 
-  const prompt = `You are writing a SHORT, PUNCHY spoken intro (1-2 sentences, 18-35 words) for a YouTube clip. The goal is to make the viewer instantly understand WHAT CONCEPT is being explored and WHY it's interesting — not just who is talking.
+  const prompt = `You are writing a SHORT, CATCHY spoken intro (1-2 sentences, ~18-32 words total) for a YouTube clip.
 
 CONTEXT
 - Podcast title: ${podcastTitle || '(unknown)'}
-- Detected host: ${hostHint || '(unknown — figure out from transcript)'}
+- Detected host: ${hostHint || '(unknown — figure out from transcript / search)'}
 - Detected guest(s): ${guestsHint || '(none / unknown)'}
-- Transcript excerpt (derive the concept ONLY from what's actually discussed here — do not invent):
+- Transcript excerpt (THIS is the clip — base the topic ONLY on what's actually discussed here, do not invent):
 ${excerpt}
 
 YOUR JOB
-1. Identify the HOST (use detected host if given; otherwise infer from transcript).
+1. Identify the HOST (use detected host if given; otherwise infer from transcript / search).
 2. Identify the GUEST if there is one (use detected guest if given; otherwise infer). If multiple guests, pick the primary one.
-3. Use Google Search grounding to get ONE short factual description of the GUEST's role/profession (e.g. "a professional comedian", "a neuroscientist", "the founder of Tesla"). 2-6 words, must be TRUE.
-4. Identify the CORE CONCEPT — the specific idea, argument, insight, or question at the heart of this clip. Capture the ANGLE, not just the subject. Ask yourself: "What is the interesting claim or insight being made here?" Examples of concept-level topics:
-   BAD (surface topic):  "life advice" / "business strategies" / "health tips"
-   GOOD (concept level): "why most people fail not from lack of talent but from fear of starting" / "how sleep deprivation quietly destroys decision-making" / "the paradox of choice that makes successful people less happy"
+3. Identify the CORE TOPIC of THIS CLIP specifically (3-7 words, concrete — not "stuff" / "things" / generic).
+4. Use Google Search grounding to pull ONE short factual description of the GUEST's role/profession (e.g. "a professional comedian", "a neuroscientist", "the founder of Tesla"). Keep it 2-6 words. Must be TRUE.
 
 OUTPUT — pick ONE shape based on whether there's a guest:
 
 WITH GUEST:
-"In this clip <Host> and <Guest>, who is <guest's role>, discuss <core concept>."
-OR (if the concept is a strong argument/claim):
-"In this clip <Host> and <Guest>, who is <guest's role>, break down <core concept>."
+"In this clip <Host> and <Guest>, who is <guest's role description>, talk about <topic>."
 
 NO GUEST (solo episode):
-"In this clip <Host> <verb> <core concept>."
+"In this clip <Host> <verb> about <topic>."
 
-EXAMPLES (notice how the topic phrase reveals the actual insight/argument):
-✓ "In this clip Joe Rogan and Nikki Glaser, who is a stand-up comedian, talk about how bombing on stage is actually what makes a comedian fearless."
-✓ "In this clip Lex Fridman and Andrej Karpathy, who is a leading AI researcher, break down why transformers learn concepts rather than just memorizing text."
-✓ "In this clip Andrew Huberman explains why the first 30 minutes after waking up determine your focus for the entire day."
-✓ "In this clip Tim Ferriss reveals how a single 4-hour workweek experiment changed how he thought about productivity forever."
+EXAMPLES
+✓ "In this clip Joe Rogan and Hardly Williams, who is a professional comedian, talk about prison stories from his early career."
+✓ "In this clip Lex Fridman and Andrej Karpathy, who is a leading AI researcher, talk about how large language models actually learn."
+✓ "In this clip Tim Ferriss explains why he stopped drinking coffee for 30 days."
 
-VERB CHOICES (no-guest): explains / reveals / breaks down / argues / shares / unpacks / reacts to / makes the case for
-
+VERB CHOICES (no-guest case): talks about / explains / breaks down / argues / reveals / reacts to / shares
 RULES
 - ONE sentence preferred. Two max. Hard cap 35 words.
 - No emojis. No quotes around the intro. No "welcome back" / "hey guys" / "let's check it out" / "today we have".
-- Guest description must be FACTUAL and grounded. If unsure, use a safe generic ("a writer", "an entrepreneur") rather than inventing specifics.
-- The concept/topic comes ONLY from THE TRANSCRIPT EXCERPT — not from the podcast title or anything external.
-- The topic phrase should reveal the CONCEPT or INSIGHT, not just name the subject area. Aim for something that makes a viewer think "oh that's interesting, I want to watch this."
-- Plain spoken English. Contractions OK. Punchy, hook-y, specific.
+- The guest description must be FACTUAL and grounded — not invented. If unsure, use a safe generic ("a writer", "an entrepreneur") rather than guessing specifics.
+- Topic comes from THE TRANSCRIPT EXCERPT above — NOT from the title or anything external. If the excerpt is about prison stories, the topic is prison stories — even if the podcast title says something else.
+- Plain spoken English. Contractions OK. Punchy, catchy, hook-y.
 
 Return JSON ONLY (no markdown, no preamble):
 {
   "host": "the host's full name as you'd say it",
   "guest": "the primary guest's full name, or empty string if solo",
   "guestRole": "short factual role description of the guest, or empty string if solo",
-  "topic": "the core concept/insight phrase — specific, not generic",
+  "topic": "3-7 word topic phrase grounded in the excerpt",
   "intro": "the full 1-2 sentence spoken intro"
 }`;
 
