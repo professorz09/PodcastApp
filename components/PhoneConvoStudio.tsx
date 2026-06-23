@@ -410,9 +410,10 @@ interface IntroFlowProps {
   selectedRanges?: { startSec: number; endSec: number }[];
   selectionLabel?: string;
   onBlobReady?: (blob: Blob) => void;
+  buttonOnly?: boolean; // renders just the action button + minimal status (no card)
 }
 
-const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel, onBlobReady }) => {
+const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel, onBlobReady, buttonOnly }) => {
   const [running, setRunning] = useState(false);
   const [bgColor, setBgColor] = useState('#ffffff');
   const [steps, setSteps] = useState<Record<IntroStepKey, { status: IntroStepStatus; detail?: string; error?: string }>>({
@@ -721,6 +722,52 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
   const runningStep = INTRO_STEPS.find(s => steps[s.key].status === 'running');
   const failedStep  = INTRO_STEPS.find(s => steps[s.key].status === 'failed');
+
+  // ── buttonOnly mode: just the button + minimal status, no card wrapper ──
+  if (buttonOnly) {
+    const btnDisabled = running || !segments.length;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* Bg color chips — only when idle + segments ready */}
+        {segments.length > 0 && !running && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Bg:</span>
+            {([{ v: '#ffffff', t: 'White' }, { v: '#00b140', t: 'Green Screen' }, { v: '#00ff00', t: 'Chroma Key' }] as const).map(({ v, t }) => (
+              <button key={v} onClick={() => setBgColor(v)} title={t} style={{ width: 18, height: 18, borderRadius: 4, background: v, cursor: 'pointer', padding: 0, border: `2px solid ${bgColor === v ? '#a855f7' : 'rgba(255,255,255,0.1)'}`, transition: 'border-color 0.15s', flexShrink: 0 }} />
+            ))}
+          </div>
+        )}
+        <button
+          onClick={() => !btnDisabled && runFrom('text')}
+          disabled={btnDisabled}
+          style={{
+            width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+            background: !segments.length ? 'rgba(255,255,255,0.05)' : running ? 'rgba(168,85,247,0.35)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
+            color: !segments.length ? 'rgba(255,255,255,0.25)' : '#fff',
+            fontSize: 13, fontWeight: 800, cursor: btnDisabled ? 'default' : 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            opacity: !segments.length ? 0.35 : 1,
+            boxShadow: !segments.length || running ? 'none' : '0 6px 20px rgba(168,85,247,0.3)',
+          }}
+        >
+          {running && runningStep
+            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {runningStep.label}{steps[runningStep.key].detail ? ` — ${steps[runningStep.key].detail}` : '…'}</>
+            : !segments.length
+              ? <>🎤 Generate &amp; Download Intro</>
+              : allDone
+                ? <>🔁 Re-generate &amp; Download Intro</>
+                : <>🎤 Generate &amp; Download Intro</>
+          }
+        </button>
+        {failedStep && !running && (
+          <div style={{ fontSize: 10, color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ flex: 1 }}>⚠ {steps[failedStep.key].error || `${failedStep.label} failed`}</span>
+            <button onClick={() => runFrom(failedStep.key)} style={{ padding: '2px 7px', borderRadius: 5, border: '1px solid rgba(252,165,165,0.4)', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>↻ Retry</button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -3102,6 +3149,23 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     return new Blob(chunks, { type: mimeType });
   };
 
+  const handleTrimClip = async () => {
+    if (!uploadedVideoForClip || !sourceClips.length || clipping) return;
+    setClipping(true); setClipProgress(0);
+    try {
+      const c = sourceClips[0];
+      const blob = await trimClipToBlob(c, p => setClipProgress(p));
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `clip-${c.title.replace(/[^a-z0-9]/gi, '-').slice(0, 40)}.${ext}`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast.success('✓ Raw clip download ho gayi!');
+    } catch (e: any) {
+      toast.error(e.message || 'Clip trim failed');
+    } finally { setClipping(false); setClipProgress(0); }
+  };
+
   const handleCombineFullVideo = async () => {
     if (!script.length) { toast.error('Pehle script generate karo'); return; }
 
@@ -4683,11 +4747,13 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
         {/* ════ EXPORT TAB ════ */}
         {tab === 'export' && (
-          <div style={{ padding: 14, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: 14, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* ── ① Intro Video — always visible, disabled hint inside when no segments ── */}
-            <div>
-              <div style={{ fontSize: 10, color: 'rgba(196,181,253,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, paddingLeft: 2 }}>① Intro Video <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.25)' }}>(optional)</span></div>
+            {/* ① Intro */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, color: 'rgba(196,181,253,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                ① Intro Video <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.2)' }}>(optional)</span>
+              </div>
               <IntroFlow
                 segments={podcastSegments}
                 podcastTitle={podcastTitle}
@@ -4696,241 +4762,132 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 selectedRanges={sourceClips.length > 0 ? sourceClips.map(c => ({ startSec: c.startSec, endSec: c.endSec })) : undefined}
                 selectionLabel={sourceClips.length > 0 ? sourceClips[0].title : undefined}
                 onBlobReady={blob => setIntroVideoBlob(blob)}
+                buttonOnly
               />
             </div>
 
-            {/* ── ② Raw Clip (Source Video Clip) ── */}
-            {uploadedVideoForClip && sourceClips.length > 0 && (
-              <div style={{ borderRadius: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', padding: 12 }}>
-                <div style={{ fontSize: 11, color: '#fca5a5', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>② Raw Clip</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>
-                  Uploaded video se selected chapter ka segment trim karke download karo.
-                </div>
-                {/* Letterbox toggle */}
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, cursor: 'pointer' }}>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Black Border (Letterbox)</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Upar/niche ~8% black bars</div>
-                  </div>
-                  <div onClick={() => setAddLetterbox(p => !p)} style={{ width: 36, height: 20, borderRadius: 50, position: 'relative', cursor: 'pointer', flexShrink: 0, background: addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
-                    <div style={{ position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', left: addLetterbox ? 18 : 2, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
-                  </div>
-                </label>
-                {/* Clip info */}
-                {sourceClips.map((c, i) => (
-                  <div key={i} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', marginBottom: i < sourceClips.length - 1 ? 5 : 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{c.title}</div>
-                    <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.45)' }}>{fmtTime(c.startSec * 1000)} → {fmtTime(c.endSec * 1000)} <span style={{ color: 'rgba(255,255,255,0.25)' }}>({fmtTime((c.endSec - c.startSec) * 1000)})</span></div>
-                  </div>
-                ))}
-                <button
-                  disabled={clipping}
-                  onClick={async () => {
-                    if (clipping || !uploadedVideoForClip || !sourceClips.length) return;
-                    setClipping(true); setClipProgress(0);
-                    try {
-                      const c = sourceClips[0];
-                      const video = document.createElement('video');
-                      video.src = uploadedVideoUrlForClip ?? URL.createObjectURL(uploadedVideoForClip);
-                      video.muted = false; video.playsInline = true;
-                      video.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px';
-                      document.body.appendChild(video);
-                      try {
-                        await new Promise<void>((res, rej) => { video.onloadedmetadata = () => res(); video.onerror = () => rej(new Error('Video load nahi hua')); setTimeout(() => rej(new Error('Timeout')), 20_000); });
-                        const captureFn = (video as any).captureStream?.bind(video) ?? (video as any).mozCaptureStream?.bind(video);
-                        if (!captureFn) throw new Error('Is browser me capture support nahi — Chrome use karo');
-                        const rawStream: MediaStream = captureFn(30);
-                        if (!rawStream.getAudioTracks().length) throw new Error('Audio track nahi mila');
-                        let recordStream = rawStream;
-                        let letterboxCanvas: HTMLCanvasElement | null = null;
-                        let letterboxRafId: number | null = null;
-                        if (addLetterbox) {
-                          const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
-                          letterboxCanvas = document.createElement('canvas');
-                          letterboxCanvas.width = vw; letterboxCanvas.height = vh;
-                          const ctx2d = letterboxCanvas.getContext('2d')!;
-                          const barH = Math.round(vh * 0.08), drawH = vh - barH * 2;
-                          const drawFrame = () => { ctx2d.fillStyle = '#000'; ctx2d.fillRect(0, 0, vw, vh); ctx2d.drawImage(video, 0, barH, vw, drawH); letterboxRafId = requestAnimationFrame(drawFrame); };
-                          drawFrame();
-                          const cs = letterboxCanvas.captureStream(30);
-                          rawStream.getAudioTracks().forEach((t: MediaStreamTrack) => cs.addTrack(t));
-                          recordStream = cs;
-                        }
-                        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
-                        const recorder = new MediaRecorder(recordStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
-                        const chunks: Blob[] = [];
-                        recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
-                        await new Promise<void>((resolve, reject) => {
-                          recorder.onstop = () => {
-                            if (letterboxRafId !== null) cancelAnimationFrame(letterboxRafId);
-                            const blob = new Blob(chunks, { type: mimeType });
-                            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-                            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                            a.download = `clip-${c.title.replace(/[^a-z0-9]/gi,'-').slice(0,40)}.${ext}`;
-                            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                            resolve();
-                          };
-                          recorder.onerror = () => reject(new Error('Recording error'));
-                          recorder.start(200);
-                          video.currentTime = c.startSec;
-                          video.onseeked = () => { video.play().catch(() => {}); };
-                          const durSec = c.endSec - c.startSec;
-                          const tick = setInterval(() => {
-                            setClipProgress(Math.min(99, Math.round(((video.currentTime - c.startSec) / durSec) * 100)));
-                            if (video.currentTime >= c.endSec) { clearInterval(tick); video.pause(); if (recorder.state !== 'inactive') recorder.stop(); }
-                          }, 250);
-                        });
-                        toast.success('✓ Raw clip download ho gayi!');
-                      } finally { video.pause(); document.body.removeChild(video); }
-                    } catch (e: any) { toast.error(e.message || 'Clip trim failed'); }
-                    finally { setClipping(false); setClipProgress(0); }
-                  }}
-                  style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: clipping ? 'rgba(239,68,68,0.3)' : '#ef4444', color: '#fff', fontSize: 12, fontWeight: 800, cursor: clipping ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                >
-                  {clipping ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Trim ho rahi hai… {clipProgress}%</> : <><Download size={13} /> Trim & Download Raw Clip ({sourceClips[0] ? fmtTime((sourceClips[0].endSec - sourceClips[0].startSec) * 1000) : ''})</>}
-                </button>
+            {/* ② Raw Clip */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, color: 'rgba(252,165,165,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                ② Raw Clip {uploadedVideoForClip && sourceClips.length > 0 ? `· ${sourceClips[0].title} (${fmtTime((sourceClips[0].endSec - sourceClips[0].startSec) * 1000)})` : ''}
               </div>
-            )}
-
-            {/* ── ③ Discussion Animation ── */}
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 1 }} />
-
-            {/* Info card */}
-            <div style={{ borderRadius: 14, border: '1px solid rgba(239,68,68,0.15)', background: 'rgba(255,255,255,0.025)', padding: 14 }}>
-              <div style={{ fontSize: 11, color: 'rgba(252,165,165,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>③ Discussion</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>1080p MP4</div>
-              {[
-                `Format: MP4 (H.264 · AAC)  ·  1920×1080`,
-                `Quality: 8 Mbps High Bitrate`,
-                `Duration: ${fmtTime(totalDuration)}`,
-                `${phones.length} phone${phones.length > 1 ? 's' : ''} · ${script.length} turns`,
-                `Audio: ${script.filter(t => t.audioUrl).length}/${script.length} turns ready`,
-              ].map(t => (
-                <div key={t} style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 6, marginBottom: 4 }}>
-                  <span style={{ color: '#ef4444' }}>•</span> {t}
-                </div>
-              ))}
-            </div>
-
-            {/* Progress bar (only while exporting) */}
-            {exporting && (
-              <div style={{ borderRadius: 14, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.07)', padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-                  <span style={{ color: '#fca5a5', fontWeight: 700 }}>{exportStatus || 'Rendering…'}</span>
-                  <span style={{ color: '#ef4444', fontFamily: 'monospace', fontWeight: 700 }}>{exportProgress}%</span>
-                </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 6, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 6, width: `${exportProgress}%`,
-                    background: 'linear-gradient(90deg,#ef4444,#f97316)',
-                    transition: 'width 0.3s ease',
-                  }} />
-                </div>
-                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
-                  Faster than real-time · WebCodecs offline render
-                </div>
-              </div>
-            )}
-
-            {/* Single export button */}
-            <button
-              onClick={handleExport}
-              disabled={exporting || !script.length}
-              style={{
-                width: '100%', padding: '15px', borderRadius: 14,
-                background: (!script.length || exporting) ? 'rgba(255,255,255,0.05)' : '#ef4444',
-                border: 'none', color: '#fff', fontWeight: 800, fontSize: 15,
-                cursor: (!script.length || exporting) ? 'default' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                fontFamily: 'inherit', opacity: (!script.length || exporting) ? 0.4 : 1,
-                boxShadow: (!script.length || exporting) ? 'none' : '0 8px 28px rgba(239,68,68,0.35)',
-                letterSpacing: '0.06em', transition: 'all 0.2s',
-              }}
-            >
-              {exporting
-                ? <><Loader2 size={17} style={{ animation: 'spin 1s linear infinite' }} /> Rendering {exportProgress}%…</>
-                : <><Download size={17} /> EXPORT 1080p MP4</>
-              }
-            </button>
-
-            {/* ── 🎥 Full Video — auto-generate & download ── */}
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 1 }} />
-            <div style={{ borderRadius: 14, border: '1px solid rgba(251,191,36,0.25)', background: 'rgba(251,191,36,0.04)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
-                <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>🎥 Full Video</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>Generate & Download</div>
-              </div>
-
-              {/* Part status rows — auto-detected */}
-              {[
-                {
-                  label: '① Intro',
-                  optional: true,
-                  ready: !!introVideoBlob,
-                  detail: introVideoBlob
-                    ? `✓ Ready (${(introVideoBlob.size / 1024 / 1024).toFixed(1)} MB)`
-                    : podcastSegments.length > 0
-                      ? '① Generate Intro button se pehle banao'
-                      : 'Podcast generate nahi hua — skip hoga',
-                },
-                {
-                  label: '② Raw Clip',
-                  optional: false,
-                  ready: !!(uploadedVideoForClip && sourceClips.length > 0),
-                  detail: (uploadedVideoForClip && sourceClips.length > 0)
-                    ? `✓ ${sourceClips[0].title} (${fmtTime((sourceClips[0].endSec - sourceClips[0].startSec) * 1000)}) — auto trim`
-                    : 'Video upload nahi hua — skip hoga',
-                },
-                {
-                  label: '③ Discussion',
-                  optional: false,
-                  ready: script.length > 0,
-                  detail: script.length > 0
-                    ? `✓ ${script.length} turns · ${fmtTime(totalDuration)} — auto render`
-                    : 'Script empty hai',
-                },
-              ].map(({ label, optional, ready, detail }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ minWidth: 82, fontSize: 11, fontWeight: 700, color: ready ? '#fbbf24' : 'rgba(255,255,255,0.3)', paddingTop: 1 }}>
-                    {label}{optional && <span style={{ fontWeight: 400, fontSize: 9, color: 'rgba(255,255,255,0.25)' }}> opt</span>}
+              {/* Letterbox toggle — only when video ready */}
+              {uploadedVideoForClip && sourceClips.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div onClick={() => setAddLetterbox(p => !p)} style={{ width: 32, height: 18, borderRadius: 50, position: 'relative', cursor: 'pointer', flexShrink: 0, background: addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
+                    <div style={{ position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', left: addLetterbox ? 16 : 2, transition: 'left 0.2s' }} />
                   </div>
-                  <div style={{ fontSize: 10, color: ready ? 'rgba(251,191,36,0.8)' : 'rgba(255,255,255,0.25)', flex: 1, lineHeight: 1.4 }}>{detail}</div>
-                </div>
-              ))}
-
-              {/* Progress bar */}
-              {combining && (
-                <div style={{ borderRadius: 10, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11 }}>
-                    <span style={{ color: '#fbbf24', fontWeight: 600, flex: 1, marginRight: 8 }}>{combineStatus}</span>
-                    <span style={{ color: '#fbbf24', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}>{combineProgress}%</span>
-                  </div>
-                  <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
-                    <div style={{ height: '100%', borderRadius: 4, width: `${combineProgress}%`, background: 'linear-gradient(90deg,#f59e0b,#fbbf24)', transition: 'width 0.3s' }} />
-                  </div>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', cursor: 'pointer' }} onClick={() => setAddLetterbox(p => !p)}>Black border (letterbox)</span>
                 </div>
               )}
+              {/* Progress bar while clipping */}
+              {clipping && (
+                <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 3, width: `${clipProgress}%`, background: 'linear-gradient(90deg,#ef4444,#f97316)', transition: 'width 0.25s' }} />
+                </div>
+              )}
+              <button
+                onClick={handleTrimClip}
+                disabled={clipping || !uploadedVideoForClip || !sourceClips.length}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+                  background: !uploadedVideoForClip || !sourceClips.length ? 'rgba(255,255,255,0.05)' : clipping ? 'rgba(239,68,68,0.35)' : '#ef4444',
+                  color: !uploadedVideoForClip || !sourceClips.length ? 'rgba(255,255,255,0.25)' : '#fff',
+                  fontSize: 13, fontWeight: 800, cursor: clipping || !uploadedVideoForClip || !sourceClips.length ? 'default' : 'pointer',
+                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: !uploadedVideoForClip || !sourceClips.length ? 0.35 : 1,
+                  boxShadow: !uploadedVideoForClip || !sourceClips.length || clipping ? 'none' : '0 6px 20px rgba(239,68,68,0.3)',
+                }}
+              >
+                {clipping
+                  ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Trim ho rahi hai… {clipProgress}%</>
+                  : <><Download size={13} /> {uploadedVideoForClip && sourceClips.length > 0 ? 'Trim & Download Raw Clip' : 'Trim & Download Raw Clip (Settings se video upload karo)'}</>
+                }
+              </button>
+            </div>
 
+            {/* ③ Discussion */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, color: 'rgba(252,165,165,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                ③ Discussion · 1080p MP4 {script.length > 0 ? `· ${fmtTime(totalDuration)}` : ''}
+              </div>
+              {exporting && (
+                <>
+                  <div style={{ fontSize: 10, color: '#fca5a5' }}>{exportStatus}</div>
+                  <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 3, width: `${exportProgress}%`, background: 'linear-gradient(90deg,#ef4444,#f97316)', transition: 'width 0.3s' }} />
+                  </div>
+                </>
+              )}
+              <button
+                onClick={handleExport}
+                disabled={exporting || !script.length}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+                  background: !script.length ? 'rgba(255,255,255,0.05)' : exporting ? 'rgba(239,68,68,0.35)' : '#ef4444',
+                  color: !script.length ? 'rgba(255,255,255,0.25)' : '#fff',
+                  fontSize: 13, fontWeight: 800, cursor: exporting || !script.length ? 'default' : 'pointer',
+                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: !script.length ? 0.35 : 1,
+                  boxShadow: !script.length || exporting ? 'none' : '0 6px 20px rgba(239,68,68,0.3)',
+                }}
+              >
+                {exporting
+                  ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Rendering… {exportProgress}%</>
+                  : <><Download size={13} /> Export Discussion 1080p MP4</>
+                }
+              </button>
+            </div>
+
+            {/* divider */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+
+            {/* 🎥 Full Video */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                🎥 Full Video · Intro + Clip + Discussion
+              </div>
+              {/* What's included */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Intro', ok: !!introVideoBlob, note: introVideoBlob ? 'ready' : 'skip' },
+                  { label: 'Clip', ok: !!(uploadedVideoForClip && sourceClips.length), note: uploadedVideoForClip ? 'auto' : 'skip' },
+                  { label: 'Discussion', ok: script.length > 0, note: 'auto-render' },
+                ].map(({ label, ok, note }) => (
+                  <div key={label} style={{ fontSize: 10, color: ok ? 'rgba(251,191,36,0.75)' : 'rgba(255,255,255,0.2)', display: 'flex', gap: 3 }}>
+                    <span>{ok ? '✓' : '–'}</span><span>{label}</span><span style={{ color: 'rgba(255,255,255,0.18)', fontSize: 9 }}>({note})</span>
+                  </div>
+                ))}
+              </div>
+              {combining && (
+                <>
+                  <div style={{ fontSize: 10, color: '#fbbf24' }}>{combineStatus}</div>
+                  <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 3, width: `${combineProgress}%`, background: 'linear-gradient(90deg,#f59e0b,#fbbf24)', transition: 'width 0.3s' }} />
+                  </div>
+                </>
+              )}
               <button
                 onClick={handleCombineFullVideo}
                 disabled={combining || !script.length}
                 style={{
-                  width: '100%', padding: '13px', borderRadius: 12, border: 'none',
-                  background: combining || !script.length ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)',
-                  color: '#000', fontWeight: 800, fontSize: 14,
-                  cursor: combining || !script.length ? 'default' : 'pointer',
-                  fontFamily: 'inherit',
-                  opacity: combining || !script.length ? 0.4 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  boxShadow: combining || !script.length ? 'none' : '0 6px 20px rgba(251,191,36,0.3)',
+                  width: '100%', padding: '15px', borderRadius: 12, border: 'none',
+                  background: !script.length ? 'rgba(255,255,255,0.05)' : combining ? 'rgba(251,191,36,0.25)' : 'linear-gradient(135deg,#f59e0b,#fbbf24)',
+                  color: !script.length ? 'rgba(255,255,255,0.25)' : '#000',
+                  fontSize: 14, fontWeight: 800, cursor: combining || !script.length ? 'default' : 'pointer',
+                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: !script.length ? 0.35 : 1,
+                  boxShadow: !script.length || combining ? 'none' : '0 8px 24px rgba(251,191,36,0.35)',
+                  letterSpacing: '0.03em',
                 }}
               >
                 {combining
-                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {combineStatus || `Generating… ${combineProgress}%`}</>
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> {combineProgress}%</>
                   : <>🎥 Generate &amp; Download Full Video</>
                 }
               </button>
             </div>
+
           </div>
         )}
 
