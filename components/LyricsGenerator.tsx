@@ -342,7 +342,7 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
                 <div className="flex flex-col gap-1.5">
                   {[
                     { id: 'gemini-3.5-flash', label: 'Gemini 3 Flash', badge: 'Fast' },
-                    { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', badge: 'Best' },
+                    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', badge: 'Best' },
                   ].map(m => (
                     <button
                       key={m.id}
