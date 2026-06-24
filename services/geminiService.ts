@@ -1429,33 +1429,29 @@ export const generateDebateScript = async (
   if (isHindi) {
       if (customScript) {
         prompt = `
-          तुम एक expert script writer हो। नीचे दी गई raw/past script को एक engaging, punchy debate/conversation script में rewrite करो।
+          तुम्हारा काम है नीचे दी गई script को speaker-tagged JSON segments में convert करना।
 
           ORIGINAL SCRIPT:
           """
           ${customScript}
           """
 
-          तुम्हारा काम:
-          1. SPEAKER DETECTION: Script में जो असली speakers हैं उनके नाम exactly detect करो (जैसे "Rahul", "Priya", "Host", "Guest" — जैसा script में है)। अगर script में speaker labels नहीं हैं, तो context से logically assign करो।
-          2. REWRITE: हर segment को engaging, natural, conversational बनाओ:
-             - Short punchy sentences (2-3 sentences per turn)
-             - Hinglish / natural spoken language
-             - Reactions add करो ("Bilkul!", "Wait, sach mein?", "Interesting point!")
-             - Key arguments/points preserve karo — content mat badlo, delivery improve karo
-             - Filler, repetition, off-topic parts hata do
-          3. SPEAKER TAGS: हर turn में correct speaker name lagao — original script के according।
-          4. अगर script में Narrator है, तो "Narrator" speaker रखो।
+          INSTRUCTIONS:
+          1. SPEAKER DETECTION: Script में जो speakers हैं उनके exact नाम detect करो जैसे script में लिखे हैं (जैसे "Rahul:", "Host:", "Guest 1:" आदि)। अगर कोई label नहीं है तो context से logically 2 speakers assign करो।
+          2. SPLIT: Script को speaker turns में बाँटो — हर बार जब speaker बदले एक नया segment बनाओ।
+          3. TEXT PRESERVE: हर segment का text EXACTLY वही रखो जो original script में है — एक भी word मत बदलो, मत हटाओ, मत छोटा करो। सिर्फ speaker label prefix हटाओ अगर है।
+          4. Narrator: अगर script में कोई unattributed text है तो उसे "Narrator" tag करो।
 
           STRICT RULES:
-          - Speaker names original script से lo — invent मत करो
-          - Core content/arguments preserve karo, सिर्फ delivery improve करो
-          - Output ONLY valid JSON array। कोई extra text नहीं।
+          ✗ Original text को rewrite, shorten, या modify मत करो — WORD FOR WORD preserve करो
+          ✗ Speaker names invent मत करो — script से exactly लो
+          ✗ Content add या remove मत करो
+          ✓ Output ONLY valid JSON array — कोई extra text नहीं।
 
           Output format:
           [
-            {"speaker": "Speaker Name", "text": "Rewritten engaging text"},
-            {"speaker": "Speaker Name", "text": "Next segment"},
+            {"speaker": "Speaker Name", "text": "Exact original text for this turn"},
+            {"speaker": "Speaker Name", "text": "Exact original text for next turn"},
             ...
           ]
         `;
@@ -3146,32 +3142,29 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
       // English Logic
       if (customScript) {
         prompt = `
-          You are an expert script writer. Take the raw/past script below and rewrite it as an engaging, punchy conversation script.
+          Your job is to convert the script below into speaker-tagged JSON segments.
 
           ORIGINAL SCRIPT:
           """
           ${customScript}
           """
 
-          YOUR TASK:
-          1. SPEAKER DETECTION: Identify the real speakers in this script by their exact names as written (e.g. "Joe Rogan", "Elon Musk", "Host", "Guest"). If the script has no explicit speaker labels, assign segments logically from context.
-          2. REWRITE each segment to be engaging and natural:
-             - Short punchy sentences (2-3 per turn)
-             - Natural spoken language — contractions, reactions ("Exactly!", "Wait, really?", "That's wild")
-             - Preserve the core arguments and key points — improve delivery, not content
-             - Remove filler, repetition, and off-topic tangents
-          3. SPEAKER TAGS: Assign the correct speaker name to each turn based on the original script.
-          4. Any narration/unattributed text should be tagged as "Narrator".
+          INSTRUCTIONS:
+          1. SPEAKER DETECTION: Find the speakers by their exact names as written in the script (e.g. "Joe Rogan:", "Host:", "Guest 1:"). If no labels exist, logically assign 2 speakers from context.
+          2. SPLIT: Divide the script into speaker turns — create a new segment each time the speaker changes.
+          3. TEXT PRESERVE: Keep the text of each segment EXACTLY as written in the original — do not change, remove, shorten, or rephrase even a single word. Only strip the speaker label prefix if present.
+          4. Any unattributed narration should be tagged as "Narrator".
 
           STRICT RULES:
-          - Use speaker names exactly as found in the original — do NOT invent names
-          - Preserve the core content and arguments — only improve how it's said
-          - Output ONLY a valid JSON array. No extra text, explanations, or markdown.
+          ✗ Do NOT rewrite, shorten, or modify the original text — WORD FOR WORD
+          ✗ Do NOT invent speaker names — use exactly what is in the script
+          ✗ Do NOT add or remove any content
+          ✓ Output ONLY a valid JSON array. No extra text, no markdown.
 
           Output format:
           [
-            {"speaker": "Speaker Name", "text": "Rewritten engaging text"},
-            {"speaker": "Speaker Name", "text": "Next segment"},
+            {"speaker": "Speaker Name", "text": "Exact original text for this turn"},
+            {"speaker": "Speaker Name", "text": "Exact original text for next turn"},
             ...
           ]
         `;
@@ -4862,18 +4855,22 @@ Speaker B (Curious): choose a different name — asks what the audience is think
     `;
   }
 
+  // customScript just needs speaker detection — use pro model, no grounding needed
+  const effectiveModel = customScript ? 'gemini-3.1-pro-preview' : model;
+
   const tools: any[] = [{ googleSearch: {} }];
   if (youtubeUrl) {
     tools.push({ urlContext: {} });
   }
 
   // Only use googleSearch grounding for models that support it without breaking text extraction
-  const supportsGrounding = model.includes('2.5') || model.includes('1.5') || model.includes('3.');
+  // Disable grounding for customScript — web search is irrelevant when user already has the script
+  const supportsGrounding = !customScript && (model.includes('2.5') || model.includes('1.5') || model.includes('3.'));
   const finalTools = supportsGrounding ? tools : [];
 
   try {
     const response = await ai.models.generateContent({
-      model: model,
+      model: effectiveModel,
       contents: { parts: [{ text: prompt }] },
       config: {
         ...(finalTools.length > 0 ? { tools: finalTools } : {}),
