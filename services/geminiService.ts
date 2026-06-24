@@ -1358,7 +1358,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.5-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -2245,6 +2245,107 @@ ${specificDetails}`
             ✗ BANNED: Multiple speakers ya dialogue format
             ✗ BANNED: "Yeh zaroori hai", "Is prakar", "Ant mein", generic filler
             ✗ BANNED: Long boring intro — hook direct aur sharp ho
+            ${durFillHi}
+          `;
+        } else if (style === 'deep_explainer') {
+          prompt = `
+            ═══════════════════════════════════════════════════════
+            STYLE: DEEP EXPLAINER — BEGINNER-FRIENDLY NEWS/TOPIC BREAKDOWN
+            दो conversational speakers। एक explain करता है, दूसरा पूछता है। हर jargon term तुरंत define होता है।
+            शुरुआत में ही strong HOOK। Structured segments। Zero assumed knowledge।
+            Think: podcast-meets-YouTube-explainer — गहरा, सटीक, conversational।
+            ═══════════════════════════════════════════════════════
+            विषय: "${topic}"
+            ${specificDetails ? `अतिरिक्त context / angle: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: Hinglish — natural, conversational, जैसे दो दोस्त podcast में बात कर रहे हों।
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STEP 1 — पहले PLAN करो (लिखने से पहले):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            इस topic के बारे में एक total beginner को क्या-क्या MUST जानना चाहिए — 5-7 key points:
+              → Shocking hook / central fact
+              → Core background (क्या हुआ / यह है क्या)
+              → Key numbers / math (simple comparisons के साथ explain करो)
+              → Real-world stakes (किसे नुकसान, किसे फायदा, क्यों matter करता है)
+              → Counterargument / दूसरा side (fair hearing दो)
+              → Hidden detail जो headlines miss करती हैं
+              → Simple takeaway
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            CHARACTERS — ठीक 2 speakers (कोई Narrator नहीं):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ${speakers.length >= 2
+              ? `Speaker A (Explainer): ${speakers[0]} — well-informed, clearly explain करता है, real analogies use करता है
+Speaker B (Curious): ${speakers[1]} — audience जो सोच रही है वही पूछता है, pushback देता है, genuinely react करता है`
+              : `Speaker A (Explainer): suitable नाम choose करो — well-informed, clearly explain करता है, real analogies use करता है
+Speaker B (Curious): अलग नाम choose करो — audience जो सोच रही है वही पूछता है, pushback देता है, genuinely react करता है`
+            }
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE (exact इसी flow में):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 HOOK — पहले 20 seconds (2-4 short exchanges) 】
+            SHOCKING number, fact, या question से खोलो — कोई warmup नहीं।
+            अच्छे examples:
+            • "Quick question। एक ही दिन में ₹5 लाख करोड़ कैसे डूब जाते हैं?"
+            • "Yaar, क्या हो अगर मैं कहूँ कि सबसे safe लगने वाला investment अब सबसे risky हो गया है?"
+            Speaker B disbelief में react करे। Speaker A full story की झलक दे।
+            End: इस video का central question।
+            RULE: Number/fact FIRST — "आज हम X के बारे में बात करेंगे" से मत शुरू करो।
+
+            【 SEGMENT 1 — क्या हुआ / यह है क्या (basics from zero) 】
+            Background बिल्कुल zero से explain करो — assume करो viewer को कुछ नहीं पता।
+            हर technical term तुरंत define होना चाहिए जब पहली बार आए:
+              ✓ "'IPO' — Initial Public Offering — यानी जब कोई private company पहली बार public को shares बेचती है।"
+              ✓ "'Valuation' का मतलब है: अगर तुम company के सारे shares खरीद लो, तो कितना पैसा लगेगा।"
+            Speaker B audience के obvious questions पूछे।
+            Tight रखो — foundation only।
+
+            【 SEGMENT 2 — Key Numbers / Math Simple में 】
+            Real analysis। Most important numbers walk-through करो।
+            हर number को concrete बनाने के लिए comparison दो:
+              ✓ "Normal company 3 times sales पर trade करती है। यह 95 times पर है।"
+              ✓ "सोचो swimming pool में पानी बहुत कम है। एक कंकड़ फेंको — tsunami जैसा लगेगा।"
+            Speaker B pushback करे: "Yaar यह normal है?" / "यह तो insane लग रहा है।"
+            कम से कम 2 vivid analogies।
+
+            【 SEGMENT 3 — Credit Where Due / दूसरा Side (fair रहो) 】
+            उस चीज़ के लिए strongest honest argument।
+            Speaker B: "तो फिर लोग worried क्यों हैं?" — transition to actual risk।
+            यह segment MUST हो — कभी one-sided मत रहो।
+
+            【 SEGMENT 4 — Hidden Detail (जो headlines miss करती हैं) 】
+            एक specific insight जो casual coverage skip करती है।
+            Speaker B react करे: "Ruko — तो इसका मतलब..."
+
+            【 SEGMENT 5 — Optimist's Case (steelman करो) 】
+            Speaker A bull/positive case fairly present करे।
+            Speaker B: "पर best-case में भी यह believe करना पड़ेगा कि..."
+
+            【 CLOSING — Simple Takeaway 】
+            Speaker B: "Plain और simple — [central question restate करो]?"
+            Speaker A: direct 2-3 sentence answer। कोई hedging नहीं।
+            MEMORABLE CLOSING LINE — sharp, witty, thought-provoking।
+            Examples:
+            • "मज़ेदार बात यह है कि इस company में जो safely land करता है हर बार... वो rockets हैं, stock नहीं।"
+            • "Math झूठ नहीं बोलता। Marketing बोलती है।"
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            NON-NEGOTIABLE RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ हर technical term को तुरंत define करो जब पहली बार आए — कोई exception नहीं
+            ✓ Short turns: 2-4 sentences per exchange — कोई long monologue नहीं
+            ✓ Speaker B हर segment में कम से कम एक बार genuinely pushback या react करे
+            ✓ हर analogy visual और concrete हो — "it's complex" या "it's nuanced" नहीं
+            ✓ Numbers को context दो — stat drop करते वक्त comparison ज़रूरी है
+            ✓ दोनों sides को fair hearing मिले — clarity, not cheerleading या fear-mongering
+            ✗ BANNED: "Yeh zaroori hai", "Ant mein", "Chaliye shuru karte hain", generic filler
+            ✗ BANNED: Hook से पहले long intro
+            ✗ BANNED: Jargon बिना explanation के
+            ✗ BANNED: कोई भी side cartoonishly wrong
+
             ${durFillHi}
           `;
         } else if (style === 'situational') {
@@ -3869,6 +3970,107 @@ ${specificDetails}`
             ✗ BANNED: Long boring intro — hook must be direct and sharp
             ${durFillEn}
           `;
+        } else if (style === 'deep_explainer') {
+          prompt = `
+            ═══════════════════════════════════════════════════════
+            STYLE: DEEP EXPLAINER — BEGINNER-FRIENDLY NEWS/TOPIC BREAKDOWN
+            Two conversational speakers. One asks, one explains. EVERY jargon term defined
+            the moment it appears. Strong hook in first 20 seconds. Structured segments.
+            Think: podcast-meets-YouTube-explainer — deep, accurate, conversational, zero assumed knowledge.
+            ═══════════════════════════════════════════════════════
+            Topic: "${topic}"
+            ${specificDetails ? `Additional context / angle: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STEP 1 — PLAN FIRST (before writing):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Identify the 5-7 most important things a total beginner MUST understand about this topic:
+              → The shocking hook / central fact
+              → Core background (what happened / what is this)
+              → The key numbers / math (explained simply with comparisons)
+              → The real-world stakes (who gets hurt, who benefits, why it matters)
+              → The counterargument / other side (give it a fair hearing)
+              → The hidden detail most headlines miss
+              → The simple takeaway
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            CHARACTERS — exactly 2 speakers (no Narrator):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ${speakers.length >= 2
+              ? `Speaker A (Explainer): ${speakers[0]} — well-informed, explains clearly, uses real analogies
+Speaker B (Curious): ${speakers[1]} — asks what the audience is thinking, pushes back, reacts genuinely`
+              : `Speaker A (Explainer): choose a fitting name — well-informed, explains clearly, uses real analogies
+Speaker B (Curious): choose a different name — asks what the audience is thinking, pushes back, reacts genuinely`
+            }
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            STRUCTURE (follow this exact flow):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【 HOOK — first 20 seconds (2-4 short exchanges) 】
+            Open with a SHOCKING number, fact, or question — no warmup, no intro.
+            Good examples:
+            • "Quick question. How do you lose $600 billion dollars in one single day?"
+            • "What if I told you the safest-looking investment just became the riskiest?"
+            Speaker B reacts in disbelief or curiosity. Speaker A teases the full story.
+            End with: the central question this video will answer.
+            RULE: Start with the number/fact FIRST — not "Today we're talking about X."
+
+            【 SEGMENT 1 — WHAT HAPPENED / WHAT IS THIS (basics from zero) 】
+            Explain background from absolute zero — assume viewer knows NOTHING.
+            EVERY technical term defined immediately when it first appears:
+              ✓ "An 'IPO' — Initial Public Offering — is just the moment a private company sells shares to the public for the first time."
+              ✓ "'Valuation' just means: if you bought every single share, that's what it would cost you."
+            Speaker B asks the obvious questions the audience is thinking.
+            Keep it tight — foundation only.
+
+            【 SEGMENT 2 — THE KEY NUMBERS / MATH MADE SIMPLE 】
+            Real analysis. Walk through the most important numbers.
+            Every number needs a comparison to make it concrete:
+              ✓ "For comparison, the average company trades at 3 times sales. This one is at 95."
+              ✓ "Picture a swimming pool with almost no water. Throw in one pebble — it looks like a tsunami."
+            Speaker B pushes back: "Is that normal?" / "That seems insane."
+            Use at least 2 vivid analogies.
+
+            【 SEGMENT 3 — CREDIT WHERE DUE / THE OTHER SIDE (be fair) 】
+            Strongest honest argument FOR the thing being analyzed.
+            Speaker B: "So why are people still worried?" — transition to what's actually risky.
+            This MUST exist — never one-sided.
+
+            【 SEGMENT 4 — THE HIDDEN DETAIL (what headlines miss) 】
+            One specific insight most casual coverage skips.
+            Speaker B reacts: "Wait — so that means..."
+
+            【 SEGMENT 5 — OPTIMIST'S CASE (steelman it) 】
+            Speaker A presents the bull/positive case fairly.
+            Speaker B: "But even the best-case version still requires believing..."
+
+            【 CLOSING — SIMPLE TAKEAWAY 】
+            Speaker B: "So, plain and simple — [restate the question]?"
+            Speaker A: direct 2-3 sentence answer. No hedging.
+            End with a MEMORABLE CLOSING LINE — sharp, witty, thought-provoking.
+            Examples:
+            • "Funny enough, the part of this company that actually lands safely every time... might be the rockets, not the stock."
+            • "The math doesn't lie. The marketing does."
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            NON-NEGOTIABLE RULES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✓ Define EVERY technical term immediately when it first appears — no exceptions
+            ✓ Short turns: 2-4 sentences per exchange — no long monologues
+            ✓ Speaker B must push back or react genuinely at least once per segment
+            ✓ Every analogy must be visual and concrete — NOT "it's complex" or "it's nuanced"
+            ✓ Numbers need context — never drop a stat without a comparison to something normal
+            ✓ Both sides get a fair hearing — clarity, not cheerleading or fear-mongering
+            ✗ BANNED: "It's important to note", "In conclusion", "Let's delve into", "Fascinating", "Great question"
+            ✗ BANNED: Long intro before the hook — first line MUST be punchy
+            ✗ BANNED: Dropping jargon without explaining immediately
+            ✗ BANNED: Either side being cartoonishly wrong
+
+            ${durFillEn}
+          `;
         } else if (style === 'situational') {
           if (!includeNarrator) {
           prompt = `
@@ -4666,7 +4868,7 @@ ${specificDetails}`
   }
 
   // Only use googleSearch grounding for models that support it without breaking text extraction
-  const supportsGrounding = model.includes('2.5') || model.includes('1.5');
+  const supportsGrounding = model.includes('2.5') || model.includes('1.5') || model.includes('3.');
   const finalTools = supportsGrounding ? tools : [];
 
   try {

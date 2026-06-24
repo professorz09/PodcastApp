@@ -38,7 +38,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3.5-flash' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite'>('gemini-3.5-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -931,7 +931,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov';
+                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
@@ -950,6 +950,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'questioning') { setSpeakerCount(4); setIncludeNarrator(true); }
                       if (newStyle === 'transcript_review') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'summarizer_pov') { setSpeakerCount(1); setIncludeNarrator(false); }
+                      if (newStyle === 'deep_explainer') { setSpeakerCount(2); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
@@ -959,6 +960,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="finance_deep_dive">💰 Finance Deep Dive</option>
                     <option value="explained">Explained</option>
                     <option value="explained_solo">🎙 Explained Solo</option>
+                    <option value="deep_explainer">🔍 Deep Explainer</option>
                     <option value="image">🖼 Imagen Style</option>
                     <option value="documentary">Documentary</option>
                     <option value="joe_rogan">🎙 Joe Rogan Experience</option>
