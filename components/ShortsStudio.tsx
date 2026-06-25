@@ -256,11 +256,17 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
   // Input
   const [inputMode, setInputMode] = useState<'upload' | 'youtube'>('upload');
   const [ytUrl, setYtUrl] = useState('');
+
+  // Config (shown after file/URL is set)
   const [clipMode, setClipMode] = useState<ClipMode>('short');
+  const [clipCount, setClipCount] = useState<3 | 5 | 7>(5);
+  const [language, setLanguage] = useState<'en-US' | 'hi-IN' | 'auto'>('en-US');
 
   // Media
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  // Stored blob URL for uploaded file (separate from videoUrl which is set after processing)
+  const [pendingFileUrl, setPendingFileUrl] = useState<string | null>(null);
 
   // Results
   const [videoTitle, setVideoTitle] = useState('');
@@ -316,48 +322,57 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     segs.forEach((seg, idx) => loadMeta(idx, seg, chunks));
   }, [clipMode, loadMeta]);
 
-  const handleVideoUpload = useCallback(async (file: File) => {
-    setVideoFile(file);
-    setError('');
-    setPhase('processing');
+  // Just stores the file — does NOT start processing
+  const handleFileSelect = useCallback((file: File) => {
+    if (pendingFileUrl) URL.revokeObjectURL(pendingFileUrl);
     const url = URL.createObjectURL(file);
-    try {
-      setStatus('Audio transcribe ho raha hai…');
-      const wordTimings = await transcribeAudioGoogleCloud(file, 'en-US', (s) => setStatus(s));
-      if (!wordTimings.length) throw new Error('Transcript nahi mila — video mein clear audio hai?');
-      const chunks = wordTimingsToChunks(wordTimings);
-      await processTranscript(chunks, file.name.replace(/\.[^.]+$/, ''), url);
-    } catch (e: any) {
-      setError(e.message || 'Kuch error aaya');
-      setPhase('input');
-      URL.revokeObjectURL(url);
-    }
-  }, [processTranscript]);
+    setVideoFile(file);
+    setPendingFileUrl(url);
+    setError('');
+  }, [pendingFileUrl]);
 
-  const handleYouTube = useCallback(async () => {
-    if (!ytUrl.trim()) return;
+  // Called when user clicks "Find Clips" — starts the actual work
+  const handleStart = useCallback(async () => {
     setError('');
     setPhase('processing');
-    try {
-      setStatus('YouTube transcript fetch ho raha hai…');
-      const res = await fetch('/api/youtube/transcript', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: ytUrl.trim(), language: 'auto' }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Transcript nahi mila');
-      const rawSegs: { text: string; start: number; end: number }[] =
-        (data.segments ?? data.transcript ?? []).map((s: any) => ({
-          text: s.text, start: s.start, end: s.start + (s.duration ?? 3),
-        }));
-      if (!rawSegs.length) throw new Error('Is video ka transcript available nahi hai');
-      await processTranscript(rawSegs, data.title ?? '', null);
-    } catch (e: any) {
-      setError(e.message || 'Kuch error aaya');
+
+    if (inputMode === 'upload' && videoFile && pendingFileUrl) {
+      try {
+        setStatus('Audio transcribe ho raha hai…');
+        const langCode = language === 'auto' ? 'en-US' : language;
+        const wordTimings = await transcribeAudioGoogleCloud(videoFile, langCode, (s) => setStatus(s));
+        if (!wordTimings.length) throw new Error('Transcript nahi mila — video mein clear audio hai?');
+        const chunks = wordTimingsToChunks(wordTimings);
+        await processTranscript(chunks, videoFile.name.replace(/\.[^.]+$/, ''), pendingFileUrl);
+      } catch (e: any) {
+        setError(e.message || 'Kuch error aaya');
+        setPhase('input');
+      }
+    } else if (inputMode === 'youtube' && ytUrl.trim()) {
+      try {
+        setStatus('YouTube transcript fetch ho raha hai…');
+        const res = await fetch('/api/youtube/transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: ytUrl.trim(), language: 'auto' }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Transcript nahi mila');
+        const rawSegs: { text: string; start: number; end: number }[] =
+          (data.segments ?? data.transcript ?? []).map((s: any) => ({
+            text: s.text, start: s.start, end: s.start + (s.duration ?? 3),
+          }));
+        if (!rawSegs.length) throw new Error('Is video ka transcript available nahi hai');
+        await processTranscript(rawSegs, data.title ?? '', null);
+      } catch (e: any) {
+        setError(e.message || 'Kuch error aaya');
+        setPhase('input');
+      }
+    } else {
+      setError('Pehle video upload karo ya YouTube URL daalo');
       setPhase('input');
     }
-  }, [ytUrl, processTranscript]);
+  }, [inputMode, videoFile, pendingFileUrl, ytUrl, language, processTranscript]);
 
   const handleDownload = useCallback(async (idx: number) => {
     const seg = segments[idx];
@@ -408,10 +423,15 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     setClipHashtags({});
     setVideoFile(null);
     if (videoUrl) URL.revokeObjectURL(videoUrl);
+    if (pendingFileUrl) URL.revokeObjectURL(pendingFileUrl);
     setVideoUrl(null);
+    setPendingFileUrl(null);
     setError('');
     setStatus('');
+    setYtUrl('');
   };
+
+  const isReady = inputMode === 'upload' ? !!videoFile : !!ytUrl.trim();
 
   // ── Input Screen ────────────────────────────────────────────────────────────
   if (phase === 'input') {
@@ -425,7 +445,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
             </button>
             <div>
               <h1 className="text-xl font-bold">Shorts Studio</h1>
-              <p className="text-xs text-gray-500">Upload video ya YouTube URL se best clips banao</p>
+              <p className="text-xs text-gray-500">Video ya YouTube URL se best clips banao</p>
             </div>
           </div>
 
@@ -437,11 +457,11 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
           )}
 
           {/* Mode Toggle */}
-          <div className="flex gap-2 mb-6 p-1 bg-white/5 rounded-xl">
+          <div className="flex gap-2 mb-5 p-1 bg-white/5 rounded-xl">
             {(['upload', 'youtube'] as const).map(m => (
               <button
                 key={m}
-                onClick={() => setInputMode(m)}
+                onClick={() => { setInputMode(m); setVideoFile(null); setYtUrl(''); if (pendingFileUrl) { URL.revokeObjectURL(pendingFileUrl); setPendingFileUrl(null); } }}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${inputMode === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : 'text-gray-400 hover:text-white'}`}
               >
                 {m === 'upload' ? <Upload size={15} /> : <Youtube size={15} />}
@@ -450,71 +470,130 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
             ))}
           </div>
 
-          {/* Upload Zone */}
-          {inputMode === 'upload' && (
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="relative border-2 border-dashed border-white/15 rounded-2xl p-10 text-center cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 transition-all mb-6"
-            >
-              <Upload size={36} className="mx-auto mb-3 text-gray-500" />
-              <p className="text-sm font-medium text-gray-300">Video file drag karo ya click karo</p>
-              <p className="text-xs text-gray-600 mt-1">MP4, MOV, AVI, MKV, WebM</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); }}
-              />
-            </div>
-          )}
+          {/* ── STEP 1: Upload / URL ── */}
+          <div className="mb-2">
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Step 1 — Source</p>
 
-          {/* YouTube Input */}
-          {inputMode === 'youtube' && (
-            <div className="mb-6">
+            {inputMode === 'upload' && (
+              videoFile ? (
+                /* File selected — show pill with change option */
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/25">
+                  <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center shrink-0">
+                    <Scissors size={15} className="text-green-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-green-300 truncate">{videoFile.name}</p>
+                    <p className="text-xs text-gray-500">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/8 transition-colors shrink-0"
+                  >
+                    Change
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-white/12 rounded-2xl p-8 text-center cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 transition-all"
+                >
+                  <Upload size={32} className="mx-auto mb-2 text-gray-500" />
+                  <p className="text-sm font-medium text-gray-300">Video file click karo</p>
+                  <p className="text-xs text-gray-600 mt-1">MP4, MOV, AVI, MKV, WebM</p>
+                  <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
+                </div>
+              )
+            )}
+
+            {inputMode === 'youtube' && (
               <input
                 type="url"
                 value={ytUrl}
                 onChange={e => setYtUrl(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleYouTube(); }}
                 placeholder="https://youtube.com/watch?v=..."
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-purple-500/50 focus:outline-none"
               />
-              <button
-                onClick={handleYouTube}
-                disabled={!ytUrl.trim()}
-                className="w-full mt-3 py-3 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <Youtube size={16} /> Find Best Clips
-              </button>
-            </div>
-          )}
-
-          {/* Clip Mode */}
-          <div className="mb-6">
-            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-medium">Clip Duration</p>
-            <div className="flex gap-2">
-              {([
-                { mode: 'short' as ClipMode, label: '⚡ Short', sub: '20–60 sec' },
-                { mode: 'long' as ClipMode, label: '🎯 Long', sub: '90s–6 min' },
-              ]).map(({ mode, label, sub }) => (
-                <button
-                  key={mode}
-                  onClick={() => setClipMode(mode)}
-                  className={`flex-1 py-3 rounded-xl border text-sm font-medium transition-all ${clipMode === mode ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/4 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                >
-                  <div>{label}</div>
-                  <div className="text-xs opacity-60 mt-0.5">{sub}</div>
-                </button>
-              ))}
-            </div>
+            )}
           </div>
 
-          {/* Info */}
-          <div className="px-4 py-3 rounded-xl bg-white/3 border border-white/6 text-xs text-gray-500 space-y-1">
-            <p>✓ AI best parts automatically dhundega</p>
-            <p>✓ Har clip ka title aur hashtags milenge</p>
-            <p>✓ 9:16 video with white header + subtitles download hoga</p>
+          {/* ── STEP 2: Configure (always visible, but highlighted when ready) ── */}
+          <div className={`mt-6 rounded-2xl border transition-all ${isReady ? 'border-white/12 bg-white/3' : 'border-white/6 bg-white/2 opacity-60'}`}>
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-4">Step 2 — Configure</p>
+
+              {/* Clip Duration */}
+              <div className="mb-4">
+                <p className="text-xs text-gray-400 mb-2">Clip Duration</p>
+                <div className="flex gap-2">
+                  {([
+                    { mode: 'short' as ClipMode, label: '⚡ Short', sub: '20–60 sec' },
+                    { mode: 'long' as ClipMode, label: '🎯 Long', sub: '90s–6 min' },
+                  ]).map(({ mode, label, sub }) => (
+                    <button
+                      key={mode}
+                      onClick={() => setClipMode(mode)}
+                      className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${clipMode === mode ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                    >
+                      <div>{label}</div>
+                      <div className="text-xs opacity-55 mt-0.5">{sub}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Number of Clips */}
+              <div className="mb-4">
+                <p className="text-xs text-gray-400 mb-2">Number of Clips</p>
+                <div className="flex gap-2">
+                  {([3, 5, 7] as const).map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setClipCount(n)}
+                      className={`flex-1 py-2 rounded-xl border text-sm font-semibold transition-all ${clipCount === n ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Language (only for video upload) */}
+              {inputMode === 'upload' && (
+                <div className="mb-4">
+                  <p className="text-xs text-gray-400 mb-2">Audio Language</p>
+                  <div className="flex gap-2">
+                    {([
+                      { val: 'en-US' as const, label: '🇺🇸 English' },
+                      { val: 'hi-IN' as const, label: '🇮🇳 Hindi' },
+                      { val: 'auto' as const, label: '🌐 Auto' },
+                    ]).map(({ val, label }) => (
+                      <button
+                        key={val}
+                        onClick={() => setLanguage(val)}
+                        className={`flex-1 py-2 rounded-xl border text-xs font-medium transition-all ${language === val ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Find Clips Button */}
+            <div className="px-4 pb-4">
+              <button
+                onClick={handleStart}
+                disabled={!isReady}
+                className="w-full py-3.5 rounded-xl font-bold text-sm bg-purple-600 hover:bg-purple-500 text-white transition-all disabled:opacity-35 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30"
+              >
+                <Sparkles size={16} />
+                Find Best Clips
+              </button>
+            </div>
           </div>
         </div>
       </div>
