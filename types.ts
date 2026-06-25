@@ -36,6 +36,7 @@ export enum AppState {
   VISUALIZER = 'VISUALIZER',
   STORYBOARD = 'STORYBOARD',
   SHORTS = 'SHORTS',
+  SHORTS_STUDIO = 'SHORTS_STUDIO',
   // Deprecated but kept for compatibility if needed during migration
   UPLOAD = 'UPLOAD',
   PROCESSING = 'PROCESSING',
