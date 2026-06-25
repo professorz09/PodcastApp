@@ -14,6 +14,7 @@ const Shorts           = lazy(() => import('./components/Shorts'));
 const LyricsGenerator  = lazy(() => import('./components/LyricsGenerator'));
 const PhoneConvoStudio = lazy(() => import('./components/PhoneConvoStudio'));
 const IgSongStudio     = lazy(() => import('./components/IgSongStudio'));
+const ShortsStudio     = lazy(() => import('./components/ShortsStudio'));
 import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, PhoneStudioSourceClip, ThumbnailState, YoutubeImportData } from './types';
@@ -622,6 +623,12 @@ Return JSON only (no markdown):
           onClearShortsContext={() => setShortsContext(null)}
           onBack={() => setAppState(AppState.STORYBOARD)}
           initialSegments={preloadedClips.length > 0 ? preloadedClips : undefined}
+        />
+      )}
+
+      {appState === AppState.SHORTS_STUDIO && (
+        <ShortsStudio
+          onBack={() => setAppState(AppState.SHORTS)}
         />
       )}
       </Suspense>
