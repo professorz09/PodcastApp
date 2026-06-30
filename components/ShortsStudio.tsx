@@ -1,10 +1,12 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   Upload, Youtube, Download, Loader2, Scissors,
-  ArrowLeft, Sparkles, Copy, Check, ChevronRight, RefreshCw,
+  ArrowLeft, Sparkles, Copy, Check, RefreshCw,
+  Film, Package,
 } from 'lucide-react';
-import { findBestShortsSegments, generateShortsTitles, ShortsSegment, ClipMode } from '../services/geminiService';
+import { findBestShortsSegments, findViralMovieClips, generateShortsTitles, ShortsSegment, ClipMode } from '../services/geminiService';
 import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
+import { createZip, ZipEntry } from '../services/zipWriter';
 import { toast } from './Toast';
 
 // Canvas 9:16 portrait
@@ -41,13 +43,29 @@ function wordTimingsToChunks(
   return out;
 }
 
+// Word-wrap helper
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
 // ── Draw one frame on canvas ─────────────────────────────────────────────────
+// kicker = small caption line shown above the big title in the white header.
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement | null,
   title: string,
   subtitle: string,
   isYoutube: boolean,
+  kicker?: string,
 ) {
   // Video / background
   if (video && video.readyState >= 2) {
@@ -75,53 +93,50 @@ function drawFrame(
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, W, HEADER_H);
 
-  // App branding (top-left, small gray)
-  ctx.fillStyle = '#888888';
-  ctx.font = '500 28px Arial, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('DebateForge', 44, 46);
-
-  // Title (bold black caps, wrapped, centered)
-  ctx.fillStyle = '#000000';
   const maxTW = W - 80;
-  let fs = 72;
-  ctx.font = `bold ${fs}px Arial, sans-serif`;
-  const words = title.toUpperCase().split(/\s+/);
-  let lines: string[] = [];
-  let line = '';
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (ctx.measureText(test).width > maxTW && line) { lines.push(line); line = w; }
-    else line = test;
-  }
-  if (line) lines.push(line);
-  // Shrink font if >2 lines
-  if (lines.length > 2) { fs = 56; ctx.font = `bold ${fs}px Arial, sans-serif`; lines = []; line = ''; for (const w of words) { const test = line ? `${line} ${w}` : w; if (ctx.measureText(test).width > maxTW && line) { lines.push(line); line = w; } else line = test; } if (line) lines.push(line); }
-  const lh = fs * 1.22;
-  const titleBlock = lines.length * lh;
-  const titleY = (HEADER_H + 40 - titleBlock) / 2 + 16;
   ctx.textAlign = 'center';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, titleY + i * lh + fs));
 
-  // Subtitle over video (white bold with strong shadow)
+  // ── Small kicker line (top of header) — colored, uppercase, letter-spaced ──
+  let headerTop = 40;
+  if (kicker && kicker.trim()) {
+    ctx.fillStyle = '#7C3AED';
+    ctx.font = '800 30px Arial, sans-serif';
+    const k = kicker.toUpperCase().slice(0, 38);
+    ctx.fillText(k, W / 2, headerTop + 26);
+    headerTop += 52;
+  }
+
+  // ── Big bold title (black caps, auto-fit) ──
+  ctx.fillStyle = '#0A0A0A';
+  const avail = HEADER_H - headerTop - 24;
+  let fs = 74;
+  let lines: string[] = [];
+  for (; fs >= 40; fs -= 4) {
+    ctx.font = `900 ${fs}px Arial, sans-serif`;
+    lines = wrapText(ctx, title.toUpperCase(), maxTW);
+    if (lines.length * fs * 1.18 <= avail) break;
+  }
+  const lh = fs * 1.18;
+  const block = lines.length * lh;
+  const titleY = headerTop + (avail - block) / 2 + fs * 0.82;
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, titleY + i * lh));
+
+  // ── Subtitle over video — big bold white, mixed-size feel, strong shadow ──
   if (subtitle.trim()) {
-    ctx.font = 'bold 54px Arial, sans-serif';
+    const sfs = 58;
+    ctx.font = `900 ${sfs}px Arial, sans-serif`;
     ctx.textAlign = 'center';
-    const sWords = subtitle.trim().split(/\s+/);
-    const sLines: string[] = [];
-    let sl = '';
-    for (const w of sWords) {
-      const t = sl ? `${sl} ${w}` : w;
-      if (ctx.measureText(t).width > W - 100 && sl) { sLines.push(sl); sl = w; }
-      else sl = t;
-    }
-    if (sl) sLines.push(sl);
-    const slh = 64;
-    const baseY = H - sLines.length * slh - 80;
-    ctx.shadowColor = 'rgba(0,0,0,0.95)';
-    ctx.shadowBlur = 14;
-    ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 2;
+    const sLines = wrapText(ctx, subtitle.trim(), W - 90);
+    const slh = sfs * 1.18;
+    const baseY = H - sLines.length * slh - 90;
+
+    // Outline for legibility on any background
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+    ctx.lineJoin = 'round';
+    sLines.forEach((l, i) => ctx.strokeText(l, W / 2, baseY + i * slh));
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 10;
     ctx.fillStyle = '#FFFFFF';
     sLines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + i * slh));
     ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
@@ -136,6 +151,7 @@ async function renderClip(
   title: string,
   transcript: { text: string; start: number; end: number }[],
   onProgress: (pct: number) => void,
+  kicker?: string,
 ): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -194,7 +210,7 @@ async function renderClip(
 
       const t = start + elapsed;
       const subtitle = getSubtitleAt(transcript, t);
-      drawFrame(ctx, video, title, subtitle, isYoutube);
+      drawFrame(ctx, video, title, subtitle, isYoutube, kicker);
 
       const done = video ? video.currentTime >= end - 0.05 : elapsed >= duration;
       if (done) {
@@ -254,13 +270,18 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
   const [error, setError] = useState('');
 
   // Input
-  const [inputMode, setInputMode] = useState<'upload' | 'youtube'>('upload');
+  const [inputMode, setInputMode] = useState<'upload' | 'youtube' | 'movie'>('upload');
   const [ytUrl, setYtUrl] = useState('');
 
   // Config (shown after file/URL is set)
   const [clipMode, setClipMode] = useState<ClipMode>('short');
   const [clipCount, setClipCount] = useState<3 | 5 | 7>(5);
   const [language, setLanguage] = useState<'en-US' | 'hi-IN' | 'auto'>('en-US');
+  // Movie mode — max Reels duration per clip
+  const [reelDuration, setReelDuration] = useState<60 | 90>(90);
+
+  const isMovie = inputMode === 'movie';
+  const isFileMode = inputMode === 'upload' || inputMode === 'movie';
 
   // Media
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -280,6 +301,11 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
   const [renderingIdx, setRenderingIdx] = useState<number | null>(null);
   const [renderProgress, setRenderProgress] = useState(0);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+  // ZIP (movie — download all)
+  const [zipping, setZipping] = useState(false);
+  const [zipDone, setZipDone] = useState(0);
+  const [zipStatus, setZipStatus] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -312,15 +338,21 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
   ) => {
     setTranscript(chunks);
     setVideoTitle(title);
-    setStatus('AI best clips dhund raha hai…');
-    const segs = await findBestShortsSegments(chunks, undefined, undefined, clipMode);
+    let segs: ShortsSegment[];
+    if (isMovie) {
+      setStatus('Poori movie analyse karke viral clips dhund raha hai…');
+      segs = await findViralMovieClips(chunks, reelDuration);
+    } else {
+      setStatus('AI best clips dhund raha hai…');
+      segs = await findBestShortsSegments(chunks, undefined, undefined, clipMode);
+    }
     if (!segs.length) throw new Error('Koi suitable clip nahi mila');
     setSegments(segs);
     setVideoUrl(url);
     setPhase('results');
     toast.success(`${segs.length} clips ready!`);
     segs.forEach((seg, idx) => loadMeta(idx, seg, chunks));
-  }, [clipMode, loadMeta]);
+  }, [clipMode, isMovie, reelDuration, loadMeta]);
 
   // Just stores the file — does NOT start processing
   const handleFileSelect = useCallback((file: File) => {
@@ -336,7 +368,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     setError('');
     setPhase('processing');
 
-    if (inputMode === 'upload' && videoFile && pendingFileUrl) {
+    if (isFileMode && videoFile && pendingFileUrl) {
       try {
         setStatus('Audio transcribe ho raha hai…');
         const langCode = language === 'auto' ? 'en-US' : language;
@@ -372,7 +404,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
       setError('Pehle video upload karo ya YouTube URL daalo');
       setPhase('input');
     }
-  }, [inputMode, videoFile, pendingFileUrl, ytUrl, language, processTranscript]);
+  }, [inputMode, isFileMode, videoFile, pendingFileUrl, ytUrl, language, processTranscript]);
 
   const handleDownload = useCallback(async (idx: number) => {
     const seg = segments[idx];
@@ -388,7 +420,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     setRenderingIdx(idx);
     setRenderProgress(0);
     try {
-      const blob = await renderClip(videoUrl, seg.start, seg.end, title, transcript, setRenderProgress);
+      const blob = await renderClip(videoUrl, seg.start, seg.end, title, transcript, setRenderProgress, seg.hook);
       setRenderProgress(100);
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -403,6 +435,62 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
       setRenderProgress(0);
     }
   }, [segments, clipTitles, videoUrl, transcript, inputMode]);
+
+  // ── Download ALL clips as a numbered ZIP + titles.txt ──
+  const handleDownloadZip = useCallback(async () => {
+    if (!videoUrl) { toast.error('Video file chahiye ZIP ke liye'); return; }
+    if (!segments.length) return;
+
+    setZipping(true);
+    setZipDone(0);
+    try {
+      const entries: ZipEntry[] = [];
+      const titleLines: string[] = [];
+      const pad = (n: number) => String(n).padStart(2, '0');
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const title = clipTitles[i] ?? seg.title;
+        setZipStatus(`Clip ${i + 1}/${segments.length} render ho rahi hai…`);
+        setRenderingIdx(i);
+        setRenderProgress(0);
+
+        const blob = await renderClip(videoUrl, seg.start, seg.end, title, transcript, setRenderProgress, seg.hook);
+        const buf = new Uint8Array(await blob.arrayBuffer());
+        const safe = title.slice(0, 50).replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
+        entries.push({ name: `${pad(i + 1)}_${safe}.webm`, data: buf });
+
+        const hashtags = (clipHashtags[i] ?? []).join(' ');
+        titleLines.push(
+          `${pad(i + 1)}. ${title}`,
+          `   ⏱ ${fmtTime(seg.start)} – ${fmtTime(seg.end)}  (${Math.round(seg.end - seg.start)}s)`,
+          hashtags ? `   ${hashtags}` : '',
+          '',
+        );
+        setZipDone(i + 1);
+      }
+
+      // titles.txt
+      const header = `${videoTitle || 'Movie'} — Viral Clips\n${'='.repeat(40)}\n\n`;
+      entries.push({ name: 'titles.txt', data: new TextEncoder().encode(header + titleLines.join('\n')) });
+
+      setZipStatus('ZIP file ban rahi hai…');
+      const zip = createZip(entries);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zip);
+      a.download = `${(videoTitle || 'movie').slice(0, 40).replace(/[^a-z0-9]/gi, '_')}_clips.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+      toast.success(`${segments.length} clips ZIP download ho gayi!`);
+    } catch (e: any) {
+      toast.error(e.message || 'ZIP banane mein error');
+    } finally {
+      setZipping(false);
+      setZipStatus('');
+      setRenderingIdx(null);
+      setRenderProgress(0);
+    }
+  }, [videoUrl, segments, clipTitles, clipHashtags, transcript, videoTitle]);
 
   const copyTimestamps = useCallback((idx: number) => {
     const seg = segments[idx];
@@ -431,7 +519,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     setYtUrl('');
   };
 
-  const isReady = inputMode === 'upload' ? !!videoFile : !!ytUrl.trim();
+  const isReady = isFileMode ? !!videoFile : !!ytUrl.trim();
 
   // ── Input Screen ────────────────────────────────────────────────────────────
   if (phase === 'input') {
@@ -445,7 +533,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
             </button>
             <div>
               <h1 className="text-xl font-bold">Shorts Studio</h1>
-              <p className="text-xs text-gray-500">Video ya YouTube URL se best clips banao</p>
+              <p className="text-xs text-gray-500">Video, YouTube ya poori movie se viral clips</p>
             </div>
           </div>
 
@@ -457,29 +545,40 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
           )}
 
           {/* Mode Toggle */}
-          <div className="flex gap-2 mb-5 p-1 bg-white/5 rounded-xl">
-            {(['upload', 'youtube'] as const).map(m => (
+          <div className="grid grid-cols-3 gap-2 mb-5 p-1 bg-white/5 rounded-xl">
+            {([
+              { m: 'upload' as const, icon: Upload, label: 'Video' },
+              { m: 'youtube' as const, icon: Youtube, label: 'YouTube' },
+              { m: 'movie' as const, icon: Film, label: 'Movie' },
+            ]).map(({ m, icon: Icon, label }) => (
               <button
                 key={m}
                 onClick={() => { setInputMode(m); setVideoFile(null); setYtUrl(''); if (pendingFileUrl) { URL.revokeObjectURL(pendingFileUrl); setPendingFileUrl(null); } }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${inputMode === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : 'text-gray-400 hover:text-white'}`}
+                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all ${inputMode === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : 'text-gray-400 hover:text-white'}`}
               >
-                {m === 'upload' ? <Upload size={15} /> : <Youtube size={15} />}
-                {m === 'upload' ? 'Video Upload' : 'YouTube URL'}
+                <Icon size={14} />
+                {label}
               </button>
             ))}
           </div>
+
+          {/* Movie mode banner */}
+          {isMovie && (
+            <div className="mb-4 px-4 py-3 rounded-xl bg-purple-500/8 border border-purple-500/20 text-xs text-purple-300/90 leading-relaxed">
+              🎬 Poori movie upload karo — AI saare viral moments dhundega, har clip Reels-length cut karega, aur sab ek ZIP me numbered + titles.txt ke saath milegi.
+            </div>
+          )}
 
           {/* ── STEP 1: Upload / URL ── */}
           <div className="mb-2">
             <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Step 1 — Source</p>
 
-            {inputMode === 'upload' && (
+            {isFileMode && (
               videoFile ? (
                 /* File selected — show pill with change option */
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/25">
                   <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center shrink-0">
-                    <Scissors size={15} className="text-green-400" />
+                    {isMovie ? <Film size={15} className="text-green-400" /> : <Scissors size={15} className="text-green-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-green-300 truncate">{videoFile.name}</p>
@@ -499,8 +598,8 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
                   onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-white/12 rounded-2xl p-8 text-center cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 transition-all"
                 >
-                  <Upload size={32} className="mx-auto mb-2 text-gray-500" />
-                  <p className="text-sm font-medium text-gray-300">Video file click karo</p>
+                  {isMovie ? <Film size={32} className="mx-auto mb-2 text-gray-500" /> : <Upload size={32} className="mx-auto mb-2 text-gray-500" />}
+                  <p className="text-sm font-medium text-gray-300">{isMovie ? 'Poori movie file click karo' : 'Video file click karo'}</p>
                   <p className="text-xs text-gray-600 mt-1">MP4, MOV, AVI, MKV, WebM</p>
                   <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
@@ -524,44 +623,70 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
             <div className="px-4 pt-4 pb-2">
               <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-4">Step 2 — Configure</p>
 
-              {/* Clip Duration */}
-              <div className="mb-4">
-                <p className="text-xs text-gray-400 mb-2">Clip Duration</p>
-                <div className="flex gap-2">
-                  {([
-                    { mode: 'short' as ClipMode, label: '⚡ Short', sub: '20–60 sec' },
-                    { mode: 'long' as ClipMode, label: '🎯 Long', sub: '90s–6 min' },
-                  ]).map(({ mode, label, sub }) => (
-                    <button
-                      key={mode}
-                      onClick={() => setClipMode(mode)}
-                      className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${clipMode === mode ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                    >
-                      <div>{label}</div>
-                      <div className="text-xs opacity-55 mt-0.5">{sub}</div>
-                    </button>
-                  ))}
+              {/* Clip Duration — non-movie modes */}
+              {!isMovie && (
+                <div className="mb-4">
+                  <p className="text-xs text-gray-400 mb-2">Clip Duration</p>
+                  <div className="flex gap-2">
+                    {([
+                      { mode: 'short' as ClipMode, label: '⚡ Short', sub: '20–60 sec' },
+                      { mode: 'long' as ClipMode, label: '🎯 Long', sub: '90s–6 min' },
+                    ]).map(({ mode, label, sub }) => (
+                      <button
+                        key={mode}
+                        onClick={() => setClipMode(mode)}
+                        className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${clipMode === mode ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                      >
+                        <div>{label}</div>
+                        <div className="text-xs opacity-55 mt-0.5">{sub}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Number of Clips */}
-              <div className="mb-4">
-                <p className="text-xs text-gray-400 mb-2">Number of Clips</p>
-                <div className="flex gap-2">
-                  {([3, 5, 7] as const).map(n => (
-                    <button
-                      key={n}
-                      onClick={() => setClipCount(n)}
-                      className={`flex-1 py-2 rounded-xl border text-sm font-semibold transition-all ${clipCount === n ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
-                    >
-                      {n}
-                    </button>
-                  ))}
+              {/* Number of Clips — non-movie modes (movie finds as many as exist) */}
+              {!isMovie && (
+                <div className="mb-4">
+                  <p className="text-xs text-gray-400 mb-2">Number of Clips</p>
+                  <div className="flex gap-2">
+                    {([3, 5, 7] as const).map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setClipCount(n)}
+                        className={`flex-1 py-2 rounded-xl border text-sm font-semibold transition-all ${clipCount === n ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Language (only for video upload) */}
-              {inputMode === 'upload' && (
+              {/* Reel Duration — movie mode only */}
+              {isMovie && (
+                <div className="mb-4">
+                  <p className="text-xs text-gray-400 mb-2">Max Reel Duration (per clip)</p>
+                  <div className="flex gap-2">
+                    {([
+                      { val: 60 as const, label: '60 sec', sub: 'Tight & punchy' },
+                      { val: 90 as const, label: '90 sec', sub: 'Reels max' },
+                    ]).map(({ val, label, sub }) => (
+                      <button
+                        key={val}
+                        onClick={() => setReelDuration(val)}
+                        className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${reelDuration === val ? 'border-purple-500 bg-purple-500/15 text-purple-300' : 'border-white/8 bg-white/3 text-gray-400 hover:border-white/20 hover:text-white'}`}
+                      >
+                        <div>{label}</div>
+                        <div className="text-xs opacity-55 mt-0.5">{sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Language (file modes only) */}
+              {isFileMode && (
                 <div className="mb-4">
                   <p className="text-xs text-gray-400 mb-2">Audio Language</p>
                   <div className="flex gap-2">
@@ -591,7 +716,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
                 className="w-full py-3.5 rounded-xl font-bold text-sm bg-purple-600 hover:bg-purple-500 text-white transition-all disabled:opacity-35 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30"
               >
                 <Sparkles size={16} />
-                Find Best Clips
+                {isMovie ? 'Find Viral Clips' : 'Find Best Clips'}
               </button>
             </div>
           </div>
@@ -624,7 +749,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold truncate">{videoTitle || 'Shorts Studio'}</h1>
-            <p className="text-xs text-gray-500">{segments.length} clips • {clipMode === 'short' ? '20–60s' : '90s–6min'}</p>
+            <p className="text-xs text-gray-500">{segments.length} clips • {isMovie ? `Reels ≤${reelDuration}s` : clipMode === 'short' ? '20–60s' : '90s–6min'}</p>
           </div>
           <button
             onClick={reset}
@@ -634,6 +759,27 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
             <RefreshCw size={16} />
           </button>
         </div>
+
+        {/* Download All (ZIP) — movie mode with uploaded video */}
+        {isMovie && videoUrl && segments.length > 0 && (
+          <button
+            onClick={handleDownloadZip}
+            disabled={zipping}
+            className="w-full mb-5 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30"
+          >
+            {zipping ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                {zipStatus || `Rendering ${zipDone}/${segments.length}…`}
+              </>
+            ) : (
+              <>
+                <Package size={16} />
+                Download All {segments.length} Clips (ZIP)
+              </>
+            )}
+          </button>
+        )}
 
         {/* Clip Cards */}
         <div className="space-y-4">
