@@ -160,6 +160,9 @@ async function renderClip(
 
   let video: HTMLVideoElement | null = null;
   let dest: MediaStreamAudioDestinationNode | null = null;
+  // Hoisted so we can close it after every render — browsers cap the number of
+  // live AudioContexts (~6), so a movie ZIP of many clips MUST release each one.
+  let audioCtx: AudioContext | null = null;
 
   if (videoUrl) {
     video = document.createElement('video');
@@ -167,16 +170,17 @@ async function renderClip(
     video.preload = 'auto';
     video.muted = false;
     await new Promise<void>((res, rej) => {
-      video!.oncanplaythrough = () => res();
-      video!.onerror = () => rej(new Error('Video load nahi hua'));
+      let loadTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => rej(new Error('Video load timeout')), 30_000);
+      const clear = () => { if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; } };
+      video!.oncanplaythrough = () => { clear(); res(); };
+      video!.onerror = () => { clear(); rej(new Error('Video load nahi hua')); };
       video!.load();
-      setTimeout(() => rej(new Error('Video load timeout')), 30_000);
     });
-    const AC = new AudioContext();
-    const src = AC.createMediaElementSource(video);
-    dest = AC.createMediaStreamDestination();
+    audioCtx = new AudioContext();
+    const src = audioCtx.createMediaElementSource(video);
+    dest = audioCtx.createMediaStreamDestination();
     src.connect(dest);
-    src.connect(AC.destination);
+    src.connect(audioCtx.destination);
     video.currentTime = start;
     await new Promise<void>(r => { video!.onseeked = () => r(); });
   }
@@ -193,16 +197,42 @@ async function renderClip(
 
   return new Promise<Blob>((resolve, reject) => {
     const chunks: Blob[] = [];
+    let animId = 0;
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+    let stopTimer: ReturnType<typeof setTimeout> | null = null;
+    let settled = false;
+
+    // Release every resource this render acquired — AudioContext, video buffers,
+    // and timers. Called exactly once on success, error, or timeout.
+    const cleanup = () => {
+      if (animId) cancelAnimationFrame(animId);
+      if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+      if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+      try { video?.pause(); } catch {}
+      if (video) { try { video.removeAttribute('src'); video.load(); } catch {} }
+      if (audioCtx && audioCtx.state !== 'closed') { audioCtx.close().catch(() => {}); }
+    };
+
     const recorder = new MediaRecorder(stream, { mimeType });
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => resolve(new Blob(chunks, { type: 'video/webm' }));
-    recorder.onerror = e => reject(new Error('MediaRecorder error'));
+    recorder.onstop = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(new Blob(chunks, { type: 'video/webm' }));
+    };
+    recorder.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('MediaRecorder error'));
+    };
 
     recorder.start(100);
     video?.play().catch(() => {});
 
     const duration = end - start;
-    let animId: number;
+    const startWall = Date.now();
 
     const tick = () => {
       const elapsed = video ? (video.currentTime - start) : ((Date.now() - startWall) / 1000);
@@ -215,24 +245,20 @@ async function renderClip(
       const done = video ? video.currentTime >= end - 0.05 : elapsed >= duration;
       if (done) {
         cancelAnimationFrame(animId);
-        video?.pause();
-        setTimeout(() => { try { recorder.stop(); } catch {} }, 300);
+        animId = 0;
+        try { video?.pause(); } catch {}
+        stopTimer = setTimeout(() => { try { recorder.stop(); } catch {} }, 300);
         return;
       }
       animId = requestAnimationFrame(tick);
     };
 
-    const startWall = Date.now();
     animId = requestAnimationFrame(tick);
 
-    // Safety timeout
-    setTimeout(() => {
-      try {
-        cancelAnimationFrame(animId);
-        video?.pause();
-        if (recorder.state !== 'inactive') recorder.stop();
-      } catch {}
-    }, (duration + 5) * 1000);
+    // Safety timeout — force-stop if playback stalls and never reaches the end.
+    safetyTimer = setTimeout(() => {
+      try { if (recorder.state !== 'inactive') recorder.stop(); } catch {}
+    }, (duration + 8) * 1000);
   });
 }
 
@@ -344,7 +370,8 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
       segs = await findViralMovieClips(chunks, reelDuration);
     } else {
       setStatus('AI best clips dhund raha hai…');
-      segs = await findBestShortsSegments(chunks, undefined, undefined, clipMode);
+      // clipCount only steers the 'short' prompt; 'long' naturally yields 2-4.
+      segs = await findBestShortsSegments(chunks, undefined, undefined, clipMode, clipMode === 'short' ? clipCount : undefined);
     }
     if (!segs.length) throw new Error('Koi suitable clip nahi mila');
     setSegments(segs);
@@ -352,7 +379,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     setPhase('results');
     toast.success(`${segs.length} clips ready!`);
     segs.forEach((seg, idx) => loadMeta(idx, seg, chunks));
-  }, [clipMode, isMovie, reelDuration, loadMeta]);
+  }, [clipMode, clipCount, isMovie, reelDuration, loadMeta]);
 
   // Just stores the file — does NOT start processing
   const handleFileSelect = useCallback((file: File) => {
