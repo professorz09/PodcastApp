@@ -7843,6 +7843,7 @@ export const findBestShortsSegments = async (
   rangeStart?: number,
   rangeEnd?: number,
   mode: ClipMode = 'short',
+  desiredCount?: number,
 ): Promise<ShortsSegment[]> => {
   if (!transcript.length) throw new Error('Transcript is empty');
 
@@ -7898,7 +7899,7 @@ Return JSON ONLY in this exact shape (no markdown, no extra text):
 Transcript with timestamps:
 ${lines}`
     : `You are an expert short-form video editor (YouTube Shorts / Instagram Reels / TikTok).
-Analyse the transcript below and find the 3 to 5 BEST segments that would make engaging Shorts.${rangeNote}
+Analyse the transcript below and find the ${desiredCount ? `${desiredCount} BEST` : '3 to 5 BEST'} segments that would make engaging Shorts.${rangeNote}
 
 Each segment must be 20-60 seconds long, have a strong hook, and contain a complete idea.
 Look for: surprising statements, emotional moments, controversial takes, valuable insights, funny lines, story climaxes.

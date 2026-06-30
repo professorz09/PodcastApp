@@ -32,3 +32,14 @@ attached_assets/
 __pycache__/
 *.pyc
 .vercel
+
+# Secrets — never commit. Cookies hold live session tokens; configure via
+# the YT_COOKIES_JSON env var (flask writes the file at startup) or the
+# /api/cookies/upload endpoint instead.
+yt_cookies.txt
+*.env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
