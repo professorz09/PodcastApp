@@ -7843,6 +7843,7 @@ export const findBestShortsSegments = async (
   rangeStart?: number,
   rangeEnd?: number,
   mode: ClipMode = 'short',
+  desiredCount?: number,
 ): Promise<ShortsSegment[]> => {
   if (!transcript.length) throw new Error('Transcript is empty');
 
@@ -7898,7 +7899,7 @@ Return JSON ONLY in this exact shape (no markdown, no extra text):
 Transcript with timestamps:
 ${lines}`
     : `You are an expert short-form video editor (YouTube Shorts / Instagram Reels / TikTok).
-Analyse the transcript below and find the 3 to 5 BEST segments that would make engaging Shorts.${rangeNote}
+Analyse the transcript below and find the ${desiredCount ? `${desiredCount} BEST` : '3 to 5 BEST'} segments that would make engaging Shorts.${rangeNote}
 
 Each segment must be 20-60 seconds long, have a strong hook, and contain a complete idea.
 Look for: surprising statements, emotional moments, controversial takes, valuable insights, funny lines, story climaxes.
@@ -7959,6 +7960,106 @@ ${lines}`;
       description: s.description || '',
       hook: s.hook || '',
     }));
+};
+
+// ── Find MANY viral clips from a full movie/long video ────────────────────────
+// Unlike findBestShortsSegments (3-5 clips), this scans the whole film and
+// returns as many Reels-worthy moments as exist — iconic dialogues, emotional
+// beats, plot twists, funny lines, action peaks. Each clip is Reels-length.
+export const findViralMovieClips = async (
+  transcript: { text: string; start: number; end: number }[],
+  maxDurationSec: number = 90,
+): Promise<ShortsSegment[]> => {
+  if (!transcript.length) throw new Error('Transcript is empty');
+
+  const ai = getAi();
+
+  // Movies are long — sample heavily but keep coverage across the whole runtime.
+  const MAX_CHARS = 40_000;
+  let allLines = transcript.map(s => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`);
+  let joined = allLines.join('\n');
+  if (joined.length > MAX_CHARS) {
+    const step = Math.ceil(allLines.length / Math.floor(MAX_CHARS / 60));
+    allLines = allLines.filter((_, i) => i % step === 0);
+    joined = allLines.join('\n');
+  }
+
+  const prompt = `You are an expert film editor who cuts viral Instagram Reels / YouTube Shorts from movies.
+Scan the ENTIRE movie transcript below and find EVERY moment that could go viral as a short clip.
+
+Look for:
+  • Iconic / quotable dialogues and one-liners
+  • Emotional peaks (heartbreak, reunion, sacrifice, betrayal)
+  • Plot twists and shocking reveals
+  • Funny / meme-able exchanges
+  • Motivational or powerful monologues
+  • Tense confrontations and action climaxes
+
+Each clip MUST:
+  • Be between 15 and ${maxDurationSec} seconds long (Instagram Reels limit — NEVER longer than ${maxDurationSec}s)
+  • Be a complete, self-contained moment that makes sense without the rest of the film
+  • Start exactly where the moment begins and end at its natural punch/conclusion
+
+Find as MANY strong clips as the movie genuinely offers — typically 8 to 20. Do NOT pad with weak moments; quality first, but don't miss any real gem. Spread them across the whole runtime (beginning, middle, end).
+
+Return JSON ONLY in this exact shape (no markdown, no extra text):
+{
+  "segments": [
+    {
+      "title": "5-8 word punchy viral title (in transcript's language)",
+      "start": <number, seconds>,
+      "end": <number, seconds>,
+      "description": "1 sentence on why this moment goes viral",
+      "hook": "The key line/moment that hooks viewers"
+    }
+  ]
+}
+
+Movie transcript with timestamps:
+${joined}`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.5-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          segments: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                start: { type: Type.NUMBER },
+                end: { type: Type.NUMBER },
+                description: { type: Type.STRING },
+                hook: { type: Type.STRING },
+              },
+              required: ['title', 'start', 'end'],
+            },
+          },
+        },
+        required: ['segments'],
+      },
+    },
+  });
+
+  const text = extractGeminiText(response);
+  const parsed = parseSegmentsJson(text, 'MovieClip');
+
+  return parsed.segments
+    .filter(s => typeof s.start === 'number' && typeof s.end === 'number' && s.end > s.start)
+    .map(s => ({
+      title: s.title || 'Untitled clip',
+      start: Math.max(0, s.start),
+      // Clamp each clip to the Reels duration limit
+      end: Math.min(s.end, s.start + maxDurationSec),
+      description: s.description || '',
+      hook: s.hook || '',
+    }))
+    .filter(s => s.end - s.start >= 5); // drop anything too short to be useful
 };
 
 // ── Generate 4 viral titles + thumbnail text from actual transcript ────────────
