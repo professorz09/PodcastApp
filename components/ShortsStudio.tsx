@@ -262,6 +262,19 @@ async function renderClip(
   });
 }
 
+// Run async tasks with a bounded concurrency so a long movie (15-20 clips)
+// doesn't fire 30-40 Gemini calls at once and trip rate limits (429).
+async function runWithLimit<T>(items: T[], limit: number, worker: (item: T, idx: number) => Promise<void>): Promise<void> {
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      await worker(items[i], i);
+    }
+  });
+  await Promise.all(runners);
+}
+
 // ── Hashtag fetcher via /api/gemini ──────────────────────────────────────────
 async function fetchHashtags(title: string, text: string): Promise<string[]> {
   try {
@@ -378,7 +391,8 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     setVideoUrl(url);
     setPhase('results');
     toast.success(`${segs.length} clips ready!`);
-    segs.forEach((seg, idx) => loadMeta(idx, seg, chunks));
+    // Throttle metadata generation — max 3 clips in flight at once.
+    runWithLimit(segs, 3, (seg, idx) => loadMeta(idx, seg, chunks));
   }, [clipMode, clipCount, isMovie, reelDuration, loadMeta]);
 
   // Just stores the file — does NOT start processing
@@ -474,6 +488,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
       const entries: ZipEntry[] = [];
       const titleLines: string[] = [];
       const pad = (n: number) => String(n).padStart(2, '0');
+      let failed = 0;
 
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
@@ -482,20 +497,31 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
         setRenderingIdx(i);
         setRenderProgress(0);
 
-        const blob = await renderClip(videoUrl, seg.start, seg.end, title, transcript, setRenderProgress, seg.hook);
-        const buf = new Uint8Array(await blob.arrayBuffer());
-        const safe = title.slice(0, 50).replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
-        entries.push({ name: `${pad(i + 1)}_${safe}.webm`, data: buf });
+        // One failed clip must not abort the whole batch — skip and continue.
+        let buf: Uint8Array | null = null;
+        try {
+          const blob = await renderClip(videoUrl, seg.start, seg.end, title, transcript, setRenderProgress, seg.hook);
+          buf = new Uint8Array(await blob.arrayBuffer());
+        } catch {
+          failed++;
+        }
+
+        if (buf) {
+          const safe = title.slice(0, 50).replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
+          entries.push({ name: `${pad(i + 1)}_${safe}.webm`, data: buf });
+        }
 
         const hashtags = (clipHashtags[i] ?? []).join(' ');
         titleLines.push(
-          `${pad(i + 1)}. ${title}`,
+          `${pad(i + 1)}. ${title}${buf ? '' : '   [render failed — skipped]'}`,
           `   ⏱ ${fmtTime(seg.start)} – ${fmtTime(seg.end)}  (${Math.round(seg.end - seg.start)}s)`,
           hashtags ? `   ${hashtags}` : '',
           '',
         );
         setZipDone(i + 1);
       }
+
+      if (!entries.length) throw new Error('Koi bhi clip render nahi hui — dobara try karo');
 
       // titles.txt
       const header = `${videoTitle || 'Movie'} — Viral Clips\n${'='.repeat(40)}\n\n`;
@@ -508,7 +534,10 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
       a.download = `${(videoTitle || 'movie').slice(0, 40).replace(/[^a-z0-9]/gi, '_')}_clips.zip`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 8000);
-      toast.success(`${segments.length} clips ZIP download ho gayi!`);
+      const ok = entries.length - 1; // minus titles.txt
+      toast.success(failed > 0
+        ? `${ok} clips ZIP me — ${failed} render fail hui`
+        : `${ok} clips ZIP download ho gayi!`);
     } catch (e: any) {
       toast.error(e.message || 'ZIP banane mein error');
     } finally {
