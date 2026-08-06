@@ -1269,17 +1269,29 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     }
   }, [scenes, characterGuide]);
 
-  // ── Generate all ──
+  // ── Generate all — parallel batches ──
+  // Vertex AI's Nano Banana image models cap out around 10 images/minute on
+  // the billing-enabled tier, so batches of 8 (same pattern AudioGenerator
+  // already uses for TTS) stay under that ceiling with a little headroom.
+  // handleGenerateImage's own retry-with-backoff absorbs any 429s that still
+  // slip through.
   const handleGenerateAll = useCallback(async () => {
     abortRef.current = false; setGeneratingAll(true); setGeneratingAllProgress(0);
     const toGen = scenes.filter(sc => !sc.imageUrl);
-    for (let i = 0; i < toGen.length; i++) {
-      if (abortRef.current) break;
-      await handleGenerateImage(toGen[i].id);
-      setGeneratingAllProgress(Math.round(((i + 1) / toGen.length) * 100));
-      // Spaced out to stay under Gemini image-gen's per-minute rate limit —
-      // handleGenerateImage's own retry-with-backoff covers occasional 429s.
-      await new Promise(r => setTimeout(r, 1500));
+    const BATCH_SIZE = 8;
+    let completed = 0;
+    for (let batchStart = 0; batchStart < toGen.length && !abortRef.current; batchStart += BATCH_SIZE) {
+      const batch = toGen.slice(batchStart, batchStart + BATCH_SIZE);
+      await Promise.all(batch.map(async (sc) => {
+        if (abortRef.current) return;
+        await handleGenerateImage(sc.id);
+        completed++;
+        setGeneratingAllProgress(Math.round((completed / toGen.length) * 100));
+      }));
+      const isLastBatch = batchStart + BATCH_SIZE >= toGen.length;
+      if (!abortRef.current && !isLastBatch) {
+        await new Promise(r => setTimeout(r, 3000));
+      }
     }
     setGeneratingAll(false); setGeneratingAllProgress(0);
     if (!abortRef.current) toast.success('All images generated!');
