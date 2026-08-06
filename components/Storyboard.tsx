@@ -1302,9 +1302,11 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       const url = await generateImageWithRetry(scene.prompt, characterGuide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
-      const msg = isQuotaError(e)
-        ? 'Gemini API quota exceeded. Wait a minute and hit Retry Failed, or check billing.'
-        : (e.message || 'Failed');
+      // Show the real backend error (now prefixed [vertex]/[apikey] with any
+      // quota-violation detail Google returns, from the gemini edge function)
+      // instead of a generic message that was hiding it.
+      const raw = e.message || 'Failed';
+      const msg = isQuotaError(e) ? `Quota exceeded — ${raw}. Wait a minute and hit Retry Failed, or check billing.` : raw;
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
       toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
     }
