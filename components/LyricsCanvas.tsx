@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from './Toast';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import {
   ArrowLeft, Play, Pause, Download, RotateCcw, ChevronLeft, ChevronRight,
   Loader2, CheckCircle, ImagePlus, X, Settings, Palette, ThumbsUp,
@@ -325,18 +326,26 @@ const LyricsCanvas: React.FC<Props> = ({ lyricsText, audioUrl = '', songStyle = 
     };
   }, [isPlaying, currentIdx, animMode, totalWords, activeLines.length, sttLines]);
 
+  const stopLyricsPreview = () => {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+  };
+
   const togglePlay = () => {
     if (!isPlaying && audioUrl && audioRef.current) {
       // Don't reset to 0 — resume from current position
+      registerActivePlayback(stopLyricsPreview);
       audioRef.current.play().catch(() => {});
     } else if (isPlaying) {
       audioRef.current?.pause();
+      clearActivePlayback(stopLyricsPreview);
     }
     setIsPlaying(p => !p);
   };
 
   const reset = () => {
     setIsPlaying(false);
+    clearActivePlayback(stopLyricsPreview);
     setCurrentIdx(0); setWordIdx(0); setAnimPhase('partial');
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
   };
