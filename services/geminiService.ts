@@ -30,7 +30,11 @@ const callGemini = async (model: string, contents: any, config?: any): Promise<a
     const err = await response.json().catch(() => ({}));
     const msg = err.error || `Gemini proxy error: ${response.status}`;
     if (response.status === 429 || msg.includes('RESOURCE_EXHAUSTED')) {
-      throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
+      // Keep the real backend detail (the gemini edge function prefixes it
+      // with [vertex]/[apikey] plus any quota-violation info Google returns)
+      // instead of replacing it with a generic message that hides which
+      // backend actually failed and why.
+      throw new Error(`Gemini API Quota Exceeded — ${msg}`);
     }
     throw new Error(msg);
   }
