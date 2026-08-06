@@ -784,6 +784,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingAllProgress, setGeneratingAllProgress] = useState(0);
+  const [generatingAllStatus, setGeneratingAllStatus] = useState('');
   const abortRef = useRef(false);
 
   const [imageAspectRatio, setImageAspectRatio] = useState<'16:9' | '3:4' | '1:1' | '9:16'>('16:9');
@@ -1293,44 +1294,71 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     }
   };
 
-  // ── Generate single image ──
-  const handleGenerateImage = useCallback(async (id: string) => {
+  // ── Generate single image ── returns a status so callers (like the patient
+  // "Generate All" drip loop below) can tell a real failure apart from "just
+  // quota, worth waiting out" without re-parsing the scene's error string.
+  const handleGenerateImage = useCallback(async (id: string, quiet = false): Promise<'success' | 'quota' | 'other'> => {
     const scene = scenes.find(sc => sc.id === id);
-    if (!scene) return;
+    if (!scene) return 'other';
     setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: true, error: undefined } : sc));
     try {
       const url = await generateImageWithRetry(scene.prompt, characterGuide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
+      return 'success';
     } catch (e: any) {
       // e.message already carries the real backend detail (the gemini edge
       // function prefixes it with [vertex]/[apikey] plus any quota-violation
       // info Google returns) — just append actionable guidance, don't hide it.
       const raw = e.message || 'Failed';
-      const msg = isQuotaError(e) ? `${raw} — hit Retry Failed in a minute, or check billing.` : raw;
+      const quota = isQuotaError(e);
+      const msg = quota ? `${raw} — hit Retry Failed in a minute, or check billing.` : raw;
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
-      toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
+      if (!quiet) toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
+      return quota ? 'quota' : 'other';
     }
   }, [scenes, characterGuide]);
 
-  // ── Generate all — sequential, one at a time ──
-  // Parallel batching (tried previously, assuming a ~10/minute RPM cap like
-  // the non-Lite Nano Banana model) made things worse: edge-function logs
-  // show successful image generations taking 10-55s each, and 429s arriving
-  // in pairs milliseconds apart — this specific preview model enforces a
-  // low CONCURRENT-request cap (looks like 1-2), not just a per-minute one.
-  // Firing 8 at once tripped that immediately. One at a time respects it;
-  // each call already takes long enough that no extra pacing delay is
-  // needed, and handleGenerateImage's retry-with-backoff still covers
-  // genuine transient 429s.
-  const handleGenerateAll = useCallback(async () => {
-    abortRef.current = false; setGeneratingAll(true); setGeneratingAllProgress(0);
-    const toGen = scenes.filter(sc => !sc.imageUrl);
-    for (let i = 0; i < toGen.length; i++) {
-      if (abortRef.current) break;
-      await handleGenerateImage(toGen[i].id);
-      setGeneratingAllProgress(Math.round(((i + 1) / toGen.length) * 100));
+  // Sleep that wakes up early (in ~500ms steps) if the user hits Stop mid-wait.
+  const abortableSleep = async (ms: number) => {
+    const step = 500;
+    for (let waited = 0; waited < ms && !abortRef.current; waited += step) {
+      await new Promise(r => setTimeout(r, Math.min(step, ms - waited)));
     }
-    setGeneratingAll(false); setGeneratingAllProgress(0);
+  };
+
+  // ── Generate all — patient background drip ──
+  // A quota error used to just fail the scene and move on (via
+  // handleGenerateImage's own quick 1-retry-after-4s) — fine for a single
+  // manual click, but for a full batch it meant "Generate All" gave up after
+  // just 1-2 images. Now: on a quota error, wait out Google's own suggested
+  // "a minute" and retry the SAME scene (up to a few times) before finally
+  // moving on — so a big batch keeps chugging along slowly in the background
+  // instead of quitting early. Hit Stop any time to cancel.
+  const QUOTA_RETRY_WAIT_MS = 60_000;
+  const MAX_QUOTA_RETRIES_PER_SCENE = 5;
+
+  const handleGenerateAll = useCallback(async () => {
+    abortRef.current = false; setGeneratingAll(true); setGeneratingAllProgress(0); setGeneratingAllStatus('');
+    const toGen = scenes.filter(sc => !sc.imageUrl);
+    const total = toGen.length;
+    for (let i = 0; i < toGen.length && !abortRef.current; i++) {
+      const scene = toGen[i];
+      let attempt = 0;
+      while (!abortRef.current) {
+        setGeneratingAllStatus(
+          attempt === 0
+            ? `Scene ${scene.sceneNumber}: generating…`
+            : `Scene ${scene.sceneNumber}: quota-limited, waited a minute — retrying (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`
+        );
+        const result = await handleGenerateImage(scene.id, true);
+        if (result !== 'quota' || attempt >= MAX_QUOTA_RETRIES_PER_SCENE) break;
+        attempt++;
+        setGeneratingAllStatus(`Scene ${scene.sceneNumber}: quota-limited — waiting a minute before retry (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`);
+        await abortableSleep(QUOTA_RETRY_WAIT_MS);
+      }
+      setGeneratingAllProgress(Math.round(((i + 1) / total) * 100));
+    }
+    setGeneratingAll(false); setGeneratingAllProgress(0); setGeneratingAllStatus('');
     if (!abortRef.current) toast.success('All images generated!');
   }, [scenes, handleGenerateImage]);
 
@@ -1473,9 +1501,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
               {/* Generate all progress */}
               {generatingAll && (
                 <div className="px-4 py-3 border-t border-white/5 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">Generating images… {generatingAllProgress}%</span>
-                    <button onClick={() => { abortRef.current = true; setGeneratingAll(false); }} className="text-red-400 text-xs hover:text-red-300">Stop</button>
+                  <div className="flex items-center justify-between text-xs gap-2">
+                    <span className="text-gray-400 truncate">{generatingAllStatus || `Generating images… ${generatingAllProgress}%`}</span>
+                    <button onClick={() => { abortRef.current = true; setGeneratingAll(false); setGeneratingAllStatus(''); }} className="text-red-400 text-xs hover:text-red-300 shrink-0">Stop</button>
                   </div>
                   <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-full transition-all" style={{ width: `${generatingAllProgress}%` }} />
