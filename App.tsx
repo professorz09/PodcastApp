@@ -182,7 +182,7 @@ const App: React.FC = () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: 'gemini-3.5-flash',
+              model: 'gemini-3.6-flash',
               contents: [{ role: 'user', parts: [{ text: `You are analyzing a YouTube video to extract SPECIFIC CLAIMS and the show/host identity.
 
 VIDEO TITLE: ${videoTitle}

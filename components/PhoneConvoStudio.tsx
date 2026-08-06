@@ -3469,7 +3469,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'gemini-3.5-flash',
+            model: 'gemini-3.6-flash',
             contents: [{
               role: 'user',
               parts: [{ text: `You are analyzing a YouTube video transcript to find the most interesting discussion points.
@@ -3556,7 +3556,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         }),
       });
