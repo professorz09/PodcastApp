@@ -1571,17 +1571,35 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     finally { setIsGeneratingScenes(false); }
   }, [script, sceneCount, model, buildSegmentTimestamps, absWords]);
 
+  // One retry on a quota error (not a multi-attempt backoff cascade), same
+  // as Storyboard.tsx — this file has its own copy of the image-gen flow
+  // that had drifted out of sync with those fixes.
+  const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e?.message || '');
+  const generateImageWithRetry = async (
+    prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio,
+  ): Promise<string> => {
+    try {
+      return await generateStoryboardImage(prompt, guide, ratio);
+    } catch (e: any) {
+      if (!isQuotaError(e)) throw e;
+      await new Promise(r => setTimeout(r, 4000));
+      return await generateStoryboardImage(prompt, guide, ratio);
+    }
+  };
+
   // ── Generate single image ──
   const handleGenerateImage = useCallback(async (id: string) => {
     const scene = scenes.find(sc => sc.id === id);
     if (!scene) return;
     setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: true, error: undefined } : sc));
     try {
-      const url = await generateStoryboardImage(scene.prompt, characterGuide, imageAspectRatio);
+      const url = await generateImageWithRetry(scene.prompt, characterGuide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
-      setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: e.message || 'Failed' } : sc));
-      toast.error(`Scene ${scene.sceneNumber}: ${e.message}`);
+      const raw = e.message || 'Failed';
+      const msg = isQuotaError(e) ? `${raw} — hit Retry Failed in a minute, or check billing.` : raw;
+      setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
+      toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
     }
   }, [scenes, characterGuide]);
 
