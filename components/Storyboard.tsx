@@ -453,24 +453,24 @@ function drawSubtitleOnCtx(
   const totalH = lines.length * lh + pad * 2;
   const baseY = cfg.position === 'top' ? 20 : H - totalH - 10;
 
-  // Crisp black outline + a tight drop shadow behind the text — reads
-  // clearly against any background, not just a soft blur glow. Optional,
-  // since a heavy outline can make the text read a bit dark/faded.
+  // Soft black glow behind the text (no hard outline/border) — a wide,
+  // dark blur that fades out, so text reads clearly against any
+  // background without looking boxed-in. Optional, toggle-able.
   if (cfg.shadow) {
-    ctx.lineJoin = 'round';
-    ctx.miterLimit = 2;
-    ctx.lineWidth = fs * 0.12;
-    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
     ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = 12;
     ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 2;
-    lines.forEach((l, i) => ctx.strokeText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
+    ctx.shadowOffsetY = 0;
   }
-
-  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   ctx.fillStyle = cfg.textColor;
   lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
+  // A second, tighter pass darkens the immediate glow around the glyphs
+  // without needing a stroke outline.
+  if (cfg.shadow) {
+    ctx.shadowBlur = 3;
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
+  }
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 }
 
 // Draw an image cover-fit on canvas
