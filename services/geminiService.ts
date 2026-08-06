@@ -1,6 +1,23 @@
 import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
 
+// Nano Banana 2 Lite — fastest/cheapest Gemini image model, used for all
+// image generation (thumbnails, avatars, storyboard illustrations, etc).
+// https://ai.google.dev/gemini-api/docs/image-generation
+const IMAGE_MODEL = 'gemini-3.1-flash-lite-image';
+
+// Least-restrictive safety config — this app generates fictional podcast
+// hosts/guests and illustrated story scenes, which default safety settings
+// over-block. Every image generation call below spreads these in.
+const IMAGE_SAFETY_SETTINGS = [
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+];
+const IMAGE_PERSON_GENERATION = 'allow_all';
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const callGemini = async (model: string, contents: any, config?: any): Promise<any> => {
@@ -6591,13 +6608,15 @@ STYLE RULES:
     parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image',
+      model: IMAGE_MODEL,
       contents: { parts: parts },
       config: {
         responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
-        }
+          personGeneration: IMAGE_PERSON_GENERATION,
+        },
+        safetySettings: IMAGE_SAFETY_SETTINGS,
       }
     });
 
@@ -6635,13 +6654,15 @@ export const generateVideoBackground = async (hostName: string, guestName: strin
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image',
+      model: IMAGE_MODEL,
       contents: { parts: [{ text: prompt }] },
       config: {
         responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
-        }
+          personGeneration: IMAGE_PERSON_GENERATION,
+        },
+        safetySettings: IMAGE_SAFETY_SETTINGS,
       }
     });
 
@@ -6682,13 +6703,15 @@ export const generateSegmentImage = async (segmentText: string, context?: string
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image',
+      model: IMAGE_MODEL,
       contents: { parts: [{ text: prompt }] },
       config: {
         responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
-        }
+          personGeneration: IMAGE_PERSON_GENERATION,
+        },
+        safetySettings: IMAGE_SAFETY_SETTINGS,
       }
     });
 
@@ -7038,9 +7061,13 @@ No text, no watermarks. Square crop, clear face.
 Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speakerIndex + 1)}".`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-flash-image',
+    model: IMAGE_MODEL,
     contents: { parts: [{ text: prompt }] },
-    config: { responseModalities: [Modality.IMAGE], imageConfig: { aspectRatio: use16x9 ? '16:9' : '1:1' } }
+    config: {
+      responseModalities: [Modality.IMAGE],
+      imageConfig: { aspectRatio: use16x9 ? '16:9' : '1:1', personGeneration: IMAGE_PERSON_GENERATION },
+      safetySettings: IMAGE_SAFETY_SETTINGS,
+    }
   });
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -7753,10 +7780,11 @@ Requirements:
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-flash-image',
+    model: IMAGE_MODEL,
     contents: { parts: [{ text: fullPrompt }] },
     config: {
-      imageConfig: { aspectRatio },
+      imageConfig: { aspectRatio, personGeneration: IMAGE_PERSON_GENERATION },
+      safetySettings: IMAGE_SAFETY_SETTINGS,
     },
   });
 
@@ -8101,10 +8129,11 @@ OVERALL: High contrast, cinematic. Looks like a top 1% viral YouTube thumbnail. 
 STRICT: Do NOT add watermarks. Only show the person and the text box as described above.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-flash-image',
+    model: IMAGE_MODEL,
     contents: { parts: [{ text: prompt }] },
     config: {
-      imageConfig: { aspectRatio: '16:9' },
+      imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
+      safetySettings: IMAGE_SAFETY_SETTINGS,
     },
   });
 
