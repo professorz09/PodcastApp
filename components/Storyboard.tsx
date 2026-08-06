@@ -8,8 +8,9 @@ import {
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased } from '../services/geminiService';
-import { saveScenes, loadScenes } from '../services/storageService';
+import { saveScenes, loadScenes, getScriptSignature } from '../services/storageService';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
+import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
 import { toast } from './Toast';
 
 interface StoryboardProps {
@@ -785,7 +786,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingAllProgress, setGeneratingAllProgress] = useState(0);
   const [generatingAllStatus, setGeneratingAllStatus] = useState('');
-  const abortRef = useRef(false);
 
   const [imageAspectRatio, setImageAspectRatio] = useState<'16:9' | '3:4' | '1:1' | '9:16'>('16:9');
 
@@ -850,6 +850,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     saveScenes(script, scenes, characterGuide);
   }, [scenes, characterGuide, script]);
 
+  const scriptSignature = useMemo(() => getScriptSignature(script), [script]);
   const { offsets, total: totalDuration } = useMemo(() => buildOffsets(script), [script]);
   // hasAudio: audioUrl present, duration optional (ElevenLabs returns 0)
   const hasAudio = script.some(s => !!s.audioUrl);
@@ -1318,49 +1319,33 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     }
   }, [scenes, characterGuide]);
 
-  // Sleep that wakes up early (in ~500ms steps) if the user hits Stop mid-wait.
-  const abortableSleep = async (ms: number) => {
-    const step = 500;
-    for (let waited = 0; waited < ms && !abortRef.current; waited += step) {
-      await new Promise(r => setTimeout(r, Math.min(step, ms - waited)));
-    }
-  };
+  // ── Generate all — runs as a background job (services/storyboardGenJobs.ts),
+  // not an inline loop tied to this component. That means it survives
+  // navigating away from Storyboard entirely — it only stops when the user
+  // hits Stop or it finishes — and it self-paces to at most 2 attempts/minute
+  // (shared across quota-retries too) instead of relying on per-scene timing
+  // alone. The useEffect below subscribes to whatever job is running for this
+  // exact script and mirrors its state into local UI state.
+  const handleGenerateAll = useCallback(() => {
+    startGenJob(script, scriptSignature, scenes, characterGuide, imageAspectRatio);
+  }, [script, scriptSignature, scenes, characterGuide, imageAspectRatio]);
 
-  // ── Generate all — patient background drip ──
-  // A quota error used to just fail the scene and move on (via
-  // handleGenerateImage's own quick 1-retry-after-4s) — fine for a single
-  // manual click, but for a full batch it meant "Generate All" gave up after
-  // just 1-2 images. Now: on a quota error, wait out Google's own suggested
-  // "a minute" and retry the SAME scene (up to a few times) before finally
-  // moving on — so a big batch keeps chugging along slowly in the background
-  // instead of quitting early. Hit Stop any time to cancel.
-  const QUOTA_RETRY_WAIT_MS = 60_000;
-  const MAX_QUOTA_RETRIES_PER_SCENE = 5;
-
-  const handleGenerateAll = useCallback(async () => {
-    abortRef.current = false; setGeneratingAll(true); setGeneratingAllProgress(0); setGeneratingAllStatus('');
-    const toGen = scenes.filter(sc => !sc.imageUrl);
-    const total = toGen.length;
-    for (let i = 0; i < toGen.length && !abortRef.current; i++) {
-      const scene = toGen[i];
-      let attempt = 0;
-      while (!abortRef.current) {
-        setGeneratingAllStatus(
-          attempt === 0
-            ? `Scene ${scene.sceneNumber}: generating…`
-            : `Scene ${scene.sceneNumber}: quota-limited, waited a minute — retrying (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`
-        );
-        const result = await handleGenerateImage(scene.id, true);
-        if (result !== 'quota' || attempt >= MAX_QUOTA_RETRIES_PER_SCENE) break;
-        attempt++;
-        setGeneratingAllStatus(`Scene ${scene.sceneNumber}: quota-limited — waiting a minute before retry (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`);
-        await abortableSleep(QUOTA_RETRY_WAIT_MS);
-      }
-      setGeneratingAllProgress(Math.round(((i + 1) / total) * 100));
+  useEffect(() => {
+    const existing = getGenJobSnapshot(scriptSignature);
+    if (existing) {
+      setScenes(existing.scenes);
+      setGeneratingAll(existing.running);
+      setGeneratingAllProgress(existing.progress);
+      setGeneratingAllStatus(existing.status);
     }
-    setGeneratingAll(false); setGeneratingAllProgress(0); setGeneratingAllStatus('');
-    if (!abortRef.current) toast.success('All images generated!');
-  }, [scenes, handleGenerateImage]);
+    const unsubscribe = subscribeGenJob(scriptSignature, (snap) => {
+      setScenes(snap.scenes);
+      setGeneratingAll(snap.running);
+      setGeneratingAllProgress(snap.progress);
+      setGeneratingAllStatus(snap.status);
+    });
+    return unsubscribe; // does NOT stop the job — just stops listening
+  }, [scriptSignature]);
 
   // ── Save prompt ──
   const handleSavePrompt = useCallback((id: string, prompt: string) => {
@@ -1503,7 +1488,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                 <div className="px-4 py-3 border-t border-white/5 space-y-2">
                   <div className="flex items-center justify-between text-xs gap-2">
                     <span className="text-gray-400 truncate">{generatingAllStatus || `Generating images… ${generatingAllProgress}%`}</span>
-                    <button onClick={() => { abortRef.current = true; setGeneratingAll(false); setGeneratingAllStatus(''); }} className="text-red-400 text-xs hover:text-red-300 shrink-0">Stop</button>
+                    <button onClick={() => stopGenJob(scriptSignature)} className="text-red-400 text-xs hover:text-red-300 shrink-0">Stop</button>
                   </div>
                   <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-full transition-all" style={{ width: `${generatingAllProgress}%` }} />
