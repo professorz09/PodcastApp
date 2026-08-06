@@ -7760,12 +7760,12 @@ Each scene covers one or more consecutive script segments. Every segment must be
 
 For each scene prompt:
 - Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
-- Include the character's action, expression, and setting
-- Keep prompts clear and visual — no abstract concepts, show what is literally happening
-- Write it as ONE simple, plain sentence: [who/what] + [doing what] + [where] — e.g.
-  "A monkey selling bananas on a street" or "A man driving a car with his wife".
-  Don't pad it with extra descriptive clauses — simple and literal renders better than
-  a sentence with five things happening at once.
+- Include the character's action, expression, and setting, and any other details
+  (mood, relevant objects, background elements) that help the image feel complete
+- Keep it clear and literal, focused on ONE main thing happening — not five unrelated
+  events crammed into one image. e.g. "A monkey selling bananas on a busy street,
+  smiling as a customer hands over a coin" is fine — that's still one clear moment,
+  just with enough detail to make the scene feel real
 - Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON in this exact format:
@@ -7828,10 +7828,10 @@ Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
 - Show what the character is DOING or EXPERIENCING during those spoken words
 - Be literal and visual — no abstract concepts
-- Write it as ONE simple, plain sentence: [who/what] + [doing what] + [where] — e.g.
-  "A monkey selling bananas on a street" or "A man driving a car with his wife".
-  Don't pad it with extra descriptive clauses — simple and literal renders better than
-  a sentence with five things happening at once.
+- Include enough detail (setting, expression, relevant objects, mood) that the scene
+  feels complete, but keep it focused on ONE main thing happening — not five unrelated
+  events crammed into one image. e.g. "A monkey selling bananas on a busy street,
+  smiling as a customer hands over a coin" is fine — one clear moment, described fully
 - Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON:
