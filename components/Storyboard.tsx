@@ -1269,29 +1269,23 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     }
   }, [scenes, characterGuide]);
 
-  // ── Generate all — parallel batches ──
-  // Vertex AI's Nano Banana image models cap out around 10 images/minute on
-  // the billing-enabled tier, so batches of 8 (same pattern AudioGenerator
-  // already uses for TTS) stay under that ceiling with a little headroom.
-  // handleGenerateImage's own retry-with-backoff absorbs any 429s that still
-  // slip through.
+  // ── Generate all — sequential, one at a time ──
+  // Parallel batching (tried previously, assuming a ~10/minute RPM cap like
+  // the non-Lite Nano Banana model) made things worse: edge-function logs
+  // show successful image generations taking 10-55s each, and 429s arriving
+  // in pairs milliseconds apart — this specific preview model enforces a
+  // low CONCURRENT-request cap (looks like 1-2), not just a per-minute one.
+  // Firing 8 at once tripped that immediately. One at a time respects it;
+  // each call already takes long enough that no extra pacing delay is
+  // needed, and handleGenerateImage's retry-with-backoff still covers
+  // genuine transient 429s.
   const handleGenerateAll = useCallback(async () => {
     abortRef.current = false; setGeneratingAll(true); setGeneratingAllProgress(0);
     const toGen = scenes.filter(sc => !sc.imageUrl);
-    const BATCH_SIZE = 8;
-    let completed = 0;
-    for (let batchStart = 0; batchStart < toGen.length && !abortRef.current; batchStart += BATCH_SIZE) {
-      const batch = toGen.slice(batchStart, batchStart + BATCH_SIZE);
-      await Promise.all(batch.map(async (sc) => {
-        if (abortRef.current) return;
-        await handleGenerateImage(sc.id);
-        completed++;
-        setGeneratingAllProgress(Math.round((completed / toGen.length) * 100));
-      }));
-      const isLastBatch = batchStart + BATCH_SIZE >= toGen.length;
-      if (!abortRef.current && !isLastBatch) {
-        await new Promise(r => setTimeout(r, 3000));
-      }
+    for (let i = 0; i < toGen.length; i++) {
+      if (abortRef.current) break;
+      await handleGenerateImage(toGen[i].id);
+      setGeneratingAllProgress(Math.round(((i + 1) / toGen.length) * 100));
     }
     setGeneratingAll(false); setGeneratingAllProgress(0);
     if (!abortRef.current) toast.success('All images generated!');
