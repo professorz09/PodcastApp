@@ -21,6 +21,7 @@ interface SubtitleConfig {
   fontSize: number;
   textColor: string;
   position: 'top' | 'bottom';
+  shadow: boolean;
 }
 
 const DEFAULT_SUBTITLE: SubtitleConfig = {
@@ -28,6 +29,7 @@ const DEFAULT_SUBTITLE: SubtitleConfig = {
   fontSize: 19,
   textColor: '#ffffff',
   position: 'bottom',
+  shadow: true,
 };
 
 const MODEL_OPTIONS = [
@@ -449,16 +451,26 @@ function drawSubtitleOnCtx(
   const lh = fs * 1.55;
   const pad = 10;
   const totalH = lines.length * lh + pad * 2;
-  const baseY = cfg.position === 'top' ? 20 : H - totalH - 20;
+  const baseY = cfg.position === 'top' ? 20 : H - totalH - 10;
 
-  // Strong shadow for legibility without background
-  ctx.shadowColor = 'rgba(0,0,0,0.95)';
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetX = 1;
-  ctx.shadowOffsetY = 2;
+  // Crisp black outline + a tight drop shadow behind the text — reads
+  // clearly against any background, not just a soft blur glow. Optional,
+  // since a heavy outline can make the text read a bit dark/faded.
+  if (cfg.shadow) {
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = fs * 0.12;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2;
+    lines.forEach((l, i) => ctx.strokeText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
+  }
+
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   ctx.fillStyle = cfg.textColor;
   lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
-  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 }
 
 // Draw an image cover-fit on canvas
@@ -1246,21 +1258,21 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     finally { setIsGeneratingScenes(false); }
   }, [script, sceneCount, model, buildSegmentTimestamps, absWords]);
 
-  // Gemini image-gen quota (RPM on the free/preview tier) trips easily when
-  // scenes are generated back-to-back — retry with backoff instead of just
-  // failing the scene on the first 429.
+  // Gemini image-gen quota trips easily when scenes are generated back-to-back.
+  // One retry on a quota error (not a multi-attempt backoff cascade — that
+  // just made a failing run take forever) — if it fails again, mark it
+  // failed and move on. The "Retry Failed" button handles picking failed
+  // scenes back up whenever the user wants to try again.
   const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e?.message || '');
   const generateImageWithRetry = async (
-    prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio, maxRetries = 3,
+    prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio,
   ): Promise<string> => {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await generateStoryboardImage(prompt, guide, ratio);
-      } catch (e: any) {
-        if (!isQuotaError(e) || attempt >= maxRetries) throw e;
-        // Backoff: 4s, 8s, 16s — free-tier quota resets are usually per-minute.
-        await new Promise(r => setTimeout(r, 4000 * Math.pow(2, attempt)));
-      }
+    try {
+      return await generateStoryboardImage(prompt, guide, ratio);
+    } catch (e: any) {
+      if (!isQuotaError(e)) throw e;
+      await new Promise(r => setTimeout(r, 4000));
+      return await generateStoryboardImage(prompt, guide, ratio);
     }
   };
 
@@ -1274,7 +1286,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
       const msg = isQuotaError(e)
-        ? 'Gemini API quota exceeded — waited and retried but it\'s still limited. Wait a minute and try again, or check billing.'
+        ? 'Gemini API quota exceeded. Wait a minute and hit Retry Failed, or check billing.'
         : (e.message || 'Failed');
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
       toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
@@ -1545,6 +1557,18 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                     </div>
                   </div>
 
+                  {/* Shadow toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-gray-400">Shadow</span>
+                      <p className="text-[10px] text-gray-600">Black outline behind the text for legibility</p>
+                    </div>
+                    <button onClick={() => setSubtitle(s => ({ ...s, shadow: !s.shadow }))}
+                      className={`w-11 h-6 rounded-full transition-all shrink-0 ${subtitle.shadow ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${subtitle.shadow ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
                 </div>
               </div>
             )}
@@ -1610,7 +1634,11 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                   {scenes.length > 0 && !generatingAll && (
                     <button onClick={handleGenerateAll} disabled={allImagesReady}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 text-sm font-semibold border border-blue-500/20 disabled:opacity-40 transition-all">
-                      <Zap size={14} /> Generate All Images
+                      <Zap size={14} />
+                      {(() => {
+                        const failedCount = scenes.filter(sc => sc.error && !sc.imageUrl).length;
+                        return failedCount > 0 ? `Retry Failed (${failedCount})` : 'Generate All Images';
+                      })()}
                     </button>
                   )}
                 </div>
