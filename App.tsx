@@ -1,6 +1,9 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import Layout from './components/Layout';
+import Login from './components/Login';
 import VideoClipImporter from './components/VideoClipImporter';
+import { supabase } from './services/supabaseClient';
 
 // Lazy-load heavy components so initial bundle stays small
 const ContentImporter  = lazy(() => import('./components/ContentImporter'));
@@ -60,8 +63,26 @@ const App: React.FC = () => {
   const [shortsContext, setShortsContext] = useState<TranscriptChunk | null>(null);
   const [preloadedClips, setPreloadedClips] = useState<ShortsSegment[]>([]);
 
-  // Load state on mount
+  // Auth gate — session undefined = still checking, null = logged out, Session = logged in.
+  // Project data only ever loads/loops once a real session exists (RLS requires it).
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const hasLoadedProjectRef = useRef(false);
+
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
+      setSession(newSession);
+      if (event === 'SIGNED_OUT') hasLoadedProjectRef.current = false;
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Load state once we have a session (not on every token refresh — a token
+  // refresh fires this same event with a new session reference, and re-running
+  // init() would clobber in-progress local edits with a stale cloud re-fetch).
+  useEffect(() => {
+    if (!session || hasLoadedProjectRef.current) return;
+    hasLoadedProjectRef.current = true;
     const init = async () => {
       const stored = await loadState();
       if (stored) {
@@ -99,7 +120,7 @@ const App: React.FC = () => {
       setIsInitialized(true);
     };
     init();
-  }, []);
+  }, [session]);
 
   // Save state on change
   useEffect(() => {
@@ -333,7 +354,7 @@ Return JSON only (no markdown):
     setAppState(AppState.VIDEO_CLIP_IMPORT);
   };
 
-  if (!isInitialized) {
+  if (session === undefined || (session && !isInitialized)) {
     return (
       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 rounded-2xl bg-white text-black flex items-center justify-center shadow-lg shadow-purple-900/20">
@@ -344,9 +365,13 @@ Return JSON only (no markdown):
           <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
           <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
-        <p className="text-gray-600 text-sm font-medium">Restoring your project…</p>
+        <p className="text-gray-600 text-sm font-medium">{session ? 'Restoring your project…' : 'Checking session…'}</p>
       </div>
     );
+  }
+
+  if (!session) {
+    return <Login />;
   }
 
   return (
@@ -421,6 +446,7 @@ Return JSON only (no markdown):
       activeStep={appState}
       onStepChange={setAppState}
       onNewProject={handleNewProject}
+      onLogout={() => supabase.auth.signOut()}
       hiddenSteps={[]}
     >
       <Suspense fallback={<LazyFallback />}>
