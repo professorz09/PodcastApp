@@ -590,6 +590,7 @@ Return JSON only (no markdown):
       {appState === AppState.STORYBOARD && (
         <Storyboard
           script={script}
+          scriptStyle={scriptStyle}
           onBack={() => setAppState(AppState.THUMBNAIL)}
         />
       )}
