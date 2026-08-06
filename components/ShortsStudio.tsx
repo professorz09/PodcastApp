@@ -41,6 +41,10 @@ function wordTimingsToChunks(
   return out;
 }
 
+const FONT_STACK = "'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+
+export type HeaderColor = 'white' | 'black';
+
 // ── Draw one frame on canvas ─────────────────────────────────────────────────
 function drawFrame(
   ctx: CanvasRenderingContext2D,
@@ -48,64 +52,72 @@ function drawFrame(
   title: string,
   subtitle: string,
   isYoutube: boolean,
+  headerEnabled: boolean = true,
+  headerColor: HeaderColor = 'white',
 ) {
+  const headerH = headerEnabled ? HEADER_H : 0;
+  const bg = headerColor === 'black' ? '#000000' : '#FFFFFF';
+  const fg = headerColor === 'black' ? '#FFFFFF' : '#000000';
+  const labelFg = headerColor === 'black' ? '#AAAAAA' : '#888888';
   // Video / background
   if (video && video.readyState >= 2) {
-    const vW = W, vH = H - HEADER_H;
+    const vW = W, vH = H - headerH;
     const vAsp = video.videoWidth / (video.videoHeight || 1);
     const cAsp = vW / vH;
     let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
     if (vAsp > cAsp) { sw = Math.round(sh * cAsp); sx = Math.round((video.videoWidth - sw) / 2); }
     else { sh = Math.round(sw / cAsp); sy = Math.round((video.videoHeight - sh) / 2); }
-    ctx.drawImage(video, sx, sy, sw, sh, 0, HEADER_H, vW, vH);
+    ctx.drawImage(video, sx, sy, sw, sh, 0, headerH, vW, vH);
   } else {
     // No video (YouTube) — dark gradient background
-    const grad = ctx.createLinearGradient(0, HEADER_H, 0, H);
+    const grad = ctx.createLinearGradient(0, headerH, 0, H);
     grad.addColorStop(0, '#111111');
     grad.addColorStop(1, '#000000');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, HEADER_H, W, H - HEADER_H);
+    ctx.fillRect(0, headerH, W, H - headerH);
     if (isYoutube) {
       ctx.fillStyle = 'rgba(255,0,0,0.15)';
-      ctx.fillRect(0, HEADER_H, W, H - HEADER_H);
+      ctx.fillRect(0, headerH, W, H - headerH);
     }
   }
 
-  // White header
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, W, HEADER_H);
+  if (headerEnabled) {
+    // Header strip — color + text togglable (white bg/black text, or black bg/white text)
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, HEADER_H);
 
-  // App branding (top-left, small gray)
-  ctx.fillStyle = '#888888';
-  ctx.font = '500 28px Arial, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('DebateForge', 44, 46);
+    // App branding (top-left, small)
+    ctx.fillStyle = labelFg;
+    ctx.font = `500 28px ${FONT_STACK}`;
+    ctx.textAlign = 'left';
+    ctx.fillText('DebateForge', 44, 46);
 
-  // Title (bold black caps, wrapped, centered)
-  ctx.fillStyle = '#000000';
-  const maxTW = W - 80;
-  let fs = 72;
-  ctx.font = `bold ${fs}px Arial, sans-serif`;
-  const words = title.toUpperCase().split(/\s+/);
-  let lines: string[] = [];
-  let line = '';
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (ctx.measureText(test).width > maxTW && line) { lines.push(line); line = w; }
-    else line = test;
+    // Title (bold caps, wrapped, centered)
+    ctx.fillStyle = fg;
+    const maxTW = W - 80;
+    let fs = 72;
+    ctx.font = `bold ${fs}px ${FONT_STACK}`;
+    const words = title.toUpperCase().split(/\s+/);
+    let lines: string[] = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w;
+      if (ctx.measureText(test).width > maxTW && line) { lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    // Shrink font if >2 lines
+    if (lines.length > 2) { fs = 56; ctx.font = `bold ${fs}px ${FONT_STACK}`; lines = []; line = ''; for (const w of words) { const test = line ? `${line} ${w}` : w; if (ctx.measureText(test).width > maxTW && line) { lines.push(line); line = w; } else line = test; } if (line) lines.push(line); }
+    const lh = fs * 1.22;
+    const titleBlock = lines.length * lh;
+    const titleY = (HEADER_H + 40 - titleBlock) / 2 + 16;
+    ctx.textAlign = 'center';
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, titleY + i * lh + fs));
   }
-  if (line) lines.push(line);
-  // Shrink font if >2 lines
-  if (lines.length > 2) { fs = 56; ctx.font = `bold ${fs}px Arial, sans-serif`; lines = []; line = ''; for (const w of words) { const test = line ? `${line} ${w}` : w; if (ctx.measureText(test).width > maxTW && line) { lines.push(line); line = w; } else line = test; } if (line) lines.push(line); }
-  const lh = fs * 1.22;
-  const titleBlock = lines.length * lh;
-  const titleY = (HEADER_H + 40 - titleBlock) / 2 + 16;
-  ctx.textAlign = 'center';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, titleY + i * lh + fs));
 
   // Subtitle over video (white bold with strong shadow)
   if (subtitle.trim()) {
-    ctx.font = 'bold 54px Arial, sans-serif';
+    ctx.font = `bold 54px ${FONT_STACK}`;
     ctx.textAlign = 'center';
     const sWords = subtitle.trim().split(/\s+/);
     const sLines: string[] = [];
@@ -136,6 +148,8 @@ async function renderClip(
   title: string,
   transcript: { text: string; start: number; end: number }[],
   onProgress: (pct: number) => void,
+  headerEnabled: boolean = true,
+  headerColor: HeaderColor = 'white',
 ): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -194,7 +208,7 @@ async function renderClip(
 
       const t = start + elapsed;
       const subtitle = getSubtitleAt(transcript, t);
-      drawFrame(ctx, video, title, subtitle, isYoutube);
+      drawFrame(ctx, video, title, subtitle, isYoutube, headerEnabled, headerColor);
 
       const done = video ? video.currentTime >= end - 0.05 : elapsed >= duration;
       if (done) {
@@ -267,6 +281,10 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   // Stored blob URL for uploaded file (separate from videoUrl which is set after processing)
   const [pendingFileUrl, setPendingFileUrl] = useState<string | null>(null);
+
+  // Header strip (branding + title bar) — togglable on/off, and white/black
+  const [headerEnabled, setHeaderEnabled] = useState(true);
+  const [headerColor, setHeaderColor] = useState<HeaderColor>('white');
 
   // Results
   const [videoTitle, setVideoTitle] = useState('');
@@ -388,7 +406,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     setRenderingIdx(idx);
     setRenderProgress(0);
     try {
-      const blob = await renderClip(videoUrl, seg.start, seg.end, title, transcript, setRenderProgress);
+      const blob = await renderClip(videoUrl, seg.start, seg.end, title, transcript, setRenderProgress, headerEnabled, headerColor);
       setRenderProgress(100);
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -633,6 +651,37 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
           >
             <RefreshCw size={16} />
           </button>
+        </div>
+
+        {/* Header strip settings — applies to all clip downloads */}
+        <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-300">Title Strip</span>
+            <button
+              onClick={() => setHeaderEnabled(v => !v)}
+              className={`relative w-9 h-5 rounded-full transition-all ${headerEnabled ? 'bg-purple-600' : 'bg-white/15'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${headerEnabled ? 'translate-x-4' : ''}`} />
+            </button>
+          </div>
+          {headerEnabled && (
+            <div className={`flex items-center gap-2 transition-opacity ${headerEnabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+              <span className="text-xs text-gray-500">Color</span>
+              <div className="flex bg-black border border-white/10 rounded-lg p-0.5 gap-0.5">
+                {(['white', 'black'] as const).map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setHeaderColor(c)}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-semibold capitalize transition-all ${
+                      headerColor === c ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Clip Cards */}
