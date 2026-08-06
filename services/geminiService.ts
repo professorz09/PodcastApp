@@ -1,10 +1,10 @@
 import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
 
-// Nano Banana 2 Lite — fastest/cheapest Gemini image model, used for all
-// image generation (thumbnails, avatars, storyboard illustrations, etc).
+// Nano Banana 2 — Gemini image model, used for all image generation
+// (thumbnails, avatars, storyboard illustrations, etc).
 // https://ai.google.dev/gemini-api/docs/image-generation
-const IMAGE_MODEL = 'gemini-3.1-flash-lite-image';
+const IMAGE_MODEL = 'gemini-3.1-flash-image';
 
 // Least-restrictive safety config — this app generates fictional podcast
 // hosts/guests and illustrated story scenes, which default safety settings

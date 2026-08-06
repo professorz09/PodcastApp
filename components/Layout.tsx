@@ -16,7 +16,6 @@ import {
   ChevronRight,
   MonitorSmartphone,
   Instagram,
-  LogOut,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -25,11 +24,10 @@ interface LayoutProps {
   activeStep: AppState;
   onStepChange: (step: AppState) => void;
   onNewProject?: () => void;
-  onLogout?: () => void;
   hiddenSteps?: AppState[];
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onNewProject, onLogout, hiddenSteps = [] }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onNewProject, hiddenSteps = [] }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const allSteps = [
@@ -154,15 +152,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
             >
               <RotateCcw size={13} className="shrink-0 group-hover:text-red-400 transition-colors" />
               <span className="text-[12px] font-medium">New Project</span>
-            </button>
-          )}
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all text-gray-600 hover:text-gray-300 hover:bg-white/[0.04] group"
-            >
-              <LogOut size={13} className="shrink-0" />
-              <span className="text-[12px] font-medium">Log Out</span>
             </button>
           )}
           <div className="px-3 py-2.5 rounded-lg bg-purple-500/[0.06] border border-purple-500/[0.12] flex items-center gap-2.5">
