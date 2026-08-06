@@ -164,7 +164,22 @@ async function callVertex(model: string, body: any, projectId: string, location:
   return data;
 }
 
+// The Gemini Developer API (AI Studio key) rejects `personGeneration` inside
+// imageConfig for Gemini image models — it's Vertex/Imagen-only there ("...
+// parameter is not supported in Gemini API"). Vertex tolerates it fine, so
+// strip it only on this fallback path rather than never sending it at all.
+function stripPersonGenerationForApiKey(body: any): any {
+  const imageConfig = body?.generationConfig?.imageConfig;
+  if (!imageConfig || !('personGeneration' in imageConfig)) return body;
+  const { personGeneration: _drop, ...restImageConfig } = imageConfig;
+  return {
+    ...body,
+    generationConfig: { ...body.generationConfig, imageConfig: restImageConfig },
+  };
+}
+
 async function callApiKey(model: string, body: any, apiKey: string): Promise<any> {
+  body = stripPersonGenerationForApiKey(body);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await resp.json();
