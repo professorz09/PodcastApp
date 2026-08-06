@@ -32,7 +32,6 @@ const DEFAULT_SUBTITLE: SubtitleConfig = {
 
 const MODEL_OPTIONS = [
   { value: 'gemini-3.6-flash', label: '⚡ Flash' },
-  { value: 'gemini-3.1-flash-lite', label: '✦ Lite' },
   { value: 'gemini-3.1-pro-preview', label: '✦ Pro' },
 ];
 
@@ -762,7 +761,7 @@ const TimelineRow: React.FC<{
 // ── Main ──────────────────────────────────────────────────────────────────────
 const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [sceneCount, setSceneCount] = useState(10);
-  const [model, setModel] = useState('gemini-3.1-flash-lite');
+  const [model, setModel] = useState('gemini-3.6-flash');
   const [showSettings, setShowSettings] = useState(false);
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
 
@@ -1235,17 +1234,38 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     finally { setIsGeneratingScenes(false); }
   }, [script, sceneCount, model, buildSegmentTimestamps, absWords]);
 
+  // Gemini image-gen quota (RPM on the free/preview tier) trips easily when
+  // scenes are generated back-to-back — retry with backoff instead of just
+  // failing the scene on the first 429.
+  const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e?.message || '');
+  const generateImageWithRetry = async (
+    prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio, maxRetries = 3,
+  ): Promise<string> => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await generateStoryboardImage(prompt, guide, ratio);
+      } catch (e: any) {
+        if (!isQuotaError(e) || attempt >= maxRetries) throw e;
+        // Backoff: 4s, 8s, 16s — free-tier quota resets are usually per-minute.
+        await new Promise(r => setTimeout(r, 4000 * Math.pow(2, attempt)));
+      }
+    }
+  };
+
   // ── Generate single image ──
   const handleGenerateImage = useCallback(async (id: string) => {
     const scene = scenes.find(sc => sc.id === id);
     if (!scene) return;
     setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: true, error: undefined } : sc));
     try {
-      const url = await generateStoryboardImage(scene.prompt, characterGuide, imageAspectRatio);
+      const url = await generateImageWithRetry(scene.prompt, characterGuide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
-      setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: e.message || 'Failed' } : sc));
-      toast.error(`Scene ${scene.sceneNumber}: ${e.message}`);
+      const msg = isQuotaError(e)
+        ? 'Gemini API quota exceeded — waited and retried but it\'s still limited. Wait a minute and try again, or check billing.'
+        : (e.message || 'Failed');
+      setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
+      toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
     }
   }, [scenes, characterGuide]);
 
@@ -1257,7 +1277,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       if (abortRef.current) break;
       await handleGenerateImage(toGen[i].id);
       setGeneratingAllProgress(Math.round(((i + 1) / toGen.length) * 100));
-      await new Promise(r => setTimeout(r, 400));
+      // Spaced out to stay under Gemini image-gen's per-minute rate limit —
+      // handleGenerateImage's own retry-with-backoff covers occasional 429s.
+      await new Promise(r => setTimeout(r, 1500));
     }
     setGeneratingAll(false); setGeneratingAllProgress(0);
     if (!abortRef.current) toast.success('All images generated!');
