@@ -7,7 +7,7 @@ import {
   Type
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
-import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased } from '../services/geminiService';
+import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
 import { saveScenes, loadScenes, syncScenesFromCloudIfNewer, getScriptSignature } from '../services/storageService';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
@@ -788,6 +788,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [generatingAllStatus, setGeneratingAllStatus] = useState('');
 
   const [imageAspectRatio, setImageAspectRatio] = useState<'16:9' | '3:4' | '1:1' | '9:16'>('16:9');
+  // Global switch (not per-screen) — also applies to Shorts/Thumbnail image gen.
+  const [useLiteModel, setUseLiteModel] = useState(isUsingLiteImageModel);
+  const toggleLiteModel = () => {
+    setUseLiteModel(v => {
+      const next = !v;
+      setUseLiteImageModel(next);
+      return next;
+    });
+  };
 
   const [subtitle, setSubtitle] = useState<SubtitleConfig>(DEFAULT_SUBTITLE);
   const [playTime, setPlayTime] = useState(0);
@@ -1653,6 +1662,19 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-black border border-white/5 rounded-xl px-3.5 py-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-300">Lite Image Model</p>
+                    <p className="text-[10px] text-gray-600 mt-0.5">Faster/cheaper, different rate limit — applies to Storyboard, Shorts &amp; Thumbnail</p>
+                  </div>
+                  <button
+                    onClick={toggleLiteModel}
+                    className={`relative w-9 h-5 rounded-full shrink-0 transition-all ${useLiteModel ? 'bg-purple-600' : 'bg-white/15'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${useLiteModel ? 'translate-x-4' : ''}`} />
+                  </button>
                 </div>
 
                 {characterGuide && (
