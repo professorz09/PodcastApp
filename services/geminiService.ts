@@ -382,7 +382,7 @@ export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVi
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
       config: {
         temperature: 1.2,
@@ -768,7 +768,7 @@ export const generateThumbnailText = async (scriptText: string, videoStyle: Thum
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
       config: {
         temperature: 1.2,
@@ -1193,7 +1193,7 @@ ${scriptText.slice(0, 3500)}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { responseMimeType: 'application/json', temperature: 1.2 },
     });
@@ -1235,7 +1235,7 @@ Write in plain English. No bullet points. No JSON. Just a short, crisp art direc
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
     return response.text?.trim() || '';
@@ -1272,7 +1272,7 @@ export const generateNarratorPrompts = async (scriptText: string): Promise<strin
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1318,7 +1318,7 @@ export const transcribeAudioBlob = async (audioBlob: Blob): Promise<TranscriptSe
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash', 
+      model: 'gemini-3.6-flash', 
       contents: {
         parts: [
             {
@@ -1373,7 +1373,7 @@ export const generateDebateScript = async (
   includeNarrator: boolean,
   customScript?: string,
   contextFileContent?: string,
-  model: string = 'gemini-3.5-flash',
+  model: string = 'gemini-3.6-flash',
   language: string = 'English',
   style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
@@ -4976,7 +4976,7 @@ export const detectSpeakers = async (topic: string, count: number = 2): Promise<
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: { parts: [{ text: prompt }] },
       config: {
         responseMimeType: "application/json",
@@ -5032,7 +5032,7 @@ export const rewriteScriptSegment = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: { parts: [{ text: prompt }] },
     });
 
@@ -5149,7 +5149,7 @@ const fileToBase64 = (file: File): Promise<string> => {
 const extractStyleFromImage = async (
   referenceImage: { data: string; mimeType: string }
 ): Promise<string> => {
-  const response = await callGemini('gemini-3.5-flash', {
+  const response = await callGemini('gemini-3.6-flash', {
     parts: [
       {
         inlineData: {
@@ -5333,7 +5333,7 @@ KEY VISUAL RULES:
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -5445,7 +5445,7 @@ Reply ONLY in JSON, no markdown:
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{ role: 'user', parts: [{ text: `Read this script and decide what image to show on the phone screen for a YouTube thumbnail.\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nCALLER: ${callerName}\n\nReply ONLY in JSON:\n{"phoneScreen":"vivid 1-2 sentence description of the topic image on the phone screen — dramatic, topic-specific","callerNote":"one sentence about the caller entity's visual icon or logo to show as phone avatar"}` }] }],
           config: { responseMimeType: 'application/json' },
         });
@@ -5512,7 +5512,7 @@ ${creatorDesc
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{ role: 'user', parts: [{ text: `Read this script and decide what image to show on the phone screen for a YouTube thumbnail.\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nCALLER: ${callerName}\n\nReply ONLY in JSON:\n{"phoneScreen":"vivid 1-2 sentence description of the topic image on the phone screen — dramatic, topic-specific, cinematic"}` }] }],
           config: { responseMimeType: 'application/json' },
         });
@@ -5580,7 +5580,7 @@ ${creatorDesc
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{ role: 'user', parts: [{ text: `For a YouTube thumbnail showing TWO phones in a conversation:\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nLEFT PHONE (speaking): ${char1}\nRIGHT PHONE (listening/topic): ${char2}\n\nDecide: is the RIGHT phone showing a REAL PERSON's face, or a TOPIC/COUNTRY/CONCEPT image?\n- If "${char2}" is a real public figure → show their face photorealistically\n- If "${char2}" is a country, topic, brand, concept → show a dramatic recognizable image (e.g. Chinese flag + Shanghai skyline, Moon with stars, etc.)\n\nReply ONLY in JSON:\n{"char1Screen":"vivid 1-2 sentence description of ${char1}'s face/appearance on the dark phone screen — intense, photorealistic","char2Screen":"vivid 1-2 sentence description of what fills the RIGHT phone screen (either face or topic image)","char2IsPerson":true}` }] }],
           config: { responseMimeType: 'application/json' },
         });
@@ -5661,7 +5661,7 @@ BOTTOM LINE: "${restLine}" — huge ultra-bold condensed black (#000000) same st
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -5773,7 +5773,7 @@ ${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic ima
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -5884,7 +5884,7 @@ GUEST: ${p2Guest || 'podcast guest'}
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -5985,7 +5985,7 @@ ${mrBackgroundScene}
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -6090,7 +6090,7 @@ ${cmAnnotations.length > 0 ? '- Annotation label boxes MUST have the glitchy/pix
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -6218,7 +6218,7 @@ VIRAL POST MESSAGE: "${p4PostText}"
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -6312,7 +6312,7 @@ ${p3ChartOverlay ? '- Chart overlay is SEMI-TRANSPARENT — text and person must
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -6420,7 +6420,7 @@ ${title && title.trim() ? `- The ONLY allowed text: "${title}" — tiny, subtle,
       onStep?.('analyzing');
       try {
         const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [{
             role: 'user',
             parts: [{
@@ -6744,7 +6744,7 @@ Comments:
 ${JSON.stringify(sample)}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -6766,7 +6766,7 @@ export const pickFunnyCommentsForSong = async (
   comments: string[],
   count: number = 20,
   language: string = 'Hindi',
-  model: string = 'gemini-3.5-flash',
+  model: string = 'gemini-3.6-flash',
 ): Promise<string[]> => {
   const ai = getAi();
   const cleaned = comments
@@ -6826,7 +6826,7 @@ Comments:
 ${sample}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
   return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Every opinion matters. Every voice counts.";
@@ -6845,7 +6845,7 @@ Input:
 ${textsJson}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -6883,7 +6883,7 @@ Script excerpt:
 ${excerpt}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -6924,7 +6924,7 @@ Return ONLY the topic phrase, nothing else. Example outputs:
 - "celebrity mental health crisis"`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
@@ -7102,7 +7102,7 @@ ${commentSample}
 Write ONE complete, detailed Veo 3 prompt. Start directly with the scene description. No preamble, no explanation, no markdown headers. Just the prompt text (150-250 words).`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
   return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
@@ -7161,7 +7161,7 @@ SCRIPT POINTS TO MAP (each point = Narrator intro + full speaker discussion):
 ${narratorStr}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
@@ -7264,7 +7264,7 @@ export const generateContextBridgeConclusion = async (
   language: string,
   speakerName: string,
   contextContent: string,
-  model: string = 'gemini-3.5-flash',
+  model: string = 'gemini-3.6-flash',
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -7429,7 +7429,7 @@ Return ONLY a JSON array. Each item: {"title": "...", "start_seconds": 0, "end_s
 The first chunk's start_seconds must be 0. The last chunk's end_seconds must be ${Math.floor(totalDuration)}.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: prompt,
   });
 
@@ -7505,7 +7505,7 @@ STRICT RULES:
 
   try {
     const response = await ai.models.generateContent({
-      model: params.model || 'gemini-3.5-flash',
+      model: params.model || 'gemini-3.6-flash',
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -7576,7 +7576,7 @@ export interface StoryboardScenesResult {
 export const generateStoryboardScenes = async (
   segments: { speaker: string; text: string; duration?: number; startTime?: number; endTime?: number }[],
   sceneCount: number,
-  model: string = 'gemini-3.5-flash',
+  model: string = 'gemini-3.6-flash',
 ): Promise<StoryboardScenesResult> => {
   const ai = getAi();
 
@@ -7659,7 +7659,7 @@ Do not add any explanation outside the JSON.
 // AI only generates image prompts (no segmentIndices decision needed)
 export const generateStoryboardScenesTimeBased = async (
   slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
-  model: string = 'gemini-3.5-flash',
+  model: string = 'gemini-3.6-flash',
 ): Promise<{ prompts: string[]; characterGuide: string }> => {
   const ai = getAi();
 
@@ -7948,7 +7948,7 @@ Transcript with timestamps:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
       responseMimeType: 'application/json',
@@ -8034,7 +8034,7 @@ Rules for thumbnailText:
 Return ONLY valid JSON. No markdown, no explanation.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: { parts: [{ text: prompt }] },
   });
 
@@ -8076,7 +8076,7 @@ Rules:
 Return ONLY the phrase text. No quotes, no explanation, no JSON.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: { parts: [{ text: prompt }] },
   });
 
@@ -8248,7 +8248,7 @@ Transcript:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
       responseMimeType: 'application/json',
@@ -8344,7 +8344,7 @@ Script:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-3.6-flash',
     contents: { parts: [{ text: prompt }] },
     config: { responseMimeType: 'application/json' },
   });
@@ -8389,7 +8389,7 @@ export const generatePhoneStudioScript = async (
   duration: number,
   description?: string,
   contextFileContent?: string,
-  model: string = 'gemini-3.5-flash',
+  model: string = 'gemini-3.6-flash',
   language: string = 'English',
   includeNarrator: boolean = false,
   youtubeComments?: string[],
@@ -8711,7 +8711,7 @@ Before finalizing, AUDIT your output:
 Transcript:
 ${promptBody}`;
 
-  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+  const data = await callGemini('gemini-3.6-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
     responseMimeType: 'application/json',
   });
 
@@ -8904,7 +8904,7 @@ Just:
     config.responseMimeType = 'application/json';
   }
 
-  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+  const data = await callGemini('gemini-3.6-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
   const raw: string = data.text
     ?? data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('')
     ?? '';
@@ -9121,7 +9121,7 @@ Return ONLY a JSON array. No markdown. No preamble. Just:
     config.responseMimeType = 'application/json';
   }
 
-  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+  const data = await callGemini('gemini-3.6-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
 
   const raw: string = data.text
     ?? data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('')
