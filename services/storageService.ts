@@ -1,5 +1,6 @@
 import { get, set, del } from 'idb-keyval';
 import { AppState, DebateSegment, StoryboardScene, ThumbnailState, YoutubeImportData } from '../types';
+import * as cloud from './cloudSync';
 
 const STORE_KEY = 'autovid_state';
 const SCENES_KEY = 'autovid_scenes';
@@ -26,6 +27,28 @@ interface StoredScenes {
 export const getScriptSignature = (script: DebateSegment[]): string =>
   script.map(s => s.id).join('|');
 
+// ── Cloud push debouncing ────────────────────────────────────────────────────
+// The app calls save*() on every edit (script text, scene image, etc). Local
+// IndexedDB writes are cheap and stay immediate; cloud pushes are debounced so
+// rapid edits collapse into one network round trip instead of spamming Supabase.
+const CLOUD_PUSH_DEBOUNCE_MS = 1200;
+
+function makeDebouncedPush<Args extends any[]>(push: (...args: Args) => Promise<void>, label: string) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const schedule = (...args: Args) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      push(...args).catch(e => console.error(`Cloud sync (${label}) failed`, e));
+    }, CLOUD_PUSH_DEBOUNCE_MS);
+  };
+  schedule.cancel = () => { if (timer) clearTimeout(timer); timer = null; };
+  return schedule;
+}
+
+const scheduleMainStatePush = makeDebouncedPush(cloud.pushMainState, 'state');
+const scheduleScenesPush = makeDebouncedPush(cloud.pushStoryboardScenes, 'storyboard');
+const scheduleShortsScenesPush = makeDebouncedPush(cloud.pushShortsScenes, 'shorts');
+
 // ── Scene persistence ──────────────────────────────────────────────────────────
 
 export const saveScenes = async (
@@ -43,16 +66,32 @@ export const saveScenes = async (
   } catch (e) {
     console.error('Failed to save scenes', e);
   }
+  scheduleScenesPush(script, scenes, characterGuide);
 };
 
 export const loadScenes = async (
   script: DebateSegment[],
 ): Promise<{ scenes: StoryboardScene[]; characterGuide: string } | null> => {
+  const signature = getScriptSignature(script);
+
+  try {
+    const row = await cloud.fetchProjectRow();
+    if (row?.storyboard && row.storyboard.scriptSignature === signature) {
+      const scenes = await Promise.all(row.storyboard.scenes.map(async sc => ({
+        ...sc,
+        imageUrl: await cloud.remoteToBlobUrl(sc.imageUrl),
+        isGenerating: false,
+      })));
+      return { scenes, characterGuide: row.storyboard.characterGuide };
+    }
+  } catch (e) {
+    console.error('Cloud load (storyboard) failed, falling back to local', e);
+  }
+
   try {
     const stored = await get<StoredScenes>(SCENES_KEY);
     if (!stored) return null;
-    // Only restore if script matches
-    if (stored.scriptSignature !== getScriptSignature(script)) return null;
+    if (stored.scriptSignature !== signature) return null;
     return { scenes: stored.scenes, characterGuide: stored.characterGuide };
   } catch (e) {
     console.error('Failed to load scenes', e);
@@ -61,6 +100,7 @@ export const loadScenes = async (
 };
 
 export const clearScenes = async (): Promise<void> => {
+  scheduleScenesPush.cancel();
   try { await del(SCENES_KEY); } catch { /* ignore */ }
 };
 
@@ -74,20 +114,38 @@ export const saveShortsScenes = async (
   try {
     await set(SHORTS_SCENES_KEY, { scriptSignature: getScriptSignature(script), scenes, characterGuide });
   } catch (e) { console.error('Failed to save shorts scenes', e); }
+  scheduleShortsScenesPush(script, scenes, characterGuide);
 };
 
 export const loadShortsScenes = async (
   script: DebateSegment[],
 ): Promise<{ scenes: StoryboardScene[]; characterGuide: string } | null> => {
+  const signature = getScriptSignature(script);
+
+  try {
+    const row = await cloud.fetchProjectRow();
+    if (row?.shorts_scenes && row.shorts_scenes.scriptSignature === signature) {
+      const scenes = await Promise.all(row.shorts_scenes.scenes.map(async sc => ({
+        ...sc,
+        imageUrl: await cloud.remoteToBlobUrl(sc.imageUrl),
+        isGenerating: false,
+      })));
+      return { scenes, characterGuide: row.shorts_scenes.characterGuide };
+    }
+  } catch (e) {
+    console.error('Cloud load (shorts) failed, falling back to local', e);
+  }
+
   try {
     const stored = await get<StoredScenes>(SHORTS_SCENES_KEY);
     if (!stored) return null;
-    if (stored.scriptSignature !== getScriptSignature(script)) return null;
+    if (stored.scriptSignature !== signature) return null;
     return { scenes: stored.scenes, characterGuide: stored.characterGuide };
   } catch (e) { console.error('Failed to load shorts scenes', e); return null; }
 };
 
 export const clearShortsScenes = async (): Promise<void> => {
+  scheduleShortsScenesPush.cancel();
   try { await del(SHORTS_SCENES_KEY); } catch { /* ignore */ }
 };
 
@@ -121,11 +179,46 @@ export const saveState = async (
   } catch (error) {
     console.error("Failed to save state to IndexedDB", error);
   }
+  scheduleMainStatePush(appState, script, thumbnailState, youtubeData);
 };
 
 let _activeBlobUrls: string[] = [];
 
 export const loadState = async (): Promise<{ appState: AppState, script: DebateSegment[], thumbnailState?: ThumbnailState, youtubeData?: YoutubeImportData | null } | null> => {
+  // Cloud is the source of truth (syncs across devices) — try it first.
+  try {
+    const row = await cloud.fetchProjectRow();
+    if (row && (row.script?.length || row.youtube_data)) {
+      _activeBlobUrls.forEach(u => URL.revokeObjectURL(u));
+      _activeBlobUrls = [];
+
+      const loadedScript: DebateSegment[] = await Promise.all(row.script.map(async seg => {
+        const audioUrl = await cloud.remoteToBlobUrl(seg.audioUrl);
+        if (audioUrl) _activeBlobUrls.push(audioUrl);
+        if (!seg.visualConfig?.backgroundUrl) return { ...seg, audioUrl };
+        const backgroundUrl = await cloud.remoteToBlobUrl(seg.visualConfig.backgroundUrl);
+        if (backgroundUrl) _activeBlobUrls.push(backgroundUrl);
+        return { ...seg, audioUrl, visualConfig: { ...seg.visualConfig, backgroundUrl } };
+      }));
+
+      let thumbnailState = row.thumbnail_state ?? undefined;
+      if (thumbnailState?.thumbnailUrl) {
+        const thumbnailUrl = await cloud.remoteToBlobUrl(thumbnailState.thumbnailUrl);
+        if (thumbnailUrl) _activeBlobUrls.push(thumbnailUrl);
+        thumbnailState = { ...thumbnailState, thumbnailUrl: thumbnailUrl ?? null };
+      }
+
+      return {
+        appState: row.app_state as AppState,
+        script: loadedScript,
+        thumbnailState,
+        youtubeData: row.youtube_data ?? null,
+      };
+    }
+  } catch (error) {
+    console.error("Cloud load (state) failed, falling back to local", error);
+  }
+
   try {
     const stored = await get<StoredState>(STORE_KEY);
     if (!stored) return null;
@@ -156,12 +249,21 @@ export const loadState = async (): Promise<{ appState: AppState, script: DebateS
 };
 
 export const clearState = async () => {
+  scheduleMainStatePush.cancel();
+  scheduleScenesPush.cancel();
+  scheduleShortsScenesPush.cancel();
   try {
     await del(STORE_KEY);
     await del(SCENES_KEY);
+    await del(SHORTS_SCENES_KEY);
     _activeBlobUrls.forEach(u => URL.revokeObjectURL(u));
     _activeBlobUrls = [];
   } catch (error) {
     console.error("Failed to clear state", error);
+  }
+  try {
+    await cloud.resetProjectCloud();
+  } catch (error) {
+    console.error("Failed to clear cloud project state", error);
   }
 };
