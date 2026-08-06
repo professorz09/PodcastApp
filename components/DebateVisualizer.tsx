@@ -8,6 +8,7 @@ import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasR
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
 import { generateSegmentImage, generateSpeakerImage, generateVideoBackground } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface DebateVisualizerProps {
@@ -449,19 +450,29 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
       if (isPlaying) {
           audioRef.current.pause();
           setIsPlaying(false);
+          clearActivePlayback(stopDebatePlayback);
       } else {
           setIsPlaying(true);
+          registerActivePlayback(stopDebatePlayback);
           const playPromise = audioRef.current.play();
           if (playPromise !== undefined) {
               playPromise.catch(e => {
                   if (e.name !== 'AbortError') {
                       console.error("Play error", e);
                       setIsPlaying(false);
+                      clearActivePlayback(stopDebatePlayback);
                   }
               });
           }
       }
     }
+  };
+
+  // Stable stop callback registered with the app-wide playback coordinator —
+  // pauses this preview when another preview starts or the tab/app backgrounds.
+  const stopDebatePlayback = () => {
+    if (audioRef.current) audioRef.current.pause();
+    setIsPlaying(false);
   };
 
   const handleAudioEnded = () => {
@@ -470,6 +481,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   const finishPlayback = () => {
       setIsPlaying(false);
+      clearActivePlayback(stopDebatePlayback);
       setCurrentSegmentIndex(0);
       if (audioRef.current) {
           audioRef.current.currentTime = 0;

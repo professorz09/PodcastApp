@@ -37,6 +37,7 @@ import {
 import { YoutubeImportData } from '../types';
 import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
 import { splitTranscriptByTopics, TranscriptChunk } from '../services/geminiService';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 
 interface Props {
   onImportDone: (data: YoutubeImportData) => void;
@@ -555,11 +556,16 @@ const YoutubeImporter: React.FC<Props> = ({ onImportDone, onAttachContext, onAtt
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
+  const stopVideoPreview = () => {
+    videoRef.current?.pause();
+    setIsPlaying(false);
+  };
+
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) { v.play(); setIsPlaying(true); }
-    else { v.pause(); setIsPlaying(false); }
+    if (v.paused) { registerActivePlayback(stopVideoPreview); v.play(); setIsPlaying(true); }
+    else { v.pause(); setIsPlaying(false); clearActivePlayback(stopVideoPreview); }
   };
 
   const seekTo = (t: number) => {

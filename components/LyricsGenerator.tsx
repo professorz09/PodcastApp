@@ -7,6 +7,7 @@ import {
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { generateLyrics, generateSongAudio } from '../services/geminiService';
 import { transcribeAudioGoogleCloud } from '../services/googleCloudService';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import LyricsCanvas from './LyricsCanvas';
 
 const LS_KEY  = 'lyrics_studio_v1';
@@ -205,10 +206,15 @@ const LyricsGenerator: React.FC<Props> = ({ initialComments = '', onSkip }) => {
     }
   }, [songBlob, language]);
 
+  const stopSongPreview = () => {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+  };
+
   const togglePlay = () => {
     if (!audioRef.current || !songUrl) return;
-    if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
-    else { audioRef.current.play(); setIsPlaying(true); }
+    if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); clearActivePlayback(stopSongPreview); }
+    else { registerActivePlayback(stopSongPreview); audioRef.current.play(); setIsPlaying(true); }
   };
 
   const downloadSong = () => {

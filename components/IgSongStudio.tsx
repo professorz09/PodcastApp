@@ -10,6 +10,7 @@ import {
   generateSongAudio,
   pickFunnyCommentsForSong,
 } from '../services/geminiService';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import LyricsCanvas from './LyricsCanvas';
 import { toast } from './Toast';
 
@@ -366,10 +367,15 @@ const IgSongStudio: React.FC = () => {
     idbDel(IDB_KEY).catch(() => {});
   };
 
+  const stopSongPreview = () => {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+  };
+
   const togglePlay = () => {
     if (!audioRef.current || !songUrl) return;
-    if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
-    else { audioRef.current.play(); setIsPlaying(true); }
+    if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); clearActivePlayback(stopSongPreview); }
+    else { registerActivePlayback(stopSongPreview); audioRef.current.play(); setIsPlaying(true); }
   };
 
   // ── Phase tabs ──

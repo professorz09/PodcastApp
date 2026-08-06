@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { CanvasRenderer, PhoneConfig, ScriptTurn, StudioState, AnimStyle } from '../services/phoneCanvasRenderer';
 import { renderVideoOffline } from '../services/videoRenderer';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import {
   generateScriptChapters,
   analyzePodcastChapters,
@@ -2922,6 +2923,14 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
 
   // ── Playback ──────────────────────────────────────────────────────────────
 
+  // Registered with the app-wide playback coordinator so this preview stops
+  // when another preview starts elsewhere, or the tab/app is backgrounded.
+  const stopPhonePreview = useCallback(() => {
+    rendererRef.current?.stop();
+    setIsPlaying(false);
+    killAudio();
+  }, [killAudio]);
+
   const togglePlay = async () => {
     const r = rendererRef.current;
     if (!r) return;
@@ -2930,11 +2939,13 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       r.stop();
       setIsPlaying(false);
       killAudio();
+      clearActivePlayback(stopPhonePreview);
       return;
     }
 
     const startMs = r.currentTime;
     setIsPlaying(true);
+    registerActivePlayback(stopPhonePreview);
     // Decode buffers FIRST, then start renderer — both begin simultaneously
     await scheduleAudioFrom(startMs);
     r.play();
