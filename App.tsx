@@ -446,7 +446,6 @@ Return JSON only (no markdown):
       activeStep={appState}
       onStepChange={setAppState}
       onNewProject={handleNewProject}
-      onLogout={() => supabase.auth.signOut()}
       hiddenSteps={[]}
     >
       <Suspense fallback={<LazyFallback />}>
