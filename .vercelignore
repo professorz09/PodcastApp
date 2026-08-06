@@ -22,3 +22,6 @@ downloads/
 .local/
 artifacts/
 attached_assets/
+
+# API logic now lives on Supabase Edge Functions, not Vercel (see vercel.json rewrites)
+supabase/

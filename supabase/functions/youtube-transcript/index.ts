@@ -1,22 +1,23 @@
-// Vercel proxy for /api/youtube/transcript
+// Supabase Edge Function: /functions/v1/youtube-transcript
+// Replaces the Vercel serverless function api/youtube/transcript.ts.
 // Tries Supadata (https://docs.supadata.ai) first when SUPADATA_API_KEY is
 // set. On any failure it falls straight through to the Render Flask server,
-// same as before. Catches Render-is-sleeping errors and returns a friendly
-// message instead of Vercel's cryptic ROUTER_EXTERNAL_TARGET_ERROR.
+// same as the Vercel version did.
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 const FLASK_URL = 'https://autovid-flask.onrender.com';
-
-export const config = { maxDuration: 120 };
 
 function extractVideoId(url: string): string | null {
   const match = url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/);
   return match ? match[1] : null;
 }
 
-// Strip YouTube auto-caption noise from a single caption segment — mirrors
-// clean_caption_text() in flask_server.py so both paths read the same.
 function cleanCaptionText(text: string): string {
   return text
     .replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
@@ -35,7 +36,7 @@ async function fetchSupadata(url: string, videoId: string | null): Promise<{
   video_id: string | null; language: string; segments: Segment[]; full_text: string;
   title: string; description: string; uploader: string;
 } | null> {
-  const apiKey = process.env.SUPADATA_API_KEY;
+  const apiKey = Deno.env.get('SUPADATA_API_KEY');
   if (!apiKey) return null;
 
   const langAttempts: (string | undefined)[] = ['hi', 'ur', 'en', undefined];
@@ -77,7 +78,7 @@ async function fetchSupadata(url: string, videoId: string | null): Promise<{
         video_id: videoId,
         language: data.lang || lang || 'auto',
         segments,
-        full_text: segments.map(s => s.text).join(' '),
+        full_text: segments.map((s) => s.text).join(' '),
         title: '',
         description: '',
         uploader: '',
@@ -87,54 +88,49 @@ async function fetchSupadata(url: string, videoId: string | null): Promise<{
   return null;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
+  const jsonHeaders = { ...CORS_HEADERS, 'Content-Type': 'application/json' };
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: jsonHeaders });
   }
 
-  const reqBody = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  let reqBody: any;
+  try { reqBody = await req.json(); } catch { reqBody = {}; }
   const url = String(reqBody.url || '').trim();
 
   if (url) {
     try {
       const supadataResult = await fetchSupadata(url, extractVideoId(url));
       if (supadataResult) {
-        return res.status(200).json(supadataResult);
+        return new Response(JSON.stringify(supadataResult), { headers: jsonHeaders });
       }
     } catch (err: any) {
       console.warn('[transcript-proxy] Supadata failed, falling back to Flask:', err?.message || err);
     }
   }
 
-  const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
-
   let flaskRes: Response;
   try {
     flaskRes = await fetch(`${FLASK_URL}/api/youtube/transcript`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body,
-      // signal: AbortSignal.timeout(110_000),  // just under maxDuration
+      body: JSON.stringify(reqBody),
     });
   } catch (err: any) {
-    // Render free tier sleeps after 15 min — connection refused / ECONNREFUSED
-    // shows as Vercel's ROUTER_EXTERNAL_TARGET_ERROR to the user.
-    // Return a clear message instead.
     const msg = String(err?.message || err);
     const isDown = /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed/i.test(msg);
     console.error('[transcript-proxy] Render unreachable:', msg);
-    return res.status(200).json({
+    return new Response(JSON.stringify({
       error: isDown
         ? 'Transcript server is starting up (Render free tier sleeps after inactivity). Please wait 30 seconds and try again.'
         : `Could not reach transcript server: ${msg}`,
       error_code: isDown ? 'SERVER_WAKING_UP' : 'PROXY_ERROR',
-    });
+    }), { headers: jsonHeaders });
   }
 
-  // Forward status + body from Flask as-is
   const ct = flaskRes.headers.get('content-type') || 'application/json';
-  res.setHeader('Content-Type', ct);
   const buf = await flaskRes.arrayBuffer();
-  return res.status(flaskRes.status).send(Buffer.from(buf));
-}
+  return new Response(buf, { status: flaskRes.status, headers: { ...CORS_HEADERS, 'Content-Type': ct } });
+});
