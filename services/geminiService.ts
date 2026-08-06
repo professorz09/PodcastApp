@@ -7762,6 +7762,10 @@ For each scene prompt:
 - Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
 - Include the character's action, expression, and setting
 - Keep prompts clear and visual — no abstract concepts, show what is literally happening
+- Write it as ONE simple, plain sentence: [who/what] + [doing what] + [where] — e.g.
+  "A monkey selling bananas on a street" or "A man driving a car with his wife".
+  Don't pad it with extra descriptive clauses — simple and literal renders better than
+  a sentence with five things happening at once.
 - Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON in this exact format:
@@ -7824,6 +7828,10 @@ Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
 - Show what the character is DOING or EXPERIENCING during those spoken words
 - Be literal and visual — no abstract concepts
+- Write it as ONE simple, plain sentence: [who/what] + [doing what] + [where] — e.g.
+  "A monkey selling bananas on a street" or "A man driving a car with his wife".
+  Don't pad it with extra descriptive clauses — simple and literal renders better than
+  a sentence with five things happening at once.
 - Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON:
@@ -7904,22 +7912,23 @@ export const generateStoryboardImage = async (
   const ai = getAi();
 
   const characterSection = characterGuide
-    ? `\nCHARACTER CONSISTENCY — always draw the character exactly as described below. Same appearance in every scene:\n${characterGuide}\n`
+    ? `\nCharacter consistency — draw them exactly like this, same face/clothes/hair as every other scene: ${characterGuide}\n`
     : '';
 
+  // Scene comes first and plain — image models track the actual subject better
+  // when it isn't buried under a long numbered list of secondary instructions.
   const fullPrompt = `
-Generate a simple illustration in the style of MS Paint that directly visualizes the following scene from a story.
-${characterSection}
-Scene: "${prompt}"
+Scene to draw: ${prompt}
 
-Requirements:
-1. Style: MS Paint style — simple drawings, basic bold colors, flat shading, unpolished, naive art style. Like a hand-drawn story illustration.
-2. Do NOT produce a clean, polished, modern 2D vector illustration or story-book art style — it must look crude and hand-drawn, like it was made in MS Paint with a mouse.
-3. Character Consistency: Draw the character(s) exactly as described in the CHARACTER CONSISTENCY section. Same face, same clothes, same hair in every image.
-4. White or very simple background.
-5. Show WHAT IS HAPPENING in the scene — action, expression, setting.
-6. No text written inside the image.
-7. Aspect Ratio: ${aspectRatio}.
+Draw this exact scene. Include everyone and everything mentioned in it — who/what is
+there, what they are doing, any objects involved, and where it's happening. Don't drop
+or simplify away any part of the scene.
+${characterSection}
+Art style: MS Paint — crude, simple, hand-drawn, basic bold colors, flat shading,
+unpolished, like it was drawn with a mouse. NOT a clean, polished, modern 2D vector
+illustration or story-book art.
+
+Plain white or very simple background. No text anywhere in the image. Aspect ratio ${aspectRatio}.
 `;
 
   const response = await ai.models.generateContent({
