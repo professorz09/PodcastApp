@@ -148,6 +148,17 @@ async function callGemini(model: string, contents: any, genConfig: any) {
   const finalContents = normalizeContents(contents);
   const body = buildRequestBody(finalContents, finalConfig);
 
+  // Diagnostic: which backend actually got picked, and why — visible in
+  // Supabase edge-function logs (console.log) so we can tell "quota errors
+  // after 2 images" apart from "silently on the free API-key tier".
+  console.log(`[gemini] backend=${saKey && projectId ? 'vertex' : apiKey ? 'apikey' : 'none'} model=${model} hasSaKey=${!!saKey} hasProjectId=${!!projectId} hasApiKey=${!!apiKey}`);
+
+  const extractQuotaDetail = (data: any): string => {
+    const violations = data?.error?.details?.flatMap((d: any) => d?.violations || d?.metadata ? [d] : []) ?? [];
+    if (violations.length) return ` [${JSON.stringify(violations)}]`;
+    return '';
+  };
+
   if (saKey && projectId) {
     const token = await getGCPAccessToken();
     const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
@@ -158,7 +169,11 @@ async function callGemini(model: string, contents: any, genConfig: any) {
       body: JSON.stringify(body),
     });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error?.message || `Vertex generateContent error ${resp.status}`);
+    if (!resp.ok) {
+      const detail = extractQuotaDetail(data);
+      console.error(`[gemini] vertex error ${resp.status}: ${data.error?.message}${detail}`);
+      throw new Error(`[vertex] ${data.error?.message || `generateContent error ${resp.status}`}${detail}`);
+    }
     return data;
   }
 
@@ -166,7 +181,11 @@ async function callGemini(model: string, contents: any, genConfig: any) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error?.message || `Gemini API error ${resp.status}`);
+    if (!resp.ok) {
+      const detail = extractQuotaDetail(data);
+      console.error(`[gemini] apikey error ${resp.status}: ${data.error?.message}${detail}`);
+      throw new Error(`[apikey] ${data.error?.message || `Gemini API error ${resp.status}`}${detail}`);
+    }
     return data;
   }
 
