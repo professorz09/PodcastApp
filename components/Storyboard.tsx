@@ -1246,21 +1246,21 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     finally { setIsGeneratingScenes(false); }
   }, [script, sceneCount, model, buildSegmentTimestamps, absWords]);
 
-  // Gemini image-gen quota (RPM on the free/preview tier) trips easily when
-  // scenes are generated back-to-back — retry with backoff instead of just
-  // failing the scene on the first 429.
+  // Gemini image-gen quota trips easily when scenes are generated back-to-back.
+  // One retry on a quota error (not a multi-attempt backoff cascade — that
+  // just made a failing run take forever) — if it fails again, mark it
+  // failed and move on. The "Retry Failed" button handles picking failed
+  // scenes back up whenever the user wants to try again.
   const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e?.message || '');
   const generateImageWithRetry = async (
-    prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio, maxRetries = 3,
+    prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio,
   ): Promise<string> => {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await generateStoryboardImage(prompt, guide, ratio);
-      } catch (e: any) {
-        if (!isQuotaError(e) || attempt >= maxRetries) throw e;
-        // Backoff: 4s, 8s, 16s — free-tier quota resets are usually per-minute.
-        await new Promise(r => setTimeout(r, 4000 * Math.pow(2, attempt)));
-      }
+    try {
+      return await generateStoryboardImage(prompt, guide, ratio);
+    } catch (e: any) {
+      if (!isQuotaError(e)) throw e;
+      await new Promise(r => setTimeout(r, 4000));
+      return await generateStoryboardImage(prompt, guide, ratio);
     }
   };
 
@@ -1274,7 +1274,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
       const msg = isQuotaError(e)
-        ? 'Gemini API quota exceeded — waited and retried but it\'s still limited. Wait a minute and try again, or check billing.'
+        ? 'Gemini API quota exceeded. Wait a minute and hit Retry Failed, or check billing.'
         : (e.message || 'Failed');
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
       toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
@@ -1610,7 +1610,11 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                   {scenes.length > 0 && !generatingAll && (
                     <button onClick={handleGenerateAll} disabled={allImagesReady}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 text-sm font-semibold border border-blue-500/20 disabled:opacity-40 transition-all">
-                      <Zap size={14} /> Generate All Images
+                      <Zap size={14} />
+                      {(() => {
+                        const failedCount = scenes.filter(sc => sc.error && !sc.imageUrl).length;
+                        return failedCount > 0 ? `Retry Failed (${failedCount})` : 'Generate All Images';
+                      })()}
                     </button>
                   )}
                 </div>
