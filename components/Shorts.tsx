@@ -9,6 +9,7 @@ import {
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, generateShortsThumbText, ShortsContentResult, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
 import { saveShortsScenes, loadShortsScenes } from '../services/storageService';
+import { registerActivePlayback } from '../services/audioManager';
 import { toast } from './Toast';
 
 interface ShortsProps {
@@ -1283,8 +1284,16 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     }
   }, []);
 
+  // Registered with the app-wide playback coordinator so this preview stops
+  // when another preview starts elsewhere, or the tab/app is backgrounded.
+  const stopPreviewAudioAndUi = useCallback(() => {
+    stopPreviewAudio();
+    setIsPlaying(false);
+  }, [stopPreviewAudio]);
+
   const startPreviewAudio = useCallback((fromTime: number) => {
     stopPreviewAudio();
+    registerActivePlayback(stopPreviewAudioAndUi);
     if (!mergedBufRef.current) return;
     if (!previewAcRef.current || previewAcRef.current.state === 'closed') {
       previewAcRef.current = new AudioContext();

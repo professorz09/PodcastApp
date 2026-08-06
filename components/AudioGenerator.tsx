@@ -5,6 +5,7 @@ import { generateSpeech, transcribeAudioBlob, generateClipIntro, generateSpeechC
 import { getElevenLabsVoices, generateElevenLabsSpeech, ElevenLabsVoice } from '../services/elevenLabsService';
 import { transcribeAudioGoogleCloud, getAudioDurationFromBlob, generateProportionalWordTimings } from '../services/googleCloudService';
 import { mergeAudioUrls } from '../services/audioUtils';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import {
   Play, Check, ChevronLeft, Wand2, User, Mic2, MessageSquare,
   RefreshCw, Download, AlertCircle, FileText, Globe, Zap, FileAudio, ArrowRight,
@@ -155,16 +156,23 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     }
   };
 
+  const stopIntroPreview = () => {
+    introAudioRef.current?.pause();
+    setIsPlayingIntro(false);
+  };
+
   const handlePlayPauseIntro = () => {
     if (!introAudioUrl) return;
     if (!introAudioRef.current) {
       introAudioRef.current = new Audio(introAudioUrl);
-      introAudioRef.current.onended = () => setIsPlayingIntro(false);
+      introAudioRef.current.onended = () => { setIsPlayingIntro(false); clearActivePlayback(stopIntroPreview); };
     }
     if (isPlayingIntro) {
       introAudioRef.current.pause();
       setIsPlayingIntro(false);
+      clearActivePlayback(stopIntroPreview);
     } else {
+      registerActivePlayback(stopIntroPreview);
       introAudioRef.current.play();
       setIsPlayingIntro(true);
     }
@@ -520,6 +528,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
   const playSegment = (id: string, url: string) => {
     if (playingSegment === id) {
       if (audioPreviewRef.current) {
+        clearActivePlayback(stopAudioPreview);
         audioPreviewRef.current.pause();
         audioPreviewRef.current.src = '';
         audioPreviewRef.current = null;
@@ -534,6 +543,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     const audio = new Audio(url);
     audioPreviewRef.current = audio;
     setPlayingSegment(id);
+    registerActivePlayback(stopAudioPreview);
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise.catch(e => {
@@ -545,8 +555,20 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       if (audioPreviewRef.current === audio) {
         setPlayingSegment(null);
         audioPreviewRef.current = null;
+        clearActivePlayback(stopAudioPreview);
       }
     };
+  };
+
+  // Registered with the app-wide playback coordinator so this preview stops
+  // when another preview starts elsewhere, or the tab/app is backgrounded.
+  const stopAudioPreview = () => {
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+      audioPreviewRef.current.src = '';
+      audioPreviewRef.current = null;
+    }
+    setPlayingSegment(null);
   };
 
   const syncTranscript = async (index: number) => {
