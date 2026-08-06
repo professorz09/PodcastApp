@@ -2,9 +2,20 @@ import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
 
 // Nano Banana 2 — Gemini image model, used for all image generation
-// (thumbnails, avatars, storyboard illustrations, etc).
+// (thumbnails, avatars, storyboard illustrations, etc). A global switch (not
+// per-screen) lets the Lite variant be flipped on to compare rate limits —
 // https://ai.google.dev/gemini-api/docs/image-generation
-const IMAGE_MODEL = 'gemini-3.1-flash-image';
+const IMAGE_MODEL_FULL = 'gemini-3.1-flash-image';
+const IMAGE_MODEL_LITE = 'gemini-3.1-flash-lite-image';
+const LITE_IMAGE_MODEL_KEY = 'autovid_use_lite_image_model';
+
+export const isUsingLiteImageModel = (): boolean => {
+  try { return localStorage.getItem(LITE_IMAGE_MODEL_KEY) === '1'; } catch { return false; }
+};
+export const setUseLiteImageModel = (useLite: boolean): void => {
+  try { localStorage.setItem(LITE_IMAGE_MODEL_KEY, useLite ? '1' : '0'); } catch { /* ignore */ }
+};
+const getImageModel = (): string => isUsingLiteImageModel() ? IMAGE_MODEL_LITE : IMAGE_MODEL_FULL;
 
 // Least-restrictive safety config — this app generates fictional podcast
 // hosts/guests and illustrated story scenes, which default safety settings
@@ -6754,7 +6765,7 @@ STYLE RULES:
     parts.push({ text: prompt });
 
     const response = await ai.models.generateContent({
-      model: IMAGE_MODEL,
+      model: getImageModel(),
       contents: { parts: parts },
       config: {
         responseModalities: [Modality.IMAGE],
@@ -6800,7 +6811,7 @@ export const generateVideoBackground = async (hostName: string, guestName: strin
 
   try {
     const response = await ai.models.generateContent({
-      model: IMAGE_MODEL,
+      model: getImageModel(),
       contents: { parts: [{ text: prompt }] },
       config: {
         responseModalities: [Modality.IMAGE],
@@ -6849,7 +6860,7 @@ export const generateSegmentImage = async (segmentText: string, context?: string
 
   try {
     const response = await ai.models.generateContent({
-      model: IMAGE_MODEL,
+      model: getImageModel(),
       contents: { parts: [{ text: prompt }] },
       config: {
         responseModalities: [Modality.IMAGE],
@@ -7207,7 +7218,7 @@ No text, no watermarks. Square crop, clear face.
 Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speakerIndex + 1)}".`;
 
   const response = await ai.models.generateContent({
-    model: IMAGE_MODEL,
+    model: getImageModel(),
     contents: { parts: [{ text: prompt }] },
     config: {
       responseModalities: [Modality.IMAGE],
@@ -7936,7 +7947,7 @@ Plain white or very simple background. No text anywhere in the image. Aspect rat
 `;
 
   const response = await ai.models.generateContent({
-    model: IMAGE_MODEL,
+    model: getImageModel(),
     contents: { parts: [{ text: fullPrompt }] },
     config: {
       imageConfig: { aspectRatio, personGeneration: IMAGE_PERSON_GENERATION },
@@ -8285,7 +8296,7 @@ OVERALL: High contrast, cinematic. Looks like a top 1% viral YouTube thumbnail. 
 STRICT: Do NOT add watermarks. Only show the person and the text box as described above.`;
 
   const response = await ai.models.generateContent({
-    model: IMAGE_MODEL,
+    model: getImageModel(),
     contents: { parts: [{ text: prompt }] },
     config: {
       imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
