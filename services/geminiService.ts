@@ -1375,7 +1375,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.6-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -2276,12 +2276,50 @@ ${specificDetails}`
             ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
 
             RULES:
-            ✓ पूरी script सिर्फ एक ही speaker बोलेगा — शुरू से अंत तक
+            ✓ पूरी script सिर्फ एक ही speaker बोलेगा — शुरू से अंत तक, ek continuous piece jaisa lage, tukdon mein todi hui speech jaisa nahi
             ✓ Natural, flowing narration — जैसे कोई किताब पढ़ी जा रही हो या कोई कहानी सुनाई जा रही हो
             ✓ कोई forced structure नहीं (opening/hook/outro जबरदस्ती मत डालो) — topic जो माँगे वैसे लिखो
-            ✓ Har paragraph 3-6 sentences ka ho, ek paragraph = ek JSON segment (lambi script khud-ba-khud kai segments mein bant jaayegi — audio generation har segment ko अलग se बनाता है aur फिर सब को क्रम से जोड़ deta hai)
+            ✓ Content ko clear CHAPTERS/sections mein organize karo (jaise ek achi book ya documentary hoti hai) — har chapter apne aap mein poora aur DETAILED ho, chhota ya sarsari mat rakho
+            ✓ Har chapter = ek JSON segment. Chapters ki length topic ke hisaab se jitni chahiye utni rakho — koi fixed short limit nahi. Lambi script khud kai chapters mein bant jaayegi, aur agar koi chapter audio ke liye bahut lamba ho to Script Editor ka "Split Script" button use karke usse automatically safe parts mein cut kiya ja sakta hai — isliye yahan sirf FULL DETAIL aur achi chapter-structure pe focus karo
             ✗ कोई dialogue नहीं, कोई दूसरा speaker नहीं, कोई "Q:"/"A:" जैसे tags नहीं
             ✗ Text के अंदर कोई speaker-label मत लिखो (जैसे "Narrator:") — सिर्फ शुद्ध बोलने वाला text
+            ${durFillHi}
+          `;
+        } else if (style === 'monkey_explain') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: MONKEY EXPLAIN — STORYTELLING-STYLE SOLO EXPLANATION
+            Yeh ek STORY hai, lecture nahi. Ek hi narrator, ek chhoti fictional/relatable
+            KAHAANI sunata hai (aksar ek बंदर ya bandaron ke group ke through, ya koi aur
+            simple roz़marra ka scenario) jo naturally real topic ko explain kar deti hai —
+            jaise "socho ek jangal mein bandaron ka ek troop hai jo..." — aur story ke
+            events ke through hi concept unfold hota hai, seedha lecture dekar nahi.
+            Engaging aur simple — kabhi bhi dry, technical, ya textbook jaisa mat lagne do.
+            ═══════════════════════════════════════
+            विषय: "${topic}"
+            ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: ${language}.
+
+            CHARACTER — केवल 1 narrator (story-teller):
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Voiceover"`}
+
+            APPROACH:
+            - Topic ke liye ek simple story/scenario socho jo us concept ko naturally represent kare — often ek monkey/troop of monkeys wali kahaani (jaise island pe bandaron ki economy, ya bandaron ka ek chhota society), ya koi aur roz़marra ka relatable scenario agar wo better fit ho.
+            - Story ko step-by-step unfold karo: ek setup se शुरू करो, फिर कुछ hota hai (problem/change/twist), फिर uska natural नतीजा — aur wahi नतीजा real topic ka core insight ban jaata hai.
+            - Jargon bilkul avoid karo. Agar koi technical term zaroori ho, use story ke andar hi ek simple cheez se replace/compare kar do.
+            - Opening seedhe story se शुरू karo — koi "in this video hum explain karenge" jaisa dry intro mat do. Seedha "Socho..." / "Imagine..." / "Ek dafa ki baat hai..." jaise story-hook se शुरू karo.
+
+            RULES:
+            ✓ Sirf 1 speaker — poori script wahi bolega, ek continuous story jaisa, tukdon mein todi hui speech jaisa nahi
+            ✓ Engaging, curiosity-driven — reader/listener ko "aage kya hoga" jaisa feel aana chahiye
+            ✓ Simple, conversational, friendly tone — kabhi lecture ya textbook jaisa nahi
+            ✓ Story khatam hote hote real topic ka core takeaway naturally clear ho jaana chahiye — alag se "moral of the story" jaisa bolne ki zaroorat nahi, khud hi samajh aa jaaye
+            ✓ Content ko clear CHAPTERS/scenes mein organize karo (jaise kisi kahaani ke chapters) — har chapter apne aap mein poora aur DETAILED ho, chhota mat rakho
+            ✓ Har chapter = ek JSON segment. Length topic ke hisaab se rakho, fixed short limit nahi — bahut lambe chapter ko baad mein "Split Script" button se audio-safe parts mein cut kiya ja sakta hai, isliye yahan FULL DETAIL aur achi storytelling pe focus karo
+            ✗ Koi dialogue nahi, koi doosra speaker nahi
+            ✗ Text ke andar speaker-label mat likho — sirf bolne wala text
+            ✗ Dry, technical, ya bullet-point-jaisa explanation mat likho — sab kuch story ke through aana chahiye
             ${durFillHi}
           `;
         } else if (style === 'deep_explainer') {
@@ -4021,14 +4059,67 @@ ${specificDetails}`
             ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
 
             RULES:
-            ✓ The entire script is spoken by ONE speaker only, start to finish
+            ✓ The entire script is spoken by ONE speaker only, start to finish — one continuous
+              piece, not something that reads like it was chopped into disconnected lines
             ✓ Natural, flowing narration — like a book being read or a story being told
             ✓ No forced structure (don't force a hook/opening/outro) — let the topic dictate the shape
-            ✓ Each paragraph is 3-6 sentences, one paragraph per JSON segment (a long script will
-              naturally split into many segments — audio generation renders each one separately
-              and stitches them together in order)
+            ✓ Organize the content into clear CHAPTERS/sections (like a good book or documentary) —
+              each chapter should be complete and DETAILED on its own, not short or thin
+            ✓ One chapter = one JSON segment. Chapter length follows the topic's needs, no fixed
+              short cap — a long script will naturally split into several chapters, and any single
+              chapter that's too long for one audio take can be cut into safe parts afterward with
+              the Script Editor's "Split Script" button, so focus here purely on full detail and a
+              good chapter structure
             ✗ No dialogue, no second speaker, no "Q:"/"A:" style tags
             ✗ Do not write speaker labels inside the text itself (e.g. "Narrator:") — just the pure spoken text
+            ${durFillEn}
+          `;
+        } else if (style === 'monkey_explain') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: MONKEY EXPLAIN — STORYTELLING-STYLE SOLO EXPLANATION
+            This is a STORY, not a lecture. One narrator tells a short fictional/relatable
+            STORY (often through a monkey or a troop of monkeys, or some other simple everyday
+            scenario) that naturally explains the real topic — like "Imagine a troop of monkeys
+            living on an island who..." — and the concept unfolds through the story's events,
+            not through direct lecturing. Engaging and simple — never dry, technical, or textbook-like.
+            ═══════════════════════════════════════
+            Topic: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            CHARACTER — exactly 1 narrator (storyteller):
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Voiceover"`}
+
+            APPROACH:
+            - Come up with a simple story or scenario that naturally represents this topic —
+              often a monkey/troop-of-monkeys story (e.g. an island monkey economy, a small
+              monkey society), or another relatable everyday scenario if that fits better.
+            - Unfold the story step by step: a setup, then something happens (a problem, a
+              change, a twist), then its natural consequence — and that consequence becomes
+              the topic's core insight.
+            - Avoid jargon entirely. If a technical term is unavoidable, replace or compare it
+              with something simple inside the story itself.
+            - Open directly with the story — no dry "in this video we'll explain..." intro.
+              Start straight with a story-hook like "Imagine..." or "Once upon a time...".
+
+            RULES:
+            ✓ Only 1 speaker — the entire script, told as one continuous story, not something
+              that reads like it was chopped into disconnected lines
+            ✓ Engaging, curiosity-driven — the listener should want to know what happens next
+            ✓ Simple, conversational, friendly tone — never a lecture or textbook
+            ✓ By the end of the story, the real topic's core takeaway should be naturally clear —
+              no need to spell out "the moral of the story", let it land on its own
+            ✓ Organize the content into clear CHAPTERS/scenes (like a story's chapters) — each
+              chapter should be complete and DETAILED on its own, not short or thin
+            ✓ One chapter = one JSON segment. Chapter length follows the topic's needs, no fixed
+              short cap — a long chapter can be cut into safe parts afterward with the "Split
+              Script" button, so focus here purely on full detail and good storytelling
+            ✗ No dialogue, no second speaker
+            ✗ Do not write speaker labels inside the text itself — just the pure spoken text
+            ✗ Do not write a dry, technical, or bullet-point-style explanation — everything
+              should come through the story
             ${durFillEn}
           `;
         } else if (style === 'deep_explainer') {

@@ -38,12 +38,9 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3.6-flash' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite'>('gemini-3.6-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
-  // Remembers the dialogue style that was active before the Solo Narration
-  // toggle was flipped on, so turning it back off restores it.
-  const prevStyleRef = useRef<typeof style>('debate');
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
   // Auto speaker count + duration for Joe Rogan Style
   const [speakerCount, setSpeakerCount] = useState<number>(initialContextContent ? 3 : 3);
@@ -934,7 +931,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov';
+                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
@@ -944,6 +941,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'explained') { setSpeakerCount(2); }
                       if (newStyle === 'explained_solo') { setSpeakerCount(1); }
                       if (newStyle === 'narration') { setSpeakerCount(1); setIncludeNarrator(false); }
+                      if (newStyle === 'monkey_explain') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'image') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'podcast_breakdown') { setSpeakerCount(2); }
                       if (newStyle === 'documentary') { setSpeakerCount(2); }
@@ -963,44 +961,22 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="situational">Situational</option>
                     <option value="finance_deep_dive">💰 Finance Deep Dive</option>
                     <option value="explained">Explained</option>
-                    <option value="explained_solo">🎙 Explained Solo</option>
-                    <option value="narration">📖 Narration (Solo, No Tags)</option>
+                    <option value="explained_solo">🎙 Explained (Solo)</option>
+                    <option value="narration">📖 Narration (Solo)</option>
+                    <option value="monkey_explain">🐒 Monkey Explain (Solo)</option>
                     <option value="deep_explainer">🔍 Deep Explainer</option>
-                    <option value="image">🖼 Imagen Style</option>
+                    <option value="image">🖼 Imagen Style (Solo)</option>
                     <option value="documentary">Documentary</option>
                     <option value="joe_rogan">🎙 Joe Rogan Experience</option>
                     <option value="podcast_panel">Podcast Panel</option>
                     <option value="podcast_breakdown">Podcast Breakdown</option>
-                    <option value="context_bridge">Context Analyst</option>
-                    <option value="professor_jiang">🎓 Prof. Jiang Xueqin</option>
+                    <option value="context_bridge">Context Analyst (Solo)</option>
+                    <option value="professor_jiang">🎓 Prof. Jiang Xueqin (Solo)</option>
                     <option value="book_summary">📚 Book Summarizer</option>
                     <option value="questioning">❓ Questioning Style</option>
-                    <option value="transcript_review">🎬 Transcript Review</option>
-                    <option value="summarizer_pov">🎯 Summarizer POV</option>
+                    <option value="transcript_review">🎬 Transcript Review (Solo)</option>
+                    <option value="summarizer_pov">🎯 Summarizer POV (Solo)</option>
                   </select>
-                  {/* Solo Narration toggle — collapses whichever style is picked above into a
-                      single continuous narrator voice, no dialogue, no speaker tags. */}
-                  <div className="flex items-center justify-between mt-2 px-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <BookOpen size={11} className="text-pink-400" />
-                      <span className="text-[10px] text-gray-400">Solo Narration (no tags, 1 voice)</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (style === 'narration') {
-                          setStyle(prevStyleRef.current);
-                        } else {
-                          prevStyleRef.current = style;
-                          setStyle('narration');
-                          setSpeakerCount(1);
-                          setIncludeNarrator(false);
-                        }
-                      }}
-                      className={`relative w-8 h-4 rounded-full transition-all ${style === 'narration' ? 'bg-pink-600' : 'bg-white/10'}`}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${style === 'narration' ? 'translate-x-4' : ''}`} />
-                    </button>
-                  </div>
                 </div>
               )}
 
