@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebateSegment, ThumbnailState, YoutubeImportData } from '../types';
 import { generateThumbnail, generateTitles, generateThumbnailText, generateThumbnailInspiration, generateTitleTextPair, ThumbnailVideoStyle } from '../services/geminiService';
+import { fetchRandomStyleReference } from '../services/styleRefClient';
 import {
   Image, Loader2, RefreshCw, Download, ChevronLeft, X, ArrowRight,
   Upload, FileText, AlignLeft, Zap, Copy, Check, Wand2, Info,
@@ -197,11 +198,22 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     const textForThumbnail = selectedThumbnailText || selectedTitle;
     if (!textForThumbnail) return;
     setIsLoading(true);
-    setLoadingStep(referenceImage ? 'inspecting' : videoStyle === 'professor_jiang' ? 'analyzing' : 'generating');
     try {
-      const refImgData = referenceImage
+      let refImgData = referenceImage
         ? { data: referenceImage.data, mimeType: referenceImage.mimeType }
         : undefined;
+
+      // Explained/Situational already know how to use a reference image for
+      // style/composition — auto-pick a real curated thumbnail when the user
+      // hasn't uploaded their own, so those styles get a genuine example to
+      // work from instead of designing blind. Other styles have their own
+      // fixed, already-tuned layouts and are left untouched.
+      if (!refImgData && (videoStyle === 'explained' || videoStyle === 'situational')) {
+        setLoadingStep('inspecting');
+        refImgData = (await fetchRandomStyleReference()) ?? undefined;
+      }
+
+      setLoadingStep(refImgData ? 'inspecting' : videoStyle === 'professor_jiang' ? 'analyzing' : 'generating');
       const scriptTextForGen = getSourceText(titleSource);
       const url = await generateThumbnail(
         textForThumbnail, hostName, guestName, refImgData, extraInstructions,

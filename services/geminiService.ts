@@ -1390,7 +1390,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.6-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -2336,6 +2336,48 @@ ${specificDetails}`
             ✗ Koi dialogue nahi, koi doosra speaker nahi
             ✗ Text ke andar speaker-label mat likho — sirf bolne wala text
             ✗ Dry, technical, ya bullet-point-jaisa explanation mat likho — sab kuch story ke through aana chahiye
+            ${durFillHi}
+          `;
+        } else if (style === 'crime_documentary') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: CRIME DOCUMENTARY — SUSPENSEFUL SOLO TRUE-CRIME STORYTELLING
+            Ek hi narrator, jaise Mr. Ballen / Dark Downunder / Crime Junkie style true-crime
+            documentary — dheema, ominous, controlled tone mein ek case ki poori kahaani sunata hai.
+            Koi dialogue nahi, koi doosra speaker nahi — sirf ek calm, measured awaaz jo suspense
+            build karti hai.
+            ═══════════════════════════════════════
+            Topic/Case: "${topic}"
+            ${specificDetails ? `Extra context/facts: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: ${language}.
+
+            CHARACTER — केवल 1 narrator:
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
+
+            APPROACH:
+            - Agar topic mein real facts/names/case-details diye gaye hain, unhe accurately use karo. Agar topic generic hai, ek realistic, grounded case socho jo believable lage (real jagah, tareekh, roz़marra ka insaan) — kabhi over-the-top ya cartoonish nahi.
+            - Opening SEEDHA scene se karo, koi "aaj hum baat karenge" jaisa dry intro nahi — ek specific date, jagah, aur ek bilkul ordinary insaan ki roz़marra zindagi se शुरू karo. Jaise: "2025 ki baat hai. Ek aadmi tha jo ek chhoti si car repair shop mein kaam karta tha..." — pehle NORMALCY establish karo, taaki baad mein jab kuch galat ho to zyada impactful lage.
+
+            STRUCTURE (isi order mein, lekin labels output mein mat likho):
+            1. THE ORDINARY DAY — specific date/jagah/insaan, roz़marra zindagi ke sensory details (awaaz, mausam, kaam) — ek shaant, normal shuruaat.
+            2. THE FIRST CRACK — kuch ajeeb ya suspicious hota hai — pehla warning sign, chhota sa lekin unsettling.
+            3. THE UNRAVELING — events dheere dheere unfold hote hain. Clues EK EK KARKE reveal karo — sab kuch shuru mein hi mat bata do, tension gradually build karo.
+            4. THE TWIST — ek shocking reveal ya turning point jo sab kuch badal deta hai.
+            5. THE AFTERMATH — kya hua end mein, consequences, case kaise resolve hua (ya nahi hua).
+            6. CLOSING LINE — ek haunting ya thought-provoking final line jo yaad rah jaaye.
+
+            RULES:
+            ✓ Sirf 1 narrator — pura case wahi bolega, ek continuous piece jaisa, tukdon mein todi hui speech jaisa nahi
+            ✓ Tone: calm, ominous, measured, documentary-style — kabhi bhi rushed, cheerful, ya sensational nahi
+            ✓ Suspenseful pacing — tense moments par chhoti, punchy sentences use karo taaki dread mehsoos ho
+            ✓ Cinematic, sensory detail — jagah, mausam, expressions, sound describe karo taaki listener scene "dekh" sake
+            ✓ Information STRATEGICALLY withhold karo — poori kahaani ek sath mat bata do, suspense ke liye reveal ko control karo
+            ✓ Content ko clear CHAPTERS mein organize karo (jaise structure mein diya hai) — har chapter poora aur DETAILED ho
+            ✓ Har chapter = ek JSON segment. Lambi script khud kai chapters mein bant jaayegi — "Split Script" button baad mein use ho sakta hai
+            ✗ Koi dialogue nahi, koi doosra speaker nahi
+            ✗ Text ke andar speaker-label mat likho — sirf bolne wala text
+            ✗ Generic filler jaise "is prakar", "ant mein", "yeh zaroori hai" — BANNED
             ${durFillHi}
           `;
         } else if (style === 'deep_explainer') {
@@ -4139,6 +4181,47 @@ ${specificDetails}`
             ✗ Do not write speaker labels inside the text itself — just the pure spoken text
             ✗ Do not write a dry, technical, or bullet-point-style explanation — everything
               should come through the story
+            ${durFillEn}
+          `;
+        } else if (style === 'crime_documentary') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: CRIME DOCUMENTARY — SUSPENSEFUL SOLO TRUE-CRIME STORYTELLING
+            One narrator only, in the style of Mr. Ballen / Dark Downunder / Crime Junkie —
+            a calm, ominous, controlled voice telling the full story of a case. No dialogue,
+            no second speaker — just one measured voice building suspense.
+            ═══════════════════════════════════════
+            Topic/Case: "${topic}"
+            ${specificDetails ? `Additional context/facts: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            CHARACTER — exactly 1 narrator:
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
+
+            APPROACH:
+            - If the topic includes real facts/names/case details, use them accurately. If the topic is generic, invent a realistic, grounded case that feels believable (a real-feeling place, date, ordinary person) — never over-the-top or cartoonish.
+            - Open DIRECTLY with the scene — no dry "today we'll talk about..." intro. Start with a specific date, place, and a completely ordinary person's everyday life. e.g. "It was 2025. A man worked at a small car repair shop..." — establish NORMALCY first, so it lands harder when something goes wrong.
+
+            STRUCTURE (in this order, but don't write the labels in the output):
+            1. THE ORDINARY DAY — a specific date/place/person, sensory details of everyday life (sounds, weather, work) — a calm, normal beginning.
+            2. THE FIRST CRACK — something strange or suspicious happens — a small but unsettling first warning sign.
+            3. THE UNRAVELING — events unfold gradually. Reveal clues ONE AT A TIME — don't front-load the whole story, build tension gradually.
+            4. THE TWIST — a shocking revelation or turning point that changes everything.
+            5. THE AFTERMATH — what happened in the end, the consequences, how the case resolved (or didn't).
+            6. CLOSING LINE — one haunting or thought-provoking final line that stays with the listener.
+
+            RULES:
+            ✓ Only 1 narrator — the entire case, told as one continuous piece, not something that reads like it was chopped into disconnected lines
+            ✓ Tone: calm, ominous, measured, documentary-style — never rushed, cheerful, or sensational
+            ✓ Suspenseful pacing — short, punchy sentences at tense moments to build dread
+            ✓ Cinematic, sensory detail — describe place, weather, expressions, sound so the listener can "see" the scene
+            ✓ Withhold information strategically — don't tell the whole story at once, control the reveal for suspense
+            ✓ Organize the content into clear CHAPTERS (matching the structure above) — each chapter complete and DETAILED
+            ✓ One chapter = one JSON segment. A long script will naturally split into several chapters — the "Split Script" button can cut any overly-long one afterward
+            ✗ No dialogue, no second speaker
+            ✗ Do not write speaker labels inside the text itself — just the pure spoken text
+            ✗ Generic filler like "it's important to note", "in conclusion" — BANNED
             ${durFillEn}
           `;
         } else if (style === 'deep_explainer') {
@@ -7962,10 +8045,27 @@ export const generateSpeechChirp3HD = async (
   return { audioUrl, duration };
 };
 
+export type StoryboardImageStyle = 'ms_paint' | 'noir_crime';
+
+const STORYBOARD_ART_STYLES: Record<StoryboardImageStyle, string> = {
+  ms_paint: `Art style: MS Paint — crude, simple, hand-drawn, basic bold colors, flat shading,
+unpolished, like it was drawn with a mouse. NOT a clean, polished, modern 2D vector
+illustration or story-book art.
+
+Plain white or very simple background. No text anywhere in the image.`,
+  noir_crime: `Art style: dark true-crime documentary illustration — muted, desaturated colors,
+deep shadows, high-contrast cinematic noir lighting, gritty grainy texture, somber and
+suspenseful mood. Think true-crime documentary reenactment art — dimly lit, atmospheric,
+tense. NOT bright, cartoonish, playful, or clean/polished — this must feel ominous.
+
+Background stays simple and uncluttered even though it's dark — no text anywhere in the image.`,
+};
+
 export const generateStoryboardImage = async (
   prompt: string,
   characterGuide?: string,
   aspectRatio: '16:9' | '3:4' | '1:1' | '9:16' = '16:9',
+  imageStyle: StoryboardImageStyle = 'ms_paint',
 ): Promise<string> => {
   const ai = getAi();
 
@@ -7982,11 +8082,9 @@ Draw this exact scene. Include everyone and everything mentioned in it — who/w
 there, what they are doing, any objects involved, and where it's happening. Don't drop
 or simplify away any part of the scene.
 ${characterSection}
-Art style: MS Paint — crude, simple, hand-drawn, basic bold colors, flat shading,
-unpolished, like it was drawn with a mouse. NOT a clean, polished, modern 2D vector
-illustration or story-book art.
+${STORYBOARD_ART_STYLES[imageStyle]}
 
-Plain white or very simple background. No text anywhere in the image. Aspect ratio ${aspectRatio}.
+Aspect ratio ${aspectRatio}.
 `;
 
   const response = await ai.models.generateContent({

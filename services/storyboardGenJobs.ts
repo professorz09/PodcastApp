@@ -6,7 +6,7 @@
 // its state into local UI state; if no component is mounted to look at it,
 // the job keeps going and persists each image straight to storage itself.
 import { DebateSegment, StoryboardScene } from '../types';
-import { generateStoryboardImage } from './geminiService';
+import { generateStoryboardImage, StoryboardImageStyle } from './geminiService';
 import { saveScenes } from './storageService';
 
 export interface GenJobSnapshot {
@@ -23,6 +23,7 @@ interface Job {
   script: DebateSegment[];
   characterGuide: string;
   aspectRatio: AspectRatio;
+  imageStyle: StoryboardImageStyle;
   scenes: StoryboardScene[];
   abort: boolean;
   running: boolean;
@@ -65,13 +66,15 @@ async function throttle(abort: () => boolean): Promise<void> {
   }
 }
 
-async function generateImageWithRetry(prompt: string, guide: string | undefined, ratio: AspectRatio): Promise<string> {
+async function generateImageWithRetry(
+  prompt: string, guide: string | undefined, ratio: AspectRatio, imageStyle: StoryboardImageStyle,
+): Promise<string> {
   try {
-    return await generateStoryboardImage(prompt, guide, ratio);
+    return await generateStoryboardImage(prompt, guide, ratio, imageStyle);
   } catch (e: any) {
     if (!isQuotaError(e)) throw e;
     await new Promise(r => setTimeout(r, 4000));
-    return await generateStoryboardImage(prompt, guide, ratio);
+    return await generateStoryboardImage(prompt, guide, ratio, imageStyle);
   }
 }
 
@@ -104,11 +107,12 @@ export function startGenJob(
   scenes: StoryboardScene[],
   characterGuide: string,
   aspectRatio: AspectRatio,
+  imageStyle: StoryboardImageStyle = 'ms_paint',
 ): void {
   if (currentJob && currentJob.running && currentJob.scriptSignature === scriptSignature) return; // already running
 
   const job: Job = {
-    scriptSignature, script, characterGuide, aspectRatio,
+    scriptSignature, script, characterGuide, aspectRatio, imageStyle,
     scenes: scenes.map(s => ({ ...s })),
     abort: false, running: true, progress: 0, status: '',
     listeners: new Set(),
@@ -140,7 +144,7 @@ export function startGenJob(
 
         let result: 'success' | 'quota' | 'other';
         try {
-          const url = await generateImageWithRetry(scene.prompt, job.characterGuide, job.aspectRatio);
+          const url = await generateImageWithRetry(scene.prompt, job.characterGuide, job.aspectRatio, job.imageStyle);
           setScene(scene.id, { imageUrl: url, isGenerating: false });
           result = 'success';
         } catch (e: any) {
