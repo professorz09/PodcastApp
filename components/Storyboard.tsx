@@ -1302,11 +1302,11 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       const url = await generateImageWithRetry(scene.prompt, characterGuide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
-      // Show the real backend error (now prefixed [vertex]/[apikey] with any
-      // quota-violation detail Google returns, from the gemini edge function)
-      // instead of a generic message that was hiding it.
+      // e.message already carries the real backend detail (the gemini edge
+      // function prefixes it with [vertex]/[apikey] plus any quota-violation
+      // info Google returns) — just append actionable guidance, don't hide it.
       const raw = e.message || 'Failed';
-      const msg = isQuotaError(e) ? `Quota exceeded — ${raw}. Wait a minute and hit Retry Failed, or check billing.` : raw;
+      const msg = isQuotaError(e) ? `${raw} — hit Retry Failed in a minute, or check billing.` : raw;
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
       toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
     }
