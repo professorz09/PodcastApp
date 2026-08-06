@@ -7766,19 +7766,26 @@ ${scriptText}
 SEGMENT DURATIONS: ${durInfo}
 
 TASK:
-Step 1 — CHARACTER GUIDE:
-First, identify the main character(s) from the script.
-Create a SHORT, PRECISE visual description for each character that will be copy-pasted into EVERY image generation prompt to ensure visual consistency.
-This must include: appearance, clothing, hair, skin tone, distinguishing features.
-Write it as a single compact paragraph starting with "Main character: ..."
-If there are 2 speakers, describe both. Keep it under 60 words total.
+Step 1 — CHARACTER GUIDE (only if the script actually needs one):
+Check whether the script naturally centers on a recurring character/host — someone
+who should look the same from scene to scene (e.g. a narrator persona, a story
+character like a monkey in a fable, a debate host).
+- If yes: create a SHORT, PRECISE visual description (appearance, clothing, hair,
+  skin tone, distinguishing features) that will be copy-pasted into EVERY image
+  generation prompt for consistency. Single compact paragraph starting with
+  "Main character: ...". If there are 2 speakers, describe both. Under 60 words total.
+- If no — the script is explaining a concept, object, event, or idea with no fixed
+  protagonist — leave characterGuide as an empty string "". Do NOT invent a host just
+  to have one; let each scene simply visualize whatever it actually needs (objects,
+  settings, symbols, different people as the moment calls for, or no people at all).
 
 Step 2 — SCENES:
 Create exactly ${sceneCount} storyboard scenes that visually represent this script as a story.
 Each scene covers one or more consecutive script segments. Every segment must be covered (no gaps, no overlaps).
 
 For each scene prompt:
-- Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
+- Describe WHAT IS HAPPENING in this scene — using the character(s) from Step 1 if one
+  exists, otherwise just whatever people/objects/setting the moment actually calls for
 - Include the character's action, expression, and setting, and any other details
   (mood, relevant objects, background elements) that help the image feel complete
 - Keep it clear and literal, focused on ONE main thing happening — not five unrelated
@@ -7846,12 +7853,19 @@ Below are ${slots.length} scenes with their exact timestamps and voiceover text 
 ${slotText}
 
 TASK:
-Step 1 — CHARACTER GUIDE:
-Identify the main character(s) from the voiceover text. Create a SHORT visual description (appearance, clothing, hair, skin tone) for consistency across all scenes. Max 60 words, starting with "Main character: ..."
+Step 1 — CHARACTER GUIDE (only if the voiceover actually needs one):
+Check whether the voiceover naturally centers on a recurring character/host who should
+look the same from scene to scene (e.g. a narrator persona, a story character like a
+monkey in a fable). If yes, create a SHORT visual description (appearance, clothing,
+hair, skin tone) for consistency across all scenes — max 60 words, starting with
+"Main character: ...". If the voiceover is explaining a concept, object, event, or idea
+with no fixed protagonist, leave characterGuide as an empty string "" — do not invent a
+host just to have one; let each scene visualize whatever it actually needs.
 
 Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
-- Show what the character is DOING or EXPERIENCING during those spoken words
+- Show what's happening — using the character from Step 1 if one exists, otherwise
+  whatever people/objects/setting the moment actually calls for
 - Include enough detail (setting, expression, relevant objects, mood) that the scene
   feels complete, but keep it focused on ONE main thing happening — not five unrelated
   events crammed into one image. e.g. "A monkey selling bananas on a busy street,
