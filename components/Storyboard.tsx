@@ -32,7 +32,6 @@ const DEFAULT_SUBTITLE: SubtitleConfig = {
 
 const MODEL_OPTIONS = [
   { value: 'gemini-3.6-flash', label: '⚡ Flash' },
-  { value: 'gemini-3.1-flash-lite', label: '✦ Lite' },
   { value: 'gemini-3.1-pro-preview', label: '✦ Pro' },
 ];
 
@@ -762,7 +761,7 @@ const TimelineRow: React.FC<{
 // ── Main ──────────────────────────────────────────────────────────────────────
 const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [sceneCount, setSceneCount] = useState(10);
-  const [model, setModel] = useState('gemini-3.1-flash-lite');
+  const [model, setModel] = useState('gemini-3.6-flash');
   const [showSettings, setShowSettings] = useState(false);
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
 
@@ -1235,29 +1234,64 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     finally { setIsGeneratingScenes(false); }
   }, [script, sceneCount, model, buildSegmentTimestamps, absWords]);
 
+  // Gemini image-gen quota (RPM on the free/preview tier) trips easily when
+  // scenes are generated back-to-back — retry with backoff instead of just
+  // failing the scene on the first 429.
+  const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e?.message || '');
+  const generateImageWithRetry = async (
+    prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio, maxRetries = 3,
+  ): Promise<string> => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await generateStoryboardImage(prompt, guide, ratio);
+      } catch (e: any) {
+        if (!isQuotaError(e) || attempt >= maxRetries) throw e;
+        // Backoff: 4s, 8s, 16s — free-tier quota resets are usually per-minute.
+        await new Promise(r => setTimeout(r, 4000 * Math.pow(2, attempt)));
+      }
+    }
+  };
+
   // ── Generate single image ──
   const handleGenerateImage = useCallback(async (id: string) => {
     const scene = scenes.find(sc => sc.id === id);
     if (!scene) return;
     setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: true, error: undefined } : sc));
     try {
-      const url = await generateStoryboardImage(scene.prompt, characterGuide, imageAspectRatio);
+      const url = await generateImageWithRetry(scene.prompt, characterGuide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
-      setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: e.message || 'Failed' } : sc));
-      toast.error(`Scene ${scene.sceneNumber}: ${e.message}`);
+      const msg = isQuotaError(e)
+        ? 'Gemini API quota exceeded — waited and retried but it\'s still limited. Wait a minute and try again, or check billing.'
+        : (e.message || 'Failed');
+      setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: false, error: msg } : sc));
+      toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
     }
   }, [scenes, characterGuide]);
 
-  // ── Generate all ──
+  // ── Generate all — parallel batches ──
+  // Vertex AI's Nano Banana image models cap out around 10 images/minute on
+  // the billing-enabled tier, so batches of 8 (same pattern AudioGenerator
+  // already uses for TTS) stay under that ceiling with a little headroom.
+  // handleGenerateImage's own retry-with-backoff absorbs any 429s that still
+  // slip through.
   const handleGenerateAll = useCallback(async () => {
     abortRef.current = false; setGeneratingAll(true); setGeneratingAllProgress(0);
     const toGen = scenes.filter(sc => !sc.imageUrl);
-    for (let i = 0; i < toGen.length; i++) {
-      if (abortRef.current) break;
-      await handleGenerateImage(toGen[i].id);
-      setGeneratingAllProgress(Math.round(((i + 1) / toGen.length) * 100));
-      await new Promise(r => setTimeout(r, 400));
+    const BATCH_SIZE = 8;
+    let completed = 0;
+    for (let batchStart = 0; batchStart < toGen.length && !abortRef.current; batchStart += BATCH_SIZE) {
+      const batch = toGen.slice(batchStart, batchStart + BATCH_SIZE);
+      await Promise.all(batch.map(async (sc) => {
+        if (abortRef.current) return;
+        await handleGenerateImage(sc.id);
+        completed++;
+        setGeneratingAllProgress(Math.round((completed / toGen.length) * 100));
+      }));
+      const isLastBatch = batchStart + BATCH_SIZE >= toGen.length;
+      if (!abortRef.current && !isLastBatch) {
+        await new Promise(r => setTimeout(r, 3000));
+      }
     }
     setGeneratingAll(false); setGeneratingAllProgress(0);
     if (!abortRef.current) toast.success('All images generated!');

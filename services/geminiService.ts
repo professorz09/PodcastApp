@@ -7670,8 +7670,8 @@ Each scene covers one or more consecutive script segments. Every segment must be
 For each scene prompt:
 - Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
 - Include the character's action, expression, and setting
-- Style: simple flat 2D illustration, story-book art, consistent character design, white or simple background
 - Keep prompts clear and visual — no abstract concepts, show what is literally happening
+- Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -7732,8 +7732,8 @@ Identify the main character(s) from the voiceover text. Create a SHORT visual de
 Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
 - Show what the character is DOING or EXPERIENCING during those spoken words
-- Style: simple flat 2D illustration, story-book art, consistent character design
 - Be literal and visual — no abstract concepts
+- Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON:
 {
@@ -7823,11 +7823,12 @@ Scene: "${prompt}"
 
 Requirements:
 1. Style: MS Paint style — simple drawings, basic bold colors, flat shading, unpolished, naive art style. Like a hand-drawn story illustration.
-2. Character Consistency: Draw the character(s) exactly as described in the CHARACTER CONSISTENCY section. Same face, same clothes, same hair in every image.
-3. White or very simple background.
-4. Show WHAT IS HAPPENING in the scene — action, expression, setting.
-5. No text written inside the image.
-6. Aspect Ratio: ${aspectRatio}.
+2. Do NOT produce a clean, polished, modern 2D vector illustration or story-book art style — it must look crude and hand-drawn, like it was made in MS Paint with a mouse.
+3. Character Consistency: Draw the character(s) exactly as described in the CHARACTER CONSISTENCY section. Same face, same clothes, same hair in every image.
+4. White or very simple background.
+5. Show WHAT IS HAPPENING in the scene — action, expression, setting.
+6. No text written inside the image.
+7. Aspect Ratio: ${aspectRatio}.
 `;
 
   const response = await ai.models.generateContent({
