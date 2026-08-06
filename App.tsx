@@ -19,17 +19,8 @@ import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStu
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, PhoneStudioSourceClip, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
-import { Key, ExternalLink, RotateCcw, AlertTriangle, X } from 'lucide-react';
+import { Key, RotateCcw, AlertTriangle, X } from 'lucide-react';
 import { ToastContainer, toast } from './components/Toast';
-
-declare global {
-  interface Window {
-    aistudio?: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
 
 const LazyFallback: React.FC = () => (
   <div className="flex items-center justify-center h-64">
@@ -65,28 +56,9 @@ const App: React.FC = () => {
   const [scriptStyle, setScriptStyle] = useState<string>('debate');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [shortsContext, setShortsContext] = useState<TranscriptChunk | null>(null);
   const [preloadedClips, setPreloadedClips] = useState<ShortsSegment[]>([]);
-
-  // Check for API Key on mount — ask the server so the key stays server-side
-  useEffect(() => {
-    const checkKey = async () => {
-      try {
-        const res = await fetch('/api/gemini/key-check');
-        if (res.ok) {
-          const data = await res.json();
-          setHasApiKey(!!data.hasKey);
-        } else {
-          setHasApiKey(false);
-        }
-      } catch {
-        setHasApiKey(false);
-      }
-    };
-    checkKey();
-  }, []);
 
   // Load state on mount
   useEffect(() => {
@@ -323,11 +295,7 @@ Return JSON only (no markdown):
       setAppState(AppState.SCRIPT);
     } catch (error: any) {
       const errorMessage = error.message || "Failed to generate script.";
-      if (errorMessage.includes("API Key is missing")) {
-        setHasApiKey(false);
-      } else {
-        toast.error(errorMessage);
-      }
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -364,30 +332,6 @@ Return JSON only (no markdown):
     setPreloadedClips([]);
     setAppState(AppState.VIDEO_CLIP_IMPORT);
   };
-
-  if (!hasApiKey) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white p-6">
-        <div className="max-w-md w-full bg-[#0a0a0a] border border-white/5 rounded-2xl p-8 shadow-2xl text-center">
-          <div className="w-16 h-16 bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Key size={32} className="text-purple-400" />
-          </div>
-          <h1 className="text-2xl font-bold mb-3">API Key Required</h1>
-          <p className="text-gray-400 mb-8 leading-relaxed">
-            To use AI features like <strong>Gemini</strong> script and image generation, add your <code className="bg-white/5 px-1 rounded">GEMINI_API_KEY</code> to the Secrets tab in the Replit sidebar, then restart the app.
-          </p>
-          <a 
-            href="https://ai.google.dev/gemini-api/docs/api-key" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            Get a Gemini API key <ExternalLink size={14} />
-          </a>
-        </div>
-      </div>
-    );
-  }
 
   if (!isInitialized) {
     return (
