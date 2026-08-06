@@ -9,6 +9,7 @@ import {
 import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased } from '../services/geminiService';
 import { saveScenes, loadScenes } from '../services/storageService';
+import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { toast } from './Toast';
 
 interface StoryboardProps {
@@ -828,7 +829,15 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     scenesLoadedRef.current = true;
     loadScenes(script).then(saved => {
       if (saved && saved.scenes.length > 0) {
-        setScenes(saved.scenes);
+        // A scene mid-generation when the page was closed/refreshed gets
+        // persisted with isGenerating still true — nothing is actually
+        // running anymore after a fresh load, so that flag would otherwise
+        // stay stuck forever with no way to resume it. Clear it and mark
+        // it as needing a retry instead.
+        const restored = saved.scenes.map(sc =>
+          sc.isGenerating ? { ...sc, isGenerating: false, error: sc.error ?? 'Interrupted — try again' } : sc
+        );
+        setScenes(restored);
         setCharacterGuide(saved.characterGuide);
       }
     });
@@ -968,8 +977,16 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     }
   }, []);
 
+  // Registered with the app-wide playback coordinator so this preview stops
+  // when another preview starts elsewhere, or the tab/app is backgrounded.
+  const stopPreviewAudioAndUi = useCallback(() => {
+    stopPreviewAudio();
+    setIsPlaying(false);
+  }, [stopPreviewAudio]);
+
   const startPreviewAudio = useCallback((fromTime: number) => {
     stopPreviewAudio();
+    registerActivePlayback(stopPreviewAudioAndUi);
     if (!mergedBufRef.current) return;
     if (!previewAcRef.current || previewAcRef.current.state === 'closed') {
       previewAcRef.current = new AudioContext();
