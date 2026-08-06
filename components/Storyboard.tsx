@@ -1695,8 +1695,13 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 text-sm font-semibold border border-blue-500/20 disabled:opacity-40 transition-all">
                       <Zap size={14} />
                       {(() => {
+                        // startGenJob processes every scene without an imageUrl — failed and
+                        // never-attempted alike — so the label should say so, not imply it's
+                        // only retrying the failed ones.
+                        const remaining = scenes.filter(sc => !sc.imageUrl).length;
                         const failedCount = scenes.filter(sc => sc.error && !sc.imageUrl).length;
-                        return failedCount > 0 ? `Retry Failed (${failedCount})` : 'Generate All Images';
+                        if (failedCount === 0) return `Generate All Images (${remaining})`;
+                        return `Generate Remaining (${remaining}) — incl. ${failedCount} failed`;
                       })()}
                     </button>
                   )}
