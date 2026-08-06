@@ -7,7 +7,7 @@ import {
   Type
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
-import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, isUsingLiteImageModel, setUseLiteImageModel, StoryboardImageStyle } from '../services/geminiService';
+import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
 import { saveScenes, loadScenes, syncScenesFromCloudIfNewer, getScriptSignature } from '../services/storageService';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
@@ -15,7 +15,6 @@ import { toast } from './Toast';
 
 interface StoryboardProps {
   script: DebateSegment[];
-  scriptStyle?: string;
   onBack: () => void;
 }
 
@@ -774,7 +773,7 @@ const TimelineRow: React.FC<{
 };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-const Storyboard: React.FC<StoryboardProps> = ({ script, scriptStyle, onBack }) => {
+const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [sceneCount, setSceneCount] = useState(10);
   const [model, setModel] = useState('gemini-3.6-flash');
   const [showSettings, setShowSettings] = useState(false);
@@ -789,11 +788,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, scriptStyle, onBack }) 
   const [generatingAllStatus, setGeneratingAllStatus] = useState('');
 
   const [imageAspectRatio, setImageAspectRatio] = useState<'16:9' | '3:4' | '1:1' | '9:16'>('16:9');
-  // Defaults to a dark noir look for Crime Documentary scripts, MS Paint otherwise —
-  // still manually overridable per-project via the picker below.
-  const [imageStyle, setImageStyle] = useState<StoryboardImageStyle>(
-    scriptStyle === 'crime_documentary' ? 'noir_crime' : 'ms_paint'
-  );
   // Global switch (not per-screen) — also applies to Shorts/Thumbnail image gen.
   const [useLiteModel, setUseLiteModel] = useState(isUsingLiteImageModel);
   const toggleLiteModel = () => {
@@ -1307,11 +1301,11 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, scriptStyle, onBack }) 
     prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio,
   ): Promise<string> => {
     try {
-      return await generateStoryboardImage(prompt, guide, ratio, imageStyle);
+      return await generateStoryboardImage(prompt, guide, ratio);
     } catch (e: any) {
       if (!isQuotaError(e)) throw e;
       await new Promise(r => setTimeout(r, 4000));
-      return await generateStoryboardImage(prompt, guide, ratio, imageStyle);
+      return await generateStoryboardImage(prompt, guide, ratio);
     }
   };
 
@@ -1337,7 +1331,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, scriptStyle, onBack }) 
       if (!quiet) toast.error(`Scene ${scene.sceneNumber}: ${msg}`);
       return quota ? 'quota' : 'other';
     }
-  }, [scenes, characterGuide, imageAspectRatio, imageStyle]);
+  }, [scenes, characterGuide]);
 
   // ── Generate all — runs as a background job (services/storyboardGenJobs.ts),
   // not an inline loop tied to this component. That means it survives
@@ -1347,8 +1341,8 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, scriptStyle, onBack }) 
   // alone. The useEffect below subscribes to whatever job is running for this
   // exact script and mirrors its state into local UI state.
   const handleGenerateAll = useCallback(() => {
-    startGenJob(script, scriptSignature, scenes, characterGuide, imageAspectRatio, imageStyle);
-  }, [script, scriptSignature, scenes, characterGuide, imageAspectRatio, imageStyle]);
+    startGenJob(script, scriptSignature, scenes, characterGuide, imageAspectRatio);
+  }, [script, scriptSignature, scenes, characterGuide, imageAspectRatio]);
 
   useEffect(() => {
     const existing = getGenJobSnapshot(scriptSignature);
@@ -1665,21 +1659,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, scriptStyle, onBack }) 
                       <button key={r} onClick={() => setImageAspectRatio(r)}
                         className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${imageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
                         {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-2">Art Style</label>
-                  <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
-                    {([
-                      { value: 'ms_paint' as const, label: '🎨 MS Paint' },
-                      { value: 'noir_crime' as const, label: '🕵 Crime Noir' },
-                    ]).map(o => (
-                      <button key={o.value} onClick={() => setImageStyle(o.value)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${imageStyle === o.value ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
-                        {o.label}
                       </button>
                     ))}
                   </div>

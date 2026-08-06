@@ -75,6 +75,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     { value: 'podcast_4', label: '🧾 Viral Tweet', desc: 'Dark bg + two faces + giant social media post center (scandal/documentary style)', color: 'zinc' },
     { value: 'corkboard_meta', label: '📌 Corkboard Meta', desc: 'Blue banner + cork board + annotated mini-thumbnail + presenter face (viral formula style)', color: 'yellow' },
     { value: 'movie_review', label: '🎬 Cinematic Review', desc: 'Full dramatic bg + dark gold-border box with bold yellow hook (any topic — movie, book, event, brand)', color: 'amber' },
+    { value: 'curated_reference', label: '📌 Reference Style', desc: 'Auto-picks a real curated viral thumbnail as a style reference each time', color: 'indigo' },
   ];
 
   const hasScript = script.length > 0;
@@ -203,12 +204,12 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
         ? { data: referenceImage.data, mimeType: referenceImage.mimeType }
         : undefined;
 
-      // Explained/Situational already know how to use a reference image for
-      // style/composition — auto-pick a real curated thumbnail when the user
-      // hasn't uploaded their own, so those styles get a genuine example to
-      // work from instead of designing blind. Other styles have their own
-      // fixed, already-tuned layouts and are left untouched.
-      if (!refImgData && (videoStyle === 'explained' || videoStyle === 'situational')) {
+      // Explained/Situational/Reference Style all know how to use a reference
+      // image for style/composition — auto-pick a real curated thumbnail when
+      // the user hasn't uploaded their own (a manual upload always wins, any
+      // style). Other styles have their own fixed, already-tuned layouts and
+      // are left untouched.
+      if (!refImgData && (videoStyle === 'explained' || videoStyle === 'situational' || videoStyle === 'curated_reference')) {
         setLoadingStep('inspecting');
         refImgData = (await fetchRandomStyleReference()) ?? undefined;
       }
