@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased } from '../services/geminiService';
-import { saveScenes, loadScenes, getScriptSignature } from '../services/storageService';
+import { saveScenes, loadScenes, syncScenesFromCloudIfNewer, getScriptSignature } from '../services/storageService';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
 import { toast } from './Toast';
@@ -828,19 +828,24 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
     // Load saved scenes on mount if they match the current script
     if (scenesLoadedRef.current) return;
     scenesLoadedRef.current = true;
+    const applyRestored = (saved: Awaited<ReturnType<typeof loadScenes>>) => {
+      if (!saved || saved.scenes.length === 0) return;
+      // A scene mid-generation when the page was closed/refreshed gets
+      // persisted with isGenerating still true — nothing is actually
+      // running anymore after a fresh load, so that flag would otherwise
+      // stay stuck forever with no way to resume it. Clear it and mark
+      // it as needing a retry instead.
+      const restored = saved.scenes.map(sc =>
+        sc.isGenerating ? { ...sc, isGenerating: false, error: sc.error ?? 'Interrupted — try again' } : sc
+      );
+      setScenes(restored);
+      setCharacterGuide(saved.characterGuide);
+    };
     loadScenes(script).then(saved => {
-      if (saved && saved.scenes.length > 0) {
-        // A scene mid-generation when the page was closed/refreshed gets
-        // persisted with isGenerating still true — nothing is actually
-        // running anymore after a fresh load, so that flag would otherwise
-        // stay stuck forever with no way to resume it. Clear it and mark
-        // it as needing a retry instead.
-        const restored = saved.scenes.map(sc =>
-          sc.isGenerating ? { ...sc, isGenerating: false, error: sc.error ?? 'Interrupted — try again' } : sc
-        );
-        setScenes(restored);
-        setCharacterGuide(saved.characterGuide);
-      }
+      applyRestored(saved);
+      // Background catch-up in case another device generated more scenes —
+      // cheap check, only re-fetches (with images) if actually newer.
+      syncScenesFromCloudIfNewer(script).then(applyRestored);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

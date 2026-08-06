@@ -21,7 +21,7 @@ const ShortsStudio     = lazy(() => import('./components/ShortsStudio'));
 import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, PhoneStudioSourceClip, ThumbnailState, YoutubeImportData } from './types';
-import { saveState, loadState, clearState } from './services/storageService';
+import { saveState, loadState, clearState, syncStateFromCloudIfNewer } from './services/storageService';
 import { Key, RotateCcw, AlertTriangle, X } from 'lucide-react';
 import { ToastContainer, toast } from './components/Toast';
 
@@ -77,47 +77,57 @@ const App: React.FC = () => {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Shared by the initial load and the background cloud-catchup sync below —
+  // applies whatever loadState()/syncStateFromCloudIfNewer() resolved with.
+  const applyLoadedState = (stored: Awaited<ReturnType<typeof loadState>>) => {
+    if (!stored) return;
+    // Restore youtubeData regardless of script length
+    // Strip contextFileContent + contextFileName — user must re-attach each session
+    if (stored.youtubeData) {
+      const { contextFileContent: _c, contextFileName: _f, ...restYoutube } = stored.youtubeData as any;
+      setYoutubeData(restYoutube);
+    }
+
+    const isImportState = (s: AppState) =>
+      s === AppState.IMPORT || s === AppState.VIDEO_CLIP_IMPORT ||
+      s === AppState.YOUTUBE_IMPORT || s === AppState.INSTAGRAM_IMPORT || s === AppState.REDDIT_IMPORT;
+
+    if (stored.script.length > 0) {
+      // Don't restore to import screen if user had a project in progress
+      const restoredState = isImportState(stored.appState) ? AppState.INPUT : stored.appState;
+      setAppState(restoredState);
+      setScript(stored.script);
+      if (stored.thumbnailState) {
+        setThumbnailState({
+          thumbnailTexts: [],
+          selectedThumbnailText: '',
+          comboPairs: [],
+          extraInstructions: '',
+          ...stored.thumbnailState,
+        });
+      }
+    } else if (stored.youtubeData) {
+      // Had transcript but no script — go to INPUT step
+      const restoredState = isImportState(stored.appState) ? AppState.INPUT : stored.appState;
+      setAppState(restoredState);
+    }
+  };
+
   // Load state once we have a session (not on every token refresh — a token
   // refresh fires this same event with a new session reference, and re-running
   // init() would clobber in-progress local edits with a stale cloud re-fetch).
+  // loadState() itself is local-first (instant on a device that's used the app
+  // before) — the network is only touched here if there's nothing cached yet.
   useEffect(() => {
     if (!session || hasLoadedProjectRef.current) return;
     hasLoadedProjectRef.current = true;
     const init = async () => {
-      const stored = await loadState();
-      if (stored) {
-        // Restore youtubeData regardless of script length
-        // Strip contextFileContent + contextFileName — user must re-attach each session
-        if (stored.youtubeData) {
-          const { contextFileContent: _c, contextFileName: _f, ...restYoutube } = stored.youtubeData as any;
-          setYoutubeData(restYoutube);
-        }
-
-        const isImportState = (s: AppState) =>
-          s === AppState.IMPORT || s === AppState.VIDEO_CLIP_IMPORT ||
-          s === AppState.YOUTUBE_IMPORT || s === AppState.INSTAGRAM_IMPORT || s === AppState.REDDIT_IMPORT;
-
-        if (stored.script.length > 0) {
-          // Don't restore to import screen if user had a project in progress
-          const restoredState = isImportState(stored.appState) ? AppState.INPUT : stored.appState;
-          setAppState(restoredState);
-          setScript(stored.script);
-          if (stored.thumbnailState) {
-            setThumbnailState({
-              thumbnailTexts: [],
-              selectedThumbnailText: '',
-              comboPairs: [],
-              extraInstructions: '',
-              ...stored.thumbnailState,
-            });
-          }
-        } else if (stored.youtubeData) {
-          // Had transcript but no script — go to INPUT step
-          const restoredState = isImportState(stored.appState) ? AppState.INPUT : stored.appState;
-          setAppState(restoredState);
-        }
-      }
+      applyLoadedState(await loadState());
       setIsInitialized(true);
+
+      // Background catch-up: cheap check for changes pushed from another
+      // device since our last sync — never blocks the render above.
+      applyLoadedState(await syncStateFromCloudIfNewer());
     };
     init();
   }, [session]);
