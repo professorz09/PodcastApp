@@ -25,9 +25,10 @@ interface ProjectRow {
   updated_at: string;
 }
 
-const PUBLIC_PREFIX = '/storage/v1/object/public/';
-
-// ── Asset upload (data:/blob: URL → Supabase Storage public URL) ───────────
+// project-assets is a PRIVATE bucket gated by RLS to the one logged-in owner —
+// so assets are addressed by a marker (not a fetchable URL) and always moved
+// through the authenticated SDK (upload/download), never a bare fetch().
+const ASSET_MARKER_PREFIX = 'sbasset://';
 
 const dataUrlToBlob = (url: string): Blob => {
   const [header, b64] = url.split(',');
@@ -43,9 +44,9 @@ const dataUrlToBlob = (url: string): Blob => {
 // cache each keystroke would re-upload every unchanged audio/image blob again.
 const uploadCache = new Map<string, string>();
 
-// Uploads a data:/blob: URL to Storage at `path` and returns its public URL.
-// Already-remote URLs (previously uploaded, or some other external URL) are
-// returned unchanged — no redundant re-upload.
+// Uploads a data:/blob: URL to Storage at `path` and returns an `sbasset://`
+// marker. Already-remote values (previous marker, or some other external URL)
+// are returned unchanged — no redundant re-upload.
 export const uploadAsset = async (url: string | undefined | null, path: string): Promise<string | undefined> => {
   if (!url) return undefined;
   if (!url.startsWith('data:') && !url.startsWith('blob:')) return url;
@@ -56,25 +57,25 @@ export const uploadAsset = async (url: string | undefined | null, path: string):
   const blob = url.startsWith('data:') ? dataUrlToBlob(url) : await (await fetch(url)).blob();
   const { error } = await supabase.storage
     .from(ASSETS_BUCKET)
-    .upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: true, cacheControl: '0' });
+    .upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: true });
   if (error) throw error;
 
-  const { data } = supabase.storage.from(ASSETS_BUCKET).getPublicUrl(path);
-  const remoteUrl = `${data.publicUrl}?v=${Date.now()}`;
-  uploadCache.set(url, remoteUrl);
-  return remoteUrl;
+  const marker = `${ASSET_MARKER_PREFIX}${path}`;
+  uploadCache.set(url, marker);
+  return marker;
 };
 
-// Fetches a Supabase Storage public URL down to a local blob: URL (avoids any
-// CORS/cross-origin canvas-tainting issues — components already know how to
-// use blob: URLs, since local IndexedDB playback used the same pattern).
+// Downloads an `sbasset://` marker through the authenticated client (respects
+// RLS — only works for the logged-in owner) and hands back a local blob: URL.
+// Components already know how to use blob: URLs (same pattern local IndexedDB
+// playback used), so no consumer needs to change.
 export const remoteToBlobUrl = async (url: string | undefined | null): Promise<string | undefined> => {
   if (!url) return undefined;
-  if (!url.includes(PUBLIC_PREFIX)) return url; // not one of ours (data:/blob:/other) — pass through
-  const res = await fetch(url);
-  if (!res.ok) return undefined;
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
+  if (!url.startsWith(ASSET_MARKER_PREFIX)) return url; // not one of ours (data:/blob:/other) — pass through
+  const path = url.slice(ASSET_MARKER_PREFIX.length);
+  const { data, error } = await supabase.storage.from(ASSETS_BUCKET).download(path);
+  if (error || !data) return undefined;
+  return URL.createObjectURL(data);
 };
 
 // ── Project row read/write ──────────────────────────────────────────────────
