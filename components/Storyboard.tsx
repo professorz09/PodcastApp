@@ -1161,14 +1161,26 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
         script.reduce((s, seg) => s + (seg.duration ?? 0), 0);
 
       if (hasWordTimings && totalDur > 0) {
-        // ── TIME-BASED approach: divide audio into N equal slots, use real word timings ──
-        const slotDur = totalDur / sceneCount;
+        // ── TIME-BASED approach, split by WORD COUNT not raw seconds ──
+        // Splitting by equal clock-time made every scene last exactly the same
+        // duration regardless of how much was actually said in it. Splitting by
+        // word count instead means each slot's boundary falls on a real spoken
+        // timestamp, so a scene covering a fast-spoken, word-dense stretch gets
+        // less screen time than one covering a slow, pause-heavy stretch — the
+        // image duration actually tracks the narration, not an arbitrary clock split.
+        const totalWords = absWords.length;
+        const wordsPerSlot = totalWords / sceneCount;
 
-        // For each slot: find all words in that time range, determine segmentIndices
         const slots = Array.from({ length: sceneCount }, (_, i) => {
-          const slotStart = i * slotDur;
-          const slotEnd = Math.min((i + 1) * slotDur, totalDur);
-          const inRange = absWords.filter(w => w.absStart >= slotStart - 0.1 && w.absStart < slotEnd + 0.1);
+          const startIdx = Math.floor(i * wordsPerSlot);
+          const endIdx = i === sceneCount - 1 ? totalWords : Math.floor((i + 1) * wordsPerSlot);
+          const inRange = absWords.slice(startIdx, endIdx);
+          const slotStart = inRange.length > 0 ? inRange[0].absStart : (i / sceneCount) * totalDur;
+          // End boundary = start of the next slot's first word, so scenes butt
+          // up against each other with no gap or overlap.
+          const slotEnd = i === sceneCount - 1
+            ? totalDur
+            : (endIdx < totalWords ? absWords[endIdx].absStart : totalDur);
           const voiceover = inRange.length === 0 ? '' :
             inRange.length <= 14 ? inRange.map(w => w.word).join(' ') :
               `${inRange.slice(0, 6).map(w => w.word).join(' ')} … ${inRange.slice(-4).map(w => w.word).join(' ')}`;
