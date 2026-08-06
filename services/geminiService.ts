@@ -7670,8 +7670,8 @@ Each scene covers one or more consecutive script segments. Every segment must be
 For each scene prompt:
 - Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
 - Include the character's action, expression, and setting
-- Style note: MS Paint style — crude, simple, hand-drawn, basic bold colors, flat shading, unpolished/naive art. NOT a clean/polished 2D vector illustration or story-book art. Consistent character design, white or simple background
 - Keep prompts clear and visual — no abstract concepts, show what is literally happening
+- Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -7732,8 +7732,8 @@ Identify the main character(s) from the voiceover text. Create a SHORT visual de
 Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
 - Show what the character is DOING or EXPERIENCING during those spoken words
-- Style note: MS Paint style — crude, simple, hand-drawn, basic bold colors, flat shading, unpolished/naive art. NOT a clean/polished 2D vector illustration or story-book art. Consistent character design
 - Be literal and visual — no abstract concepts
+- Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON:
 {
