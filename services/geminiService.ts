@@ -7786,6 +7786,11 @@ Each scene covers one or more consecutive script segments. Every segment must be
 For each scene prompt:
 - Describe WHAT IS HAPPENING in this scene — using the character(s) from Step 1 if one
   exists, otherwise just whatever people/objects/setting the moment actually calls for
+- Match the segment's actual content — if it mentions a car with a man and a woman in
+  it, the scene shows the car with BOTH of them in it, not just one person standing
+  somewhere generic. Never drop a person/object the segment clearly describes just to
+  simplify — "one clear moment" means one coherent event, not fewer things than the
+  script actually says are there
 - Include the character's action, expression, and setting, and any other details
   (mood, relevant objects, background elements) that help the image feel complete
 - Keep it clear and literal, focused on ONE main thing happening — not five unrelated
@@ -7798,7 +7803,9 @@ For each scene prompt:
 - For an abstract idea, emotion, or turning point, reach for a vivid visual metaphor
   when it reads more clearly at a glance than a literal illustration would — e.g. a
   looming shadow for fear, a tangled knot for confusion, a rising sun for a fresh start
-- Keep it simple — do not describe an art style here, the image generator applies that separately
+- Keep it to WHO is there, WHAT they're doing, WHAT objects/setting are involved —
+  never describe art style, rendering technique, or colors/coloring here (no "vibrant",
+  no "flat colors", no medium). The image generator applies style separately at the end.
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -7866,6 +7873,11 @@ Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
 - Show what's happening — using the character from Step 1 if one exists, otherwise
   whatever people/objects/setting the moment actually calls for
+- Match the voiceover's actual content — if it mentions a car with a man and a woman in
+  it, the scene shows the car with BOTH of them in it, not just one person standing
+  somewhere generic. Never drop a person/object the voiceover clearly describes just to
+  simplify — "one clear moment" means one coherent event, not fewer things than the
+  voiceover actually says are there
 - Include enough detail (setting, expression, relevant objects, mood) that the scene
   feels complete, but keep it focused on ONE main thing happening — not five unrelated
   events crammed into one image. e.g. "A monkey selling bananas on a busy street,
@@ -7876,7 +7888,9 @@ For each scene, create one image prompt that visually illustrates what is happen
 - For an abstract idea, emotion, or turning point, reach for a vivid visual metaphor
   when it reads more clearly at a glance than a literal illustration would — e.g. a
   looming shadow for fear, a tangled knot for confusion, a rising sun for a fresh start
-- Keep it simple — do not describe an art style here, the image generator applies that separately
+- Keep it to WHO is there, WHAT they're doing, WHAT objects/setting are involved —
+  never describe art style, rendering technique, or colors/coloring here (no "vibrant",
+  no "flat colors", no medium). The image generator applies style separately at the end.
 
 Respond ONLY with valid JSON:
 {
