@@ -21,6 +21,7 @@ interface SubtitleConfig {
   fontSize: number;
   textColor: string;
   position: 'top' | 'bottom';
+  shadow: boolean;
 }
 
 const DEFAULT_SUBTITLE: SubtitleConfig = {
@@ -28,6 +29,7 @@ const DEFAULT_SUBTITLE: SubtitleConfig = {
   fontSize: 19,
   textColor: '#ffffff',
   position: 'bottom',
+  shadow: true,
 };
 
 const MODEL_OPTIONS = [
@@ -449,16 +451,26 @@ function drawSubtitleOnCtx(
   const lh = fs * 1.55;
   const pad = 10;
   const totalH = lines.length * lh + pad * 2;
-  const baseY = cfg.position === 'top' ? 20 : H - totalH - 20;
+  const baseY = cfg.position === 'top' ? 20 : H - totalH - 10;
 
-  // Strong shadow for legibility without background
-  ctx.shadowColor = 'rgba(0,0,0,0.95)';
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetX = 1;
-  ctx.shadowOffsetY = 2;
+  // Crisp black outline + a tight drop shadow behind the text — reads
+  // clearly against any background, not just a soft blur glow. Optional,
+  // since a heavy outline can make the text read a bit dark/faded.
+  if (cfg.shadow) {
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = fs * 0.12;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2;
+    lines.forEach((l, i) => ctx.strokeText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
+  }
+
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   ctx.fillStyle = cfg.textColor;
   lines.forEach((l, i) => ctx.fillText(l, W / 2, baseY + pad + (i + 1) * lh - fs * 0.25));
-  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
 }
 
 // Draw an image cover-fit on canvas
@@ -1543,6 +1555,18 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                         <input type="color" value={subtitle.textColor} onChange={e => setSubtitle(s => ({ ...s, textColor: e.target.value }))} className="opacity-0 absolute" />
                       </label>
                     </div>
+                  </div>
+
+                  {/* Shadow toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-gray-400">Shadow</span>
+                      <p className="text-[10px] text-gray-600">Black outline behind the text for legibility</p>
+                    </div>
+                    <button onClick={() => setSubtitle(s => ({ ...s, shadow: !s.shadow }))}
+                      className={`w-11 h-6 rounded-full transition-all shrink-0 ${subtitle.shadow ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${subtitle.shadow ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
                   </div>
 
                 </div>
