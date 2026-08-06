@@ -1375,7 +1375,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.6-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -2258,6 +2258,30 @@ ${specificDetails}`
             ✗ BANNED: Multiple speakers ya dialogue format
             ✗ BANNED: "Yeh zaroori hai", "Is prakar", "Ant mein", generic filler
             ✗ BANNED: Long boring intro — hook direct aur sharp ho
+            ${durFillHi}
+          `;
+        } else if (style === 'narration') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: NARRATION — SIMPLE SINGLE-VOICE SCRIPT (कोई speaker tag नहीं)
+            यह एक plain narration script है। कोई dialogue नहीं, कोई hook-structure नहीं, कोई forced format नहीं।
+            बस topic को एक ही आवाज़ में, शुरू से आखिर तक, flowing paragraphs में सुनाओ — जैसे कोई audiobook या essay पढ़ा जा रहा हो।
+            ═══════════════════════════════════════
+            विषय: "${topic}"
+            ${specificDetails ? `विशेष context: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: ${language}.
+
+            CHARACTER — केवल 1 narrator:
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
+
+            RULES:
+            ✓ पूरी script सिर्फ एक ही speaker बोलेगा — शुरू से अंत तक
+            ✓ Natural, flowing narration — जैसे कोई किताब पढ़ी जा रही हो या कोई कहानी सुनाई जा रही हो
+            ✓ कोई forced structure नहीं (opening/hook/outro जबरदस्ती मत डालो) — topic जो माँगे वैसे लिखो
+            ✓ Har paragraph 3-6 sentences ka ho, ek paragraph = ek JSON segment (lambi script khud-ba-khud kai segments mein bant jaayegi — audio generation har segment ko अलग se बनाता है aur फिर सब को क्रम से जोड़ deta hai)
+            ✗ कोई dialogue नहीं, कोई दूसरा speaker नहीं, कोई "Q:"/"A:" जैसे tags नहीं
+            ✗ Text के अंदर कोई speaker-label मत लिखो (जैसे "Narrator:") — सिर्फ शुद्ध बोलने वाला text
             ${durFillHi}
           `;
         } else if (style === 'deep_explainer') {
@@ -3978,6 +4002,33 @@ ${specificDetails}`
             ✗ BANNED: Multiple speakers or dialogue format
             ✗ BANNED: "It's important to note", "In conclusion", "Furthermore", generic filler
             ✗ BANNED: Long boring intro — hook must be direct and sharp
+            ${durFillEn}
+          `;
+        } else if (style === 'narration') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: NARRATION — SIMPLE SINGLE-VOICE SCRIPT (no speaker tags)
+            Plain narration script. No dialogue, no hook-structure, no forced format.
+            Just narrate the topic in ONE continuous voice, start to finish, in flowing paragraphs —
+            like an audiobook or an essay being read aloud.
+            ═══════════════════════════════════════
+            Topic: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            CHARACTER — exactly 1 narrator:
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
+
+            RULES:
+            ✓ The entire script is spoken by ONE speaker only, start to finish
+            ✓ Natural, flowing narration — like a book being read or a story being told
+            ✓ No forced structure (don't force a hook/opening/outro) — let the topic dictate the shape
+            ✓ Each paragraph is 3-6 sentences, one paragraph per JSON segment (a long script will
+              naturally split into many segments — audio generation renders each one separately
+              and stitches them together in order)
+            ✗ No dialogue, no second speaker, no "Q:"/"A:" style tags
+            ✗ Do not write speaker labels inside the text itself (e.g. "Narrator:") — just the pure spoken text
             ${durFillEn}
           `;
         } else if (style === 'deep_explainer') {
