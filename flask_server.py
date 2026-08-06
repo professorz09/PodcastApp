@@ -342,38 +342,88 @@ def get_transcript():
                 continue
         return result
 
+    # ── Attempt 0: Supadata API (https://docs.supadata.ai) — first priority
+    # when SUPADATA_API_KEY is configured. Any failure (missing key, HTTP
+    # error, empty content) falls straight through to the existing
+    # youtube-transcript-api / yt-dlp chain below, unchanged.
+    supadata_key = os.environ.get('SUPADATA_API_KEY', '').strip()
+    if supadata_key:
+        def fetch_supadata(lang=None):
+            params = {'url': url}
+            if lang:
+                params['lang'] = lang
+            resp = _requests_lib.get(
+                'https://api.supadata.ai/v1/transcript',
+                headers={'x-api-key': supadata_key},
+                params=params, timeout=20,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        for lang in ['hi', 'ur', 'en', None]:
+            try:
+                data = fetch_supadata(lang)
+            except Exception as e:
+                failure_reason = f'Supadata: {e}'
+                continue
+            content = data.get('content')
+            if not content:
+                continue
+            if isinstance(content, str):
+                text = clean_caption_text(content)
+                candidate = [{'text': text, 'start': 0, 'duration': 0}] if text else []
+            else:
+                candidate = []
+                for chunk in content:
+                    text = clean_caption_text(chunk.get('text', ''))
+                    if text:
+                        candidate.append({
+                            'text': text,
+                            'start': chunk.get('offset', 0) / 1000,
+                            'duration': chunk.get('duration', 0) / 1000,
+                        })
+            if candidate:
+                raw = candidate
+                lang_used = data.get('lang', lang or 'auto')
+                available_langs = [
+                    {'code': c, 'name': c, 'auto': False}
+                    for c in data.get('availableLangs', [])
+                ]
+                break
+
     # ── Attempt 1: list() — inspect all available transcripts, sort by preference
     # youtube-transcript-api v1.x uses instance-based API: YouTubeTranscriptApi().list(video_id)
-    try:
-        api = make_transcript_api()
-        transcript_list = api.list(video_id)
-        all_t = list(transcript_list)
-        available_langs = [{'code': t.language_code, 'name': t.language, 'auto': t.is_generated} for t in all_t]
-        # Sort: manual transcripts first, then by language priority rank
-        all_t.sort(key=lambda t: (1 if t.is_generated else 0, lang_rank(t.language_code)))
-        for t in all_t:
-            try:
-                fetched = t.fetch()
-                candidate = normalize_raw(fetched)
-                if candidate:
-                    raw = candidate
-                    lang_used = t.language_code
-                    break
-            except Exception as fe:
-                failure_reason = str(fe)
-                continue
-    except Exception as e:
-        err_str = str(e).lower()
-        if 'disabled' in err_str or 'no transcript' in err_str:
-            failure_reason = 'TRANSCRIPTS_DISABLED'
-        elif 'unavailable' in err_str or 'private' in err_str or 'not available' in err_str:
-            failure_reason = 'VIDEO_UNAVAILABLE'
-        elif 'too many requests' in err_str or '429' in err_str:
-            failure_reason = 'RATE_LIMITED'
-        elif 'age-restricted' in err_str or 'age restricted' in err_str or 'inappropriate' in err_str:
-            failure_reason = 'AGE_RESTRICTED'
-        else:
-            failure_reason = str(e)
+    if raw is None:
+        try:
+            api = make_transcript_api()
+            transcript_list = api.list(video_id)
+            all_t = list(transcript_list)
+            available_langs = [{'code': t.language_code, 'name': t.language, 'auto': t.is_generated} for t in all_t]
+            # Sort: manual transcripts first, then by language priority rank
+            all_t.sort(key=lambda t: (1 if t.is_generated else 0, lang_rank(t.language_code)))
+            for t in all_t:
+                try:
+                    fetched = t.fetch()
+                    candidate = normalize_raw(fetched)
+                    if candidate:
+                        raw = candidate
+                        lang_used = t.language_code
+                        break
+                except Exception as fe:
+                    failure_reason = str(fe)
+                    continue
+        except Exception as e:
+            err_str = str(e).lower()
+            if 'disabled' in err_str or 'no transcript' in err_str:
+                failure_reason = 'TRANSCRIPTS_DISABLED'
+            elif 'unavailable' in err_str or 'private' in err_str or 'not available' in err_str:
+                failure_reason = 'VIDEO_UNAVAILABLE'
+            elif 'too many requests' in err_str or '429' in err_str:
+                failure_reason = 'RATE_LIMITED'
+            elif 'age-restricted' in err_str or 'age restricted' in err_str or 'inappropriate' in err_str:
+                failure_reason = 'AGE_RESTRICTED'
+            else:
+                failure_reason = str(e)
 
     # ── Attempt 2: explicit language fallback via fetch()
     # youtube-transcript-api v1.x: api.fetch(video_id, languages=[...])
