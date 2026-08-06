@@ -71,7 +71,7 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4' | 'corkboard_meta' | 'movie_review';
+export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4' | 'corkboard_meta' | 'movie_review' | 'curated_reference';
 
 const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
   if (style === 'explained') {
@@ -8045,27 +8045,10 @@ export const generateSpeechChirp3HD = async (
   return { audioUrl, duration };
 };
 
-export type StoryboardImageStyle = 'ms_paint' | 'noir_crime';
-
-const STORYBOARD_ART_STYLES: Record<StoryboardImageStyle, string> = {
-  ms_paint: `Art style: MS Paint — crude, simple, hand-drawn, basic bold colors, flat shading,
-unpolished, like it was drawn with a mouse. NOT a clean, polished, modern 2D vector
-illustration or story-book art.
-
-Plain white or very simple background. No text anywhere in the image.`,
-  noir_crime: `Art style: dark true-crime documentary illustration — muted, desaturated colors,
-deep shadows, high-contrast cinematic noir lighting, gritty grainy texture, somber and
-suspenseful mood. Think true-crime documentary reenactment art — dimly lit, atmospheric,
-tense. NOT bright, cartoonish, playful, or clean/polished — this must feel ominous.
-
-Background stays simple and uncluttered even though it's dark — no text anywhere in the image.`,
-};
-
 export const generateStoryboardImage = async (
   prompt: string,
   characterGuide?: string,
   aspectRatio: '16:9' | '3:4' | '1:1' | '9:16' = '16:9',
-  imageStyle: StoryboardImageStyle = 'ms_paint',
 ): Promise<string> => {
   const ai = getAi();
 
@@ -8082,9 +8065,11 @@ Draw this exact scene. Include everyone and everything mentioned in it — who/w
 there, what they are doing, any objects involved, and where it's happening. Don't drop
 or simplify away any part of the scene.
 ${characterSection}
-${STORYBOARD_ART_STYLES[imageStyle]}
+Art style: MS Paint — crude, simple, hand-drawn, basic bold colors, flat shading,
+unpolished, like it was drawn with a mouse. NOT a clean, polished, modern 2D vector
+illustration or story-book art.
 
-Aspect ratio ${aspectRatio}.
+Plain white or very simple background. No text anywhere in the image. Aspect ratio ${aspectRatio}.
 `;
 
   const response = await ai.models.generateContent({
