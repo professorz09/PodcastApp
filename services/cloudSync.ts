@@ -90,12 +90,24 @@ export const fetchProjectRow = async (): Promise<ProjectRow | null> => {
   return data as ProjectRow | null;
 };
 
+// Cheap poll used to decide whether a full row fetch (which downloads every
+// changed asset) is even worth doing — see storageService's local-first load.
+export const fetchProjectUpdatedAt = async (): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from('project_state')
+    .select('updated_at')
+    .eq('id', PROJECT_ROW_ID)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.updated_at ?? null;
+};
+
 export const pushMainState = async (
   appState: AppState,
   script: DebateSegment[],
   thumbnailState?: ThumbnailState,
   youtubeData?: YoutubeImportData | null,
-): Promise<void> => {
+): Promise<string> => {
   const scriptForCloud = await Promise.all(script.map(async seg => {
     const audioUrl = await uploadAsset(seg.audioUrl, `audio/${seg.id}`);
     if (!seg.visualConfig?.backgroundUrl) return { ...seg, audioUrl };
@@ -107,15 +119,17 @@ export const pushMainState = async (
     ? { ...thumbnailState, referenceImage: null, thumbnailUrl: await uploadAsset(thumbnailState.thumbnailUrl ?? undefined, 'thumbnail/main') ?? null }
     : null;
 
+  const updatedAt = new Date().toISOString();
   const { error } = await supabase.from('project_state').upsert({
     id: PROJECT_ROW_ID,
     app_state: appState,
     script: scriptForCloud,
     thumbnail_state: thumbnailForCloud,
     youtube_data: youtubeData ?? null,
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
   });
   if (error) throw error;
+  return updatedAt;
 };
 
 const pushSceneSet = async (
@@ -124,7 +138,7 @@ const pushSceneSet = async (
   script: DebateSegment[],
   scenes: StoryboardScene[],
   characterGuide: string,
-): Promise<void> => {
+): Promise<string> => {
   const scenesForCloud = await Promise.all(scenes.map(async sc => ({
     ...sc,
     imageUrl: await uploadAsset(sc.imageUrl, `${folder}/${sc.id}`),
@@ -134,12 +148,14 @@ const pushSceneSet = async (
     scenes: scenesForCloud,
     characterGuide,
   };
+  const updatedAt = new Date().toISOString();
   const { error } = await supabase.from('project_state').upsert({
     id: PROJECT_ROW_ID,
     [column]: payload,
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
   });
   if (error) throw error;
+  return updatedAt;
 };
 
 export const pushStoryboardScenes = (script: DebateSegment[], scenes: StoryboardScene[], characterGuide: string) =>

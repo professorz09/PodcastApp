@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, generateShortsThumbText, ShortsContentResult, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
-import { saveShortsScenes, loadShortsScenes } from '../services/storageService';
+import { saveShortsScenes, loadShortsScenes, syncShortsScenesFromCloudIfNewer } from '../services/storageService';
 import { registerActivePlayback } from '../services/audioManager';
 import { toast } from './Toast';
 
@@ -1067,11 +1067,14 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     // Load saved scenes on mount if they match the current script
     if (scenesLoadedRef.current) return;
     scenesLoadedRef.current = true;
+    const applyRestored = (saved: Awaited<ReturnType<typeof loadShortsScenes>>) => {
+      if (!saved || saved.scenes.length === 0) return;
+      setScenes(saved.scenes);
+      setCharacterGuide(saved.characterGuide);
+    };
     loadShortsScenes(script).then(saved => {
-      if (saved && saved.scenes.length > 0) {
-        setScenes(saved.scenes);
-        setCharacterGuide(saved.characterGuide);
-      }
+      applyRestored(saved);
+      syncShortsScenesFromCloudIfNewer(script).then(applyRestored);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
