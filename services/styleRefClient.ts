@@ -13,7 +13,8 @@ const styleRefClient = createClient(STYLE_REF_URL, STYLE_REF_ANON_KEY);
 
 interface StyleImageRow {
   path: string;
-  meta: { has_face?: boolean } | null;
+  name: string | null;
+  meta: { has_face?: boolean; niche?: string; keywords?: string[]; summary?: string; composition?: string } | null;
 }
 
 // A handful of the same curated thumbnails bundled locally — used only if the
@@ -45,6 +46,53 @@ const fetchLocalFallback = async (): Promise<{ data: string; mimeType: string } 
     return await fetchAsReference(url);
   } catch (e) {
     console.error('Failed to load local fallback style reference', e);
+    return null;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Topic-matched style pick — mirrors the sister project's own YouTube
+// auto-match flow (match a topic to the best-fitting curated thumbnail),
+// except that project's vector-search RPC is locked to its own service-role
+// key (see its migrations 0014/0019), so it can't be called from here. This
+// fetches the same public metadata instead (rich per-image `meta` JSON —
+// niche/keywords/summary/composition — already anon-readable via RLS) and
+// lets the caller rank it with an LLM, then picks a real image by path.
+// ─────────────────────────────────────────────────────────────────────────────
+
+let poolCache: StyleImageRow[] | null = null;
+
+export interface StylePoolEntry { path: string; name: string | null; meta: StyleImageRow['meta'] }
+
+// Metadata only (no image bytes) — cheap enough to hand the whole pool to an
+// LLM for topic ranking. Cached for the session since the pool rarely changes.
+export const fetchStylePoolMeta = async (): Promise<StylePoolEntry[]> => {
+  if (poolCache) return poolCache;
+  try {
+    const { data: rows, error } = await styleRefClient
+      .from('style_images')
+      .select('path, name, meta')
+      .like('path', 'admin/%')
+      .eq('active', true)
+      .eq('show_in_picker', true)
+      .is('user_id', null)
+      .limit(200);
+    if (error || !rows?.length) return [];
+    poolCache = rows as StyleImageRow[];
+    return poolCache;
+  } catch (e) {
+    console.error('Failed to fetch style pool metadata', e);
+    return [];
+  }
+};
+
+// Fetches the actual image bytes for one pool entry, chosen after ranking.
+export const fetchStyleImageByPath = async (path: string): Promise<{ data: string; mimeType: string } | null> => {
+  try {
+    const url = `${STYLE_REF_URL}/storage/v1/object/public/${STYLE_REF_BUCKET}/${path}`;
+    return await fetchAsReference(url);
+  } catch (e) {
+    console.error('Failed to fetch style reference image by path', e);
     return null;
   }
 };

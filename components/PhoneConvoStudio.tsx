@@ -1332,7 +1332,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
     setComboError(null);
     try {
       const srcText = segments.map(s => s.text).join(' ').slice(0, 3500);
-      const result = await generateTitleTextPair(srcText, 'podcast');
+      const result = await generateTitleTextPair(srcText);
       if (!result.length) { setComboError('Koi combo nahi aaya — dobara try karo'); return; }
       setComboPairs(result);
       setSelectedCombo(result[0]);
@@ -1352,14 +1352,11 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       const srcText = segments.map(s => s.text).join(' ').slice(0, 3500);
       const url = await generateThumbnail(
         selectedCombo.title,
-        podcastHost || supporterName || 'Host',
-        podcastGuests[0] || criticName || 'Guest',
-        undefined,
         selectedCombo.description,
+        undefined,
         step => setThumbStep(step),
-        'podcast',
         srcText,
-        podcastTitle || undefined,
+        podcastTitle || '',
       );
       setThumbUrl(url);
       setThumbStep('');
