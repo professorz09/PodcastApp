@@ -2293,6 +2293,7 @@ ${specificDetails}`
             RULES:
             ✓ पूरी script सिर्फ एक ही speaker बोलेगा — शुरू से अंत तक, ek continuous piece jaisa lage, tukdon mein todi hui speech jaisa nahi
             ✓ Natural, flowing narration — जैसे कोई किताब पढ़ी जा रही हो या कोई कहानी सुनाई जा रही हो
+            ✓ Engaging aur simple rakho — jahan bhi koi idea samjhane mein madad kare, wahan ek concrete real-world example, analogy, ya vivid specific detail zaroor daalo. Rigid structure force kiye bina bhi listener ko interested banaye rakhna hai, dry/textbook jaisa bilkul nahi
             ✓ कोई forced structure नहीं (opening/hook/outro जबरदस्ती मत डालो) — topic जो माँगे वैसे लिखो
             ✓ Content ko clear CHAPTERS/sections mein organize karo (jaise ek achi book ya documentary hoti hai) — har chapter apne aap mein poora aur DETAILED ho, chhota ya sarsari mat rakho
             ✓ Har chapter = ek JSON segment. Chapters ki length topic ke hisaab se jitni chahiye utni rakho — koi fixed short limit nahi. Lambi script khud kai chapters mein bant jaayegi, aur agar koi chapter audio ke liye bahut lamba ho to Script Editor ka "Split Script" button use karke usse automatically safe parts mein cut kiya ja sakta hai — isliye yahan sirf FULL DETAIL aur achi chapter-structure pe focus karo
@@ -4077,6 +4078,9 @@ ${specificDetails}`
             ✓ The entire script is spoken by ONE speaker only, start to finish — one continuous
               piece, not something that reads like it was chopped into disconnected lines
             ✓ Natural, flowing narration — like a book being read or a story being told
+            ✓ Engaging and simple — wherever it helps an idea land, use a concrete real-world
+              example, analogy, or vivid specific detail. Keep the listener interested without
+              forcing a rigid structure — never dry or textbook-like
             ✓ No forced structure (don't force a hook/opening/outro) — let the topic dictate the shape
             ✓ Organize the content into clear CHAPTERS/sections (like a good book or documentary) —
               each chapter should be complete and DETAILED on its own, not short or thin
@@ -7762,19 +7766,26 @@ ${scriptText}
 SEGMENT DURATIONS: ${durInfo}
 
 TASK:
-Step 1 — CHARACTER GUIDE:
-First, identify the main character(s) from the script.
-Create a SHORT, PRECISE visual description for each character that will be copy-pasted into EVERY image generation prompt to ensure visual consistency.
-This must include: appearance, clothing, hair, skin tone, distinguishing features.
-Write it as a single compact paragraph starting with "Main character: ..."
-If there are 2 speakers, describe both. Keep it under 60 words total.
+Step 1 — CHARACTER GUIDE (only if the script actually needs one):
+Check whether the script naturally centers on a recurring character/host — someone
+who should look the same from scene to scene (e.g. a narrator persona, a story
+character like a monkey in a fable, a debate host).
+- If yes: create a SHORT, PRECISE visual description (appearance, clothing, hair,
+  skin tone, distinguishing features) that will be copy-pasted into EVERY image
+  generation prompt for consistency. Single compact paragraph starting with
+  "Main character: ...". If there are 2 speakers, describe both. Under 60 words total.
+- If no — the script is explaining a concept, object, event, or idea with no fixed
+  protagonist — leave characterGuide as an empty string "". Do NOT invent a host just
+  to have one; let each scene simply visualize whatever it actually needs (objects,
+  settings, symbols, different people as the moment calls for, or no people at all).
 
 Step 2 — SCENES:
 Create exactly ${sceneCount} storyboard scenes that visually represent this script as a story.
 Each scene covers one or more consecutive script segments. Every segment must be covered (no gaps, no overlaps).
 
 For each scene prompt:
-- Describe WHAT IS HAPPENING in this scene using the character(s) from Step 1
+- Describe WHAT IS HAPPENING in this scene — using the character(s) from Step 1 if one
+  exists, otherwise just whatever people/objects/setting the moment actually calls for
 - Include the character's action, expression, and setting, and any other details
   (mood, relevant objects, background elements) that help the image feel complete
 - Keep it clear and literal, focused on ONE main thing happening — not five unrelated
@@ -7842,12 +7853,19 @@ Below are ${slots.length} scenes with their exact timestamps and voiceover text 
 ${slotText}
 
 TASK:
-Step 1 — CHARACTER GUIDE:
-Identify the main character(s) from the voiceover text. Create a SHORT visual description (appearance, clothing, hair, skin tone) for consistency across all scenes. Max 60 words, starting with "Main character: ..."
+Step 1 — CHARACTER GUIDE (only if the voiceover actually needs one):
+Check whether the voiceover naturally centers on a recurring character/host who should
+look the same from scene to scene (e.g. a narrator persona, a story character like a
+monkey in a fable). If yes, create a SHORT visual description (appearance, clothing,
+hair, skin tone) for consistency across all scenes — max 60 words, starting with
+"Main character: ...". If the voiceover is explaining a concept, object, event, or idea
+with no fixed protagonist, leave characterGuide as an empty string "" — do not invent a
+host just to have one; let each scene visualize whatever it actually needs.
 
 Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
-- Show what the character is DOING or EXPERIENCING during those spoken words
+- Show what's happening — using the character from Step 1 if one exists, otherwise
+  whatever people/objects/setting the moment actually calls for
 - Include enough detail (setting, expression, relevant objects, mood) that the scene
   feels complete, but keep it focused on ONE main thing happening — not five unrelated
   events crammed into one image. e.g. "A monkey selling bananas on a busy street,
