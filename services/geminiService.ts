@@ -7781,6 +7781,12 @@ For each scene prompt:
   events crammed into one image. e.g. "A monkey selling bananas on a busy street,
   smiling as a customer hands over a coin" is fine — that's still one clear moment,
   just with enough detail to make the scene feel real
+- Vary the shot across scenes so the storyboard doesn't feel repetitive — mix wide
+  establishing shots, close-ups on a face or hands, over-the-shoulder moments, and
+  reaction shots instead of framing every scene the same way ("person standing there")
+- For an abstract idea, emotion, or turning point, reach for a vivid visual metaphor
+  when it reads more clearly at a glance than a literal illustration would — e.g. a
+  looming shadow for fear, a tangled knot for confusion, a rising sun for a fresh start
 - Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON in this exact format:
@@ -7842,11 +7848,16 @@ Identify the main character(s) from the voiceover text. Create a SHORT visual de
 Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
 - Show what the character is DOING or EXPERIENCING during those spoken words
-- Be literal and visual — no abstract concepts
 - Include enough detail (setting, expression, relevant objects, mood) that the scene
   feels complete, but keep it focused on ONE main thing happening — not five unrelated
   events crammed into one image. e.g. "A monkey selling bananas on a busy street,
   smiling as a customer hands over a coin" is fine — one clear moment, described fully
+- Vary the shot across scenes so the storyboard doesn't feel repetitive — mix wide
+  establishing shots, close-ups on a face or hands, over-the-shoulder moments, and
+  reaction shots instead of framing every scene the same way ("person standing there")
+- For an abstract idea, emotion, or turning point, reach for a vivid visual metaphor
+  when it reads more clearly at a glance than a literal illustration would — e.g. a
+  looming shadow for fear, a tangled knot for confusion, a rising sun for a fresh start
 - Keep it simple — do not describe an art style here, the image generator applies that separately
 
 Respond ONLY with valid JSON:
