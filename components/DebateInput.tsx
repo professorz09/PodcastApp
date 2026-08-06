@@ -1101,16 +1101,16 @@ const DebateInput: React.FC<DebateInputProps> = ({
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <button
-                  onClick={() => setModel('gemini-3.6-flash')}
+                  onClick={() => setModel('gemini-3.1-flash-lite')}
                   className={`p-2.5 rounded-lg border text-left transition-all flex flex-col gap-0.5 group ${
-                    model === 'gemini-3.6-flash'
+                    model === 'gemini-3.1-flash-lite'
                       ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400'
                       : 'bg-[#111111] border-transparent text-gray-400 hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="font-bold text-[11px] group-hover:text-cyan-300 transition-colors">3 Flash</div>
-                    <Zap size={10} className={model === 'gemini-3.6-flash' ? 'text-cyan-400' : 'text-gray-600'} />
+                    <Zap size={10} className={model === 'gemini-3.1-flash-lite' ? 'text-cyan-400' : 'text-gray-600'} />
                   </div>
                   <div className="text-[8px] opacity-70 uppercase tracking-wider font-semibold">Fast</div>
                 </button>

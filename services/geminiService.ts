@@ -2293,6 +2293,7 @@ ${specificDetails}`
             RULES:
             ✓ पूरी script सिर्फ एक ही speaker बोलेगा — शुरू से अंत तक, ek continuous piece jaisa lage, tukdon mein todi hui speech jaisa nahi
             ✓ Natural, flowing narration — जैसे कोई किताब पढ़ी जा रही हो या कोई कहानी सुनाई जा रही हो
+            ✓ Engaging aur simple rakho — jahan bhi koi idea samjhane mein madad kare, wahan ek concrete real-world example, analogy, ya vivid specific detail zaroor daalo. Rigid structure force kiye bina bhi listener ko interested banaye rakhna hai, dry/textbook jaisa bilkul nahi
             ✓ कोई forced structure नहीं (opening/hook/outro जबरदस्ती मत डालो) — topic जो माँगे वैसे लिखो
             ✓ Content ko clear CHAPTERS/sections mein organize karo (jaise ek achi book ya documentary hoti hai) — har chapter apne aap mein poora aur DETAILED ho, chhota ya sarsari mat rakho
             ✓ Har chapter = ek JSON segment. Chapters ki length topic ke hisaab se jitni chahiye utni rakho — koi fixed short limit nahi. Lambi script khud kai chapters mein bant jaayegi, aur agar koi chapter audio ke liye bahut lamba ho to Script Editor ka "Split Script" button use karke usse automatically safe parts mein cut kiya ja sakta hai — isliye yahan sirf FULL DETAIL aur achi chapter-structure pe focus karo
@@ -4077,6 +4078,9 @@ ${specificDetails}`
             ✓ The entire script is spoken by ONE speaker only, start to finish — one continuous
               piece, not something that reads like it was chopped into disconnected lines
             ✓ Natural, flowing narration — like a book being read or a story being told
+            ✓ Engaging and simple — wherever it helps an idea land, use a concrete real-world
+              example, analogy, or vivid specific detail. Keep the listener interested without
+              forcing a rigid structure — never dry or textbook-like
             ✓ No forced structure (don't force a hook/opening/outro) — let the topic dictate the shape
             ✓ Organize the content into clear CHAPTERS/sections (like a good book or documentary) —
               each chapter should be complete and DETAILED on its own, not short or thin
