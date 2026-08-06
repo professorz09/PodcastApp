@@ -138,6 +138,44 @@ function buildRequestBody(contents: any, config: any) {
   return body;
 }
 
+const extractQuotaDetail = (data: any): string => {
+  const violations = data?.error?.details?.flatMap((d: any) => d?.violations || d?.metadata ? [d] : []) ?? [];
+  if (violations.length) return ` [${JSON.stringify(violations)}]`;
+  return '';
+};
+
+const isQuotaMessage = (msg: string) => /RESOURCE_EXHAUSTED|429|quota/i.test(msg);
+
+async function callVertex(model: string, body: any, projectId: string, location: string): Promise<any> {
+  const token = await getGCPAccessToken();
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  const url = `https://${host}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-goog-user-project': projectId },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    const detail = extractQuotaDetail(data);
+    console.error(`[gemini] vertex error ${resp.status}: ${data.error?.message}${detail}`);
+    throw new Error(`[vertex] ${data.error?.message || `generateContent error ${resp.status}`}${detail}`);
+  }
+  return data;
+}
+
+async function callApiKey(model: string, body: any, apiKey: string): Promise<any> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await resp.json();
+  if (!resp.ok) {
+    const detail = extractQuotaDetail(data);
+    console.error(`[gemini] apikey error ${resp.status}: ${data.error?.message}${detail}`);
+    throw new Error(`[apikey] ${data.error?.message || `Gemini API error ${resp.status}`}${detail}`);
+  }
+  return data;
+}
+
 async function callGemini(model: string, contents: any, genConfig: any) {
   const saKey = Deno.env.get('GCP_SA_KEY');
   const projectId = Deno.env.get('GCP_PROJECT_ID');
@@ -153,41 +191,28 @@ async function callGemini(model: string, contents: any, genConfig: any) {
   // after 2 images" apart from "silently on the free API-key tier".
   console.log(`[gemini] backend=${saKey && projectId ? 'vertex' : apiKey ? 'apikey' : 'none'} model=${model} hasSaKey=${!!saKey} hasProjectId=${!!projectId} hasApiKey=${!!apiKey}`);
 
-  const extractQuotaDetail = (data: any): string => {
-    const violations = data?.error?.details?.flatMap((d: any) => d?.violations || d?.metadata ? [d] : []) ?? [];
-    if (violations.length) return ` [${JSON.stringify(violations)}]`;
-    return '';
-  };
-
   if (saKey && projectId) {
-    const token = await getGCPAccessToken();
-    const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
-    const url = `https://${host}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-goog-user-project': projectId },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      const detail = extractQuotaDetail(data);
-      console.error(`[gemini] vertex error ${resp.status}: ${data.error?.message}${detail}`);
-      throw new Error(`[vertex] ${data.error?.message || `generateContent error ${resp.status}`}${detail}`);
+    try {
+      return await callVertex(model, body, projectId, location);
+    } catch (e: any) {
+      // Vertex AI and the Gemini Developer API (AI Studio key) are separate
+      // quota pools on Google's side — a Vertex 429 doesn't mean the AI
+      // Studio key is exhausted too. Only worth falling back on an actual
+      // quota error (not e.g. an auth/model-not-found problem), and only if
+      // an AI Studio key is even configured.
+      if (apiKey && isQuotaMessage(e.message || '')) {
+        console.warn(`[gemini] vertex quota-exhausted, falling back to AI Studio key: ${e.message}`);
+        try {
+          return await callApiKey(model, body, apiKey);
+        } catch (e2: any) {
+          throw new Error(`${e.message} — AI Studio fallback also failed: ${e2.message}`);
+        }
+      }
+      throw e;
     }
-    return data;
   }
 
-  if (apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await resp.json();
-    if (!resp.ok) {
-      const detail = extractQuotaDetail(data);
-      console.error(`[gemini] apikey error ${resp.status}: ${data.error?.message}${detail}`);
-      throw new Error(`[apikey] ${data.error?.message || `Gemini API error ${resp.status}`}${detail}`);
-    }
-    return data;
-  }
+  if (apiKey) return await callApiKey(model, body, apiKey);
 
   throw new Error('No Gemini backend configured. Set GCP_SA_KEY + GCP_PROJECT_ID (preferred) or GEMINI_API_KEY.');
 }
