@@ -95,7 +95,7 @@ export function stopGenJob(scriptSignature: string): void {
   if (currentJob && currentJob.scriptSignature === scriptSignature) currentJob.abort = true;
 }
 
-const QUOTA_RETRY_WAIT_MS = 60_000;
+const QUOTA_RETRY_WAIT_MS = 30_000;
 const MAX_QUOTA_RETRIES_PER_SCENE = 5;
 
 export function startGenJob(
@@ -129,7 +129,7 @@ export function startGenJob(
       while (!job.abort) {
         job.status = attempt === 0
           ? `Scene ${scene.sceneNumber}: generating…`
-          : `Scene ${scene.sceneNumber}: quota-limited, waited a minute — retrying (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
+          : `Scene ${scene.sceneNumber}: quota-limited, waited 30s — retrying (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
         notify(job);
 
         await throttle(() => job.abort);
@@ -155,7 +155,7 @@ export function startGenJob(
 
         if (result !== 'quota' || attempt >= MAX_QUOTA_RETRIES_PER_SCENE) break;
         attempt++;
-        job.status = `Scene ${scene.sceneNumber}: quota-limited — waiting a minute before retry (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
+        job.status = `Scene ${scene.sceneNumber}: quota-limited — waiting 30s before retry (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
         notify(job);
         for (let waited = 0; waited < QUOTA_RETRY_WAIT_MS && !job.abort; waited += 500) {
           await new Promise(r => setTimeout(r, Math.min(500, QUOTA_RETRY_WAIT_MS - waited)));
