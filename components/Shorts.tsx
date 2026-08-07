@@ -355,7 +355,7 @@ function buildSceneTimings(
 }
 
 function buildScenesFromRaw(
-  rawScenes: { sceneNumber: number; prompt: string; segmentIndices: number[] }[],
+  rawScenes: { sceneNumber: number; prompt: string; segmentIndices: number[]; usesCharacter?: boolean }[],
   segments: DebateSegment[],
   knownTotal?: number,
 ): StoryboardScene[] {
@@ -375,6 +375,7 @@ function buildScenesFromRaw(
       startTime: 0,
       endTime: total,
       segmentIndices: indices,
+      usesCharacter: raw.usesCharacter ?? true,
     };
   });
 
@@ -1548,6 +1549,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
           endTime: slot.endTime,
           segmentIndices: slot.segmentIndices,
           isGenerating: false,
+          usesCharacter: result.usesCharacter[i] ?? true,
         }));
 
         setScenes(built);
@@ -1596,7 +1598,8 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     if (!scene) return;
     setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, isGenerating: true, error: undefined } : sc));
     try {
-      const url = await generateImageWithRetry(scene.prompt, characterGuide, imageAspectRatio);
+      const guide = scene.usesCharacter === false ? undefined : characterGuide;
+      const url = await generateImageWithRetry(scene.prompt, guide, imageAspectRatio);
       setScenes(prev => prev.map(sc => sc.id === id ? { ...sc, imageUrl: url, isGenerating: false } : sc));
     } catch (e: any) {
       const raw = e.message || 'Failed';
