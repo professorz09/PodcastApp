@@ -28,10 +28,23 @@ interface Job {
   running: boolean;
   progress: number;
   status: string;
-  listeners: Set<(s: GenJobSnapshot) => void>;
 }
 
 let currentJob: Job | null = null;
+
+// Listeners are keyed by scriptSignature, not by job instance — a component
+// almost always subscribes BEFORE any job exists (mount, then the user
+// clicks Generate), and a job created after that moment is a brand new
+// object with its own empty listener set. Tying subscriptions to the
+// signature instead means "subscribe now, get updates whenever a job for
+// this script exists" always works, regardless of click timing.
+const listenersBySignature = new Map<string, Set<(s: GenJobSnapshot) => void>>();
+
+function getListeners(sig: string): Set<(s: GenJobSnapshot) => void> {
+  let set = listenersBySignature.get(sig);
+  if (!set) { set = new Set(); listenersBySignature.set(sig, set); }
+  return set;
+}
 
 function snapshot(job: Job): GenJobSnapshot {
   return { running: job.running, progress: job.progress, status: job.status, scenes: job.scenes };
@@ -39,7 +52,7 @@ function snapshot(job: Job): GenJobSnapshot {
 
 function notify(job: Job) {
   const snap = snapshot(job);
-  job.listeners.forEach(l => l(snap));
+  getListeners(job.scriptSignature).forEach(l => l(snap));
 }
 
 const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e?.message || '');
@@ -51,6 +64,14 @@ const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 2;
 const recentAttempts: number[] = [];
+
+// Exported so manual per-scene "Generate" clicks (Storyboard.tsx's own
+// handleGenerateImage) share this same sliding window with the background
+// job — otherwise manual clicks fire unthrottled and burst straight into
+// Vertex's tight per-minute cap regardless of what the job is doing.
+export async function throttleGeneration(abort: () => boolean = () => false): Promise<void> {
+  return throttle(abort);
+}
 
 async function throttle(abort: () => boolean): Promise<void> {
   for (;;) {
@@ -76,11 +97,11 @@ async function generateImageWithRetry(prompt: string, guide: string | undefined,
 }
 
 export function subscribeGenJob(scriptSignature: string, listener: (s: GenJobSnapshot) => void): () => void {
+  getListeners(scriptSignature).add(listener);
   if (currentJob && currentJob.scriptSignature === scriptSignature) {
-    currentJob.listeners.add(listener);
     listener(snapshot(currentJob));
   }
-  return () => { currentJob?.listeners.delete(listener); };
+  return () => { listenersBySignature.get(scriptSignature)?.delete(listener); };
 }
 
 export function getGenJobSnapshot(scriptSignature: string): GenJobSnapshot | null {
@@ -111,7 +132,6 @@ export function startGenJob(
     scriptSignature, script, characterGuide, aspectRatio,
     scenes: scenes.map(s => ({ ...s })),
     abort: false, running: true, progress: 0, status: '',
-    listeners: new Set(),
   };
   currentJob = job;
 
