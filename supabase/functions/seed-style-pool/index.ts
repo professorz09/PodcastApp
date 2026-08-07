@@ -77,36 +77,33 @@ async function getGCPAccessToken(): Promise<string> {
   return _tokenCache.value;
 }
 
-async function embedText(text: string): Promise<number[]> {
-  const projectId = Deno.env.get('GCP_PROJECT_ID');
-  const apiKey = Deno.env.get('GEMINI_API_KEY');
-  if (projectId) {
-    const location = Deno.env.get('GCP_EMBED_REGION') || DEFAULT_EMBED_LOCATION;
-    const token = await getGCPAccessToken();
-    const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${EMBED_MODEL}:predict`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-goog-user-project': projectId },
-      body: JSON.stringify({ instances: [{ content: text }] }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(`[vertex] ${data?.error?.message || `predict error ${resp.status}`}`);
-    const values: number[] = data?.predictions?.[0]?.embeddings?.values || [];
-    if (values.length) return values;
-    throw new Error('[vertex] No embedding returned');
-  }
-  if (apiKey) {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: `models/${EMBED_MODEL}`, content: { parts: [{ text }] } }) }
-    );
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(`[apikey] ${data?.error?.message || `embedContent error ${resp.status}`}`);
-    const values: number[] = data?.embedding?.values || [];
-    if (values.length) return values;
-    throw new Error('[apikey] No embedding returned');
-  }
-  throw new Error('No Gemini backend configured.');
+async function embedViaVertex(text: string): Promise<number[]> {
+  const projectId = Deno.env.get('GCP_PROJECT_ID')!;
+  const location = Deno.env.get('GCP_EMBED_REGION') || DEFAULT_EMBED_LOCATION;
+  const token = await getGCPAccessToken();
+  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${EMBED_MODEL}:predict`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-goog-user-project': projectId },
+    body: JSON.stringify({ instances: [{ content: text }] }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(`[vertex] ${data?.error?.message || `predict error ${resp.status}`}`);
+  const values: number[] = data?.predictions?.[0]?.embeddings?.values || [];
+  if (values.length) return values;
+  throw new Error('[vertex] No embedding returned');
+}
+
+async function embedViaApiKey(text: string, apiKey: string): Promise<number[]> {
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: `models/${EMBED_MODEL}`, content: { parts: [{ text }] } }) }
+  );
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(`[apikey] ${data?.error?.message || `embedContent error ${resp.status}`}`);
+  const values: number[] = data?.embedding?.values || [];
+  if (values.length) return values;
+  throw new Error('[apikey] No embedding returned');
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -114,18 +111,23 @@ const isQuotaError = (msg: string) => /quota|429|RESOURCE_EXHAUSTED/i.test(msg);
 
 // The Vertex `textembedding-gecko` base-model quota this project has is
 // tight enough that firing rows back-to-back trips it after just a couple
-// of calls — retry once with a backoff pause instead of failing the row
-// outright the first time we hit it.
+// of calls. On a quota error, fall back to the AI Studio key (a separate
+// quota pool, and a much higher one — 100 RPM vs Vertex's handful) instead
+// of just retrying the same exhausted Vertex quota.
 async function embedWithRetry(text: string): Promise<number[]> {
-  try {
-    return await embedText(text);
-  } catch (e: any) {
-    if (isQuotaError(e?.message || '')) {
-      await sleep(20000);
-      return await embedText(text);
+  const projectId = Deno.env.get('GCP_PROJECT_ID');
+  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  if (projectId) {
+    try {
+      return await embedViaVertex(text);
+    } catch (e: any) {
+      if (apiKey && isQuotaError(e?.message || '')) return await embedViaApiKey(text, apiKey);
+      if (isQuotaError(e?.message || '')) { await sleep(20000); return await embedViaVertex(text); }
+      throw e;
     }
-    throw e;
   }
+  if (apiKey) return await embedViaApiKey(text, apiKey);
+  throw new Error('No Gemini backend configured.');
 }
 
 interface SourceRow { path: string; name: string | null; meta: any }

@@ -1,6 +1,6 @@
 import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
-import { fetchStylePoolMeta, fetchStyleImageByPath, fetchRandomStyleReference } from "./styleRefClient";
+import { fetchStylePoolMeta, fetchStyleImageByPath, fetchRandomStyleReference, matchStylesVector } from "./styleRefClient";
 
 // Nano Banana 2 — Gemini image model, used for all image generation
 // (thumbnails, avatars, storyboard illustrations, etc). A global switch (not
@@ -4347,12 +4347,13 @@ ${scriptText.slice(0, 2000)}`;
   }
 };
 
-// Topic-matched style pick — best-effort ranking of the sister project's
-// curated style pool by topic/mood fit (their own vector-search RPC is
-// locked to their service role — see styleRefClient.ts), then a
-// Fisher-Yates shuffle across the top matches so regenerations still vary,
-// instead of a purely random pick across the whole pool.
-const pickBestStyleReference = async (topicQuery: string): Promise<{ data: string; mimeType: string } | null> => {
+// Fallback path: LLM-reasoning ranking of the sister project's LIVE style
+// pool by topic/mood fit (their own vector-search RPC is locked to their
+// service role — see styleRefClient.ts), then a Fisher-Yates shuffle across
+// the top matches. Only used if our own copied pool's real vector search
+// (matchStylesVector, tried first in pickBestStyleReference below) comes up
+// empty — e.g. before the pool has been seeded, or if it's unreachable.
+const pickBestStyleReferenceByLLMRanking = async (topicQuery: string): Promise<{ data: string; mimeType: string } | null> => {
   try {
     const pool = await fetchStylePoolMeta();
     if (!pool.length) return await fetchRandomStyleReference();
@@ -4396,6 +4397,16 @@ Return ONLY a JSON array of up to 8 candidate indices, best match first, e.g. [1
     console.warn('Style match ranking failed, falling back to random reference', e);
     return await fetchRandomStyleReference();
   }
+};
+
+// Topic-matched style pick — tries real cosine-similarity vector search
+// against our own copied+embedded style pool first (matchStylesVector), and
+// only falls back to LLM-reasoning ranking against the live sister project
+// (then a purely random pick) if that comes up empty.
+const pickBestStyleReference = async (topicQuery: string): Promise<{ data: string; mimeType: string } | null> => {
+  const vectorMatch = await matchStylesVector(topicQuery);
+  if (vectorMatch) return vectorMatch;
+  return await pickBestStyleReferenceByLLMRanking(topicQuery);
 };
 
 export const generateThumbnail = async (
