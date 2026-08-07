@@ -5733,7 +5733,7 @@ export const generateStoryboardImage = async (
   // render an actual Windows Paint application window (title bar, menus,
   // blank margins) instead of just adopting the crude flat art style, so
   // this describes the look directly instead.
-  const fullPrompt = `${prompt}.${characterSection} Simple flat 2D cartoon clip-art illustration style, bold black outlines, flat colors, minimal shading, no text, no watermark, no app windows or UI chrome, full-bleed edge-to-edge with no borders or blank margins, aspect ratio ${aspectRatio}.`;
+  const fullPrompt = `${prompt}.${characterSection} Simple flat 2D cartoon clip-art illustration style, bold black outlines, vibrant colorful flat colors, minimal shading, no text, no watermark, no app windows or UI chrome, full-bleed edge-to-edge with no borders or blank margins, aspect ratio ${aspectRatio}.`;
 
   const response = await ai.models.generateContent({
     model: getImageModel(),
