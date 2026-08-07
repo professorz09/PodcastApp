@@ -1580,83 +1580,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
             </div>
           )}
 
-          {/* ── Subtitle Settings (collapsible) ── */}
-          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
-            <button onClick={() => setShowSubtitleSettings(v => !v)} className="w-full flex items-center justify-between px-4 py-4">
-              <div className="flex items-center gap-2">
-                <Type size={15} className="text-blue-400" />
-                <span className="font-bold text-white text-sm">Subtitle Settings</span>
-                {subtitle.enabled ? <span className="text-[9px] text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded-full">ON</span>
-                  : <span className="text-[9px] text-gray-600 bg-white/5 border border-white/8 px-1.5 py-0.5 rounded-full">OFF</span>}
-              </div>
-              {showSubtitleSettings ? <ChevronUp size={17} className="text-gray-500" /> : <ChevronDown size={17} className="text-gray-500" />}
-            </button>
-
-            {showSubtitleSettings && (
-              <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
-                {/* Enable toggle */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Show Subtitles</span>
-                  <button onClick={() => setSubtitle(s => ({ ...s, enabled: !s.enabled }))}
-                    className={`w-11 h-6 rounded-full transition-all ${subtitle.enabled ? 'bg-blue-600' : 'bg-gray-700'}`}>
-                    <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${subtitle.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-
-                <div className={`space-y-4 transition-opacity ${subtitle.enabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
-                  {/* Font size */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-gray-400"><span>Font Size</span><span className="font-mono text-blue-400">{subtitle.fontSize}px</span></div>
-                    <input type="range" min={10} max={32} value={subtitle.fontSize}
-                      onChange={e => setSubtitle(s => ({ ...s, fontSize: Number(e.target.value) }))}
-                      className="w-full accent-blue-500" />
-                  </div>
-
-                  {/* Position */}
-                  <div className="space-y-2">
-                    <span className="text-xs text-gray-400">Position</span>
-                    <div className="flex gap-2">
-                      {(['top', 'bottom'] as const).map(pos => (
-                        <button key={pos} onClick={() => setSubtitle(s => ({ ...s, position: pos }))}
-                          className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${subtitle.position === pos ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' : 'bg-white/5 border-white/8 text-gray-500 hover:text-gray-300'}`}>
-                          {pos === 'top' ? '↑ Top' : '↓ Bottom'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Text color */}
-                  <div className="space-y-2">
-                    <span className="text-xs text-gray-400">Text Color</span>
-                    <div className="flex gap-2 flex-wrap">
-                      {['#ffffff', '#ffff00', '#00ff88', '#ff6b6b', '#74b9ff'].map(c => (
-                        <button key={c} onClick={() => setSubtitle(s => ({ ...s, textColor: c }))}
-                          style={{ background: c }}
-                          className={`w-8 h-8 rounded-full border-2 transition-all ${subtitle.textColor === c ? 'border-white scale-110' : 'border-transparent'}`} />
-                      ))}
-                      <label className="w-8 h-8 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-white/40 transition-all overflow-hidden" style={{ background: subtitle.textColor }}>
-                        <input type="color" value={subtitle.textColor} onChange={e => setSubtitle(s => ({ ...s, textColor: e.target.value }))} className="opacity-0 absolute" />
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Shadow toggle */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-gray-400">Shadow</span>
-                      <p className="text-[10px] text-gray-600">Black outline behind the text for legibility</p>
-                    </div>
-                    <button onClick={() => setSubtitle(s => ({ ...s, shadow: !s.shadow }))}
-                      className={`w-11 h-6 rounded-full transition-all shrink-0 ${subtitle.shadow ? 'bg-blue-600' : 'bg-gray-700'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${subtitle.shadow ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* ── Image Generation Settings (collapsible) ── */}
           <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
             <button onClick={() => setShowSettings(v => !v)} className="w-full flex items-center justify-between px-4 py-4">
@@ -1747,6 +1670,83 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                       })()}
                     </button>
                   )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Subtitle Settings (collapsible) ── */}
+          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
+            <button onClick={() => setShowSubtitleSettings(v => !v)} className="w-full flex items-center justify-between px-4 py-4">
+              <div className="flex items-center gap-2">
+                <Type size={15} className="text-blue-400" />
+                <span className="font-bold text-white text-sm">Subtitle Settings</span>
+                {subtitle.enabled ? <span className="text-[9px] text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded-full">ON</span>
+                  : <span className="text-[9px] text-gray-600 bg-white/5 border border-white/8 px-1.5 py-0.5 rounded-full">OFF</span>}
+              </div>
+              {showSubtitleSettings ? <ChevronUp size={17} className="text-gray-500" /> : <ChevronDown size={17} className="text-gray-500" />}
+            </button>
+
+            {showSubtitleSettings && (
+              <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
+                {/* Enable toggle */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Show Subtitles</span>
+                  <button onClick={() => setSubtitle(s => ({ ...s, enabled: !s.enabled }))}
+                    className={`w-11 h-6 rounded-full transition-all ${subtitle.enabled ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                    <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${subtitle.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                <div className={`space-y-4 transition-opacity ${subtitle.enabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                  {/* Font size */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-gray-400"><span>Font Size</span><span className="font-mono text-blue-400">{subtitle.fontSize}px</span></div>
+                    <input type="range" min={10} max={32} value={subtitle.fontSize}
+                      onChange={e => setSubtitle(s => ({ ...s, fontSize: Number(e.target.value) }))}
+                      className="w-full accent-blue-500" />
+                  </div>
+
+                  {/* Position */}
+                  <div className="space-y-2">
+                    <span className="text-xs text-gray-400">Position</span>
+                    <div className="flex gap-2">
+                      {(['top', 'bottom'] as const).map(pos => (
+                        <button key={pos} onClick={() => setSubtitle(s => ({ ...s, position: pos }))}
+                          className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${subtitle.position === pos ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' : 'bg-white/5 border-white/8 text-gray-500 hover:text-gray-300'}`}>
+                          {pos === 'top' ? '↑ Top' : '↓ Bottom'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Text color */}
+                  <div className="space-y-2">
+                    <span className="text-xs text-gray-400">Text Color</span>
+                    <div className="flex gap-2 flex-wrap">
+                      {['#ffffff', '#ffff00', '#00ff88', '#ff6b6b', '#74b9ff'].map(c => (
+                        <button key={c} onClick={() => setSubtitle(s => ({ ...s, textColor: c }))}
+                          style={{ background: c }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all ${subtitle.textColor === c ? 'border-white scale-110' : 'border-transparent'}`} />
+                      ))}
+                      <label className="w-8 h-8 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-white/40 transition-all overflow-hidden" style={{ background: subtitle.textColor }}>
+                        <input type="color" value={subtitle.textColor} onChange={e => setSubtitle(s => ({ ...s, textColor: e.target.value }))} className="opacity-0 absolute" />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Shadow toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-gray-400">Shadow</span>
+                      <p className="text-[10px] text-gray-600">Black outline behind the text for legibility</p>
+                    </div>
+                    <button onClick={() => setSubtitle(s => ({ ...s, shadow: !s.shadow }))}
+                      className={`w-11 h-6 rounded-full transition-all shrink-0 ${subtitle.shadow ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${subtitle.shadow ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
                 </div>
               </div>
             )}
