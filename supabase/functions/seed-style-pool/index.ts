@@ -109,6 +109,25 @@ async function embedText(text: string): Promise<number[]> {
   throw new Error('No Gemini backend configured.');
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const isQuotaError = (msg: string) => /quota|429|RESOURCE_EXHAUSTED/i.test(msg);
+
+// The Vertex `textembedding-gecko` base-model quota this project has is
+// tight enough that firing rows back-to-back trips it after just a couple
+// of calls — retry once with a backoff pause instead of failing the row
+// outright the first time we hit it.
+async function embedWithRetry(text: string): Promise<number[]> {
+  try {
+    return await embedText(text);
+  } catch (e: any) {
+    if (isQuotaError(e?.message || '')) {
+      await sleep(20000);
+      return await embedText(text);
+    }
+    throw e;
+  }
+}
+
 interface SourceRow { path: string; name: string | null; meta: any }
 
 Deno.serve(async (req: Request) => {
@@ -127,7 +146,7 @@ Deno.serve(async (req: Request) => {
   let payload: any;
   try { payload = await req.json(); } catch { payload = {}; }
   const offset = Number(payload?.offset) || 0;
-  const limit = Math.min(Number(payload?.limit) || 15, 30);
+  const limit = Math.min(Number(payload?.limit) || 10, 12);
 
   const results = { processed: 0, copied: 0, skipped: 0, failed: [] as { path: string; error: string }[] };
 
@@ -169,7 +188,7 @@ Deno.serve(async (req: Request) => {
         const meta = row.meta || {};
         const embedInput = [row.name, meta.niche, meta.summary, Array.isArray(meta.keywords) ? meta.keywords.join(' ') : '', meta.composition]
           .filter(Boolean).join('. ').slice(0, 2000) || row.path;
-        const embedding = await embedText(embedInput);
+        const embedding = await embedWithRetry(embedInput);
 
         // Upsert the row (path, name, meta, embedding) into our own table.
         const insResp = await fetch(`${supabaseUrl}/rest/v1/style_images?on_conflict=path`, {
@@ -183,6 +202,7 @@ Deno.serve(async (req: Request) => {
         if (!insResp.ok) throw new Error(`insert failed: ${insResp.status} ${await insResp.text()}`);
 
         results.copied++;
+        await sleep(6000); // stay well under the tight embedding-model quota
       } catch (e: any) {
         results.failed.push({ path: row.path, error: e?.message || String(e) });
       }
