@@ -35,7 +35,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     setTranscriptLanguage(isHindiScript ? 'hi-IN' : 'en-US');
   }, [isHindiScript]);
 
-  const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'नारेटर', 'Narator', 'narrator', 'NARRATOR'];
+  const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'नारेटर', 'Narator', 'narrator', 'NARRATOR', 'Voiceover', 'voiceover', 'VOICEOVER'];
   const isNarrator = (s: string) => NARRATOR_KEYS.some(k => s.trim() === k || s.trim().toLowerCase() === k.toLowerCase());
 
   const uniqueSpeakers = React.useMemo(() => {

@@ -1186,7 +1186,7 @@ ${specificDetails}`
             भाषा: ${language}.
 
             CHARACTER — केवल 1 narrator:
-            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Voiceover"`}
 
             RULES:
             ✓ पूरी script सिर्फ एक ही speaker बोलेगा — शुरू से अंत तक, ek continuous piece jaisa lage, tukdon mein todi hui speech jaisa nahi
@@ -1251,7 +1251,7 @@ ${specificDetails}`
             भाषा: ${language}.
 
             CHARACTER — केवल 1 narrator:
-            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Voiceover"`}
 
             APPROACH:
             - Agar topic mein real facts/names/case-details diye gaye hain, unhe accurately use karo. Agar topic generic hai, ek realistic, grounded case socho jo believable lage (real jagah, tareekh, roz़marra ka insaan) — kabhi over-the-top ya cartoonish nahi.
@@ -1293,7 +1293,7 @@ ${specificDetails}`
             भाषा: ${language}.
 
             CHARACTER — केवल 1 narrator:
-            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Voiceover"`}
 
             APPROACH:
             - Agar topic mein real facts/names/numbers diye gaye hain, unhe accurately use karo aur unki wildness pe lean karo. Agar topic generic hai, specific vivid believable details (naam, dollar amounts, dates) invent karo — vague mat raho.
@@ -3052,7 +3052,7 @@ ${specificDetails}`
             Language: ${language}.
 
             CHARACTER — exactly 1 narrator:
-            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Voiceover"`}
 
             RULES:
             ✓ The entire script is spoken by ONE speaker only, start to finish — one continuous
@@ -3135,7 +3135,7 @@ ${specificDetails}`
             Language: ${language}.
 
             CHARACTER — exactly 1 narrator:
-            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Voiceover"`}
 
             APPROACH:
             - If the topic includes real facts/names/case details, use them accurately. If the topic is generic, invent a realistic, grounded case that feels believable (a real-feeling place, date, ordinary person) — never over-the-top or cartoonish.
@@ -3178,7 +3178,7 @@ ${specificDetails}`
             Language: ${language}.
 
             CHARACTER — exactly 1 narrator:
-            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Voiceover"`}
 
             APPROACH:
             - If the topic includes real facts/names/numbers, use them accurately and lean into how wild they are. If the topic is generic, invent specific, vivid, believable details (names, dollar amounts, dates) rather than staying vague.

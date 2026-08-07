@@ -71,7 +71,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     );
   }
 
-  const NARRATOR_KEYS = ['Narrator', 'नैरेटर'];
+  const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'Voiceover'];
   const isNarrator = (s: string) => NARRATOR_KEYS.includes(s);
 
   // Extract unique speakers
