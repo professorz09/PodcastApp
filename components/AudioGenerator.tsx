@@ -54,9 +54,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const newVoices = { ...prev };
       uniqueSpeakers.forEach((speaker) => {
         if (!newVoices[speaker]) {
-          if (isNarrator(speaker)) newVoices[speaker] = 'Sulafat';
+          if (isNarrator(speaker)) newVoices[speaker] = 'Puck';
           else {
-            const defaults = ['Puck', 'Zephyr', 'Charon', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
+            const defaults = ['Zephyr', 'Charon', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
             const speakerIndex = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(speaker);
             newVoices[speaker] = defaults[speakerIndex % defaults.length];
           }
