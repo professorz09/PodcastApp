@@ -5739,6 +5739,7 @@ export const generateStoryboardImage = async (
     model: getImageModel(),
     contents: { parts: [{ text: fullPrompt }] },
     config: {
+      responseModalities: [Modality.IMAGE],
       imageConfig: { aspectRatio, personGeneration: IMAGE_PERSON_GENERATION },
       safetySettings: IMAGE_SAFETY_SETTINGS,
     },
@@ -5749,7 +5750,13 @@ export const generateStoryboardImage = async (
       return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
     }
   }
-  throw new Error('No image generated');
+  // Surface WHY — a safety block or a text-only reply both land here, and
+  // "No image generated" alone gives no way to tell them apart or act on it.
+  const blockReason = response.promptFeedback?.blockReason;
+  const finishReason = response.candidates?.[0]?.finishReason;
+  const textReply = response.candidates?.[0]?.content?.parts?.map((p: any) => p.text).filter(Boolean).join(' ');
+  const detail = blockReason ? `blocked: ${blockReason}` : finishReason ? `finishReason: ${finishReason}` : textReply ? `model replied with text instead: "${textReply.slice(0, 200)}"` : 'empty response';
+  throw new Error(`No image generated (${detail})`);
 };
 
 // ── Best Shorts Segments Finder ──────────────────────────────────────────────
