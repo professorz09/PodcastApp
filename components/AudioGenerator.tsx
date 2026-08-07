@@ -35,7 +35,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     setTranscriptLanguage(isHindiScript ? 'hi-IN' : 'en-US');
   }, [isHindiScript]);
 
-  const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'नारेटर', 'Narator', 'narrator', 'NARRATOR'];
+  const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'नारेटर', 'Narator', 'narrator', 'NARRATOR', 'Voiceover', 'voiceover', 'VOICEOVER'];
   const isNarrator = (s: string) => NARRATOR_KEYS.some(k => s.trim() === k || s.trim().toLowerCase() === k.toLowerCase());
 
   const uniqueSpeakers = React.useMemo(() => {
@@ -54,9 +54,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const newVoices = { ...prev };
       uniqueSpeakers.forEach((speaker) => {
         if (!newVoices[speaker]) {
-          if (isNarrator(speaker)) newVoices[speaker] = 'Sulafat';
+          if (isNarrator(speaker)) newVoices[speaker] = 'Puck';
           else {
-            const defaults = ['Puck', 'Zephyr', 'Charon', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
+            const defaults = ['Zephyr', 'Charon', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
             const speakerIndex = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(speaker);
             newVoices[speaker] = defaults[speakerIndex % defaults.length];
           }

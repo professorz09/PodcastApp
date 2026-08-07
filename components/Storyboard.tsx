@@ -13,6 +13,32 @@ import { registerActivePlayback, clearActivePlayback } from '../services/audioMa
 import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
 import { toast } from './Toast';
 
+type ImageAspectRatio = '16:9' | '3:4' | '1:1' | '9:16';
+
+// Decodes an image data URL and matches its real pixel ratio to whichever of
+// the 4 supported aspect ratios is closest — used to recover the ratio a
+// reloaded project's images were actually generated at, since it isn't
+// persisted anywhere else.
+const detectAspectRatioFromImage = (dataUrl: string): Promise<ImageAspectRatio | null> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      if (!img.naturalWidth || !img.naturalHeight) { resolve(null); return; }
+      const ratio = img.naturalWidth / img.naturalHeight;
+      const targets: { key: ImageAspectRatio; value: number }[] = [
+        { key: '16:9', value: 16 / 9 },
+        { key: '9:16', value: 9 / 16 },
+        { key: '3:4', value: 3 / 4 },
+        { key: '1:1', value: 1 },
+      ];
+      const closest = targets.reduce((best, t) => Math.abs(t.value - ratio) < Math.abs(best.value - ratio) ? t : best);
+      resolve(closest.key);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+};
+
 interface StoryboardProps {
   script: DebateSegment[];
   onBack: () => void;
@@ -788,6 +814,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [generatingAllStatus, setGeneratingAllStatus] = useState('');
 
   const [imageAspectRatio, setImageAspectRatio] = useState<'16:9' | '3:4' | '1:1' | '9:16'>('16:9');
+  // Once any scene has an image, lock the ratio so the rest of the batch
+  // can't drift onto a different aspect ratio mid-storyboard.
+  const hasAnyImage = scenes.some(sc => !!sc.imageUrl);
   // Global switch (not per-screen) — also applies to Shorts/Thumbnail image gen.
   const [useLiteModel, setUseLiteModel] = useState(isUsingLiteImageModel);
   const toggleLiteModel = () => {
@@ -849,6 +878,14 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       );
       setScenes(restored);
       setCharacterGuide(saved.characterGuide);
+
+      // The aspect ratio a reloaded project's images were actually generated
+      // at isn't stored anywhere — detect it from the first real image so
+      // the ratio picker (now locked once any image exists) reflects
+      // reality instead of resetting to the 16:9 default and letting new
+      // scenes drift onto a different ratio than the existing ones.
+      const firstImage = restored.find(sc => sc.imageUrl)?.imageUrl;
+      if (firstImage) detectAspectRatioFromImage(firstImage).then(r => { if (r) setImageAspectRatio(r); });
     };
     loadScenes(script).then(saved => {
       applyRestored(saved);
@@ -1543,6 +1580,101 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
             </div>
           )}
 
+          {/* ── Image Generation Settings (collapsible) ── */}
+          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
+            <button onClick={() => setShowSettings(v => !v)} className="w-full flex items-center justify-between px-4 py-4">
+              <div className="flex items-center gap-2">
+                <Settings2 size={15} className="text-purple-500" />
+                <span className="font-bold text-white text-sm">Image Generation</span>
+                {scenes.length > 0 && <span className="text-[10px] text-gray-600">{scenes.length} scenes · {doneImages} images</span>}
+              </div>
+              {showSettings ? <ChevronUp size={17} className="text-gray-500" /> : <ChevronDown size={17} className="text-gray-500" />}
+            </button>
+
+            {showSettings && (
+              <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-2">Scenes <span className="text-purple-400 font-bold">{sceneCount}</span></label>
+                    <input type="range" min={1} max={200} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} className="w-full accent-purple-500" />
+                    <div className="flex justify-between text-[10px] text-gray-700 mt-0.5"><span>1</span><span>200</span></div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-2">Model</label>
+                    <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
+                      {MODEL_OPTIONS.map(o => (
+                        <button key={o.value} onClick={() => setModel(o.value)}
+                          className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${model === o.value ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs text-gray-500">Image Ratio</label>
+                    {hasAnyImage && (
+                      <span className="text-[10px] text-gray-600">Locked — first image already generated</span>
+                    )}
+                  </div>
+                  <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
+                    {(['16:9', '9:16', '3:4', '1:1'] as const).map(r => (
+                      <button key={r} onClick={() => setImageAspectRatio(r)} disabled={hasAnyImage}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${imageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'} ${hasAnyImage ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-black border border-white/5 rounded-xl px-3.5 py-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-300">Lite Image Model</p>
+                    <p className="text-[10px] text-gray-600 mt-0.5">Faster/cheaper, different rate limit — applies to Storyboard, Shorts &amp; Thumbnail</p>
+                  </div>
+                  <button
+                    onClick={toggleLiteModel}
+                    className={`relative w-9 h-5 rounded-full shrink-0 transition-all ${useLiteModel ? 'bg-purple-600' : 'bg-white/15'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${useLiteModel ? 'translate-x-4' : ''}`} />
+                  </button>
+                </div>
+
+                {characterGuide && (
+                  <div className="bg-blue-500/5 border border-blue-500/12 rounded-xl px-3 py-2.5">
+                    <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-1">Character Guide</p>
+                    <p className="text-[10px] text-gray-500 leading-relaxed">{characterGuide}</p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={handleGenerateScenes} disabled={isGeneratingScenes || !script.length}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/30 disabled:text-purple-800 text-white text-sm font-semibold transition-all">
+                    {isGeneratingScenes ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                    {isGeneratingScenes ? 'Generating…' : scenes.length > 0 ? 'Regenerate Scenes' : 'Generate Scenes'}
+                  </button>
+                  {scenes.length > 0 && !generatingAll && (
+                    <button onClick={handleGenerateAll} disabled={allImagesReady}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 text-sm font-semibold border border-blue-500/20 disabled:opacity-40 transition-all">
+                      <Zap size={14} />
+                      {(() => {
+                        // startGenJob processes every scene without an imageUrl — failed and
+                        // never-attempted alike — so the label should say so, not imply it's
+                        // only retrying the failed ones.
+                        const remaining = scenes.filter(sc => !sc.imageUrl).length;
+                        const failedCount = scenes.filter(sc => sc.error && !sc.imageUrl).length;
+                        if (failedCount === 0) return `Generate All Images (${remaining})`;
+                        return `Generate Remaining (${remaining}) — incl. ${failedCount} failed`;
+                      })()}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* ── Subtitle Settings (collapsible) ── */}
           <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
             <button onClick={() => setShowSubtitleSettings(v => !v)} className="w-full flex items-center justify-between px-4 py-4">
@@ -1615,96 +1747,6 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                     </button>
                   </div>
 
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Image Generation Settings (collapsible) ── */}
-          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
-            <button onClick={() => setShowSettings(v => !v)} className="w-full flex items-center justify-between px-4 py-4">
-              <div className="flex items-center gap-2">
-                <Settings2 size={15} className="text-purple-500" />
-                <span className="font-bold text-white text-sm">Image Generation</span>
-                {scenes.length > 0 && <span className="text-[10px] text-gray-600">{scenes.length} scenes · {doneImages} images</span>}
-              </div>
-              {showSettings ? <ChevronUp size={17} className="text-gray-500" /> : <ChevronDown size={17} className="text-gray-500" />}
-            </button>
-
-            {showSettings && (
-              <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-2">Scenes <span className="text-purple-400 font-bold">{sceneCount}</span></label>
-                    <input type="range" min={1} max={200} value={sceneCount} onChange={e => setSceneCount(Number(e.target.value))} className="w-full accent-purple-500" />
-                    <div className="flex justify-between text-[10px] text-gray-700 mt-0.5"><span>1</span><span>200</span></div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-2">Model</label>
-                    <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
-                      {MODEL_OPTIONS.map(o => (
-                        <button key={o.value} onClick={() => setModel(o.value)}
-                          className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${model === o.value ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
-                          {o.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-2">Image Ratio</label>
-                  <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
-                    {(['16:9', '9:16', '3:4', '1:1'] as const).map(r => (
-                      <button key={r} onClick={() => setImageAspectRatio(r)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${imageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between bg-black border border-white/5 rounded-xl px-3.5 py-3">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-300">Lite Image Model</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">Faster/cheaper, different rate limit — applies to Storyboard, Shorts &amp; Thumbnail</p>
-                  </div>
-                  <button
-                    onClick={toggleLiteModel}
-                    className={`relative w-9 h-5 rounded-full shrink-0 transition-all ${useLiteModel ? 'bg-purple-600' : 'bg-white/15'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${useLiteModel ? 'translate-x-4' : ''}`} />
-                  </button>
-                </div>
-
-                {characterGuide && (
-                  <div className="bg-blue-500/5 border border-blue-500/12 rounded-xl px-3 py-2.5">
-                    <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-1">Character Guide</p>
-                    <p className="text-[10px] text-gray-500 leading-relaxed">{characterGuide}</p>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={handleGenerateScenes} disabled={isGeneratingScenes || !script.length}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/30 disabled:text-purple-800 text-white text-sm font-semibold transition-all">
-                    {isGeneratingScenes ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                    {isGeneratingScenes ? 'Generating…' : scenes.length > 0 ? 'Regenerate Scenes' : 'Generate Scenes'}
-                  </button>
-                  {scenes.length > 0 && !generatingAll && (
-                    <button onClick={handleGenerateAll} disabled={allImagesReady}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 text-sm font-semibold border border-blue-500/20 disabled:opacity-40 transition-all">
-                      <Zap size={14} />
-                      {(() => {
-                        // startGenJob processes every scene without an imageUrl — failed and
-                        // never-attempted alike — so the label should say so, not imply it's
-                        // only retrying the failed ones.
-                        const remaining = scenes.filter(sc => !sc.imageUrl).length;
-                        const failedCount = scenes.filter(sc => sc.error && !sc.imageUrl).length;
-                        if (failedCount === 0) return `Generate All Images (${remaining})`;
-                        return `Generate Remaining (${remaining}) — incl. ${failedCount} failed`;
-                      })()}
-                    </button>
-                  )}
                 </div>
               </div>
             )}
