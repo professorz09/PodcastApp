@@ -288,7 +288,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.6-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1275,6 +1275,46 @@ ${specificDetails}`
             ✓ Har chapter = ek JSON segment. Lambi script khud kai chapters mein bant jaayegi — "Split Script" button baad mein use ho sakta hai
             ✗ Koi dialogue nahi, koi doosra speaker nahi
             ✗ Text ke andar speaker-label mat likho — sirf bolne wala text
+            ✗ Generic filler jaise "is prakar", "ant mein", "yeh zaroori hai" — BANNED
+            ${durFillHi}
+          `;
+        } else if (style === 'viral_recap') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: VIRAL RECAP — HYPE, MEME-ENERGY SOLO TRUE-STORY NARRATION
+            Ek hi narrator, jaise viral internet true-story/scam/heist recap channels — fast,
+            breathless, chatty, jaise koi apne dost ko sabse crazy story excitedly sunata hai.
+            Yeh "Crime Documentary" style ka bilkul OPPOSITE hai (wo somber/ominous hai) —
+            yeh loud, fun, thoda unhinged, full of personality aur reaction wala tone hai.
+            ═══════════════════════════════════════
+            Topic/Story: "${topic}"
+            ${specificDetails ? `Extra context/facts: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: ${language}.
+
+            CHARACTER — केवल 1 narrator:
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
+
+            APPROACH:
+            - Agar topic mein real facts/names/numbers diye gaye hain, unhe accurately use karo aur unki wildness pe lean karo. Agar topic generic hai, specific vivid believable details (naam, dollar amounts, dates) invent karo — vague mat raho.
+            - Opening seedhe sabse shocking fact/number se karo, casually, jaise beech baatcheet mein ho — jaise "so this guy is rich, I mean like $230 million rich — because he stole it." Koi warmup nahi, koi "aaj hum baat karenge" nahi.
+            - Isse SPOKEN, transcribed audio jaisa likho, polished prose nahi: run-on sentences "and" se connected, casual fillers ("I mean", "like", "so", "okay so"), sentence fragments punch ke liye, aur beech mein jaan-boojh kar audience-facing asides (jaise "okay real quick ek cheez batana bhool gaya, chalo rewind karte hain").
+            - Sabse bade, jaw-dropping numbers/facts ko EMPHASIS ke liye REPEAT karo — ek baar bolo, phir dobara bolo jaise narrator khud believe nahi kar pa raha (jaise "$230 million... $230 million.").
+            - Apni khud ki story pe react karo jaise sunate ho — rhetorical asides jaise "like damn, kitna drive kar raha hai ye?", "I can't even make this up", "bro really thought—". Narrator ko real, entertained insaan jaisa lagna chahiye, script jaisa nahi.
+            - Jab spending spree/escalation/excess ki list ho, usse item-by-item actually list karo specific numbers ke saath (cars, rent, bottles, gifts) — numbers ki repetition hi entertainment hai, usse summarize karke mat udao.
+            - Jahan fit ho, logon ki real reactions ko unke apne words mein "quote" karo (exclamations, texts) jaise actual audio replay ho raha ho — isse real, sourced story jaisa lagta hai, summary jaisa nahi.
+            - Ek turn ki taraf build karo — wo moment jab sab unravel hone lagta hai — aur ending ko ek dry, matter-of-fact epilogue note ke saath khatam karo (kya confirmed hai vs alleged, aage kya hoga, current status) — moralizing wrap-up nahi.
+
+            RULES:
+            ✓ Sirf 1 narrator — poori story ek continuous, high-energy piece jaisa, tukdon mein todi hui speech jaisa nahi
+            ✓ Tone: excited, casual, funny, thoda chaotic — jaise gossip sunaya ja raha ho, kabhi somber ya slow nahi
+            ✓ Fast pacing — short punchy bursts aur lambe breathless run-ons mix karo, bilkul real spoken storytelling jaisa
+            ✓ Har jagah specific numbers, names, details — vague generalities is style ko kill kar dete hain
+            ✓ Content ko clear CHAPTERS/beats mein organize karo (setup → escalation → turn → aftermath) — har chapter poora aur DETAILED ho
+            ✓ Har chapter = ek JSON segment. Lambi script khud kai chapters mein bant jaayegi — "Split Script" button baad mein use ho sakta hai
+            ✗ Koi dialogue nahi, koi doosra speaker nahi
+            ✗ Text ke andar speaker-label mat likho — sirf bolne wala text
+            ✗ Kabhi bhi formal, documentary, ya news-anchor tone mein mat jao — wo alag style hai
             ✗ Generic filler jaise "is prakar", "ant mein", "yeh zaroori hai" — BANNED
             ${durFillHi}
           `;
@@ -3119,6 +3159,47 @@ ${specificDetails}`
             ✓ One chapter = one JSON segment. A long script will naturally split into several chapters — the "Split Script" button can cut any overly-long one afterward
             ✗ No dialogue, no second speaker
             ✗ Do not write speaker labels inside the text itself — just the pure spoken text
+            ✗ Generic filler like "it's important to note", "in conclusion" — BANNED
+            ${durFillEn}
+          `;
+        } else if (style === 'viral_recap') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: VIRAL RECAP — HYPE, MEME-ENERGY SOLO TRUE-STORY NARRATION
+            One narrator only, in the style of viral internet true-story/scam/heist recap
+            channels — fast, breathless, chatty, like someone excitedly telling their friend
+            the wildest story they just heard. This is the OPPOSITE of a somber documentary
+            voice (that's what "Crime Documentary" is for) — this is loud, fun, a little
+            unhinged, full of personality and reaction.
+            ═══════════════════════════════════════
+            Topic/Story: "${topic}"
+            ${specificDetails ? `Additional context/facts: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            CHARACTER — exactly 1 narrator:
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
+
+            APPROACH:
+            - If the topic includes real facts/names/numbers, use them accurately and lean into how wild they are. If the topic is generic, invent specific, vivid, believable details (names, dollar amounts, dates) rather than staying vague.
+            - Open with the SINGLE most shocking fact or number, stated almost casually, like you're already mid-conversation — e.g. "so this guy is rich, I mean like $230 million rich — because he stole it." No warmup, no "today we're talking about...".
+            - Write it like SPOKEN, transcribed audio, not polished prose: run-on sentences connected with "and", casual fillers ("I mean", "like", "so", "okay so"), sentence fragments for punch, and audience-facing asides that break the flow on purpose (e.g. "okay real quick there's one thing I forgot to mention, let's rewind").
+            - For the biggest, most jaw-dropping numbers or facts, REPEAT them for emphasis — say it once, then say it again like the narrator can't quite believe it themselves (e.g. "$230 million... $230 million.").
+            - React to your own story as you tell it — rhetorical asides like "like damn, how much is he even driving?", "I can't even make this up", "bro really thought—". Make the narrator sound like a real, entertained person, not a script.
+            - When there's a spending spree / escalation / list of excess, actually list it out item by item with specific numbers each time (cars, rent, bottles, gifts) — the sheer repetition of numbers IS the entertainment, don't summarize it away.
+            - Where it fits, "quote" people's real reactions in the moment (their own words, exclamations, texts) as if replaying the actual audio — this makes it feel like a real, sourced story rather than a summary.
+            - Build toward a turn — the moment it starts unraveling — and let the ending land with a dry, matter-of-fact epilogue note (what's actually confirmed vs. alleged, what happens next, current status) rather than a moralizing wrap-up.
+
+            RULES:
+            ✓ Only 1 narrator — the entire story, told as one continuous, high-energy piece, not something that reads like it was chopped into disconnected lines
+            ✓ Tone: excited, casual, funny, a little chaotic — like recounting gossip, never somber or slow
+            ✓ Fast pacing — short punchy bursts mixed with long breathless run-ons, exactly like real spoken storytelling
+            ✓ Specific numbers, names, and details everywhere — vague generalities kill this style
+            ✓ Organize the content into clear CHAPTERS/beats (setup → escalation → turn → aftermath) — each chapter complete and DETAILED
+            ✓ One chapter = one JSON segment. A long script will naturally split into several chapters — the "Split Script" button can cut any overly-long one afterward
+            ✗ No dialogue, no second speaker
+            ✗ Do not write speaker labels inside the text itself — just the pure spoken text
+            ✗ Never slip into a formal, documentary, or news-anchor tone — that's a different style
             ✗ Generic filler like "it's important to note", "in conclusion" — BANNED
             ${durFillEn}
           `;
