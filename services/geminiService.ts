@@ -5725,24 +5725,15 @@ export const generateStoryboardImage = async (
   const ai = getAi();
 
   const characterSection = characterGuide
-    ? `\nCharacter consistency — draw them exactly like this, same face/clothes/hair as every other scene: ${characterGuide}\n`
+    ? ` Character consistency — draw them exactly like this, same face/clothes/hair as every other scene: ${characterGuide}`
     : '';
 
-  // Scene comes first and plain — image models track the actual subject better
-  // when it isn't buried under a long numbered list of secondary instructions.
-  const fullPrompt = `
-Scene to draw: ${prompt}
-
-Draw this exact scene. Include everyone and everything mentioned in it — who/what is
-there, what they are doing, any objects involved, and where it's happening. Don't drop
-or simplify away any part of the scene.
-${characterSection}
-Art style: MS Paint — crude, simple, hand-drawn, basic bold colors, flat shading,
-unpolished, like it was drawn with a mouse. NOT a clean, polished, modern 2D vector
-illustration or story-book art.
-
-Plain white or very simple background. No text anywhere in the image. Aspect ratio ${aspectRatio}.
-`;
+  // Keep this as close to the raw scene prompt as possible — just one style
+  // line appended at the end. Explicitly saying "MS Paint" made the model
+  // render an actual Windows Paint application window (title bar, menus,
+  // blank margins) instead of just adopting the crude flat art style, so
+  // this describes the look directly instead.
+  const fullPrompt = `${prompt}.${characterSection} Simple flat 2D cartoon clip-art illustration style, bold black outlines, flat colors, minimal shading, no text, no watermark, no app windows or UI chrome, full-bleed edge-to-edge with no borders or blank margins, aspect ratio ${aspectRatio}.`;
 
   const response = await ai.models.generateContent({
     model: getImageModel(),
