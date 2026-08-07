@@ -5482,6 +5482,7 @@ export interface StoryboardSceneRaw {
   sceneNumber: number;
   prompt: string;
   segmentIndices: number[];
+  usesCharacter?: boolean;
 }
 
 export interface StoryboardScenesResult {
@@ -5561,6 +5562,11 @@ For each scene prompt:
 - Keep it to WHO is there, WHAT they're doing, WHAT objects/setting are involved —
   never describe art style, rendering technique, or colors/coloring here (no "vibrant",
   no "flat colors", no medium). The image generator applies style separately at the end.
+- Set "usesCharacter": true ONLY if the recurring character from Step 1 is actually
+  depicted doing something in THIS scene. Plenty of scenes legitimately don't need
+  them (e.g. a cutaway to an object, a different person, a location, a statistic, a
+  reaction from someone else) — set "usesCharacter": false for those, even though a
+  character guide exists overall. If Step 1 produced no character at all, always false.
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -5569,7 +5575,8 @@ Respond ONLY with valid JSON in this exact format:
     {
       "sceneNumber": 1,
       "prompt": "Scene description here using the character...",
-      "segmentIndices": [0, 1]
+      "segmentIndices": [0, 1],
+      "usesCharacter": true
     },
     ...
   ]
@@ -5600,7 +5607,7 @@ Do not add any explanation outside the JSON.
 export const generateStoryboardScenesTimeBased = async (
   slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
   model: string = 'gemini-3.6-flash',
-): Promise<{ prompts: string[]; characterGuide: string }> => {
+): Promise<{ prompts: string[]; usesCharacter: boolean[]; characterGuide: string }> => {
   const ai = getAi();
 
   const slotText = slots.map(s =>
@@ -5646,12 +5653,19 @@ For each scene, create one image prompt that visually illustrates what is happen
 - Keep it to WHO is there, WHAT they're doing, WHAT objects/setting are involved —
   never describe art style, rendering technique, or colors/coloring here (no "vibrant",
   no "flat colors", no medium). The image generator applies style separately at the end.
+- For each scene also decide usesCharacter: true ONLY if the recurring character from
+  Step 1 is actually depicted doing something in THAT scene. Many scenes legitimately
+  don't need them (a cutaway to an object, a different person, a location, a statistic,
+  someone else's reaction) — use false for those even though a character guide exists
+  overall. If Step 1 produced no character at all, every usesCharacter must be false.
 
 Respond ONLY with valid JSON:
 {
   "characterGuide": "Main character: ...",
-  "prompts": ["prompt for scene 1", "prompt for scene 2", ...]
+  "prompts": ["prompt for scene 1", "prompt for scene 2", ...],
+  "usesCharacter": [true, false, ...]
 }
+"usesCharacter" must have exactly one entry per scene, same order as "prompts".
 Do not add explanation outside the JSON.
 `;
 
@@ -5666,6 +5680,7 @@ Do not add explanation outside the JSON.
   const parsed = JSON.parse(cleaned);
   return {
     prompts: (parsed.prompts || []) as string[],
+    usesCharacter: (parsed.usesCharacter || []) as boolean[],
     characterGuide: (parsed.characterGuide || '') as string,
   };
 };

@@ -154,7 +154,8 @@ export function startGenJob(
 
         let result: 'success' | 'quota' | 'other';
         try {
-          const url = await generateImageWithRetry(scene.prompt, job.characterGuide, job.aspectRatio);
+          const guide = scene.usesCharacter === false ? undefined : job.characterGuide;
+          const url = await generateImageWithRetry(scene.prompt, guide, job.aspectRatio);
           setScene(scene.id, { imageUrl: url, isGenerating: false });
           result = 'success';
         } catch (e: any) {

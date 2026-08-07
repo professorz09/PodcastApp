@@ -151,6 +151,7 @@ export interface StoryboardScene {
   imageUrl?: string;   // base64 data URL once generated
   isGenerating?: boolean;
   error?: string;
+  usesCharacter?: boolean; // whether this specific scene should include the characterGuide description
 }
 
 export interface DebateConfig {
