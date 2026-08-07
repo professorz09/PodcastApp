@@ -13,6 +13,32 @@ import { registerActivePlayback, clearActivePlayback } from '../services/audioMa
 import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
 import { toast } from './Toast';
 
+type ImageAspectRatio = '16:9' | '3:4' | '1:1' | '9:16';
+
+// Decodes an image data URL and matches its real pixel ratio to whichever of
+// the 4 supported aspect ratios is closest — used to recover the ratio a
+// reloaded project's images were actually generated at, since it isn't
+// persisted anywhere else.
+const detectAspectRatioFromImage = (dataUrl: string): Promise<ImageAspectRatio | null> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      if (!img.naturalWidth || !img.naturalHeight) { resolve(null); return; }
+      const ratio = img.naturalWidth / img.naturalHeight;
+      const targets: { key: ImageAspectRatio; value: number }[] = [
+        { key: '16:9', value: 16 / 9 },
+        { key: '9:16', value: 9 / 16 },
+        { key: '3:4', value: 3 / 4 },
+        { key: '1:1', value: 1 },
+      ];
+      const closest = targets.reduce((best, t) => Math.abs(t.value - ratio) < Math.abs(best.value - ratio) ? t : best);
+      resolve(closest.key);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+};
+
 interface StoryboardProps {
   script: DebateSegment[];
   onBack: () => void;
@@ -788,6 +814,9 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [generatingAllStatus, setGeneratingAllStatus] = useState('');
 
   const [imageAspectRatio, setImageAspectRatio] = useState<'16:9' | '3:4' | '1:1' | '9:16'>('16:9');
+  // Once any scene has an image, lock the ratio so the rest of the batch
+  // can't drift onto a different aspect ratio mid-storyboard.
+  const hasAnyImage = scenes.some(sc => !!sc.imageUrl);
   // Global switch (not per-screen) — also applies to Shorts/Thumbnail image gen.
   const [useLiteModel, setUseLiteModel] = useState(isUsingLiteImageModel);
   const toggleLiteModel = () => {
@@ -849,6 +878,14 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       );
       setScenes(restored);
       setCharacterGuide(saved.characterGuide);
+
+      // The aspect ratio a reloaded project's images were actually generated
+      // at isn't stored anywhere — detect it from the first real image so
+      // the ratio picker (now locked once any image exists) reflects
+      // reality instead of resetting to the 16:9 default and letting new
+      // scenes drift onto a different ratio than the existing ones.
+      const firstImage = restored.find(sc => sc.imageUrl)?.imageUrl;
+      if (firstImage) detectAspectRatioFromImage(firstImage).then(r => { if (r) setImageAspectRatio(r); });
     };
     loadScenes(script).then(saved => {
       applyRestored(saved);
@@ -1653,11 +1690,16 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-500 mb-2">Image Ratio</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs text-gray-500">Image Ratio</label>
+                    {hasAnyImage && (
+                      <span className="text-[10px] text-gray-600">Locked — first image already generated</span>
+                    )}
+                  </div>
                   <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
                     {(['16:9', '9:16', '3:4', '1:1'] as const).map(r => (
-                      <button key={r} onClick={() => setImageAspectRatio(r)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${imageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                      <button key={r} onClick={() => setImageAspectRatio(r)} disabled={hasAnyImage}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${imageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'} ${hasAnyImage ? 'opacity-40 cursor-not-allowed' : ''}`}>
                         {r}
                       </button>
                     ))}
