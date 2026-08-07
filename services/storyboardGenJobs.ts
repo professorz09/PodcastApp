@@ -65,14 +65,6 @@ const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 2;
 const recentAttempts: number[] = [];
 
-// Exported so manual per-scene "Generate" clicks (Storyboard.tsx's own
-// handleGenerateImage) share this same sliding window with the background
-// job — otherwise manual clicks fire unthrottled and burst straight into
-// Vertex's tight per-minute cap regardless of what the job is doing.
-export async function throttleGeneration(abort: () => boolean = () => false): Promise<void> {
-  return throttle(abort);
-}
-
 async function throttle(abort: () => boolean): Promise<void> {
   for (;;) {
     const now = Date.now();

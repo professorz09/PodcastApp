@@ -10,7 +10,7 @@ import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
 import { saveScenes, loadScenes, syncScenesFromCloudIfNewer, getScriptSignature } from '../services/storageService';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
-import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot, throttleGeneration } from '../services/storyboardGenJobs';
+import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
 import { toast } from './Toast';
 
 interface StoryboardProps {
@@ -1300,17 +1300,11 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const generateImageWithRetry = async (
     prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio,
   ): Promise<string> => {
-    // Share the exact same sliding-window limiter the background job uses —
-    // otherwise a manual per-scene click fires immediately, uncoordinated
-    // with any job/other manual click also in flight, and bursts straight
-    // into Vertex's tight per-minute cap.
-    await throttleGeneration();
     try {
       return await generateStoryboardImage(prompt, guide, ratio);
     } catch (e: any) {
       if (!isQuotaError(e)) throw e;
       await new Promise(r => setTimeout(r, 4000));
-      await throttleGeneration();
       return await generateStoryboardImage(prompt, guide, ratio);
     }
   };

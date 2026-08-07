@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene, YoutubeImportData } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, findBestShortsSegments, generateShortsTitles, generateShortsThumbnail, generateShortsThumbText, ShortsContentResult, ShortsSegment, TranscriptChunk, ClipMode } from '../services/geminiService';
-import { throttleGeneration } from '../services/storyboardGenJobs';
 import { saveShortsScenes, loadShortsScenes, syncShortsScenesFromCloudIfNewer } from '../services/storageService';
 import { registerActivePlayback } from '../services/audioManager';
 import { toast } from './Toast';
@@ -982,7 +981,6 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     if (!layer) return;
     setGeneratingLayerIdx(idx);
     try {
-      await throttleGeneration();
       const dataUrl = await generateStoryboardImage(layer.text, characterGuide || undefined, '9:16');
       setSubtitleLayers(prev => prev.map((l, i) => i === idx ? { ...l, imageDataUrl: dataUrl } : l));
       toast.success('Image generated');
@@ -1583,16 +1581,11 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   const generateImageWithRetry = async (
     prompt: string, guide: string | undefined, ratio: typeof imageAspectRatio,
   ): Promise<string> => {
-    // Shares the same sliding-window limiter as Storyboard's manual clicks
-    // and background job — otherwise Shorts/Storyboard generating at the same
-    // time burst well past Vertex's tight per-minute cap.
-    await throttleGeneration();
     try {
       return await generateStoryboardImage(prompt, guide, ratio);
     } catch (e: any) {
       if (!isQuotaError(e)) throw e;
       await new Promise(r => setTimeout(r, 4000));
-      await throttleGeneration();
       return await generateStoryboardImage(prompt, guide, ratio);
     }
   };
