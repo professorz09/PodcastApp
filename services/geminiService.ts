@@ -1,5 +1,6 @@
 import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
+import { fetchStylePoolMeta, fetchStyleImageByPath, fetchRandomStyleReference, matchStylesVector } from "./styleRefClient";
 
 // Nano Banana 2 — Gemini image model, used for all image generation
 // (thumbnails, avatars, storyboard illustrations, etc). A global switch (not
@@ -71,1137 +72,39 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export type ThumbnailVideoStyle = 'situational' | 'debate' | 'podcast' | 'explained' | 'professor_jiang' | 'phone_studio' | 'phone_clean' | 'phone_clean_2' | 'phone_dual' | 'news_dramatic' | 'podcast_2' | 'cinematic_drama' | 'podcast_3' | 'podcast_4' | 'corkboard_meta' | 'movie_review' | 'curated_reference';
-
-const getTitleStylePrompt = (style: ThumbnailVideoStyle): string => {
-  if (style === 'explained') {
-    return `
-You are a YouTube copywriter for "Explained" channels that do book summaries, biographies, and topic breakdowns.
-Read the script and generate 4 direct, conversational YouTube titles — the kind that NAME the topic clearly and invite the viewer to learn it with you.
-
-STYLE: Direct + Conversational. No clickbait tricks. The title should tell exactly what the video is about, but make it sound exciting.
-
-REQUIREMENTS:
-1. ALWAYS name the exact topic/book/person/concept from the script — never be vague.
-2. Sound like you are talking TO the viewer — warm, confident, inviting.
-3. ALWAYS write in English only — do NOT use Hindi, Hinglish, or any other language.
-4. The title should feel like the presenter just sat down and is starting the video.
-5. 55-75 characters max. Complete and readable.
-
-FORMATS to vary across 4 options:
-- Direct intro style: "The Full Story Of [Topic] — Everything Explained"
-- Conversational hook: "Have You Heard About [Topic]? Here's The Truth"
-- Bold claim: "[Topic] — The [Key Insight] Nobody Talks About"
-- Punchy: "[Topic]: The [Angle] No One Explained"
-
-EXAMPLES (if topic is "Robert Greene's 48 Laws of Power"):
-- "48 Laws of Power — The Book That Changes How You See The World"
-- "Robert Greene's 48 Laws of Power Fully Explained"
-- "What Is 48 Laws of Power? Robert Greene's Complete Secret"
-- "48 Laws of Power Explained: The Formula To Understand Power"
-
-Return ONLY a valid JSON array of 4 strings. No markdown.
-    `;
-  }
-  if (style === 'situational') {
-    return `
-    You are a YouTube copywriter specializing in personal story and emotional content.
-    Read the script and generate 4 highly clickable YouTube titles that feel deeply personal, relatable, and emotionally resonant.
-
-    Requirements:
-    1. First-person or story-driven: "I Lost Everything...", "Nobody Warned Me About This", "My Life Changed After..."
-    2. Make the viewer feel "this is literally my situation" or "I need to watch this"
-    3. Emotional words: "Broke Me", "Changed Everything", "Nobody Told Me", "I Finally Understood", "Worst Mistake"
-    4. Under 65 characters. No generic clickbait — must feel like a real person's real story.
-    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
-    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
-    `;
-  }
-  if (style === 'debate') {
-    return `
-    You are a YouTube copywriter specializing in debate, opinion, and controversy content.
-    Read the script and generate 4 highly clickable YouTube titles that feel confrontational, opinionated, and debate-worthy.
-
-    Requirements:
-    1. Two-sides framing: "X vs Y: Who's Actually Right?", "Why Everyone Is WRONG About X", "The REAL Truth About X"
-    2. Challenge conventional wisdom: "Stop Believing This About X", "X Is A Lie — Here's Proof"
-    3. Strong opinion words: "EXPOSED", "DEBUNKED", "The REAL Truth", "WRONG", "FIGHT BACK", "Unpopular Opinion"
-    4. Under 65 characters. Must feel like a hot debate, not a tutorial.
-    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
-    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
-    `;
-  }
-  if (style === 'phone_studio') {
-    return `
-You are a YouTube copywriter for the "Phone Studio" thumbnail style — punchy AI-chat-style clips that go viral on Shorts and homepage. The thumbnail shows a phone screen on one side (AI chat about a celebrity's take) and the celebrity's face on the other, with HUGE red+white impact text in the middle.
-
-Read the script and generate 4 SHORT, CATCHY, ULTRA-CLICKABLE YouTube titles in this style.
-
-STYLE: Ultra-short. Question or bold claim. Sounds like a headline you'd say out loud. The shorter, the better. The celebrity / person being discussed MUST be named.
-
-REQUIREMENTS:
-1. 35-55 characters max. Tight, punchy, no filler words.
-2. Format options to mix across the 4:
-   - Direct question: "Do Aliens Exist? — Joe Rogan Answers"
-   - Bold claim with name: "Elon Musk: Shift Data Centers To The Moon"
-   - Punchy shock: "Trump: War Phase Won Again"
-   - Reveal: "Joe Rogan Reveals What's Really In Area 51"
-3. Always name the celebrity / person from the script in the title.
-4. No semicolons, no em-dashes overuse — keep it conversational.
-5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
-6. The 4 titles must approach the SAME topic from DIFFERENT angles (question / bold claim / reveal / consequence).
-
-EXAMPLES (for tone — do NOT copy verbatim):
-- "Do Aliens Exist? Trump Reveals The Truth"
-- "Elon Musk Wants Data Centers On The Moon"
-- "Joe Rogan: War Phase Has Already Started"
-- "Putin Just Said Something Insane About AI"
-
-Return ONLY a valid JSON array of 4 strings. No markdown.
-    `;
-  }
-  if (style === 'professor_jiang') {
-    return `
-You are a YouTube copywriter for serious current-events analysis channels — think Fox News, CNN Breaking, geopolitical commentary. Titles must feel urgent, important, and analytical.
-
-Read the script and generate 4 highly clickable YouTube titles for a BREAKING NEWS ANALYSIS video. The topic is a real current event.
-
-STYLE: Urgent, authoritative, analytical. Makes the viewer feel they MUST watch this RIGHT NOW to understand what just happened.
-
-REQUIREMENTS:
-1. Name the SPECIFIC event, country, leader, or policy from the script — never vague
-2. Feel like a breaking news chyron or urgent editorial — serious, not sensational gossip
-3. Use power words: "EXPLAINED", "BREAKING", "REAL REASON", "WHAT THIS MEANS", "NOBODY IS SAYING", "THE TRUTH"
-4. Under 70 characters. Clear, readable.
-5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
-6. Mix formats across 4 options.
-
-FORMATS to vary:
-- Urgent question: "Why Did [Event] Happen? The Answer Will Shock You"
-- Bold claim: "[Leader/Country] Just Changed Everything — Here's Why"
-- Analysis hook: "The REAL Reason Behind [Event] Nobody Is Talking About"
-- Prediction: "What [Event] Means For [Country/World] In The Next 6 Months"
-
-Return ONLY a valid JSON array of 4 strings. No markdown.
-    `;
-  }
-  if (style === 'phone_clean') {
-    return `
-You are a YouTube copywriter for the "Phone Clean" style — clean white-background thumbnails showing an AI phone call with a shocking topic. Short, viral, makes people stop scrolling.
-
-REQUIREMENTS:
-1. 40-60 characters max. Bold claim or question.
-2. Read the FULL script to extract the EXACT topic, person, brand, or event — never be generic.
-3. MUST name the specific entity (person/org/brand/event) from the script.
-4. Sounds like a revealing expose or insider scoop about that specific topic.
-5. ALWAYS write titles in English only.
-6. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only — rewrite for the actual script topic):
-- "OpenAI's Hidden Plan Nobody Told You About"
-- "Google's Secret Deal Just Got Exposed"
-- "Why Apple Is Quietly Buying This Company"
-    `;
-  }
-  if (style === 'phone_clean_2') {
-    return `
-You are a YouTube copywriter for the "Phone Clean 2" style — clean white-background thumbnail, phone on left, sitting presenter with lapel mic on right, bold topic text in center.
-
-REQUIREMENTS:
-1. 40-60 characters max. Direct, punchy, reveals something SPECIFIC.
-2. Read the FULL script to extract the EXACT topic, person, brand, country, or event — never generic.
-3. MUST name the specific entity from the script — make the viewer feel they're getting insider info.
-4. Format ideas: "X's Secret Plan", "The Truth About X", "Why X Is Doing This", "X Just Revealed This"
-5. ALWAYS write titles in English only.
-6. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only — rewrite for the actual script topic):
-- "The Real Reason Tesla Fired Half Its Engineers"
-- "India's Secret Space Plan Nobody Told You About"
-- "Why Sam Altman's Plan Will Change Everything"
-    `;
-  }
-  if (style === 'phone_dual') {
-    return `
-You are a YouTube copywriter for the "Phone Dual" style — two characters having a shocking phone conversation about a wild topic. Think conspiracy meets comedy meets clickbait.
-
-REQUIREMENTS:
-1. 40-65 characters max. Make it a question or a confrontational claim.
-2. Name BOTH characters if possible, or make the topic the star.
-3. "Do X Exist?", "Does Y Know About Z?", "X Calls Y About Z" formats work great.
-4. ALWAYS write titles in English only.
-5. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES:
-- "Do Aliens Exist? Trump Calls To Find Out"
-- "Elon Calls Putin: What Did They Really Say?"
-- "Does God Exist? Einstein vs. Darwin Phone Call"
-    `;
-  }
-  if (style === 'podcast_2') {
-    return `
-You are a YouTube copywriter for real podcast channels (Joe Rogan / Lex Fridman / Andrew Huberman style) — two people sitting across each other, discussing a specific topic shown in a CENTER image insert.
-
-REQUIREMENTS:
-1. 55-75 characters. Conversational, specific, makes you curious about the discussion.
-2. MUST name the specific topic, person, or thing being discussed — never vague.
-3. Sounds like two people reacting to something: "[Person] Reacts To...", "We Tested...", "The Truth About X", "Is X Real? — [Person]'s Take"
-4. Format ideas: "[Guest Name] On [Topic]", "Why [Topic] Is [Shocking Claim]", "[Topic]: The Conversation Nobody Is Having"
-5. ALWAYS write titles in English only.
-6. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only — rewrite for the actual script topic):
-- "Joe Rogan and Guest React To Moon Landing Evidence"
-- "The Truth About COVID Vaccines — No Filter Conversation"
-- "Trump's Real Opinion On Drinking — Shocking Reveal"
-- "We Discussed XVideos, Pornhub, And The Internet's Dark Side"
-    `;
-  }
-  if (style === 'movie_review') {
-    return `
-You are a YouTube copywriter for a cinematic review/analysis channel — works for ANY topic (movies, books, events, brands, people, documentaries, sports). Titles are opinionated, punchy, Hindi-English mix or pure English, honest hot takes.
-
-REQUIREMENTS:
-1. 45-70 characters. Sounds like a reviewer's raw honest reaction — can be in Hindi, English, or Hinglish.
-2. MUST name the actual topic (film, book, brand, event, person) from the script.
-3. Can use emojis and colloquial expressions.
-4. Works for: movie review, book review, event breakdown, brand story, sports moment, documentary reaction.
-5. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only):
-- "Krishnavataram Review: Dhoka Hua Mere Saath 💔"
-- "Jolly LLB 3: WTF Bhai Rula Diya 🔥"
-- "Apple's Biggest Failure — Full Story Explained 🤯"
-- "IPL 2025 Final: Paisa Vasool Tha Yaar 🏏"
-    `;
-  }
-  if (style === 'corkboard_meta') {
-    return `
-You are a YouTube copywriter for meta educational content — "how thumbnails/videos go viral", "what makes content work", YouTube strategy breakdowns. The thumbnail shows a cork board with an annotated thumbnail pinned to it.
-
-REQUIREMENTS:
-1. 50-70 characters. Sounds like you're revealing a YouTube/content creation formula or secret.
-2. MUST be topic-specific — name what formula, strategy, or concept is being broken down.
-3. Formats: "The [X] Formula", "Why [X] Goes Viral", "How [Channel] Gets [Y] Views", "The Secret Behind [X]"
-4. ALWAYS write titles in English only.
-5. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only):
-- "The Viral Formula Behind Every 10M View Podcast Thumbnail"
-- "Why DOAC Thumbnails Always Go Viral — Broken Down"
-- "The Secret Structure Behind Every Successful YouTube Hook"
-- "How MrBeast Designs Thumbnails That Get Billions Of Views"
-    `;
-  }
-  if (style === 'podcast_4') {
-    return `
-You are a YouTube copywriter for the "Viral Tweet / Scandal Documentary" style — dark background, two emotional faces (left & right), and a giant social media post in the center showing the shocking reveal. Used for business scandals, celebrity controversies, founder stories.
-
-REQUIREMENTS:
-1. 55-80 characters. Sounds like a documentary title or investigative exposé.
-2. MUST name the real person, brand, or event from the script.
-3. Formats: "The [X] Scandal Nobody Talked About", "When [Person] Posted This And Everything Changed", "How [Brand] Collapsed After One Tweet"
-4. ALWAYS write titles in English only.
-5. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only):
-- "The Café Coffee Day Founder's Last Tweet Before He Disappeared"
-- "How One Tweet Ended India's Biggest Coffee Chain"
-- "The Dark Truth Behind VG Siddhartha's Final Message"
-- "When A Founder's 'I Quit' Post Shocked The Entire Country"
-    `;
-  }
-  if (style === 'podcast_3') {
-    return `
-You are a YouTube copywriter for the "Podcast Quote" style — deep red background, speaker's face on right, a bold statement sentence on the left with ONE key word highlighted in a YELLOW BOX. Used by financial/opinion podcasts (crypto, investing, life advice).
-
-REQUIREMENTS:
-1. 55-75 characters. Sounds like something a guest actually SAID — a direct quote or bold opinion.
-2. MUST be specific to the actual topic/person from the script — name the speaker or the claim.
-3. Formats: "[Person]: [Shocking Statement]", "[Claim] — [Person]", conversational opinion.
-4. ALWAYS write in English only.
-5. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only):
-- "Scaramucci Said Bitcoin Is Complete Bullsh*t — Here's Why He Changed"
-- "Raoul Pal: Impatience Is Literally Keeping You Broke"
-- "Matt Hougan Says Just Buy This One Thing And Wait"
-- "They Are Actively Trying To Steal Your Crypto — Here's How"
-    `;
-  }
-  if (style === 'cinematic_drama') {
-    return `
-You are a YouTube copywriter for cinematic drama / Bollywood / thriller content — thumbnails with ZERO or minimal text. The visual tells the whole story.
-
-REQUIREMENTS:
-1. 55-80 characters. Cinematic, story-driven. Sounds like a movie title or dramatic reveal.
-2. MUST name the specific person, film, event, or drama from the script.
-3. Evokes emotion: mystery, danger, betrayal, shock, humor contrast.
-4. Formats: "[Name]'s Shocking Secret", "What Nobody Knew About [Event]", "[X] vs [Y] — The Real Story", "When [X] Happened..."
-5. ALWAYS write titles in English only.
-6. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only):
-- "Ranbir Kapoor Destroys Avatar & Avengers — Here's Why"
-- "The Dark Truth Behind Punjab's Drug Mafia Nobody Talks About"
-- "When The Trolley Problem Met God — Nobody Expected This"
-- "Superman Meets Bollywood — The Craziest Crossover Yet"
-    `;
-  }
-  if (style === 'news_dramatic') {
-    return `
-You are a YouTube copywriter for Indian breaking news channels (Career247 / ABP / India TV style) — dramatic, urgent, shocking headlines that go viral. The thumbnail shows a BLUE text box on the left + dramatic background scene + celebrity face foreground.
-
-REQUIREMENTS:
-1. 55-75 characters. Hard-hitting, factual but dramatic. Names the SPECIFIC event, country, leader, or policy.
-2. Format: "[Shocking Event]!! — [Consequence/Twist]" or "[Country/Person] [Shocking Action]!! — [Why It Matters]"
-3. MUST name the real entity from the script (person, country, conflict, event) — never vague.
-4. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
-5. Return ONLY a valid JSON array of 4 strings. No markdown.
-
-EXAMPLES (tone only — rewrite for the actual script topic):
-- "Israel Attacks Iran!! — Humiliation For Trump!!"
-- "Moscow Burning!! — Why Black Rain On Putin??"
-- "Iran Hits US Air Force Hard!! — Shocking Images Show Damage!!"
-- "Pakistan Increases Defence Budget By 18%!! — War With India Near??"
-    `;
-  }
-  // podcast / default
-  return `
-    You are an expert YouTube strategist and copywriter.
-    Read the ENTIRE script to deeply understand the core topic, context, and main conflict or value proposition.
-    Generate 4 highly clickable, catchy, viral-style YouTube video titles.
-
-    Requirements:
-    1. Topic MUST be immediately clear.
-    2. Hook/Curiosity: intense FOMO or curiosity bait.
-    3. Strong words: "Exposed", "The Truth", "Why You're Wrong", "Secret", "Nobody Talks About This"
-    4. Under 60 characters so they don't get cut off on mobile.
-    5. ALWAYS write titles in English only — do NOT use Hindi or Hinglish.
-    6. Return ONLY a valid JSON array of exactly 4 strings. No markdown.
-  `;
-};
-
-export const generateTitles = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
+export const generateTitleTextPair = async (scriptText: string): Promise<{ title: string; thumbnailText: string; description: string }[]> => {
   const ai = getAi();
-
-  const variationSeed = Math.floor(Math.random() * 9999);
-  const prompt = `
-    ${getTitleStylePrompt(videoStyle)}
-    
-    Generate completely fresh titles — do NOT repeat or paraphrase any previously generated titles. Variation seed: ${variationSeed}.
-    
-    Script:
-    ${scriptText}
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: prompt,
-      config: {
-        temperature: 1.2,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
-      }
-    });
-
-    if (!response.text) throw new Error("No response from Gemini");
-    let jsonText = response.text;
-    jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonText);
-  } catch (error: any) {
-    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
-      throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
-    }
-    console.error("Error in generateTitles:", error);
-    throw error;
-  }
-};
-
-const getThumbnailTextStylePrompt = (style: ThumbnailVideoStyle): string => {
-  if (style === 'explained') {
-    return `
-You are a thumbnail copywriter for "Explained" YouTube channels. Write SHORT text that appears ON the thumbnail image — this is the BIG BOLD TEXT overlay, not the title.
-
-STYLE: Direct, name-drops the topic. Inviting and informative — not shock clickbait.
-
-CRITICAL RULE — NAME THE TOPIC:
-The text must say or strongly hint at the exact subject. Vague generic text like "EXPLAINED" alone is useless.
-BAD: "EXPLAINED" / "THE TRUTH"
-GOOD: "48 LAWS" / "ROBERT GREENE" / "THE SECRET" / "THE BOOK"
-
-Generate exactly 5 options with VARIETY:
-- Option 1: Topic name directly in CAPS (e.g. "48 LAWS OF POWER")
-- Option 2: Short punchy hook (e.g. "READ THIS NOW!" / "POWER SECRETS")
-- Option 3: Action/invitation (e.g. "FULL STORY" / "EVERYTHING EXPLAINED")
-- Option 4: Ultra-short 2 words (e.g. "MUST READ" / "LIFE CHANGING")
-- Option 5: One punchy insight from the topic (e.g. "POWER WINS" / "RULES MATTER")
-
-RULES:
-- Max 4 words each
-- CAPS for the topic name and power words
-- ALWAYS write in English only — do NOT use Hindi or Hinglish
-- Must feel like it belongs on a clean explained thumbnail with a face
-- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
-    `;
-  }
-  if (style === 'situational') {
-    return `
-You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT that appears on a thumbnail image.
-
-STYLE: Emotional personal story — raw, real, relatable. NOT generic clickbait.
-
-CRITICAL RULE — TOPIC SPECIFICITY:
-Every option MUST hint at the actual topic from the script. Generic phrases like "It Broke Me" or "My Biggest Regret" that could apply to ANY video are FORBIDDEN unless combined with a topic hint.
-BAD: "It Broke Me" (could be anything)
-GOOD: "My Job Broke Me..." (topic: job loss)
-BAD: "Everything Is Over" (too vague)
-GOOD: "My Relationship Ended..." (topic: relationship)
-
-Generate exactly 5 options with VARIETY — not all the same tone:
-- Option 1: Pure emotional first-person with topic hint (e.g. "Lost Everything at 40...")
-- Option 2: The unspoken truth about this topic (e.g. "Nobody Warns You About This")
-- Option 3: Raw confession style (e.g. "I Was So Wrong...")
-- Option 4: The question this person is living (e.g. "Can I Still Fix This?")
-- Option 5: The hardest moment, specific (e.g. "That One Phone Call...")
-
-RULES:
-- Max 5 words each — short and heavy
-- Trailing "..." welcome for emotion
-- One word can be light caps (CAPS for 1 word max)
-- NO generic topic-free phrases
-- ALWAYS write in English only — do NOT use Hindi or Hinglish
-- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
-    `;
-  }
-  if (style === 'debate') {
-    return `
-You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT that appears on a debate thumbnail.
-
-STYLE: Bold, confrontational, two-sides battle — makes you pick a side immediately.
-
-CRITICAL RULE — TOPIC SPECIFICITY:
-The thumbnail text MUST reference the actual debate topic from the script. Generic "WHO'S RIGHT?" or "EXPOSED!" with no topic context are weak.
-BAD: "WHO'S RIGHT?" (could be anything)
-GOOD: "Is MARRIAGE Over?" (topic: marriage debate)
-BAD: "BOTH WRONG?"
-GOOD: "BOTH Sides LYING?" (keeps confrontation + hints)
-
-Generate exactly 5 options with VARIETY:
-- Option 1: Direct yes/no question about THIS topic (e.g. "Is Hustle Culture DEAD?")
-- Option 2: Explosive claim about THIS topic (e.g. "MARRIAGE Is A TRAP")  
-- Option 3: Challenge conventional wisdom (e.g. "Stop Believing This LIE")
-- Option 4: Bold accusation (e.g. "They LIED To You!" / "You're Being FOOLED")
-- Option 5: Censored-style if controversial (e.g. "It's All BULL**IT") — use * for letters
-
-RULES:
-- Max 5 words each
-- ALL CAPS for 1-2 key power words
-- ! or ? welcome
-- Censored style (F**K, BULL**IT) only if topic is genuinely controversial
-- ALWAYS write in English only — do NOT use Hindi or Hinglish
-- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
-    `;
-  }
-  if (style === 'phone_studio') {
-    return `
-You are a thumbnail copywriter for the "Phone Studio" style — ultra-bold red+white text overlaid on a phone screen + celebrity face composition.
-
-STYLE: 2-5 word ALL-CAPS punch line. Either a SHORT QUESTION (ends with ?) or a SHOCK DECLARATION (ends with ! or no punctuation). Half the words will be WHITE, the most explosive 1-2 words RED.
-
-CRITICAL RULE — MUST BE TOPIC-SPECIFIC:
-Read the script. Pick the SINGLE most viral 2-5 word hook from the actual content. Never generic.
-
-Generate exactly 5 options with VARIETY:
-- Option 1: 2-word shock question — "ALIENS REAL?" / "WAR OVER?" / "DOGE DEAD?"
-- Option 2: 3-4 word bold claim — "WAR PHASE WON" / "MOON IS TARGET" / "DOGE WILL WIN"
-- Option 3: 4-5 word question — "DO ALIENS REALLY EXIST?" / "SHIFT DATA TO MOON?"
-- Option 4: 2-3 word declaration — "AREA 51 EXPOSED" / "ELON LIED"
-- Option 5: Punchy verb-action — "TRUMP WINS AGAIN" / "MUSK GOES MARS"
-
-RULES:
-- Max 5 words. Lean toward 2-3.
-- ALL CAPS only.
-- Each option DIFFERENT — different word, different angle, different punctuation.
-- ALWAYS English only — no Hindi/Hinglish.
-- No emojis, no quotes, no punctuation except ? or !
-- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
-    `;
-  }
-  if (style === 'professor_jiang') {
-    return `
-You are a thumbnail copywriter for breaking news and current-events analysis channels. Write the BIG BOLD TEXT that appears on the thumbnail — the 2-4 word SHOCKER in huge yellow/white caps on a red breaking news banner.
-
-STYLE: Fox News Alert / CNN Breaking — urgent, declarative, impossible to ignore. The text tells you something massive just happened.
-
-CRITICAL RULE — TOPIC SPECIFIC:
-The text MUST hint at the actual event from the script. Generic "IT'S OVER" with no context is weak.
-BAD: "IT'S OVER" (could be anything)
-GOOD: "TRADE WAR OVER" (topic: US-China trade deal)
-BAD: "BREAKING NEWS"
-GOOD: "CEASEFIRE BROKEN" (topic: ceasefire collapse)
-
-Generate exactly 5 options with VARIETY:
-- Option 1: 2-3 word declarative statement (e.g. "SYSTEM FAILING", "DEAL COLLAPSED")
-- Option 2: Quoted speech style (e.g. "IT'S OVER", "WE LOST") — with quote marks 
-- Option 3: Action claim (e.g. "WAR STARTS NOW", "RATES FROZEN")
-- Option 4: Urgent warning (e.g. "WATCH THIS NOW", "DON'T MISS THIS")
-- Option 5: Verdict style (e.g. "CHINA WINS", "TRUMP BLINKS", "INDIA LOSES")
-
-RULES:
-- Maximum 4 words each — shorter is more powerful
-- ALL CAPS — this is a breaking news chyron
-- No trailing "..." — declarative and final
-- Must feel like it belongs on a red news alert banner
-- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
-    `;
-  }
-  if (style === 'phone_clean') {
-    return `
-You are a thumbnail copywriter for "Phone Clean" style — bold black text + RED BOX on a white background. The text sits in the center of a clean phone thumbnail.
-
-STYLE: 2-5 words ALL CAPS, punchy. One key word goes in a SOLID RED RECTANGLE. Must be TOPIC-SPECIFIC — extracted from the script.
-BAD: "GAME OVER" (generic, could mean anything)
-GOOD (for OpenAI script): "OPENAI'S HIDDEN PLAN" with HIDDEN in red box
-GOOD (for India space script): "INDIA GOES MARS" with MARS in red box
-
-Generate 5 options — each MUST reference the actual topic/entity from the script:
-- Option 1: "X's [RED WORD] REVEALED" — name the entity
-- Option 2: "[RED WORD] EXPOSED" — the shocking thing
-- Option 3: Short question about the topic
-- Option 4: 2-3 word declaration about the script topic
-- Option 5: Bold claim specific to this script
-
-RULES: ALL CAPS, max 5 words, English only. Return ONLY a JSON array of 5 strings.
-    `;
-  }
-  if (style === 'phone_clean_2') {
-    return `
-You are a thumbnail copywriter for "Phone Clean 2" style — sitting presenter with lapel mic on right, phone on left, BOLD TEXT center on white background. One key word appears in a RED RECTANGLE.
-
-STYLE: 2-5 words ALL CAPS. Must be TOPIC-SPECIFIC — read the script and name the actual person/brand/event/country.
-BAD: "THE REAL PLAN" (generic, no info)
-GOOD (for Tesla script): "TESLA'S REAL PLAN" with REAL in red box
-GOOD (for India script): "INDIA'S SECRET EXPOSED" with SECRET in red box
-
-Generate 5 options — each MUST be specific to the script's topic:
-- Option 1: "[ENTITY]'S [RED WORD]" — entity name + key concept
-- Option 2: "[RED WORD] EXPOSED" — shocking reveal
-- Option 3: "WHY [ENTITY] [VERB]?" — question format
-- Option 4: Short verdict about the topic
-- Option 5: Bold 2-word claim from the script
-
-RULES: ALL CAPS, max 5 words, English only. Return ONLY a JSON array of 5 strings.
-    `;
-  }
-  if (style === 'phone_dual') {
-    return `
-You are a thumbnail copywriter for "Phone Dual" style — two phones showing characters, giant question/claim in center.
-
-STYLE: 2-5 words MAX. Must work as a huge question OR bold revelation. Should make people think "wait, what?"
-
-Generate 5 options:
-- Option 1: Short question "DO X EXIST?"
-- Option 2: Shocking question "IS X REAL?"
-- Option 3: Bold claim "X IS REAL"
-- Option 4: Conspiracy hook "X KNOWS"
-- Option 5: Wild reveal "X EXPOSED"
-
-RULES: ALL CAPS only, max 5 words, English only. Return ONLY a JSON array of 5 strings.
-    `;
-  }
-  if (style === 'podcast_2') {
-    return `
-You are a thumbnail copywriter for the "Podcast 2" style — two hosts on either side, topic image INSERT in center with colored border. No big bold text overlay — the image insert IS the visual hook.
-
-The "thumbnail text" here describes the CENTER INSERT VISUAL (the topic image inside the colored border), not actual text on screen.
-
-Generate 5 options — each describes what should appear in the center topic insert image:
-- Option 1: The most iconic visual object related to the topic (e.g. "COVID-19 vaccine bottle closeup")
-- Option 2: A dramatic scene visual (e.g. "whiskey being poured into glass, dark moody lighting")
-- Option 3: A symbolic image (e.g. "moon surface with rainbow light beam")
-- Option 4: A controversial or surprising visual (e.g. "multiple adult platform logos side by side")
-- Option 5: A person or face collage related to the topic
-
-Each option should be 4-8 words MAX describing the topic insert image. ALL in plain English. No ALL CAPS needed.
-Return ONLY a JSON array of 5 strings. No markdown.
-    `;
-  }
-  if (style === 'movie_review') {
-    return `
-You are a thumbnail copywriter for a cinematic review/analysis channel. The thumbnail shows a dramatic full-frame background image (movie still, event scene, person, etc.) with a dark GOLD-BORDER box on the left containing the bold yellow hook text.
-
-The thumbnailText = the BOLD YELLOW HOOK TEXT inside the dark gold-border box — the raw honest reaction/opinion. Can be Hindi, English, or Hinglish. Can include 1-2 emojis.
-
-RULES:
-- 3-6 words. Raw, expressive, emotional reaction or punchy opinion.
-- Works for ANY topic — film, book, event, brand, person, sports, documentary.
-- This goes in LARGE BOLD YELLOW inside the dark box — it's the emotional anchor.
-- 5 options, varied tones (loved it, hated it, shocked, funny, emotional)
-- Return ONLY a JSON array of 5 strings. No markdown.
-
-EXAMPLES (tone only):
-- "DHOKA HUA 💔 MERE SATH"
-- "NOT INDIAN 😱 ENOUGH"
-- "WTF BHAI 🔥 RULA DIYA"
-- "PAISA VASOOL HAI YAR"
-- "MIND BLOWN 🤯 SERIOUSLY"
-    `;
-  }
-  if (style === 'corkboard_meta') {
-    return `
-You are a thumbnail copywriter for the "Corkboard Meta" style — a cork bulletin board background with a smaller YouTube thumbnail PINNED to it, with annotation labels pointing to its elements.
-
-The thumbnailText = the TWO-WORD TITLE shown in the BLUE TOP BANNER. Format: "[YELLOW WORD] White Word"
-— first word gets a YELLOW BOX, remaining words are white on the blue banner.
-
-RULES:
-- 2-4 words total that work as a big bold banner title
-- First word in [YELLOW BOX] format using [BRACKETS]: "[Viral] Formula", "[Secret] Structure", "[Hidden] Formula"
-- Choose words that evoke a "formula revealed" feeling
-- Extract from the actual topic/script
-- 5 options, varied angles
-- Return ONLY a JSON array of 5 strings with FIRST WORD in [BRACKETS]. No markdown.
-    `;
-  }
-  if (style === 'podcast_4') {
-    return `
-You are a thumbnail copywriter for the "Viral Tweet / Scandal Documentary" style. The CENTER of the thumbnail is a giant social media post screenshot showing the shocking reveal text.
-
-The thumbnailText = the BIG DRAMATIC TEXT that appears inside the social media post — the actual shocking message that was posted.
-
-RULES:
-- 2-5 words maximum. Sounds like something a founder/celebrity actually posted/said.
-- Emotional, final, shocking — like a last message: "I Quit...", "It's Over", "I'm Sorry", "Goodbye Everyone", "I Failed You"
-- Can include ellipsis (...) for drama
-- Extract from actual script content — what was the viral/famous thing that was said or posted?
-- 5 options, varied emotional angles
-- Return ONLY a JSON array of 5 strings. No markdown.
-    `;
-  }
-  if (style === 'podcast_3') {
-    return `
-You are a thumbnail copywriter for the "Podcast Quote" style — deep red gradient background, speaker face RIGHT, bold statement sentence LEFT with ONE word in a YELLOW HIGHLIGHT BOX.
-
-The thumbnailText = the BIG STATEMENT SENTENCE that appears on the left. Format using [BRACKETS] around the ONE word that gets the yellow box highlight.
-
-RULES:
-- Write a bold 4-8 word statement or quote — sounds like the guest actually said it
-- ONE key word wrapped in [BRACKETS] — the most shocking/impactful/interesting word
-- That bracketed word gets a SOLID YELLOW RECTANGLE with BLACK text — this is the visual hook
-- Rest of the sentence is in large white text
-- Examples:
-  - "Bitcoin is [BULLSH*T]"
-  - "They want to [STEAL] your Crypto!"
-  - "Impatience keeps you [Broke.]"
-  - "[Just Buy This.]"
-- Extract the most shocking claim/word from the actual script topic — never generic
-- 5 options, each a different angle on the script's main claim
-- Return ONLY a JSON array of 5 strings. No markdown.
-    `;
-  }
-  if (style === 'cinematic_drama') {
-    return `
-You are a thumbnail visual director for the "Cinematic Drama" style — NO text or MINIMAL text on thumbnail. The entire story is told through dramatic visuals, extreme close-ups, and multi-layer compositing.
-
-"thumbnailText" here = ONE optional short element (a quote in quotes, a single word, or EMPTY). Not a headline — just the rare piece of text that belongs naturally in the scene.
-
-Generate 5 options:
-- Option 1: Leave empty "" — pure visual, no text at all
-- Option 2: A short 2-4 word QUOTE in "quotes" as if a character said it (e.g. "God said pull")
-- Option 3: A single dramatic word/name label (e.g. "EXPOSED" or a character name)
-- Option 4: Leave empty "" — another pure visual variation
-- Option 5: A very short ironic/funny contrast label (e.g. "Meanwhile..." or "But why?")
-
-RULES: If text, keep it 1-4 words MAX. English only. Return ONLY a JSON array of 5 strings.
-    `;
-  }
-  if (style === 'news_dramatic') {
-    return `
-You are a thumbnail copywriter for Indian breaking news thumbnails (Career247 / ABP style). The thumbnail shows TWO stacked text blocks on the LEFT side:
-- Block 1 (SOLID BLUE BOX): The main shocking headline — 3-6 words ALL CAPS
-- Block 2 (dark background): The secondary twist/consequence — 3-6 words ALL CAPS
-
-Generate 5 paired options. Each option = "HEADLINE | SUBHEADLINE" (pipe-separated, both ALL CAPS).
-
-RULES:
-- Both parts must be topic-specific — extracted from the actual script. NO generic phrases.
-- Headline = the main shocking event (e.g. "ISRAEL ATTACKS IRAN!!")
-- Subheadline = the consequence or second twist (e.g. "HUMILIATION FOR TRUMP!!")
-- Max 6 words each part. ALL CAPS. English only.
-- GOOD: "MOSCOW BURNING!! | BLACK RAIN ON PUTIN??"
-- GOOD: "IRAN HITS US HARD!! | TRUMP IN SHOCK!!"
-- Return ONLY a JSON array of 5 strings in format "HEADLINE | SUBHEADLINE". No markdown.
-    `;
-  }
-  // podcast / default
-  return `
-You are a world-class YouTube thumbnail copywriter. Your job: write BIG BOLD TEXT for a podcast-style thumbnail.
-
-STYLE: Shocking, curiosity-driven, high-energy — Joe Rogan / MrBeast energy. Makes you stop scrolling.
-
-CRITICAL RULE — TOPIC SPECIFICITY:
-The text must hint at the actual topic/person/revelation from the script. Pure generic shock with no content hook is weak.
-BAD: "Gone FOREVER" (could be anything)
-GOOD: "He LEFT It All..." (topic: someone who quit everything)
-BAD: "The Truth REVEALED"
-GOOD: "The REAL Story Finally" (still vague but slightly better — prefer specific)
-
-Generate exactly 5 options with VARIETY:
-- Option 1: Shocking revelation about THIS topic (e.g. "He Knew All Along...")
-- Option 2: Explosive question (e.g. "She Said WHAT To Him?!")
-- Option 3: The bombshell moment (e.g. "It's OVER For Real")
-- Option 4: Raw honest reaction (e.g. "Nobody Saw This Coming!")
-- Option 5: Censored shock (e.g. "That Was F***ING Crazy") — only if warranted
-
-RULES:
-- Maximum 4-6 words each
-- ALL CAPS for 1-2 shock words
-- Ellipsis (...) or !? for drama
-- Censored style (F***ING, SH*T) only if content warrants
-- ALWAYS write in English only — do NOT use Hindi or Hinglish
-- Return ONLY a valid JSON array of exactly 5 strings. No markdown.
-  `;
-};
-
-export const generateThumbnailText = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'podcast'): Promise<string[]> => {
-  const ai = getAi();
-
-  const variationSeed = Math.floor(Math.random() * 9999);
-  const prompt = `
-    ${getThumbnailTextStylePrompt(videoStyle)}
-
-    Generate completely fresh thumbnail text options — do NOT repeat any previously generated options. Variation seed: ${variationSeed}.
-
-    Content:
-    ${scriptText}
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: prompt,
-      config: {
-        temperature: 1.2,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
-      }
-    });
-
-    if (!response.text) throw new Error("No response from Gemini");
-    let jsonText = response.text;
-    jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonText);
-  } catch (error: any) {
-    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
-      throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
-    }
-    console.error("Error in generateThumbnailText:", error);
-    throw error;
-  }
-};
-
-export const generateTitleTextPair = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<{ title: string; thumbnailText: string; description: string }[]> => {
-  const ai = getAi();
-
-  const styleGuide = videoStyle === 'situational'
-    ? `STYLE — Situational / Personal Story:
-TITLE RULES:
-- Tell a SPECIFIC personal story hook. Use real numbers/timeframes/emotions. 55-70 chars.
-- MUST feel like the person is confessing something shocking or deeply personal.
-- BAD: "A Lot Happened In My Life" (too vague)
-- GOOD: "I Found Out After 3 Years — My Company Was Destroying Me"
-- GOOD: "Rs 40 Lakh Gone In One Night — Never Make This Mistake"
-
-THUMBNAIL TEXT RULES:
-- 2-4 words. ALL CAPS. The EMOTIONAL PUNCH that the title builds toward.
-- Must ADD a new dimension, never repeat title words.
-- BAD: "LIFE RUINED" (repeats title idea)
-- GOOD (for "lost money" title) → "NO ESCAPE" / "TRUTH HIDDEN" / "TOO LATE NOW"
-- Together they hint at a story bigger than either alone.
-
-DESCRIPTION RULES — brief for the AI image generator:
-- ONE person only, RIGHT SIDE of frame, mid-shot, looking slightly left toward the text
-- Describe EXACTLY who this person is from the script (age, gender, build, clothing, emotional state — e.g. "stressed 35-year-old Indian man in plain shirt, looking down defeated")
-- BACKGROUND: dark moody color matching the emotion (deep charcoal, dark red, dark teal) — NOT white, NOT generic
-- TEXT: thumbnailText in bold ALL CAPS LEFT SIDE, 2-3 lines, yellow or white on dark background
-- Include 1 topic-specific prop if relevant (e.g. "laptop showing red loss graph", "torn documents on table", "empty wallet")`
-
-    : videoStyle === 'debate'
-    ? `STYLE — Debate / Two Sides:
-TITLE RULES:
-- Name the TWO SPECIFIC sides clearly. Real names, real stakes, real tension. 55-70 chars.
-- MUST create a "who's right?" tension the viewer wants resolved.
-- BAD: "Is Hustle Culture Right?" (no stakes, too safe)
-- GOOD: "Sandeep Maheshwari vs Vivek Bindra — Who Is Actually Telling The Truth?"
-- GOOD: "Delhi vs Mumbai: Who Makes More Money And Why?"
-
-THUMBNAIL TEXT RULES:
-- 2-4 words. CONFRONTATIONAL CAPS. Name one side's verdict or the clash itself.
-- BAD: "BIG FIGHT" (generic)
-- GOOD: "BINDRA EXPOSED" / "DELHI WINS" / "BOTH WRONG"
-
-DESCRIPTION RULES — brief for the AI image generator:
-- TWO people on OPPOSITE SIDES of frame, facing each other, confrontational energy
-- Name BOTH people from the script exactly (e.g. "Sandeep Maheshwari on left, Vivek Bindra on right")
-- CENTER: thumbnailText in BOLD CAPS between them, 1-2 lines, red or yellow
-- Background: dark dramatic (red/orange split or dark grey), high energy tension
-- Expression: both looking intense/confrontational — like they're about to clash`
-
-    : videoStyle === 'explained'
-    ? `STYLE — Explained / Educational YouTube:
-TITLE RULES:
-- NAME the exact topic, book, person, country, or concept directly. No vague hooks. 55-75 chars.
-- Conversational — like a friend saying "let me explain this to you…"
-- BAD: "A Book That Changes Everything" (no name)
-- GOOD: "48 Laws of Power — The Book That Changed How The World Works"
-- GOOD: "The Real Truth About The Israel-Hamas War — What Media Won't Tell You"
-
-THUMBNAIL TEXT RULES:
-- 2-4 words CAPS. NAME the core concept or drop the most shocking fact.
-- BAD: "MUST WATCH" (says nothing)
-- GOOD: "48 LAWS" / "WAR TRUTH" / "REAL REASON" / "HIDDEN TRUTH"
-
-DESCRIPTION RULES — brief for the AI image generator:
-- ONE large person/face RIGHT SIDE of frame, mid-shot or close-up, photorealistic
-- NAME the exact person from the script (or describe type if unnamed: "stressed 40-year-old Indian man in suit")
-- BACKGROUND: dark dramatic (charcoal, deep blue, or topic-specific color) + relevant topic visual element behind/beside them
-- TEXT: thumbnailText in bold CAPS LEFT SIDE, 2-3 lines, white or yellow
-- Add the key visual prop or scene from the script (e.g. "book cover in hand", "map of Israel-Hamas behind them", "stock chart on screen behind")`
-
-    : videoStyle === 'phone_studio'
-    ? `STYLE — Phone Studio (Phone Screen + Celebrity Face + Big Red/White Text):
-TITLE RULES:
-- Ultra-short, catchy, viral-Shorts energy. 35-55 chars MAX.
-- ALWAYS name the celebrity / featured person from the script in the title (e.g. "Joe Rogan", "Trump", "Elon Musk").
-- Format options: bold question / shock claim / reveal. Pick whichever hits hardest for THIS script.
-- BAD: "An Interesting Take On Aliens" (no name, no punch)
-- GOOD: "Do Aliens Exist? — Joe Rogan Reveals The Truth"
-- GOOD: "Elon Musk Wants Data Centers On The Moon"
-- GOOD: "Trump: War Phase Won Again"
-
-THUMBNAIL TEXT RULES:
-- 2-5 word ALL CAPS punch — fits inside the central red+white impact text block.
-- A short QUESTION ("ALIENS REAL?") or a SHOCK DECLARATION ("WAR PHASE WON").
-- The CELEBRITY NAME from the title goes on the PHONE STATUS BAR, NOT in the big text — so the big text is the topic hook, not the person.
-- Title + thumbnail text together should feel like one viral combo where the text is the visual stinger.
-- BAD: thumbnail text = same words as title (echoes)
-- GOOD pair: title "Do Aliens Exist? — Joe Rogan Reveals The Truth" + text "DO ALIENS EXIST?"
-- GOOD pair: title "Elon Musk Wants Data Centers On The Moon" + text "SHIFT DATA TO MOON"
-- GOOD pair: title "Trump: War Phase Won Again" + text "WAR PHASE WON!"
-
-DESCRIPTION RULES — write the BRIEF for an AI image generator. MUST include:
-- The CELEBRITY NAME so the generator places the right face on the right side of the phone (e.g. "celebrity: Joe Rogan, late 50s, bald, grey goatee, black t-shirt")
-- The PHONE SCREEN content — a topic-specific image showing on the phone (e.g. "phone screen shows a glowing alien face / a moon with data servers / war battlefield")
-- The BIG TEXT on screen (matches thumbnailText, ALL CAPS, white + red split)
-- Background = pure black or very dark grey, cinematic.
-- Keep it 3-5 sentences, actionable for an image model.`
-
-    : videoStyle === 'phone_clean'
-    ? `STYLE — Phone Clean (White background, phone left, bold text center-right):
-TITLE RULES:
-- Short & punchy, reveals a hidden truth or secret about the SPECIFIC topic in the script. 40-60 chars.
-- MUST name the exact entity (company, person, tech, country, event) from the script — no generic titles.
-- BAD: "Something Shocking Is Happening" (zero info, could be anything)
-- GOOD (for OpenAI script): "OpenAI's Hidden Plan Nobody Told You About"
-- GOOD (for India space script): "India's Secret Space Mission Just Got Exposed"
-
-THUMBNAIL TEXT RULES:
-- 2-5 words ALL CAPS. One key word goes in a SOLID RED RECTANGLE. Extract from the script topic.
-- The boxed word = the most shocking/secret element FROM THIS SCRIPT.
-- BAD: "HIDDEN AGENDA" (generic) — GOOD: "OPENAI'S [HIDDEN] PLAN" / "INDIA'S [SECRET] MISSION"
-
-DESCRIPTION RULES — brief for the image generator:
-- Pure white background (#FFFFFF)
-- Left: realistic iPhone with topic-specific image on screen + caller name "Speaking"
-- Center: bold ALL CAPS 3-line text, one line in SOLID RED RECTANGLE with white text
-- Right: half-body presenter figure with concerned/intrigued expression facing left
-- Clean, minimal, professional feel.`
-
-    : videoStyle === 'phone_clean_2'
-    ? `STYLE — Phone Clean 2 (White background, phone left, SITTING presenter with LAPEL MIC right):
-TITLE RULES:
-- 40-60 chars. Direct, reveals insider info about the SPECIFIC topic from the script.
-- MUST name the exact entity from the script — never vague or generic.
-- BAD: "The Truth Nobody Knows" (no entity, zero info)
-- GOOD (for Tesla script): "The Real Reason Tesla Fired Half Its Engineers"
-- GOOD (for India script): "India's Secret Plan That America Fears"
-
-THUMBNAIL TEXT RULES:
-- 2-5 words ALL CAPS. One key word in SOLID RED RECTANGLE. Must be TOPIC-SPECIFIC.
-- Extract the most shocking element from THIS script's topic.
-- BAD: "THE REAL PLAN" (generic) — GOOD: "TESLA'S [REAL] PLAN" / "INDIA [GOES] NUCLEAR"
-
-DESCRIPTION RULES — brief for the image generator:
-- Pure white background (#FFFFFF), clean minimal
-- Left: realistic iPhone portrait with topic-specific image on screen + caller name "Speaking"
-- Center: bold ALL CAPS 3-line impact text, middle line in SOLID RED RECTANGLE
-- Right: SITTING presenter in chair/stool — upper body, clip-on LAPEL MIC visible on shirt/lapel, facing left toward text, confident expression
-- Lapel mic detail: small silver/black clip microphone on chest, realistic and clearly visible
-- No separate background behind the presenter — clean cut-out on white`
-
-    : videoStyle === 'phone_dual'
-    ? `STYLE — Phone Dual (Two phones side by side, topic text center):
-TITLE RULES:
-- Question format works best: "Do X Exist?", "Does Y Know About Z?", "X vs Y — Who's Right?"
-- Name BOTH characters if the script has them. 40-65 chars.
-- GOOD: "Do Aliens Exist? Trump Calls To Find Out"
-- GOOD: "Elon Calls Putin: What Did They Really Say?"
-
-THUMBNAIL TEXT RULES:
-- 2-4 words. Giant bold ALL CAPS center text. Works best as a question or single shocking fact.
-- GOOD: "DO ALIENS EXIST?" / "IS THIS REAL?" / "THEY KNOW"
-
-DESCRIPTION RULES — brief for the image generator:
-- Light gray/white gradient background
-- LEFT phone: Character 1 (speaking) — their photo on screen, "Speaking" green dot indicator
-- RIGHT phone: Character 2 (listening) — their photo or blue listening circle on screen
-- CENTER: Giant bold impact typography with ONE red word/phrase
-- Two phones slightly angled inward toward the text`
-
-    : videoStyle === 'professor_jiang'
-    ? `STYLE — Breaking News / Current Events Analysis (Fox News Alert style):
-TITLE RULES:
-- NAME the specific country/leader/event/organization. Sound like a breaking news headline. 55-70 chars.
-- MUST include: WHO did WHAT and WHY it matters — like a news editor wrote it.
-- BAD: "Something Big Is About To Happen In The World" (zero information)
-- BAD: "Trump Did Something" (too vague)
-- GOOD: "Trump Just Put 145% Tariffs On China — What Does This Mean For India?"
-- GOOD: "Fed Refused To Cut Rates — Why Hasn't The Dollar Crashed Yet?"
-- GOOD: "Russia-Ukraine Deal — What Are Putin's Real Demands?"
-- GOOD: "China Backed Down — Is This America's Victory Or A Trap?"
-
-THUMBNAIL TEXT RULES:
-- 2-4 words ALL CAPS. Must be a FOX NEWS ALERT chyron — shocking, declarative, punchy.
-- Pick the MOST EXPLOSIVE outcome/actor/fact FROM THIS SPECIFIC SCRIPT. Make the viewer feel dread or urgency.
-- BAD: "BIG NEWS" / "BREAKING" / any phrase that could apply to ANY topic (too generic)
-- The text MUST be invented fresh from the script — do NOT copy or reuse example phrases below. Examples are only to show the TONE and STRUCTURE, not the words.
-- TONE CATEGORIES (use as inspiration for structure only — create your own words from the script):
-  Defeat/Surrender tone: "[ACTOR] TRAPPED" / "[COUNTRY] SURRENDERED" / "[PARTY] CORNERED"
-  Economy/Currency tone: "[CURRENCY] CRASHES" / "[INSTITUTION] FAILED" / "[MARKET] COLLAPSED"  
-  War/Deal tone: "[DEAL NAME] BROKEN" / "LAST [X]" / "NO RETURN"
-  Power-shift tone: "[WINNER] WINS" / "[LOSER] FALLS" / "[COUNTRY] RISES"
-  Urgency tone: "TOO LATE" / "IT ENDS" / "POINT CROSSED"
-- Each combo must generate a DIFFERENT thumbnail text — never repeat the same phrase across the 3 combos.
-- Together = feels like a BREAKING STORY viewers CANNOT ignore.
-
-DESCRIPTION RULES — brief for the AI image generator:
-- Fox News Alert chyron style: bold red BREAKING NEWS banner at bottom, dark blue/grey background
-- LARGE face of the real political figure/analyst from this script — named specifically (e.g. "Trump, 78, silver hair, dark suit, shocked expression")
-- Behind them: topic-specific background image (e.g. "US-China trade war map", "burning Ukrainian city", "Federal Reserve building")
-- thumbnailText as a bold chyron bar at the bottom — white text on dark red rectangle
-- High contrast, news broadcast aesthetic`
-
-    : videoStyle === 'podcast_2'
-    ? `STYLE — Podcast 2 (Two real hosts + center topic image insert with colored border):
-TITLE RULES:
-- Conversational, specific — sounds like two real people reacting to something. 55-75 chars.
-- NAME the specific topic, guest, or thing being discussed — never generic.
-- GOOD: "Joe Rogan and Guest React To Moon Landing Evidence"
-- GOOD: "Trump's Real Opinion On Drinking — Shocking Reveal"
-- GOOD: "The Truth About COVID Vaccines — No Filter Conversation"
-
-THUMBNAIL TEXT RULES:
-- Not actual on-screen text — describe the CENTER INSERT IMAGE visual (what goes inside the colored border box).
-- 4-8 words describing the topic-specific image that appears in the center insert.
-- Must be a clear, photorealistic, visually striking image description.
-- GOOD: "COVID-19 vaccine bottle held by gloved hand"
-- GOOD: "whiskey being poured into crystal glass"
-- GOOD: "moon surface with rainbow light beam from space"
-
-DESCRIPTION RULES — brief for the AI image generator:
-- Background: blurred warm podcast studio with equipment
-- LEFT SIDE: Name the real host from the script (e.g. "Joe Rogan, bald, black t-shirt, facing right with mic")
-- RIGHT SIDE: Name the real guest from the script (e.g. "Elon Musk, dark suit, facing left with mic, reacting expression")
-- CENTER INSERT: Thick colored border box with a SPECIFIC topic image inside — describe the exact image from this script topic (e.g. "Tesla Cybertruck in flames", "COVID-19 vaccine vial glowing", "glowing moon surface with data server")
-- Border color: green (science/space), red (political/war), cyan (health/tech), orange (entertainment) — pick based on topic`
-
-    : videoStyle === 'movie_review'
-    ? `STYLE — Cinematic Review (full dramatic background image + dark gold-border box with bold yellow hook text on left):
-TITLE RULES:
-- Opinionated, punchy tone. NAME the specific topic (film, book, brand, event, person). 45-70 chars.
-- Can be Hindi/English/Hinglish. Can use emojis. Works for any topic, not just movies.
-- GOOD: "Krishnavataram Review: Dhoka Hua Mere Saath 💔"
-- GOOD: "Ramayana Movie — Not Indian Enough? My Honest Take 😱"
-- GOOD: "Jolly LLB 3 Review: WTF Bhai Rula Diya 🔥"
-- GOOD (non-movie): "Apple's Biggest Failure — Full Story 🤯"
-
-THUMBNAIL TEXT RULES:
-- 3-6 words raw reaction/hook in LARGE BOLD YELLOW inside a dark gold-border box. Can be Hindi/Hinglish + emoji.
-- GOOD: "DHOKA HUA 💔 MERE SATH" / "WTF BHAI 🔥 RULA DIYA" / "NOT INDIAN 😱 ENOUGH"
-- Extract from the actual topic/sentiment in the script.
-
-DESCRIPTION RULES — brief for the AI image generator:
-- BACKGROUND: Describe the EXACT scene from this specific topic (e.g. "Ranbir Kapoor as Ram in Ramayana epic temple scene, golden hour lighting" OR "Steve Jobs in black turtleneck on Apple stage, spotlight" — NOT generic)
-- LEFT-CENTER: Dark semi-transparent box with GOLD border. Inside TOP: topic name in small white caps. MIDDLE: thumbnailText in LARGE BOLD YELLOW. BOTTOM: content type label (MOVIE REVIEW / DEEP DIVE / FULL STORY / etc.)
-- No host/reviewer face — background scene only
-- Cinematic color grade matching THIS topic's specific mood`
-
-    : videoStyle === 'corkboard_meta'
-    ? `STYLE — Corkboard Meta (blue top banner + cork board bg + annotated thumbnail pinned + presenter face right):
-TITLE RULES:
-- Meta educational / formula-reveal tone. 50-70 chars. Names what's being broken down.
-- GOOD: "The Viral Formula Behind Every 10M View Podcast Thumbnail"
-- GOOD: "Why DOAC Thumbnails Always Go Viral — Broken Down"
-- GOOD: "How MrBeast Designs Thumbnails That Get Billions Of Views"
-
-THUMBNAIL TEXT RULES:
-- 2-4 words for the BLUE TOP BANNER. First word in [BRACKETS] gets YELLOW BOX on blue.
-- GOOD: "[Viral] Formula", "[Secret] Structure", "[Hidden] Blueprint", "[Real] Strategy"
-
-DESCRIPTION RULES — brief for the AI image generator:
-- TOP BANNER: Bright blue horizontal bar full width, top 12% of frame — holds the banner title (yellow box first word + white bold remaining words)
-- BACKGROUND (below banner): Cork/bulletin board texture — warm tan/brown, natural cork material, realistic texture fills entire remaining frame
-- CENTER-LEFT: A smaller YOUTUBE THUMBNAIL pinned to the cork board with a red pushpin at the top center — the mini thumbnail shows two podcast hosts with bold text overlay (any podcast style). The mini thumbnail is slightly tilted (~3°)
-- ANNOTATION LABELS on the mini thumbnail: 3 glitchy/pixelated red-orange label boxes with white text — "Subject" (pointing to left person), "Hook" (pointing to text), "Caption" (pointing to bottom) — connected by thin red lines/arrows to their targets
-- RIGHT SIDE (40%): Presenter face — young professional, thoughtful expression, chin on hand or pointing gesture, looking at the cork board area, clean cut-out against the cork texture`
-
-    : videoStyle === 'podcast_4'
-    ? `STYLE — Viral Tweet / Scandal Documentary (dark background, two emotional faces, giant social media post center):
-TITLE RULES:
-- Documentary/exposé tone. Name the real person, brand, or event. 55-80 chars.
-- GOOD: "The Café Coffee Day Founder's Last Tweet Before He Disappeared"
-- GOOD: "How One Tweet Ended India's Biggest Coffee Chain"
-- GOOD: "When A Founder's 'I Quit' Post Shocked The Entire Country"
-
-THUMBNAIL TEXT RULES:
-- The actual shocking post/message shown INSIDE the social media screenshot. 2-6 words MAX.
-- Must feel like a REAL social media post someone actually wrote — TOPIC-SPECIFIC to the script.
-- NEVER use "EXPOSED" or any generic word — the text must come from the actual drama in the script.
-- Finance/Business: "We're Filing Bankruptcy", "I Lost Everything", "The Company Is Over"
-- Resignation/Quit: "I Quit...", "I Resign Today", "It's Over For Me"
-- Personal crisis: "I Failed My Family", "I Can't Do This Anymore", "I'm Sorry Everyone"
-- Political: "I Resign Effective Today", "They Forced Me Out", "This Is My Last Post"
-- Relationship: "She Left Me", "I Lied To You All", "It Was All Fake"
-- Death/Loss: "He's Gone. I Tried.", "I Couldn't Save Him"
-- Always extract from the ACTUAL turning point event in the script — what was the viral/real message?
-
-DESCRIPTION RULES — brief for the AI image generator:
-- Background: very dark charcoal/near-black with slight vignette
-- LEFT: Name the actual subject person from the script (e.g. "V.G. Siddhartha, founder of Café Coffee Day — close-up face, tears, devastated expression"). Thick BLACK CENSOR BAR over eyes with topic-specific word (NOT "EXPOSED" — e.g. "BANKRUPT", "SU*CIDE", "RUINED")
-- CENTER: Large social media post screenshot — real account name from script, thumbnailText as GIANT BOLD post message, red underline, realistic timestamp
-- RIGHT: Name the narrator/reactor from the script if known, otherwise "serious young narrator, concerned expression"
-- Overall: dark, investigative, documentary scandal feel — name all real people and events from script`
-
-    : videoStyle === 'podcast_3'
-    ? `STYLE — Podcast Quote (deep red background, speaker face right, bold statement left with yellow highlight word):
-TITLE RULES:
-- Sounds like the guest actually said something shocking. 55-75 chars. Name the speaker + claim.
-- GOOD: "Scaramucci Said Bitcoin Is Complete Bullsh*t — Here's Why He Changed"
-- GOOD: "Raoul Pal: Impatience Is Literally Keeping You Broke"
-- GOOD: "They Are Actively Trying To Steal Your Crypto — Here's How"
-
-THUMBNAIL TEXT RULES:
-- A 4-8 word bold statement sentence with [BRACKETS] around ONE key word that gets the YELLOW BOX.
-- The bracketed word = the most shocking/impactful element of the sentence.
-- Extract from the actual script topic — never generic.
-- GOOD: "Bitcoin is [BULLSH*T]"
-- GOOD: "They want to [STEAL] your Crypto!"
-- GOOD: "Impatience keeps you [Broke.]"
-- GOOD: "[Just Buy This.]"
-
-DESCRIPTION RULES — brief for the AI image generator:
-- Background: deep rich crimson red gradient (#8B0000 → #CC0000)
-- LEFT 45%: thumbnailText as big statement — white text with ONE word in SOLID YELLOW BOX. Below: "- [Speaker's real name from script] →" italic attribution line
-- Optional topic prop: if finance/crypto, faint candlestick chart behind text; if health, subtle medical visual; if politics, faint flag
-- RIGHT 55%: Name the actual speaker/guest from the script (e.g. "Raoul Pal, grey-haired economist, serious expression, podcast microphone visible"). Photorealistic, clean cutout on red background
-- No logo or watermark. Describe any topic-specific element that makes this visually unique to the script`
-
-    : videoStyle === 'cinematic_drama'
-    ? `STYLE — Cinematic Drama (Bollywood / thriller / drama — NO text or MINIMAL text, pure visual storytelling):
-TITLE RULES:
-- Cinematic, story-driven, sounds like a film title or dramatic reveal. 55-80 chars.
-- MUST name the specific person, film, or event from the script.
-- GOOD: "Ranbir Kapoor Destroys Avatar & Avengers — Here's Why"
-- GOOD: "The Dark Truth Behind Punjab's Drug Mafia Nobody Talks About"
-- GOOD: "When God Said Pull The Lever — The Trolley Problem Explained"
-
-THUMBNAIL TEXT RULES:
-- This is NOT a headline. It is either EMPTY or a single short element that appears naturally in the visual.
-- Option A: "" (empty — pure visual thumbnail, zero text)
-- Option B: A short QUOTE in "quotes" as a character would say it: e.g. "God said pull"
-- Option C: A single dramatic word if absolutely needed: "EXPOSED"
-- DEFAULT to "" (empty) unless a quote or single word would dramatically add to the visual.
-
-DESCRIPTION RULES — brief for the AI image generator:
-- ZERO TEXT unless thumbnailText has a quote — if so, tiny white text top-left corner only
-- RIGHT SIDE: EXTREME CLOSE-UP of the main character from this script — name them specifically (e.g. "Ranbir Kapoor, intense bloodshot eyes, bruised face, dark lighting"). Face fills 40-50% of frame
-- BACKGROUND/LEFT: Describe the exact topic-specific dramatic scene from the script (e.g. "Punjab drug mafia dealing scene in a dark alley at night", "courtroom with judges", "battlefield with tanks")
-- Cinematic color grade specific to this topic's mood (e.g. "teal-orange Bollywood poster grade", "cold blue thriller grade", "warm golden drama grade")
-- Multi-layer depth: foreground face + middle scene + background environment — photorealistic film still quality`
-
-    : videoStyle === 'news_dramatic'
-    ? `STYLE — News Dramatic (Career247 / ABP / India TV breaking news thumbnail):
-TITLE RULES:
-- Hard-hitting breaking news headline. NAME the specific event + person + consequence. 55-75 chars.
-- Format: "[Shocking Event]!! — [Consequence/Twist]" works perfectly.
-- GOOD: "Israel Attacks Iran!! — Humiliation For Trump!!"
-- GOOD: "Moscow Burning!! — Why Black Rain On Putin??"
-- GOOD: "Pakistan Increases Defence Budget By 18%!! — War With India Near??"
-
-THUMBNAIL TEXT RULES:
-- Two stacked blocks — format: "HEADLINE | SUBHEADLINE" (pipe-separated, ALL CAPS, max 5 words each)
-- Headline (BLUE BOX — top): the main shocking event in 2-4 ALL-CAPS words. Very short, punchy.
-- Subheadline (dark box — below): the consequence or reaction in 2-5 ALL-CAPS words.
-- BOTH must come from the actual script — never generic fillers like "BIG NEWS" or "BREAKING"
-- GOOD: "INDIA STRIKES BACK!! | PAKISTAN IN SHOCK!!"
-- GOOD: "MARKET CRASHES!! | DOLLAR AT 90!!"
-- GOOD: "TRUMP BANS INDIA | WAR IMMINENT??"
-- The AI will also auto-derive better topic-specific headline/subheadline from the script during image generation
-
-DESCRIPTION RULES — brief for the AI image generator:
-- BACKGROUND: Describe the EXACT topic-specific scene from this script (e.g. "Indian Air Force jets firing missiles at night over Pakistani border, orange explosion clouds", "US Congress in chaos, senators shouting, American flags", "burning Ukrainian town with black smoke")
-- LEFT TEXT BLOCKS: Blue (#1565C0) rectangle on top with headline, dark charcoal rectangle below with subheadline — both sharp-edged, bold white ALL-CAPS
-- FOREGROUND CENTER: Name the REAL person from this script (e.g. "Donald Trump, 78, silver hair, dark suit, shocked open-mouthed expression") — VERY LARGE, overlapping both text blocks and background
-- Photorealistic, cinematic quality — NOT illustrated
-- NO channel name, NO "By [Name]" text`
-
-    : `STYLE — Podcast / High Energy:
-TITLE RULES:
-- Drop a specific bombshell or reveal. Name names. Use real numbers. 55-65 chars.
-- MUST make viewer feel: "I need to know what happened here"
-- BAD: "The Story Of A Man Who Got Very Rich"
-- GOOD: "He Quit A Rs 2 Crore Job — And Moved Back To His Village. Here's Why."
-- GOOD: "Parag Agrawal Joined Twitter For $5M — Here's What You Don't Know"
-
-THUMBNAIL TEXT RULES:
-- 2-4 words explosive CAPS. Amplifies the title's most shocking element.
-- BAD: "CRAZY STORY" (no info)
-- GOOD: "HE QUIT IT ALL" / "PARAG EXPOSED" / "REAL REASON"`;
 
   const variationSeed = Math.floor(Math.random() * 9999);
   const prompt = `You are India's top viral YouTube content strategist — you've helped channels like NDTV, ABP, Dhruv Rathee, and Ranveer Allahbadia crack 10M+ views with title+thumbnail combos.
 
 YOUR TASK: Read the script carefully. Extract the MOST SHOCKING, SPECIFIC, INTERESTING element. Then write 3 killer combos. Variation seed: ${variationSeed} — generate fresh output every time, never repeat previous runs.
 
-${styleGuide}
+TITLE RULES:
+- SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real from the script: a person, a country, a number, an event, a year. 55-75 chars.
+- BAD: "Something Shocking Happened" (too vague)
+- GOOD: "I Found Out After 3 Years — My Company Was Destroying Me"
+- GOOD: "Trump Just Put 145% Tariffs On China — What Does This Mean For India?"
 
-━━━ GLOBAL RULES (apply to ALL styles) ━━━
-1. SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real from the script: a person, a country, a number, an event, a year.
-2. Each of the 3 combos must approach the SAME topic from a DIFFERENT ANGLE:
+THUMBNAIL TEXT RULES:
+- 2-4 words. ALL CAPS. The emotional punch the title builds toward — must ADD a new dimension, never repeat title words.
+- BAD: "LIFE RUINED" (repeats title idea) — GOOD: "NO ESCAPE" / "TRUTH HIDDEN" / "REAL REASON"
+
+DESCRIPTION RULES — a vivid, photorealistic scene-concept brief for an AI image generator (this becomes the actual generation prompt, not a layout spec):
+- Describe ONE clear, specific, camera-real moment that captures the story: who is in it (age/gender/build/clothing/expression, named exactly if the script names them), what they're doing, where, and the mood/lighting.
+- Make EVERY detail 100% specific to THIS script — never generic ("a stressed person" → "a stressed 35-year-old Indian man in a plain shirt, staring at a laptop showing a red loss graph").
+- Do NOT describe text placement, colors, or layout — that's handled separately. Just the real-world scene/subject.
+- Keep it 2-4 sentences.
+
+━━━ GLOBAL RULES ━━━
+1. Each of the 3 combos must approach the SAME topic from a DIFFERENT ANGLE:
    - Combo 1: Lead with the SHOCKING OUTCOME / consequence
-   - Combo 2: Lead with the MYSTERY / hidden reason ("Real Reason", "The Truth Nobody Says", "What Nobody Mentions")
-   - Combo 3: Lead with the PERSONAL STAKES for the viewer ("What This Means For You", "Why You Should Care", "Your Life Changes")
-3. Thumbnail text MUST complement the title — NEVER echo the same words.
-4. DO NOT copy or reuse example phrases verbatim — all examples in the style guide above are only to show FORMAT and TONE. Your output must be freshly written from the actual script content.
-5. Each of the 3 thumbnail texts must be DIFFERENT from each other — vary the words, angle, and emotional hook.
-6. Language: ALWAYS write titles and thumbnail text in English only — do NOT use Hindi, Hinglish, or any other language, regardless of the script language.
-7. For each combo, write a "description" — a STYLE-SPECIFIC and SCRIPT-SPECIFIC visual brief for an AI image generator. CRITICAL RULES for the description:
-   a. FOLLOW THE DESCRIPTION RULES from the style guide above for layout structure (which element goes where, what colors, what format).
-   b. Make EVERY detail 100% specific to THIS script — NEVER use generic placeholders:
-      - NAME the actual real person/celebrity from the script (e.g. "Donald Trump, 78, silver hair, dark suit" — NOT "a political figure")
-      - DESCRIBE the exact topic-specific scene (e.g. "Indian fighter jets firing over Pakistani border at night, orange explosion glow" — NOT "a dramatic scene")
-      - SPECIFY the exact thumbnail text and where it appears per the style's layout
-      - ADD topic-specific props/elements that make this thumbnail unique to THIS script
-   c. Keep it 3-5 sentences, actionable and specific enough that an image model can execute it without guessing.
-8. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "...", "description": "..."}, ...]
+   - Combo 2: Lead with the MYSTERY / hidden reason ("Real Reason", "The Truth Nobody Says")
+   - Combo 3: Lead with the PERSONAL STAKES for the viewer ("What This Means For You")
+2. Thumbnail text MUST complement the title — NEVER echo the same words.
+3. Each of the 3 thumbnail texts and descriptions must be DIFFERENT from each other.
+4. Language: ALWAYS write titles and thumbnail text in English only — do NOT use Hindi, Hinglish, or any other language, regardless of the script language.
+5. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "...", "description": "..."}, ...]
 
 SCRIPT TO ANALYZE:
 ${scriptText.slice(0, 3500)}`;
@@ -1228,7 +131,7 @@ ${scriptText.slice(0, 3500)}`;
   }
 };
 
-export const generateThumbnailInspiration = async (scriptText: string, videoStyle: ThumbnailVideoStyle = 'situational'): Promise<string> => {
+export const generateThumbnailInspiration = async (scriptText: string): Promise<string> => {
   const ai = getAi();
 
   const prompt = `You are a creative YouTube thumbnail director. Read the script below and write a short, specific thumbnail art direction in 2-4 sentences.
@@ -1236,17 +139,12 @@ export const generateThumbnailInspiration = async (scriptText: string, videoStyl
 SCRIPT (first 2000 chars):
 ${scriptText.slice(0, 2000)}
 
-STYLE: ${videoStyle}
-
 Your output should describe:
-1. WHO should appear (person type, age, gender, look — e.g. "stressed middle-aged man in plain shirt", "young confident woman in business attire", "tired working-class man in his 40s")
+1. WHO should appear (person type, age, gender, look — e.g. "stressed middle-aged man in plain shirt", "young confident woman in business attire", "tired working-class man in his 40s") — or the key topic-specific scene/object if no person fits.
 2. EXPRESSION / MOOD (e.g. "shocked and overwhelmed", "quietly sad", "determined and angry")
 3. BACKGROUND / ATMOSPHERE (e.g. "dark red dramatic background", "moody office blur", "gritty urban night")
-4. TEXT STYLE (e.g. "bold white sans-serif", "yellow highlight box", "red accent on key word")
 
-${videoStyle === 'situational' ? 'Single person composition — person right side, text left side.' : ''}
-
-Write in plain English. No bullet points. No JSON. Just a short, crisp art direction paragraph (2-4 sentences max) that a thumbnail designer can immediately follow.`;
+Write in plain English. No bullet points. No JSON. Just a short, crisp scene description (2-4 sentences max) that an image generator can immediately turn into a photorealistic thumbnail.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -1390,7 +288,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.6-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -2377,6 +1275,46 @@ ${specificDetails}`
             ✓ Har chapter = ek JSON segment. Lambi script khud kai chapters mein bant jaayegi — "Split Script" button baad mein use ho sakta hai
             ✗ Koi dialogue nahi, koi doosra speaker nahi
             ✗ Text ke andar speaker-label mat likho — sirf bolne wala text
+            ✗ Generic filler jaise "is prakar", "ant mein", "yeh zaroori hai" — BANNED
+            ${durFillHi}
+          `;
+        } else if (style === 'viral_recap') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: VIRAL RECAP — HYPE, MEME-ENERGY SOLO TRUE-STORY NARRATION
+            Ek hi narrator, jaise viral internet true-story/scam/heist recap channels — fast,
+            breathless, chatty, jaise koi apne dost ko sabse crazy story excitedly sunata hai.
+            Yeh "Crime Documentary" style ka bilkul OPPOSITE hai (wo somber/ominous hai) —
+            yeh loud, fun, thoda unhinged, full of personality aur reaction wala tone hai.
+            ═══════════════════════════════════════
+            Topic/Story: "${topic}"
+            ${specificDetails ? `Extra context/facts: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: ${language}.
+
+            CHARACTER — केवल 1 narrator:
+            ${speakers.length > 0 ? `Speaker का नाम: ${speakers[0]}` : `Speaker का नाम: "Narrator"`}
+
+            APPROACH:
+            - Agar topic mein real facts/names/numbers diye gaye hain, unhe accurately use karo aur unki wildness pe lean karo. Agar topic generic hai, specific vivid believable details (naam, dollar amounts, dates) invent karo — vague mat raho.
+            - Opening seedhe sabse shocking fact/number se karo, casually, jaise beech baatcheet mein ho — jaise "so this guy is rich, I mean like $230 million rich — because he stole it." Koi warmup nahi, koi "aaj hum baat karenge" nahi.
+            - Isse SPOKEN, transcribed audio jaisa likho, polished prose nahi: run-on sentences "and" se connected, casual fillers ("I mean", "like", "so", "okay so"), sentence fragments punch ke liye, aur beech mein jaan-boojh kar audience-facing asides (jaise "okay real quick ek cheez batana bhool gaya, chalo rewind karte hain").
+            - Sabse bade, jaw-dropping numbers/facts ko EMPHASIS ke liye REPEAT karo — ek baar bolo, phir dobara bolo jaise narrator khud believe nahi kar pa raha (jaise "$230 million... $230 million.").
+            - Apni khud ki story pe react karo jaise sunate ho — rhetorical asides jaise "like damn, kitna drive kar raha hai ye?", "I can't even make this up", "bro really thought—". Narrator ko real, entertained insaan jaisa lagna chahiye, script jaisa nahi.
+            - Jab spending spree/escalation/excess ki list ho, usse item-by-item actually list karo specific numbers ke saath (cars, rent, bottles, gifts) — numbers ki repetition hi entertainment hai, usse summarize karke mat udao.
+            - Jahan fit ho, logon ki real reactions ko unke apne words mein "quote" karo (exclamations, texts) jaise actual audio replay ho raha ho — isse real, sourced story jaisa lagta hai, summary jaisa nahi.
+            - Ek turn ki taraf build karo — wo moment jab sab unravel hone lagta hai — aur ending ko ek dry, matter-of-fact epilogue note ke saath khatam karo (kya confirmed hai vs alleged, aage kya hoga, current status) — moralizing wrap-up nahi.
+
+            RULES:
+            ✓ Sirf 1 narrator — poori story ek continuous, high-energy piece jaisa, tukdon mein todi hui speech jaisa nahi
+            ✓ Tone: excited, casual, funny, thoda chaotic — jaise gossip sunaya ja raha ho, kabhi somber ya slow nahi
+            ✓ Fast pacing — short punchy bursts aur lambe breathless run-ons mix karo, bilkul real spoken storytelling jaisa
+            ✓ Har jagah specific numbers, names, details — vague generalities is style ko kill kar dete hain
+            ✓ Content ko clear CHAPTERS/beats mein organize karo (setup → escalation → turn → aftermath) — har chapter poora aur DETAILED ho
+            ✓ Har chapter = ek JSON segment. Lambi script khud kai chapters mein bant jaayegi — "Split Script" button baad mein use ho sakta hai
+            ✗ Koi dialogue nahi, koi doosra speaker nahi
+            ✗ Text ke andar speaker-label mat likho — sirf bolne wala text
+            ✗ Kabhi bhi formal, documentary, ya news-anchor tone mein mat jao — wo alag style hai
             ✗ Generic filler jaise "is prakar", "ant mein", "yeh zaroori hai" — BANNED
             ${durFillHi}
           `;
@@ -4224,6 +3162,47 @@ ${specificDetails}`
             ✗ Generic filler like "it's important to note", "in conclusion" — BANNED
             ${durFillEn}
           `;
+        } else if (style === 'viral_recap') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: VIRAL RECAP — HYPE, MEME-ENERGY SOLO TRUE-STORY NARRATION
+            One narrator only, in the style of viral internet true-story/scam/heist recap
+            channels — fast, breathless, chatty, like someone excitedly telling their friend
+            the wildest story they just heard. This is the OPPOSITE of a somber documentary
+            voice (that's what "Crime Documentary" is for) — this is loud, fun, a little
+            unhinged, full of personality and reaction.
+            ═══════════════════════════════════════
+            Topic/Story: "${topic}"
+            ${specificDetails ? `Additional context/facts: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            CHARACTER — exactly 1 narrator:
+            ${speakers.length > 0 ? `Speaker name: ${speakers[0]}` : `Speaker name: "Narrator"`}
+
+            APPROACH:
+            - If the topic includes real facts/names/numbers, use them accurately and lean into how wild they are. If the topic is generic, invent specific, vivid, believable details (names, dollar amounts, dates) rather than staying vague.
+            - Open with the SINGLE most shocking fact or number, stated almost casually, like you're already mid-conversation — e.g. "so this guy is rich, I mean like $230 million rich — because he stole it." No warmup, no "today we're talking about...".
+            - Write it like SPOKEN, transcribed audio, not polished prose: run-on sentences connected with "and", casual fillers ("I mean", "like", "so", "okay so"), sentence fragments for punch, and audience-facing asides that break the flow on purpose (e.g. "okay real quick there's one thing I forgot to mention, let's rewind").
+            - For the biggest, most jaw-dropping numbers or facts, REPEAT them for emphasis — say it once, then say it again like the narrator can't quite believe it themselves (e.g. "$230 million... $230 million.").
+            - React to your own story as you tell it — rhetorical asides like "like damn, how much is he even driving?", "I can't even make this up", "bro really thought—". Make the narrator sound like a real, entertained person, not a script.
+            - When there's a spending spree / escalation / list of excess, actually list it out item by item with specific numbers each time (cars, rent, bottles, gifts) — the sheer repetition of numbers IS the entertainment, don't summarize it away.
+            - Where it fits, "quote" people's real reactions in the moment (their own words, exclamations, texts) as if replaying the actual audio — this makes it feel like a real, sourced story rather than a summary.
+            - Build toward a turn — the moment it starts unraveling — and let the ending land with a dry, matter-of-fact epilogue note (what's actually confirmed vs. alleged, what happens next, current status) rather than a moralizing wrap-up.
+
+            RULES:
+            ✓ Only 1 narrator — the entire story, told as one continuous, high-energy piece, not something that reads like it was chopped into disconnected lines
+            ✓ Tone: excited, casual, funny, a little chaotic — like recounting gossip, never somber or slow
+            ✓ Fast pacing — short punchy bursts mixed with long breathless run-ons, exactly like real spoken storytelling
+            ✓ Specific numbers, names, and details everywhere — vague generalities kill this style
+            ✓ Organize the content into clear CHAPTERS/beats (setup → escalation → turn → aftermath) — each chapter complete and DETAILED
+            ✓ One chapter = one JSON segment. A long script will naturally split into several chapters — the "Split Script" button can cut any overly-long one afterward
+            ✗ No dialogue, no second speaker
+            ✗ Do not write speaker labels inside the text itself — just the pure spoken text
+            ✗ Never slip into a formal, documentary, or news-anchor tone — that's a different style
+            ✗ Generic filler like "it's important to note", "in conclusion" — BANNED
+            ${durFillEn}
+          `;
         } else if (style === 'deep_explainer') {
           prompt = `
             ═══════════════════════════════════════════════════════
@@ -5389,1496 +4368,189 @@ const fileToBase64 = (file: File): Promise<string> => {
   return blobToBase64(file);
 };
 
-// ── Step 1: Extract style from reference image (pure inspection, no generation) ──
-const extractStyleFromImage = async (
-  referenceImage: { data: string; mimeType: string }
-): Promise<string> => {
-  const response = await callGemini('gemini-3.6-flash', {
-    parts: [
-      {
-        inlineData: {
-          data: referenceImage.data,
-          mimeType: referenceImage.mimeType,
-        }
-      },
-      {
-        text: `You are a visual style analyst. Inspect this YouTube thumbnail image deeply and extract ONLY its visual style — not its content, people, or topic.
+// ── Thumbnail generation — ported from the sister "PodcastFlux" thumbnail
+// system: one universal style (no per-video-style branching), a real curated
+// thumbnail picked as a visual STYLE reference (best match to the topic, not
+// purely random), and an optional real face photo swapped in as the main
+// subject. ──
 
-Describe the following in precise detail:
+const BASE_THUMB = 'Design a top-tier, agency-grade, scroll-stopping YouTube thumbnail in 16:9 landscape — match the production quality, polish and click-worthiness of the best viral thumbnails from the biggest creators. Unless a specific art style is explicitly requested, lean photorealistic and lifelike — real-camera depth of field, natural skin texture, and a sharp, detailed, expressive face with realistic lighting. Compose it in whatever way best suits the topic — a bold real scene, a dramatic environment, or a clean backdrop — with a strong, clear focal point and real depth; just avoid random, meaningless clutter. Depict the subject and topic accurately. Use dramatic lighting, punchy vibrant colors and strong contrast so it pops even at small sizes. Render at high fidelity — crisp, detailed and clean, with no blur, noise, artifacts, warping or distorted anatomy. Do not add extra text, letters, captions, subtitles, watermarks or gibberish beyond any text that is explicitly requested.';
 
-1. COLOR_PALETTE: Dominant colors, background color, accent colors, overall tone (dark/bright/muted/neon/warm/cold)
-2. TYPOGRAPHY: Font weight (bold/thin), font size on screen (massive/medium/small), text color, text effects (shadow, outline, glow, background box, sticker shape), text placement (top/bottom/center/left/right)
-3. LAYOUT: Position of people (left-right, centered, overlapping), how much of frame they occupy, where text sits relative to people
-4. BACKGROUND: Solid color / gradient / blurred / studio / outdoor / pattern — describe exactly
-5. LIGHTING_MOOD: Dramatic / soft / high-contrast / backlit / flat — describe the lighting feel
-6. FACIAL_EXPRESSION_ENERGY: Shocked / intense / calm / laughing / serious — what emotional vibe
-7. VISUAL_EFFECTS: Any overlays, frames, borders, emoji stickers, censorship bars, watermarks, glows, vignette
-8. THUMBNAIL_STYLE_ARCHETYPE: e.g. "Mr Beast shock face", "Dark dramatic debate", "Clean minimal podcast", "Clickbait emoji", etc.
-
-Return ONLY a structured list — no commentary, no explanation. Be extremely specific about colors (use hex codes if possible), sizes, and positions.`
-      }
-    ]
-  });
-
-  const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return text.trim();
+const TOPIC_HINTS: { re: RegExp; hint: string }[] = [
+  { re: /\b(game|gaming|gameplay|minecraft|fortnite|gta|valorant|fps|roblox|pubg|bgmi)\b/i, hint: 'High-energy gaming look: vivid neon accents, glowing effects, dynamic action framing.' },
+  { re: /\b(money|rich|income|invest|stock|crypto|bitcoin|business|profit|millionaire|earn)\b/i, hint: 'Wealth/finance look: gold and deep-green tones, cash/upward-arrow motifs, confident expression.' },
+  { re: /\b(tech|iphone|android|gadget|ai|coding|developer|laptop|pc|review|unbox)\b/i, hint: 'Clean modern tech look: sleek gradients, cool blue/purple accents, crisp product focus.' },
+  { re: /\b(fitness|gym|workout|muscle|bodybuild|weight ?loss|diet|abs)\b/i, hint: 'Fitness look: strong dramatic rim lighting, energetic pose, bold red/orange accents.' },
+  { re: /\b(food|recipe|cook|cooking|eat|mukbang|kitchen|restaurant)\b/i, hint: 'Mouth-watering food look: warm appetizing light, tight close-up, glossy vivid colors.' },
+  { re: /\b(travel|trip|tour|country|city|adventure|explore|journey|vlog)\b/i, hint: 'Travel look: stunning scenic backdrop, warm golden-hour light, sense of wonder.' },
+  { re: /\b(horror|scary|ghost|haunted|creepy|nightmare|paranormal)\b/i, hint: 'Dark suspenseful horror look: moody shadows, cold eerie lighting, high tension.' },
+  { re: /\b(kids|cartoon|toy|family|nursery|fun)\b/i, hint: 'Playful colorful look: bright cheerful palette, fun exaggerated expressions.' },
+  { re: /\b(story|storytime|drama|exposed|expose|truth|shocking|secret|reaction)\b/i, hint: 'Dramatic storytelling look: expressive shocked face, bold arrows/circles highlighting the key element.' },
+  { re: /\b(tutorial|how to|guide|learn|course|tips|hack)\b/i, hint: 'Clear educational look: clean layout, numbered/step feel, confident presenter, legible callouts.' },
+];
+const topicDirective = (topic: string): string => {
+  const t = topic.trim();
+  if (!t) return '';
+  const hit = TOPIC_HINTS.find(h => h.re.test(t));
+  return hit ? `${hit.hint} ` : '';
 };
 
-export const generateThumbnail = async (title: string, hostName: string, guestName: string, referenceImage?: { data: string, mimeType: string }, extraInstructions?: string, onStep?: (step: 'inspecting' | 'analyzing' | 'generating') => void, videoStyle?: string, scriptText?: string, topicName?: string): Promise<string> => {
+const textDirective = (t: string): string => {
+  const raw = t.trim();
+  if (!raw) {
+    return 'Do NOT render any text, words, letters, captions, labels, numbers or watermarks anywhere on the image — keep it completely clean and text-free.';
+  }
+  const long = raw.split(/\s+/).length > 5;
+  const hook = long
+    ? `distill the idea into a punchy 2-4 word hook (do NOT paste the whole sentence)`
+    : `use it exactly as "${raw}"`;
+  return `Overlay ONE bold, chunky, EXTRA-LARGE uppercase title text — ${hook}. The text color MUST be pure white with a thick solid black outline and a strong drop shadow for maximum contrast. Place it clear of the subject's face and keep it to at most one third of the frame. Render ONLY this single piece of text — absolutely no other words, duplicate captions, subtitles, stray letters or gibberish anywhere else on the image.`;
+};
+
+// Cheap LLM pass producing a vivid, camera-real scene-concept for the
+// thumbnail — only runs when the caller hasn't already supplied one (e.g.
+// the Combo's auto-filled "description", or hand-typed by the user).
+const generateThumbnailConcept = async (scriptText: string, topicName: string, title: string): Promise<string> => {
+  const ai = getAi();
+  const prompt = `You are a YouTube thumbnail art director. Read the context below and write ONE vivid, camera-real scene-concept for a thumbnail — who/what is in it, their expression, and the setting. 2-3 sentences, no bullet points, no JSON, plain English.
+
+TITLE / HOOK: "${title}"
+${topicName ? `TOPIC: ${topicName}\n` : ''}SCRIPT CONTEXT (first 2000 chars):
+${scriptText.slice(0, 2000)}`;
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
+    return response.text?.trim() || '';
+  } catch {
+    return '';
+  }
+};
+
+// Fallback path: LLM-reasoning ranking of the sister project's LIVE style
+// pool by topic/mood fit (their own vector-search RPC is locked to their
+// service role — see styleRefClient.ts), then a Fisher-Yates shuffle across
+// the top matches. Only used if our own copied pool's real vector search
+// (matchStylesVector, tried first in pickBestStyleReference below) comes up
+// empty — e.g. before the pool has been seeded, or if it's unreachable.
+const pickBestStyleReferenceByLLMRanking = async (topicQuery: string): Promise<{ data: string; mimeType: string } | null> => {
+  try {
+    const pool = await fetchStylePoolMeta();
+    if (!pool.length) return await fetchRandomStyleReference();
+
+    const listing = pool
+      .map((r, i) => `${i}: ${JSON.stringify(r.meta || {}).slice(0, 350)}`)
+      .join('\n')
+      .slice(0, 14000);
+
+    const ai = getAi();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `You are picking the best-matching thumbnail STYLE reference for a YouTube video, based only on mood/niche/composition fit — not content.
+
+VIDEO CONTEXT:
+${topicQuery.slice(0, 1500)}
+
+STYLE POOL (index: metadata for each candidate image):
+${listing}
+
+Return ONLY a JSON array of up to 8 candidate indices, best match first, e.g. [12,4,88]. No commentary.`
+        }]
+      }],
+      config: { responseMimeType: 'application/json' },
+    });
+    const raw = response.text?.trim() || '[]';
+    const idx: number[] = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] || '[]');
+    const candidates = idx.map(i => pool[i]).filter(Boolean);
+    const shortlist = (candidates.length ? candidates : pool).slice(0, 8);
+    for (let i = shortlist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shortlist[i], shortlist[j]] = [shortlist[j], shortlist[i]];
+    }
+    const chosen = shortlist[0] || pool[Math.floor(Math.random() * pool.length)];
+    const img = await fetchStyleImageByPath(chosen.path);
+    return img ?? (await fetchRandomStyleReference());
+  } catch (e) {
+    console.warn('Style match ranking failed, falling back to random reference', e);
+    return await fetchRandomStyleReference();
+  }
+};
+
+// Topic-matched style pick — tries real cosine-similarity vector search
+// against our own copied+embedded style pool first (matchStylesVector), and
+// only falls back to LLM-reasoning ranking against the live sister project
+// (then a purely random pick) if that comes up empty.
+const pickBestStyleReference = async (topicQuery: string): Promise<{ data: string; mimeType: string } | null> => {
+  const vectorMatch = await matchStylesVector(topicQuery);
+  if (vectorMatch) return vectorMatch;
+  return await pickBestStyleReferenceByLLMRanking(topicQuery);
+};
+
+export const generateThumbnail = async (
+  title: string,
+  extraInstructions: string | undefined,
+  faceImage: { data: string; mimeType: string } | undefined,
+  onStep: ((step: 'inspecting' | 'analyzing' | 'generating') => void) | undefined,
+  scriptText: string,
+  topicName: string,
+): Promise<string> => {
   const ai = getAi();
 
-  let professorImagePart: any = null;
+  onStep?.('analyzing');
+  const concept = extraInstructions?.trim() || (await generateThumbnailConcept(scriptText, topicName || '', title));
 
-  const extraNote = extraInstructions?.trim()
-    ? `\n\nCREATOR EXTRA INSTRUCTIONS (apply these on top):\n${extraInstructions.trim()}`
+  onStep?.('inspecting');
+  const topicQuery = [title, topicName, concept].filter(Boolean).join('. ').slice(0, 2000);
+  const styleRef = await pickBestStyleReference(topicQuery);
+
+  onStep?.('generating');
+
+  const faceDir = faceImage
+    ? `Feature the person from the uploaded face photo (the ${styleRef ? 'SECOND' : 'FIRST'} image) as the thumbnail's main subject — swap in their exact face and likeness, photorealistically, matching the rest of the composition's pose, scale and lighting. ${styleRef ? "Do NOT use the FIRST image's person — that is a completely different, unrelated person from someone else's thumbnail. " : ''}`
+    : `Build the main subject from the concept below — a photorealistic person or scene fitting the topic. ${styleRef ? "Do NOT reuse the FIRST image's specific person or face under any circumstances — that person belongs to a different, unrelated thumbnail. " : ''}`;
+
+  const conceptLine = concept ? `SCENE CONCEPT: ${concept} ` : '';
+
+  const styleIntro = styleRef
+    ? "Use the FIRST image ONLY as a visual STYLE reference — copy its composition, framing, lighting, color grade and mood (and, only if it uses on-image text, its text placement). CRITICAL: the FIRST image is from a completely different, unrelated thumbnail — its specific person/face, props and any on-image wording all belong to THAT one. Do NOT copy any of them — take ONLY the visual style and create an ORIGINAL thumbnail for THIS video in that same look. "
     : '';
 
-  let prompt: string;
-
-  if (referenceImage) {
-    // Step 1: Extract style from reference image
-    onStep?.('inspecting');
-    const styleAnalysis = await extractStyleFromImage(referenceImage);
-
-    // Step 2: Generate using extracted style, creative content based on topic
-    onStep?.('generating');
-
-    if (videoStyle === 'explained') {
-      const scriptSnippet = scriptText?.slice(0, 1500) || '';
-      prompt = `You are a world-class YouTube thumbnail designer specializing in "Explained" / documentary-style content.
-
-VISUAL STYLE GUIDE (extracted from reference — follow this for colors, mood, font style, layout energy):
-${styleAnalysis}
-
-YOUR TASK:
-Create a brand-new "Explained" style YouTube thumbnail for the topic below. Use the style guide above for color palette, mood, and typography feel. Content and composition are yours to design.
-
-TOPIC: "${title}"
-${scriptSnippet ? `SCRIPT CONTEXT:\n${scriptSnippet}` : ''}
-${hostName ? `PRESENTER: ${hostName}` : 'PRESENTER: Confident, photorealistic presenter fitting this topic'}
-
-LAYOUT (Explained signature look):
-1. LEFT 40%: Large face close-up — intrigued, confident, or slightly shocked expression matching topic. Photorealistic, cinematic.
-2. RIGHT 55%: A bold PROP, SCENE, or CONCEPT visual that represents this specific topic. NOT a second person. Make it dramatic and topic-specific.
-3. BOTTOM: Full title text "${title}" — small but COMPLETELY READABLE, thin dark bar or clean white text at very bottom edge.
-4. BACKGROUND: Solid dark saturated color that unifies both halves (deep green, navy, or dark red).
-
-STYLE RULES:
-- Match color grading and mood from the style guide
-- High contrast, cinematic quality, sharply focused subjects
-- Do NOT copy any people, text, or logos from the reference${extraNote}`;
-    } else if (videoStyle === 'situational') {
-      const scriptSnippet = scriptText?.slice(0, 2000) || '';
-      prompt = `You are a world-class YouTube thumbnail designer specializing in personal story / situational content.
-
-VISUAL STYLE GUIDE (extracted from a reference thumbnail — follow this religiously):
-${styleAnalysis}
-
-YOUR TASK:
-Create a powerful single-person YouTube thumbnail for the story/situation below.
-
-CRITICAL — ANALYZE THE SCRIPT AND DETERMINE THE PERSON TYPE:
-Read the script carefully and identify WHO the main person is. Choose the person appearance from these types:
-- Young man (22-30, modern casual clothes, city person)
-- Middle-class man (30-45, plain shirt or simple suit, ordinary look)
-- Wealthy/rich man (40-55, expensive suit, watch, polished look)
-- Young woman (22-32, modern professional or casual)
-- Middle-aged woman (35-50, everyday practical look)
-- Attractive/stylish woman (25-38, fashionable, confident)
-- Elderly man or woman (60+, aged face, life-worn look)
-- Working class / simple person (any age, plain worn clothes)
-Pick the type that EXACTLY matches who this story is about. Generate a PHOTOREALISTIC person of that type.
-
-SCRIPT / TOPIC CONTENT:
-${scriptSnippet}
-
-HOOK TEXT: "${title}"
-
-LAYOUT (follow this strictly):
-- ONE person only — positioned on the RIGHT side of the frame, looking slightly left (toward the text), seated or slightly turned, natural pose
-- Hook text on the LEFT side — bold, large, prominent, 2-3 lines max
-- Background: match the style guide (dark, dramatic, textured)
-- Expression: matches the emotional weight of the topic — stressed, reflective, shocked, or determined based on the content
-- A studio microphone visible near the person (subtle, not dominant)
-- NO second person. NO split screen. ONE compelling face that tells the whole story.
-
-STYLE RULES (non-negotiable):
-- Match color palette, typography, background mood from the style guide EXACTLY
-- Photorealistic, high quality, 16:9 YouTube thumbnail
-- Do NOT copy any people, text, or logos from the reference${extraNote}`;
-    } else {
-      prompt = `You are a world-class YouTube thumbnail designer.
-
-VISUAL STYLE GUIDE (extracted from a reference thumbnail — follow this religiously):
-${styleAnalysis}
-
-YOUR TASK:
-Design a brand new, highly engaging YouTube thumbnail for the topic below. Use the visual style guide above for ALL design decisions — colors, typography, layout, background, mood, effects. Be completely creative with the content and composition — make it feel like it was made for this specific topic.
-
-TOPIC & CAST:
-- Main hook text (show this prominently, bold, exactly as written): "${title}"
-${hostName ? `- Host: ${hostName}` : '- Host: Generate a random realistic person appropriate for this topic'}
-${guestName ? `- Guest / other speaker: ${guestName}` : '- Guest / other speaker: Generate a random realistic person appropriate for this topic'}
-
-CONTENT FREEDOM — you decide:
-- Best facial expressions and poses that match the topic energy
-- Most impactful composition and framing for this specific topic
-- Whether to show both people or focus on one for more impact
-- Where text appears for maximum visual punch
-- Any creative visual metaphors or elements that reinforce the topic
-
-STYLE RULES (non-negotiable):
-- Match the color palette, typography style, background type, and mood from the style guide above EXACTLY
-- The text "${title}" must be clearly readable and prominent
-- Photorealistic, high quality, 16:9 YouTube thumbnail
-- Do NOT copy any people, text, or logos from the reference${extraNote}`;
-    }
-
-  } else if (videoStyle === 'explained') {
-    // ── EXPLAINED style: big face left + bold visual right + small full title bottom ──
-    const scriptSnippet = scriptText?.slice(0, 1500) || '';
-    prompt = `You are a world-class YouTube thumbnail designer specializing in "Explained" and documentary-style content (like Kurzgesagt, Wendover Productions, Veritasium, MKBHD).
-
-YOUR TASK:
-Create a powerful, cinematic "Explained" style YouTube thumbnail — 16:9, photorealistic, ultra-high detail.
-
-TOPIC / HOOK TEXT: "${title}"
-${scriptSnippet ? `SCRIPT CONTEXT (use to pick the right visual):\n${scriptSnippet}` : ''}
-${hostName ? `HOST / PRESENTER: ${hostName} — show this person as the main face` : 'PRESENTER: Generate a photorealistic confident presenter person fitting this topic'}
-
-LAYOUT (follow STRICTLY — this is the signature "Explained" look):
-1. LEFT 40% — Large face close-up of the presenter/character. Face takes up most of this zone. Expression: intrigued, slightly shocked, or confidently serious — matches the topic energy. Slight angle toward center. Photorealistic skin, hair, and lighting.
-2. RIGHT 55% — A bold, dramatic visual that represents the topic. This is NOT another person — it is a PROP, SCENE, CONCEPT, or VISUAL METAPHOR. Examples: a burning object, a massive machine, a city skyline, a chart, a news clipping, a product, a creature — whatever BEST represents this specific topic visually. Make it dramatic and impactful.
-3. TITLE TEXT — Positioned at the BOTTOM of the frame in a thin dark semi-transparent bar OR as small clean white bold sans-serif text at the very bottom. The full title "${title}" must be COMPLETELY READABLE — no cropping. Font size: small but sharp. This is the YouTube title displayed ON the thumbnail for context — do not make it the dominant element.
-4. BACKGROUND — Solid dark color (deep green #1a3a1a, dark navy, dark grey, or deep red) that unifies both halves. Slight vignette at edges.
-
-KEY VISUAL RULES:
-- The face and the topic visual must look like they belong together — same lighting direction, same color grading
-- High contrast, saturated colors, sharp focus on both elements
-- The VISUAL on the right must be topic-specific — if topic is about AI, show a dramatic AI visualization; if about economy, show money/charts/graphs burning or collapsing; if about a movie, show a dramatic movie scene prop
-- NO text overlays except the title line at the bottom
-- NO generic stock photo look — cinematic, dramatic, editorial quality
-- 16:9 aspect ratio, 1920×1080 quality feel
-- Photorealistic — NOT illustrated or cartoon${extraNote}`;
-
-  } else if (videoStyle === 'phone_studio') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    // The featured person whose face goes on the right side of the thumbnail.
-    // The user picks them in the "Guest" field — fall back to host if guest empty.
-    const celebrityName = (guestName || hostName || '').trim();
-
-    // ── Step 1: Ask Gemini what should appear on the PHONE SCREEN ──
-    let phoneScreenVisual = 'A topic-specific dramatic photo filling the phone screen — e.g. a glowing alien face, a moon base, a war battlefield, a stock market crash — chosen to match the script topic';
-    let celebrityDescription = celebrityName
-      ? `${celebrityName} — match the real public photographs of this person EXACTLY (face, age, hair, signature look). Confident expression, head-and-shoulders crop.`
-      : 'A confident, recognizable male public figure appropriate for the topic — photorealistic head-and-shoulders crop, dramatic studio lighting';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `You are a thumbnail art director for the "Phone Studio" YouTube style — viral format: vertical phone FAR LEFT showing topic image, large celebrity face CENTER-RIGHT, huge red+white hook text in the middle.
-
-SCRIPT:
-${scriptSnippet}
-
-CELEBRITY (person whose face is large on the right): ${celebrityName || '(infer from script — who is the most prominent person?)'}
-HOOK TEXT: "${title}"
-${topicName ? `TOPIC: ${topicName}` : ''}
-
-Decide:
-1. PHONE SCREEN VISUAL: The single most dramatic, topic-specific image to fill the phone screen. Must instantly tell the viewer what the video is about. Be hyper-specific to THIS script — not generic.
-   - India-Pakistan war script → "Indian fighter jets firing missiles over Pakistani border at night, orange explosion plumes, dramatic aerial view"
-   - Bitcoin crash script → "Bitcoin symbol shattering like glass, red market chart plummeting, dark dramatic lighting"
-   - Political scandal → "specific politician's leaked document on screen, stamped 'CLASSIFIED' in red"
-   - Not: generic battlefield / generic chart — SPECIFIC to this exact topic
-
-2. CELEBRITY DESCRIPTION: Real name, their signature appearance (exact hair, age look, clothing style they're known for), and the emotional expression that fits this topic mood. This must match their real public photographs.
-
-Reply ONLY in JSON, no markdown:
-{
-  "phoneScreen": "Vivid 2-3 sentence description of the topic image on phone screen — 100% specific to this script, photorealistic, dramatic",
-  "celebrity": "Full description: name, exact appearance (hair, age, typical clothing), expression for this topic"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const entityRaw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const entities = JSON.parse(entityRaw);
-        if (entities.phoneScreen) phoneScreenVisual = entities.phoneScreen;
-        if (entities.celebrity && !celebrityName) celebrityDescription = entities.celebrity;
-        else if (entities.celebrity && celebrityName) {
-          celebrityDescription = `${celebrityName} — ${entities.celebrity}. Match the real public photographs of ${celebrityName} EXACTLY (face, age, hair, signature look).`;
-        }
-      } catch (e) {
-        console.warn('[PhoneStudio] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    // Split the hook text — first half white, last 1-2 words red (matches reference).
-    const hookClean = (title || '').replace(/["“”]/g, '').trim();
-    const hookWords = hookClean.split(/\s+/).filter(Boolean);
-    const redWordCount = Math.min(2, Math.max(1, Math.floor(hookWords.length / 2)));
-    const whitePart = hookWords.slice(0, hookWords.length - redWordCount).join(' ');
-    const redPart   = hookWords.slice(hookWords.length - redWordCount).join(' ');
-
-    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE STUDIO" style thumbnail — viral AI-chat / podcast-clip aesthetic. The composition is FIXED:
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ LEFT SIDE (left 0–28% of frame): A REALISTIC IPHONE-STYLE SMARTPHONE
-- Vertical phone, slight tilt (~-4°), photorealistic glossy black bezel, rounded corners
-- Phone is FULL HEIGHT — top of phone near top edge, bottom near bottom edge of frame
-- Status bar at top: small white text "${celebrityName || 'Speaker'}" (left, with tiny pulse dot "● Speaking") and "73% 🔋" on the right
-- The ENTIRE phone screen is filled with this image: ${phoneScreenVisual}
-- Image on screen must be vivid, dramatic, topic-specific — it is the visual story of the script
-- At the bottom of the phone screen: a small red circular X close button (end call button)
-- Subtle side-light glinting on the bezel
-
-▶ CELEBRITY FACE — LARGE, CENTER-DOMINANT (fills center-right ~35% to 100% of frame):
-- ${celebrityDescription}
-- Face and upper body positioned CENTER to RIGHT — their face should be the LARGEST element
-- The celebrity's body starts from about 35% of the frame width, extending to the right edge
-- Face should be at roughly 60-65% of frame width — LARGE, prominent, not squeezed to the side
-- Looking TOWARD the left/center (toward the phone and text)
-- Cinematic studio lighting — sharp focus, dramatic rim light matching topic mood
-- A small floating name label near their shoulder: "${celebrityName || 'SPEAKER'}" in white text with thin pointer line
-- Person visually DOMINATES the right half — this is the emotional anchor of the thumbnail
-
-▶ CENTER OVERLAY — THE MASSIVE HOOK TEXT (overlapping phone right edge and celebrity left body):
-- The text "${hookClean}" rendered HUGE, between the phone and celebrity (roughly 22%–58% of frame width)
-- Font: ultra-bold condensed italic display sans-serif (Anton / Impact / Bebas Neue extended-italic), ALL CAPS, slight rightward lean
-- Color split: "${whitePart}" in PURE WHITE, "${redPart}" in BRIGHT RED (#ED1C24)
-- Stack on 2-3 lines, left-aligned to the phone's right edge
-- Slight dark drop-shadow for readability against the celebrity face
-- Text overlaps BOTH the phone (right edge) and the celebrity body (left portion) — this overlap creates the layered depth
-
-▶ BACKGROUND:
-- SOLID PURE BLACK (#0a0a0a) — absolutely uniform, no variation
-- ZERO texture, ZERO pattern, ZERO bokeh, ZERO grain, ZERO gradients
-- Only 3 things exist: (1) phone on far left, (2) celebrity face center-right, (3) hook text in the middle
-- Think photography studio black backdrop — flat, featureless, infinite
-
-════ STRICT RULES ════
-- Photorealistic — NOT illustrated, NOT cartoon, NOT 3D-rendered
-- Celebrity face MUST fill a large area — they are NOT a small figure on the side; they dominate the right 65% of the frame
-- Celebrity MUST be recognizable as ${celebrityName || 'the named figure'} — match real reference photos exactly
-- Phone screen visual MUST match the script topic — viewers must immediately understand what the video is about
-- Hook text is bold, high-contrast, sharp — white + red split as specified
-- BACKGROUND IS PURE SOLID BLACK — any texture, gradient, or extra element is FORBIDDEN
-- 16:9 aspect ratio (1920×1080)
-- No watermarks, no logos${extraNote}`;
-
-  } else if (videoStyle === 'phone_clean') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    const callerName = (guestName || hostName || 'AI Assistant').trim();
-
-    let phoneScreenVisual = 'A dramatic, high-contrast topic-relevant image filling the entire phone screen — mysterious, glowing, cinematic';
-    let creatorDesc = hostName ? `${hostName} — photorealistic headshot, concerned or intrigued expression, professional look` : '';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{ role: 'user', parts: [{ text: `Read this script and decide what image to show on the phone screen for a YouTube thumbnail.\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nCALLER: ${callerName}\n\nReply ONLY in JSON:\n{"phoneScreen":"vivid 1-2 sentence description of the topic image on the phone screen — dramatic, topic-specific","callerNote":"one sentence about the caller entity's visual icon or logo to show as phone avatar"}` }] }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const raw = entityResponse.text?.trim() || '{}';
-        const m = raw.match(/\{[\s\S]*\}/);
-        const entities = JSON.parse(m ? m[0] : '{}');
-        if (entities.phoneScreen) phoneScreenVisual = entities.phoneScreen;
-      } catch (e) {
-        console.warn('[PhoneClean] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    const hookWords = title.trim().toUpperCase().split(/\s+/).filter(Boolean);
-    const redCount = Math.min(2, Math.max(1, Math.floor(hookWords.length / 3)));
-    const blackPart1 = hookWords.slice(0, Math.floor((hookWords.length - redCount) / 2)).join(' ');
-    const redPart    = hookWords.slice(Math.floor((hookWords.length - redCount) / 2), hookWords.length - redCount).join(' ');
-    const blackPart2 = hookWords.slice(hookWords.length - redCount).join(' ');
-
-    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN" style thumbnail — exactly matching the reference style: phone on left, big text center, presenter/person on right.
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ BACKGROUND: Pure white (#FFFFFF) — clean, minimal, no textures, no gradients
-
-▶ LEFT SIDE (30% of frame): REALISTIC iPHONE
-- Portrait iPhone, slight 6° rightward tilt, photorealistic black glossy bezel, rounded corners
-- Status bar: small white text "${callerName}" (left, with tiny blue dot "● Speaking") + "73% 🔋" (right)
-- Phone SCREEN filled entirely with: ${phoneScreenVisual}
-- Bottom of phone screen: three call buttons (gray mic, gray ●●●, red ✕ circle)
-- Realistic drop shadow on white background for depth
-
-▶ CENTER (35% of frame): BOLD IMPACT TYPOGRAPHY — 3 stacked lines
-  Line 1: "${blackPart1 || title.split(' ')[0].toUpperCase()}" — PURE BLACK (#000000), ultra-bold condensed, Impact/Anton style
-  Line 2: "${redPart || (title.split(' ')[1] || 'HIDDEN').toUpperCase()}" — WHITE text on a SOLID RED RECTANGLE (#CC0000) — the rectangle is a full-width banner behind this word, white text centered inside it
-  Line 3: "${blackPart2 || title.split(' ').slice(-1)[0].toUpperCase()}" — PURE BLACK (#000000), same style as Line 1
-- Text lines are tightly stacked, centered in this zone
-
-▶ RIGHT SIDE (35% of frame): ${creatorDesc ? `PRESENTER / CREATOR` : 'TOPIC VISUAL'}
-${creatorDesc
-  ? `- Photorealistic half-body or 3/4-body figure of ${creatorDesc}
-- Standing or slightly gesturing toward the text (facing left)
-- Clean cut-out on the white background — NO separate background behind them
-- Natural lighting matching the white background — casual professional look`
-  : `- A dramatic topic-relevant image or icon that represents "${callerName}" or the subject
-- Slightly faded / subtle so text stays dominant`}
-
-════ STRICT RULES ════
-- PURE WHITE background — not gray, not gradient
-- Typography ENORMOUS — must read at thumbnail size
-- Phone photorealistic with proper iOS call UI
-- Red rectangle on Line 2 is the hero visual element — make it vivid
-- 16:9 exactly. No watermarks.${extraNote}`;
-
-  } else if (videoStyle === 'phone_clean_2') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    const callerName = (guestName || hostName || 'AI Assistant').trim();
-    const presenterDesc = hostName
-      ? `${hostName} — photorealistic upper body, SEATED in a chair or stool, clip-on lapel microphone clearly visible on shirt/lapel near chest, confident expression, looking slightly left toward camera`
-      : 'a professional presenter — seated in a chair, clip-on lapel microphone visible on shirt, confident expression, facing slightly left';
-
-    let phoneScreenVisual = 'A dramatic, high-contrast topic-relevant image filling the entire phone screen — cinematic, specific to the topic';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{ role: 'user', parts: [{ text: `Read this script and decide what image to show on the phone screen for a YouTube thumbnail.\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nCALLER: ${callerName}\n\nReply ONLY in JSON:\n{"phoneScreen":"vivid 1-2 sentence description of the topic image on the phone screen — dramatic, topic-specific, cinematic"}` }] }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const raw = entityResponse.text?.trim() || '{}';
-        const m = raw.match(/\{[\s\S]*\}/);
-        const entities = JSON.parse(m ? m[0] : '{}');
-        if (entities.phoneScreen) phoneScreenVisual = entities.phoneScreen;
-      } catch (e) {
-        console.warn('[PhoneClean2] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    const hookWords = title.trim().toUpperCase().split(/\s+/).filter(Boolean);
-    const redCount = Math.min(2, Math.max(1, Math.floor(hookWords.length / 3)));
-    const blackPart1 = hookWords.slice(0, Math.floor((hookWords.length - redCount) / 2)).join(' ');
-    const redPart    = hookWords.slice(Math.floor((hookWords.length - redCount) / 2), hookWords.length - redCount).join(' ');
-    const blackPart2 = hookWords.slice(hookWords.length - redCount).join(' ');
-
-    prompt = `You are a world-class YouTube thumbnail designer creating a "PHONE CLEAN 2" style thumbnail — white background, phone on left, big bold text center, SEATED presenter with LAPEL MIC on right.
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ BACKGROUND: Pure white (#FFFFFF) — completely clean, no textures, no shadows on background
-
-▶ LEFT SIDE (28% of frame): REALISTIC iPHONE
-- Portrait iPhone, slight 6° rightward tilt, photorealistic black glossy bezel, rounded corners
-- Status bar: small white text "${callerName}" (left, tiny blue dot "● Speaking") + "73% 🔋" (right)
-- Phone SCREEN filled entirely with: ${phoneScreenVisual}
-- Bottom of phone screen: three call buttons (gray mic, gray ●●●, red ✕ circle)
-- Realistic drop shadow for depth
-
-▶ CENTER (37% of frame): BOLD IMPACT TYPOGRAPHY — 3 stacked lines
-  Line 1: "${blackPart1 || hookWords.slice(0, 2).join(' ')}" — PURE BLACK (#000000), ultra-bold condensed, Impact/Anton style, enormous size
-  Line 2: "${redPart || hookWords[Math.floor(hookWords.length / 2)]}" — WHITE text inside a SOLID RED RECTANGLE (#CC0000) — full-width banner, white text centered
-  Line 3: "${blackPart2 || hookWords.slice(-2).join(' ')}" — PURE BLACK (#000000), same size as Line 1
-- All 3 lines tightly stacked, centered in this zone, massive readable size
-
-▶ RIGHT SIDE (35% of frame): SEATED PRESENTER WITH LAPEL MIC
-- Photorealistic upper-body shot of ${presenterDesc}
-- SEATED position — person is in a chair or on a stool, NOT standing
-- LAPEL MICROPHONE: small silver/black clip-on mic attached to shirt collar/lapel area, clearly visible, realistic detail — this is a key element
-- Person faces slightly LEFT toward the center text, looking at camera with engaged confident expression
-- Clean cut-out on the pure white background — NO separate background behind them
-- Casual-professional attire: button shirt or jacket, the lapel mic clipped on the chest/collar
-
-════ STRICT RULES ════
-- PURE WHITE background — absolutely no gray, no gradient
-- Typography ENORMOUS — dominant visual element, must be readable at small thumbnail size
-- Seated presenter is essential — NOT standing, NOT half-body standing pose
-- Lapel mic must be clearly visible and realistic — not hidden, not tiny
-- Phone photorealistic with proper iOS call UI elements
-- Red rectangle (Line 2) is the hero accent — bold, vivid red
-- 16:9 exactly. No watermarks. No logos.${extraNote}`;
-
-  } else if (videoStyle === 'phone_dual') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    const char1 = (guestName || 'Character 1').trim();
-    const char2 = (hostName || 'Character 2').trim();
-
-    let char1Screen = `${char1}'s face filling the screen — photorealistic, dramatic studio lighting, intense expression, pointing or gesturing, microphone visible`;
-    let char2Screen = `${char2}'s face — photorealistic, soft neutral lighting, thoughtful listening expression, looking slightly off-screen`;
-    let char2IsPerson = true;
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{ role: 'user', parts: [{ text: `For a YouTube thumbnail showing TWO phones in a conversation:\n\nSCRIPT:\n${scriptSnippet}\nHOOK TEXT: "${title}"\nLEFT PHONE (speaking): ${char1}\nRIGHT PHONE (listening/topic): ${char2}\n\nDecide: is the RIGHT phone showing a REAL PERSON's face, or a TOPIC/COUNTRY/CONCEPT image?\n- If "${char2}" is a real public figure → show their face photorealistically\n- If "${char2}" is a country, topic, brand, concept → show a dramatic recognizable image (e.g. Chinese flag + Shanghai skyline, Moon with stars, etc.)\n\nReply ONLY in JSON:\n{"char1Screen":"vivid 1-2 sentence description of ${char1}'s face/appearance on the dark phone screen — intense, photorealistic","char2Screen":"vivid 1-2 sentence description of what fills the RIGHT phone screen (either face or topic image)","char2IsPerson":true}` }] }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const raw = entityResponse.text?.trim() || '{}';
-        const m = raw.match(/\{[\s\S]*\}/);
-        const entities = JSON.parse(m ? m[0] : '{}');
-        if (entities.char1Screen) char1Screen = entities.char1Screen;
-        if (entities.char2Screen) char2Screen = entities.char2Screen;
-        if (entities.char2IsPerson !== undefined) char2IsPerson = !!entities.char2IsPerson;
-      } catch (e) {
-        console.warn('[PhoneDual] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    // Text layout matching reference: "[Speaker]:" / "[KEY WORD in RED BOX]" / "[rest]"
-    const hookClean = title.trim();
-    const hookWords2 = hookClean.split(/\s+/).filter(Boolean);
-    // First line: speaker name + colon. Middle: key word(s) in red box. Last: rest of claim.
-    const speakerLine = char1.toUpperCase() + ':';
-    let redWord = hookWords2[0]?.toUpperCase() || title.toUpperCase();
-    let restLine = hookWords2.slice(1).join(' ').toUpperCase() || '';
-    // If title has 3+ words, put middle word(s) in red box
-    if (hookWords2.length >= 3) {
-      const mid = Math.floor(hookWords2.length / 2);
-      redWord = hookWords2.slice(0, mid).join(' ').toUpperCase();
-      restLine = hookWords2.slice(mid).join(' ').toUpperCase();
-    }
-
-    prompt = `You are a world-class YouTube thumbnail designer creating a viral "PHONE DUAL" style thumbnail — exactly matching the reference style where two phones flank bold center text on a white background.
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ BACKGROUND: Pure white to very light gray (#ffffff → #f2f2f2) — clean, minimal, airy
-
-▶ LEFT PHONE (30% of frame, left side): ${char1.toUpperCase()} IS SPEAKING
-- DARK/BLACK iPhone — photorealistic glossy black bezel, rounded corners
-- Status bar: small white text "09:41" top-left, "73% 🔋" top-right
-- Below status bar: "${char1}" in white bold, below it green dot "● Speaking"
-- ENTIRE dark phone screen filled edge-to-edge with: ${char1Screen}
-- Bottom call buttons: mic icon (gray circle), ••• (gray circle), red ✕ circle (hang up)
-- Phone tilts very slightly clockwise (~5°). Strong realistic drop shadow.
-
-▶ RIGHT PHONE (30% of frame, right side): ${char2.toUpperCase()} IS LISTENING
-- WHITE/SILVER iPhone — photorealistic white or silver bezel, rounded corners — NOT black
-- Status bar: small dark text "09:41" top-left, "73% 🔋" top-right (dark text on light background)
-- Below status bar: "${char2}" in dark bold text, below it blue dot "● Listening" in blue text
-- Phone screen: ${char2IsPerson ? `${char2Screen} — face filling most of the screen with neutral background` : `${char2Screen} — fills the entire screen dramatically`}
-- Bottom call buttons: mic icon (gray circle), ••• (gray circle), red ✕ circle (hang up)
-- Phone tilts very slightly counter-clockwise (~5°). Strong realistic drop shadow.
-
-▶ CENTER TEXT (40% of frame, dominant):
-EXACT 3-LAYER TYPOGRAPHY matching reference style:
-
-TOP LINE: "${speakerLine}" — huge ultra-bold condensed black (#000000) serif/impact font, weight 900
-MIDDLE BAND: A solid RED RECTANGLE (#CC0000 to #ED1C24) spanning ~60-70% of the text column width, containing "${redWord}" in crisp white bold letters centered inside the rectangle — this is the KEY visual element
-BOTTOM LINE: "${restLine}" — huge ultra-bold condensed black (#000000) same style as top line
-
-- All text is stacked vertically, centered between the two phones
-- Text slightly overlaps both phones for depth
-- Very subtle black drop shadow on text for legibility
-
-════ STRICT RULES ════
-- Background MUST be white/near-white — NOT dark, NOT gray
-- Left phone = BLACK bezel. Right phone = WHITE/SILVER bezel. This contrast is critical.
-- The red rectangle for the middle word is MANDATORY — it's the hero element
-- Both phones photorealistic with proper iOS call UI visible
-- 16:9 aspect ratio, 1920×1080, no extra text or watermarks${extraNote}`;
-
-  } else if (videoStyle === 'professor_jiang') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-
-    // ── Step 1: Extract topic-specific visual entities from script ──
-    let leftVisual = 'A dramatic close-up of a world political leader relevant to the script topic, in formal attire, with their country flag behind them, intense red atmospheric lighting';
-    let rightVisual = 'A dramatic close-up of a second world political leader or symbolic figure relevant to the script, with their country flag behind them, dark red vignette';
-    let bgAtmosphere = 'Deep crimson red with dramatic vignette and faint downward stock chart lines';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `You are a creative Fox News thumbnail art director. Read this script and decide the 2 most VISUALLY DRAMATIC and TOPIC-RELEVANT elements to show on the LEFT and RIGHT sides of a breaking news thumbnail.
-
-SCRIPT:
-${scriptSnippet}
-
-TITLE: "${title}"
-
-Be completely creative — you can show anything that visually tells the story:
-- A political leader in a dramatic action or pose (e.g. "Trump sitting in a B2 stealth bomber cockpit, fierce expression, American flag reflected in visor")
-- A country's military or power symbol (e.g. "Iranian missile launch with fire and smoke, Iran flag in background")
-- A dramatic scene or metaphor (e.g. "A burning US dollar bill with crumbling stock charts, red smoke")
-- A person + action combo (e.g. "Xi Jinping pointing aggressively at a crashing chart, red dramatic lighting")
-- Any cinematic visual that INSTANTLY tells the viewer what the story is about
-
-Read the script, understand the story, then pick the 2 most impactful visuals. No restrictions — be bold and creative.
-
-Reply in JSON only — no extra text, no markdown:
-{
-  "left": "One vivid cinematic description for the LEFT SIDE — be specific about pose, action, setting, atmosphere (1-2 sentences)",
-  "right": "One vivid cinematic description for the RIGHT SIDE — be specific about pose, action, setting, atmosphere (1-2 sentences)",
-  "bgMood": "Background atmosphere (e.g. 'deep crimson with explosion glow' or 'dark stormy sky with falling numbers')"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const entityRaw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const jsonMatch = raw.match(/\{[\s\S]*\}/);
-          return jsonMatch ? jsonMatch[0] : '{}';
-        })();
-        console.log('[Prof.Jiang] Entity extraction raw:', entityRaw);
-        const entities = JSON.parse(entityRaw);
-        if (entities.left) leftVisual = entities.left;
-        if (entities.right) rightVisual = entities.right;
-        if (entities.bgMood) bgAtmosphere = entities.bgMood;
-        console.log('[Prof.Jiang] Left:', leftVisual);
-        console.log('[Prof.Jiang] Right:', rightVisual);
-      } catch (e) {
-        console.warn('[Prof.Jiang] Entity extraction failed, using fallback:', e);
-      }
-    }
-
-    // ── Step 2: Load professor's reference photo ──
-    try {
-      const resp = await fetch('/professor_jiang.png');
-      if (resp.ok) {
-        const blob = await resp.blob();
-        const b64 = await blobToBase64(blob);
-        professorImagePart = { inlineData: { data: b64.split(',')[1], mimeType: 'image/png' } };
-      }
-    } catch (_) {}
-
-    prompt = `You are a world-class YouTube thumbnail designer specializing in breaking news and current events analysis — Fox News Alert / CNN Breaking style.
-
-${professorImagePart ? `REFERENCE PERSON — MANDATORY:
-A reference photo of the HOST/ANALYST is provided. You MUST replicate this exact person's face, hairstyle, skin tone, and glasses precisely. Do NOT invent a different person.` : ''}
-
-TOPIC / HOOK TEXT: "${title}"
-HOST / ANALYST: ${professorImagePart ? 'Asian male, middle-aged, salt-and-pepper hair, rectangular metal-frame glasses, light blue casual shirt — MATCH THE REFERENCE PHOTO EXACTLY.' : hostName || 'Concerned-looking male analyst, centered.'}
-
-════ LAYOUT — FOLLOW EXACTLY ════
-
-▶ CENTER (focal point):
-The host/analyst ${professorImagePart ? 'from the reference photo' : ''}. Dead center. Face fully visible. Expression: deeply concerned, worried, hands pressed near chin in prayer gesture. Photorealistic.
-
-▶ LEFT SIDE — TOPIC-SPECIFIC VISUAL (40% of frame):
-${leftVisual}
-Large, dramatic, fills the left side. Intense red/orange atmospheric glow. Dark vignette at edges. This visual MUST match the script topic.
-
-▶ RIGHT SIDE — TOPIC-SPECIFIC VISUAL (40% of frame):
-${rightVisual}
-Large, dramatic, fills the right side. Same intense red atmospheric treatment. This visual MUST match the script topic.
-
-▶ BOTTOM BANNER — MOST CRITICAL ELEMENT:
-Wide bold RED horizontal banner — full width, bottom 20% of image.
-  • TOP LINE: "${title}" — MASSIVE yellow/gold ALL CAPS Impact-style font. Huge, dominant, 70% of banner height.
-  • BOTTOM LINE: "FOX NEWS ALERT" in smaller white bold text.
-  • Small stylized news logo on left side of banner.
-
-▶ BACKGROUND:
-${bgAtmosphere}. Dark vignette. Faint stock chart lines or relevant symbolic imagery in background. Urgent, tense.
-
-════ STRICT RULES ════
-- LEFT and RIGHT visuals MUST be EXACTLY as described above — flags, symbols, charts, buildings — NOT random generic people
-- These side visuals must visually represent the TOPIC: "${title}" — a viewer should instantly recognize which countries/forces are involved
-- Red banner + yellow/gold text = most important element — bold, clean, highly readable
-- CENTER person must look exactly like the reference photo (if provided)
-- Photorealistic, cinematic quality — NOT illustrated or cartoon
-- 16:9 aspect ratio, 1920×1080
-- High contrast, sharp edges, no blur${extraNote}`;
-
-  } else if (videoStyle === 'podcast_2') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    const p2Host = (hostName || 'Podcast host').trim();
-    const p2Guest = (guestName || '').trim();
-
-    let p2InsertVisual = 'A topic-relevant photorealistic object or scene — dramatic, high-contrast, clearly tied to the script topic';
-    let p2InsertBorderColor = '#00FF00';
-    let p2HostDesc = `${p2Host} — photorealistic, natural podcast expression, upper body, facing toward the center`;
-    let p2GuestDesc = p2Guest
-      ? `${p2Guest} — photorealistic, MATCH REAL PHOTOGRAPHS of this person EXACTLY (face, hair, look), upper body, facing toward the center, engaged reacting expression`
-      : 'Second podcast guest — upper body, natural reacting expression, facing toward the center';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `You are a YouTube thumbnail art director for a real podcast channel (Joe Rogan / Lex Fridman style).
-
-SCRIPT:
-${scriptSnippet}
-
-HOST: ${p2Host}
-GUEST: ${p2Guest || '(infer from script)'}
-
-Based on the script topic, decide:
-1. CENTER INSERT IMAGE: The single most iconic, photorealistic, visually dramatic object or scene to show in the center insert box — this is the topic visual that appears between the two hosts. Should instantly communicate what the podcast is about.
-2. BORDER COLOR: The thick colored border around the insert. Pick ONE that fits the topic mood:
-   - "#00FF00" (bright green) — for science/space/nature topics
-   - "#FF0000" (bright red) — for political/controversial/shocking topics
-   - "#00E5FF" (cyan/teal) — for health/tech/medical topics
-   - "#FF6600" (orange) — for entertainment/drama topics
-3. HOST description: appearance of ${p2Host} as they would look in a podcast (clothing, expression, look)
-4. GUEST description: appearance of ${p2Guest || 'the guest'} (MUST match real photographs if real person)
-
-Reply ONLY in JSON, no markdown:
-{
-  "insertVisual": "Vivid 2-3 sentence description of the center insert image — photorealistic, topic-specific, dramatic",
-  "borderColor": "#RRGGBB hex color",
-  "hostDesc": "One sentence: ${p2Host}'s appearance (hair, clothing, expression) in the podcast",
-  "guestDesc": "One sentence: ${p2Guest || 'guest'}'s appearance (face, hair, clothing, expression) — match real photos if real person"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const p2Raw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const p2Entities = JSON.parse(p2Raw);
-        if (p2Entities.insertVisual) p2InsertVisual = p2Entities.insertVisual;
-        if (p2Entities.borderColor) p2InsertBorderColor = p2Entities.borderColor;
-        if (p2Entities.hostDesc) p2HostDesc = `${p2Host} — ${p2Entities.hostDesc}`;
-        if (p2Entities.guestDesc) {
-          p2GuestDesc = p2Guest
-            ? `${p2Guest} — ${p2Entities.guestDesc}. MATCH REAL PUBLIC PHOTOGRAPHS of ${p2Guest} EXACTLY.`
-            : p2Entities.guestDesc;
-        }
-      } catch (e) {
-        console.warn('[Podcast2] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    prompt = `You are a world-class YouTube thumbnail designer for real podcast channels (Joe Rogan Experience / Lex Fridman / Andrew Huberman style). Create a PHOTOREALISTIC thumbnail that looks like a genuine professional podcast screenshot.
-
-TOPIC: "${title}"
-HOST: ${p2Host}
-GUEST: ${p2Guest || 'podcast guest'}
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ LEFT SIDE (38% of frame): THE HOST
-- ${p2HostDesc}
-- Upper body, shoulders and head clearly visible, cropped at chest/waist level
-- Positioned on the far LEFT, facing INWARD toward the center
-- Studio microphone (black or dark grey, modern podcast mic) visible in front of them in the lower portion
-- Natural expression: engaged, curious, reacting to the topic
-- Slightly blurred warm studio background behind them (out of focus)
-
-▶ RIGHT SIDE (38% of frame): THE GUEST
-- ${p2GuestDesc}
-- Upper body, shoulders and head clearly visible, cropped at chest/waist level
-- Positioned on the far RIGHT, facing INWARD toward the center
-- Studio microphone visible in front of them in the lower portion
-- Natural expression: speaking, explaining, reacting — genuine podcast energy
-- Slightly blurred studio or home background behind them
-
-▶ CENTER INSERT (center 30% of frame, vertically centered, slight portrait or landscape orientation):
-- A RECTANGULAR IMAGE INSERT with a THICK (8-12px equivalent) SOLID COLORED BORDER in ${p2InsertBorderColor}
-- The border is crisp, bold, clearly visible against the background
-- INSIDE the border box: ${p2InsertVisual}
-- The insert photo is photorealistic, sharp, high-contrast, dramatically lit
-- The insert floats in the center, partially overlapping both the host and guest slightly at the edges
-
-▶ BACKGROUND:
-- Warm, ambient, slightly out-of-focus podcast studio environment
-- Studio equipment subtly visible: stands, cables, acoustic panels, colored lighting
-- Real room feel — NOT solid color, NOT plain backdrop
-- The background transitions naturally between the left and right sides
-
-════ STRICT RULES ════
-- NO big text overlay, NO headlines, NO captions on the image (the insert IS the hook)
-- Both people are REAL-LOOKING — photorealistic, NOT illustrated or cartoon
-- ${p2Guest ? `The guest (${p2Guest}) MUST match real public photographs of this person — face, hair, age, look` : 'The guest looks natural and credible'}
-- The CENTER INSERT must be clearly framed with the thick colored border — it stands out as a deliberate element
-- Microphones visible for both hosts — this grounds it as a real podcast
-- 16:9 aspect ratio, 1920×1080${extraNote}`;
-
-  } else if (videoStyle === 'movie_review') {
-    const scriptSnippet = scriptText?.slice(0, 1500) || '';
-    const mrTopicName = (topicName || guestName || '').trim();
-    const mrHookText = (title || '').trim();
-
-    let mrBackgroundScene = 'A dramatic cinematic scene — powerful character in action, intense expression, vivid cinematic lighting, fills the entire frame with rich detail';
-    let mrTopLabel = mrTopicName || 'REVIEW';
-    let mrBottomLabel = 'REVIEW';
-    let mrColorGrade = 'Rich cinematic grade — deep warm tones, high contrast, dramatic feel';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `You are a YouTube thumbnail art director for a cinematic review/analysis channel.
-
-SCRIPT:
-${scriptSnippet}
-
-TOPIC: ${mrTopicName || '(infer from script)'}
-HOOK: "${mrHookText}"
-
-This style works for ANY topic — movie review, book review, documentary, event, business story, sports moment, etc.
-
-Decide:
-1. BACKGROUND SCENE: A dramatic, photorealistic cinematic image that fills the entire frame — related to this specific topic. Could be a movie still, a dramatic event photo, a character in costume, a historical moment, a sports action shot, or any vivid scene directly tied to the script topic.
-2. TOP LABEL: The short topic name shown at the top of the dark box (e.g. a film name, brand name, event name, person's name — 1-4 words ALL CAPS)
-3. BOTTOM LABEL: What type of content this is — shown at the bottom of the dark box (e.g. "MOVIE REVIEW", "BOOK REVIEW", "DEEP DIVE", "FULL STORY", "EXPLAINED", "DOCUMENTARY", "ANALYSIS" — pick the best fit for the script)
-4. COLOR GRADE: The cinematic color mood matching this topic's feel
-
-Reply ONLY in JSON, no markdown:
-{
-  "backgroundScene": "Vivid 2-3 sentence description of the dramatic cinematic image filling the background — specific to THIS topic",
-  "topLabel": "Short topic name (ALL CAPS, 1-4 words)",
-  "bottomLabel": "Content type label (1-2 words ALL CAPS, e.g. MOVIE REVIEW, BOOK REVIEW, DEEP DIVE, FULL STORY, EXPLAINED)",
-  "colorGrade": "Cinematic color grade description"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const mrRaw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const mrEntities = JSON.parse(mrRaw);
-        if (mrEntities.backgroundScene) mrBackgroundScene = mrEntities.backgroundScene;
-        if (mrEntities.topLabel) mrTopLabel = mrEntities.topLabel;
-        if (mrEntities.bottomLabel) mrBottomLabel = mrEntities.bottomLabel;
-        if (mrEntities.colorGrade) mrColorGrade = mrEntities.colorGrade;
-      } catch (e) {
-        console.warn('[MovieReview] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    prompt = `You are a world-class YouTube thumbnail designer for a cinematic review/analysis channel. Create a powerful thumbnail using a dramatic full-frame background image with a dark gold-border overlay box.
-
-TOPIC: ${mrTopLabel}
-HOOK TEXT: "${mrHookText}"
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ BACKGROUND (entire frame — 100% of image):
-${mrBackgroundScene}
-- Fills the ENTIRE 16:9 frame — edge to edge, top to bottom
-- Photorealistic, cinematic — rich detail, dramatic lighting
-- Color grade: ${mrColorGrade}
-- Visually arresting — the kind of image that immediately stops the scroll
-
-▶ CENTER-LEFT OVERLAY BOX (positioned left-center, ~38% of frame width):
-- A DARK SEMI-TRANSPARENT ROUNDED RECTANGLE — near-black (#0d0d0d) at ~85% opacity
-- BORDER: A thin (2-3px) GOLD (#D4AF37) outline around the entire rectangle — the gold border is a KEY design element, must be clearly visible
-- Padding inside the box (~20-25px all sides)
-- INSIDE THE BOX (top to bottom):
-  1. TOP: "${mrTopLabel}" — small white ALL CAPS text, thin font weight, subtle
-  2. MIDDLE: "${mrHookText}" — LARGE BOLD YELLOW (#F5C518) text, 2-3 lines, heavy bold weight. This is the dominant element inside the box — big, impactful.
-  3. BOTTOM: "${mrBottomLabel}" — small white ALL CAPS text, thin font weight
-
-════ STRICT RULES ════
-- BACKGROUND must be a real dramatic photorealistic scene — NOT solid color, NOT studio, NOT plain
-- DARK BOX with GOLD BORDER must be left-center positioned — gold outline clearly visible
-- Hook text MUST appear in LARGE BOLD YELLOW — this is the most critical text element
-- Box is semi-transparent — the background scene is faintly visible through it
-- NO separate host/reviewer face cutout
-- Photorealistic cinematic quality throughout
-- 16:9 aspect ratio, 1920×1080${extraNote}`;
-
-  } else if (videoStyle === 'corkboard_meta') {
-    const cmPresenter = (hostName || '').trim();
-
-    // Parse banner text: [YELLOW] white part
-    const cmRaw = (title || '').trim();
-    const cmBracketMatch = cmRaw.match(/\[([^\]]+)\]/);
-    const cmYellowWord = cmBracketMatch ? cmBracketMatch[1] : cmRaw.split(' ')[0];
-    const cmWhitePart = cmBracketMatch
-      ? cmRaw.replace(/\[[^\]]+\]\s*/, '').trim()
-      : cmRaw.split(' ').slice(1).join(' ');
-
-    const cmPresenterDesc = cmPresenter
-      ? `${cmPresenter} — MATCH REAL PHOTOGRAPHS EXACTLY. Thoughtful expression, chin on hand or pointing gesture, looking left toward the cork board`
-      : 'A confident young male presenter — short brown hair, casual-smart attire, thoughtful chin-on-hand pose, looking left toward the pinned thumbnail';
-
-    const cmScriptSnippet = scriptText?.slice(0, 600) || '';
-    let cmMiniThumbDesc = 'A podcast-style thumbnail: two hosts (older man left with glasses, younger man right) facing each other, bold white text center with one RED highlighted word, black background — classic DOAC/diary-of-a-CEO style';
-    let cmAnnotations: string[] = [];
-
-    if (cmScriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `Script topic: ${cmScriptSnippet}
-Title: "${title}"
-
-For a "thumbnail breakdown" YouTube video, decide:
-1. What mini thumbnail to pin on the cork board — which channel style / what it shows / what the hook text inside it says (make it directly relevant to the script topic)
-2. Should annotation labels appear? Only add them if they genuinely help explain the topic. They are OPTIONAL.
-   If yes, provide 2-3 labels that are SPECIFIC to what's being taught in this script (not generic "Subject/Hook/Caption" unless those are what the script teaches).
-   If the script is not about thumbnail/content strategy, use labels that fit the actual topic being shown on the mini thumbnail.
-
-Reply ONLY in JSON:
-{
-  "miniThumbDesc": "Description of the smaller pinned thumbnail — make it topic-specific",
-  "showLabels": true or false,
-  "labels": ["label1 text", "label2 text", "label3 text"] (2-3 short 2-3 word labels, or empty array if showLabels is false)
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const cmEntityRaw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const cmEntities = JSON.parse(cmEntityRaw);
-        if (cmEntities.miniThumbDesc) cmMiniThumbDesc = cmEntities.miniThumbDesc;
-        if (cmEntities.showLabels && Array.isArray(cmEntities.labels)) {
-          cmAnnotations = cmEntities.labels.slice(0, 3).filter(Boolean);
-        }
-      } catch (e) {
-        console.warn('[CorkboardMeta] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    const cmLabelsBlock = cmAnnotations.length > 0
-      ? `- Three ANNOTATION LABELS floating near the mini thumbnail, each in a GLITCHY/PIXELATED RED-ORANGE rectangle with white bold text:
-  ${cmAnnotations.map((l, i) => `- Label "${l}" with a thin red arrow pointing to a relevant element of the mini thumbnail`).join('\n  ')}
-- The glitchy label boxes have a pixelated/degraded border effect — like a digital glitch filter
-- Thin red lines/arrows connecting each label to its target`
-      : `- NO annotation labels — the pinned thumbnail stands alone on the cork board, clean and simple`;
-
-    prompt = `You are a world-class YouTube thumbnail designer for meta/educational content creators. Create a thumbnail that looks like a PROFESSIONAL CONTENT STRATEGY video thumbnail — "cork board with annotated thumbnail pinned to it" style.
-
-TOPIC: "${title}"
-BANNER TITLE: "${cmYellowWord}" (yellow box) + "${cmWhitePart}" (white text)
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ TOP BANNER (full width, top 12% of frame):
-- BRIGHT BLUE horizontal bar (#1565C0 to #1E88E5) spanning the entire top
-- LEFT PORTION: The word "${cmYellowWord}" inside a SOLID YELLOW RECTANGLE (#FFD700) with BOLD BLACK text — large, dominant
-- RIGHT OF YELLOW BOX: "${cmWhitePart}" in LARGE BOLD WHITE text — same font weight, same size
-- The banner looks like a TV chyron / news ticker — clean, bold, impactful
-
-▶ BACKGROUND (below the banner, fills rest of frame):
-- CORK BULLETIN BOARD texture — realistic warm tan/brown cork material
-- Natural cork surface: slight grain, organic texture, warm amber tones
-- The cork fills the entire background area below the banner
-
-▶ CENTER-LEFT (the pinned element):
-- A SMALLER YOUTUBE THUMBNAIL (about 35% of frame width) pinned to the cork board
-- Slight tilt (~3° clockwise), realistic drop shadow beneath it
-- A RED PUSHPIN at the top-center of the mini thumbnail, pressed into the cork
-- The mini thumbnail content: ${cmMiniThumbDesc}
-${cmLabelsBlock}
-
-▶ RIGHT SIDE (40% of frame):
-- ${cmPresenterDesc}
-- Upper body visible, head and shoulders
-- Clean, well-lit, photorealistic
-- Natural against the cork board background
-
-════ STRICT RULES ════
-- TOP BANNER = YELLOW BOX + WHITE TEXT on BRIGHT BLUE — this is the most important text element
-- Cork board texture MUST look realistic — warm grain, natural material, not a flat color
-- The red pushpin pressed into the cork at the top of the mini thumbnail is mandatory
-${cmAnnotations.length > 0 ? '- Annotation label boxes MUST have the glitchy/pixelated red-orange border effect — NOT clean rectangles\n- Red arrows/lines must visibly connect each label to its target' : '- No annotation labels — keep it clean'}
-- Photorealistic — NOT cartoon or illustrated
-- 16:9 aspect ratio, 1920×1080${extraNote}`;
-
-  } else if (videoStyle === 'podcast_4') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    const p4Subject = (guestName || hostName || '').trim();
-
-    let p4PostText = (title || 'I Quit...').trim();
-
-    let p4SubjectDesc = p4Subject
-      ? `${p4Subject} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. Extreme left-side close-up, deeply emotional expression (tears, praying hands, devastated look)`
-      : 'The main person in the story — extreme left-side close-up face, deeply emotional expression, tears or praying hands';
-    let p4ReactorDesc = hostName && guestName
-      ? `${hostName} — close-up face on the right side, serious concerned expression, looking straight at viewer`
-      : 'A serious young narrator/reactor — close-up face on the right side, furrowed brow, concerned expression, looking at camera';
-    let p4AccountName = p4Subject || 'Unknown';
-    let p4CensorText = 'CENSORED';
-    let p4PostTime = '11:25 PM · Jul 29, 2019';
-    let p4Platform = 'Twitter/X';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `You are a YouTube thumbnail art director for a scandal/documentary channel. Analyze this script and decide the visual elements.
-
-SCRIPT:
-${scriptSnippet}
-
-SUBJECT (person story is about): ${p4Subject || '(infer from script)'}
-HOST/NARRATOR (reactor on right): ${hostName || '(infer from script)'}
-USER-SELECTED POST TEXT: "${p4PostText}"
-
-Decide:
-1. Subject's appearance and emotional expression (the person on the LEFT who the story is about)
-2. Narrator/reactor's appearance (the person on the RIGHT reacting/narrating)
-3. The social media account name and platform shown in the post screenshot
-4. The word on the BLACK CENSORSHIP BAR over the left person's eyes — the most sensitive/shocking word SPECIFIC to this script (censored with * e.g. "SU*CIDE", "BANK*RUPT", "FR**D", "FIR*D", "M*RDER", "RUINED", "B*OKRUPT") — NEVER use "EXPOSED" or generic words
-5. A realistic-looking timestamp for the viral post
-6. The best 2-6 word post message for the social media screenshot — if user-selected post text is good (2-6 words, feels like a real post), use it as-is. Otherwise write a better topic-specific one that captures the actual viral turning point from the script. Must sound like a real social media post, NOT a headline.
-
-Reply ONLY in JSON, no markdown:
-{
-  "subjectDesc": "Vivid description of left person's appearance + emotional state (crying/praying/devastated)",
-  "reactorDesc": "Description of right person's appearance + serious concerned expression",
-  "accountName": "The social media account name for the post (real or made up to match topic)",
-  "platform": "Twitter/X or Instagram or WhatsApp",
-  "censorText": "The word shown on the black censor bar (2-10 chars, censored with * — topic-specific, NEVER 'EXPOSED')",
-  "postTime": "A realistic timestamp (e.g. '11:25 PM · Jul 29, 2019')",
-  "postText": "The final 2-6 word post message shown in giant bold text inside the screenshot"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const p4Raw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const p4Entities = JSON.parse(p4Raw);
-        if (p4Entities.subjectDesc) {
-          p4SubjectDesc = p4Subject
-            ? `${p4Subject} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. ${p4Entities.subjectDesc}`
-            : p4Entities.subjectDesc;
-        }
-        if (p4Entities.reactorDesc) p4ReactorDesc = p4Entities.reactorDesc;
-        if (p4Entities.accountName) p4AccountName = p4Entities.accountName;
-        if (p4Entities.platform) p4Platform = p4Entities.platform;
-        if (p4Entities.censorText) p4CensorText = p4Entities.censorText;
-        if (p4Entities.postTime) p4PostTime = p4Entities.postTime;
-        if (p4Entities.postText) p4PostText = p4Entities.postText;
-      } catch (e) {
-        console.warn('[Podcast4] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    prompt = `You are a world-class YouTube thumbnail designer for scandal documentary / investigative exposé channels. Create a dark, dramatic, cinematic thumbnail — style inspired by Indian business scandal channels (Think School / Dhruv Rathee / Nikhil Kamath-style investigative content).
-
-TOPIC: "${title}"
-VIRAL POST MESSAGE: "${p4PostText}"
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ BACKGROUND (full frame):
-- Near-black to very dark charcoal (#0a0a0a → #1a1a1a), slight vignette at all edges
-- Dark, heavy, serious — no color, no patterns — just deep darkness
-
-▶ LEFT SIDE (30% of frame): THE SUBJECT'S FACE
-- ${p4SubjectDesc}
-- Extreme close-up — face fills the left 30%, cropped tight (chin to forehead)
-- Expression: devastated, crying, praying hands pressed together at chin level — raw emotion
-- A THICK BLACK HORIZONTAL BAR across the eyes area (like a censorship/redaction bar)
-  - Inside the black bar: white bold ALL-CAPS text "${p4CensorText}" — worn/distressed font style
-  - The bar sits at eye level, partially covering the eyes — this is a critical visual element
-- Slightly dark/desaturated tone — moody, heavy
-
-▶ CENTER (40% of frame): THE VIRAL SOCIAL MEDIA POST
-- A large FLOATING SCREENSHOT of a ${p4Platform} post, centered, slightly tilted (~2°), taking up ~40% of frame width
-- The screenshot looks like a real ${p4Platform} post card — slightly worn/grungy white or light grey background
-- INSIDE THE SCREENSHOT:
-  - TOP: Small profile photo (logo/avatar) + account name "${p4AccountName}" + verified blue checkmark
-  - MIDDLE: The post message in GIANT BOLD dark typography: "${p4PostText}"
-  - Below the text: a SHORT THICK RED HORIZONTAL LINE underline
-  - BOTTOM: Timestamp "${p4PostTime}" + engagement stats (2K · 15K ♥ · 1.9M views) in small grey text
-- The screenshot has a subtle drop shadow and slight edge glow, floating against the dark background
-
-▶ RIGHT SIDE (30% of frame): THE NARRATOR/REACTOR'S FACE
-- ${p4ReactorDesc}
-- Extreme close-up — face fills the right 30%, cropped tight
-- Expression: serious, concerned, slightly furrowed brow — watching the viewer directly
-- Same dark moody treatment as the left face
-
-════ STRICT RULES ════
-- The BLACK CENSOR BAR with white text on the left face is a MANDATORY element — make it clearly visible
-- The social media screenshot must look like a REAL ${p4Platform} post — not a generic card
-- "${p4PostText}" must appear in VERY LARGE bold text inside the screenshot — this is the visual center of gravity
-- The RED UNDERLINE below the post text is important — thick, saturated red (#FF0000)
-- Overall color palette: near-black background, white/grey screenshot, red underline, dark faces
-- Photorealistic — NOT illustrated or cartoon
-- 16:9 aspect ratio, 1920×1080${extraNote}`;
-
-  } else if (videoStyle === 'podcast_3') {
-    const p3Speaker = (guestName || hostName || 'the speaker').trim();
-
-    // Parse statement: extract [BRACKETED] word and split sentence
-    const p3Raw = (title || '').trim();
-    const p3BracketMatch = p3Raw.match(/\[([^\]]+)\]/);
-    const p3HighlightWord = p3BracketMatch ? p3BracketMatch[1] : '';
-    const p3FullStatement = p3Raw.replace(/\[|\]/g, '');
-    const p3BeforeHighlight = p3BracketMatch
-      ? p3Raw.substring(0, p3Raw.indexOf('[')).replace(/\[|\]/g, '').trim()
-      : '';
-    const p3AfterHighlight = p3BracketMatch
-      ? p3Raw.substring(p3Raw.indexOf(']') + 1).replace(/\[|\]/g, '').trim()
-      : '';
-
-    let p3SpeakerDesc = p3Speaker !== 'the speaker'
-      ? `${p3Speaker} — MATCH REAL PUBLIC PHOTOGRAPHS of ${p3Speaker} EXACTLY. Upper body portrait, professional, facing slightly left toward the text, microphone at bottom`
-      : 'A confident professional expert — upper body portrait, facing slightly left, microphone at bottom, natural expression';
-
-    let p3ChartOverlay = '';
-    const scriptSnippet = scriptText?.slice(0, 800) || '';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `SCRIPT EXCERPT: ${scriptSnippet}
-SPEAKER: ${p3Speaker}
-STATEMENT: "${p3FullStatement}"
-
-Is this topic finance/crypto/investing/economics? If yes, what chart or data visual would work as a subtle background overlay?
-Also describe the speaker's exact appearance.
-
-Reply ONLY in JSON:
-{
-  "speakerDesc": "One sentence: speaker's appearance (hair, age, clothing style, expression — natural podcast look)",
-  "chartOverlay": "If finance topic: describe a chart (e.g. 'red and green candlestick chart trending upward with yellow moving average lines') — otherwise empty string"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const p3EntityRaw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const p3Entities = JSON.parse(p3EntityRaw);
-        if (p3Entities.speakerDesc) {
-          p3SpeakerDesc = p3Speaker !== 'the speaker'
-            ? `${p3Speaker} — ${p3Entities.speakerDesc}. MATCH REAL PUBLIC PHOTOGRAPHS of ${p3Speaker} EXACTLY.`
-            : p3Entities.speakerDesc;
-        }
-        if (p3Entities.chartOverlay) p3ChartOverlay = p3Entities.chartOverlay;
-      } catch (e) {
-        console.warn('[Podcast3] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    prompt = `You are a world-class YouTube thumbnail designer for financial and opinion podcasts ("When Shift Happens" / Lex Fridman / Real Vision style). Create a clean, powerful, professional thumbnail with a DEEP RED BACKGROUND.
-
-SPEAKER: ${p3Speaker}
-STATEMENT: "${p3FullStatement}"
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ BACKGROUND (full frame):
-- Deep rich crimson red gradient — brighter/lighter red in the center-right (behind the face), darker toward the left and all corners
-- Color: center #CC2020 → edges #550000, smooth radial vignette
-- Clean, bold, professional — NOT textured, NOT grungy
-${p3ChartOverlay ? `- Subtle OVERLAY on left side: ${p3ChartOverlay} — semi-transparent (30-40% opacity) layered on the red background, gives financial/data context without overwhelming the text` : ''}
-
-▶ LEFT SIDE (45% of frame): THE BOLD STATEMENT
-- Render the sentence in LARGE, CLEAN, BOLD typography — like a direct quote from the speaker
-- Font: heavy bold sans-serif (similar to bold Helvetica/DM Sans/Nunito) — NOT Impact, NOT condensed
-${p3HighlightWord ? `- The word(s) "${p3HighlightWord}" rendered inside a SOLID YELLOW RECTANGLE (#FFD700 or #FFEB00) with BOLD BLACK text — the yellow box is the visual stinger
-- "${p3BeforeHighlight}" in white before the yellow box (on its own line or inline)
-- "${p3AfterHighlight}" in white after the yellow box
-- The yellow box word POPS off the red background — this is the most eye-catching element` : `- Full statement "${p3FullStatement}" in large white bold text, 2-4 lines, left-aligned`}
-- Text is 3-4 lines total, left-aligned, starting about 1/4 from the left edge
-- Text takes up the middle-left 40% of the frame vertically
-- BELOW the statement text (lower left): A small italic attribution line — "- ${p3Speaker}" in white italic script font, with a small curved arrow (→ or ↓) pointing toward the person on the right
-
-▶ RIGHT SIDE (55% of frame): THE SPEAKER
-- ${p3SpeakerDesc}
-- Clean photorealistic cutout — person placed against the red background naturally
-- Upper body clearly visible: head, shoulders, chest, slightly cropped at mid-torso
-- A professional studio microphone (dark/black, modern podcast mic) visible at the bottom in front of them
-- Expression: calm, confident, assertive — as if they just delivered the statement
-- Soft warm rim light on one side, matching the red background mood
-
-════ STRICT RULES ════
-- The YELLOW HIGHLIGHT BOX is the most critical element — must be clearly visible, sharp, clean rectangle
-- Background is SOLID RED GRADIENT — absolutely no photos, no scenes, no studio blur behind
-${p3ChartOverlay ? '- Chart overlay is SEMI-TRANSPARENT — text and person must remain fully readable over it' : ''}
-- NO large channel watermark or logo — only if the speaker/channel specifically requires it
-- Person must be photorealistic and recognizable as ${p3Speaker}
-- Typography is clean professional sans-serif — NOT grungy, NOT handwritten (except the small attribution line)
-- 16:9 aspect ratio, 1920×1080${extraNote}`;
-
-  } else if (videoStyle === 'cinematic_drama') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    const cdProtagonist = (guestName || hostName || '').trim();
-
-    let cdFaceDesc = cdProtagonist
-      ? `${cdProtagonist} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. Extreme close-up, right side of frame, filling 40-50% of frame, intense beaten/emotional/mystical expression`
-      : 'A dramatic intense face — extreme close-up, right side of frame, expression of pain/determination/shock/mystery';
-    let cdBackgroundScene = 'A dramatic cinematic outdoor scene — action, confrontation, or symbolic elements specific to the topic, filling the left side and background';
-    let cdColorGrade = 'Rich golden-hour warmth with deep blue shadows, high contrast cinematic grade';
-    let cdForegroundProp = '';
-    let cdMinimalText = (title || '').trim().split(/\s*—\s*/)[0] || '';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `You are a Bollywood/cinematic YouTube thumbnail art director. Your thumbnails have ZERO text — the entire story is told through dramatic visuals.
-
-SCRIPT:
-${scriptSnippet}
-
-TITLE: "${title}"
-MAIN PERSON (extreme close-up face on right): ${cdProtagonist || '(infer from script)'}
-
-Design a cinematic multi-layer thumbnail. Decide:
-1. FACE/PROTAGONIST: Who is the extreme close-up face? Describe their appearance and expression vividly.
-2. BACKGROUND SCENE: What dramatic scene fills the left side and background? (fight, confrontation, burning, laughing group, conspiracy, nature scene — match script topic exactly)
-3. FOREGROUND PROP (optional): Is there any dramatic prop in the very foreground? (a burning movie poster, a gun held out, a hand showing something — only if it strongly tells the story)
-4. COLOR GRADE: The overall cinematic color mood (e.g. "golden harvest fields with deep blue sky", "dark moody navy with blood red accents", "bright outdoor daylight with warm orange tones")
-5. COMEDY OR DRAMA?: Is this primarily comedy (bright, laughing, absurd contrast) or serious drama (dark, violent, emotional)?
-
-Reply ONLY in JSON, no markdown:
-{
-  "faceDesc": "Vivid description of the extreme close-up face — who, expression, makeup/wounds/look",
-  "backgroundScene": "Vivid 2-3 sentence description of the dramatic background scene (left side + full background)",
-  "foregroundProp": "One sentence describing any dramatic prop in the very foreground (or empty string if none)",
-  "colorGrade": "Cinematic color grade description (e.g. 'golden fields + deep blue sky', 'dark shadows + blood red')",
-  "mood": "comedy" or "drama"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const cdRaw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const cdEntities = JSON.parse(cdRaw);
-        if (cdEntities.faceDesc) {
-          cdFaceDesc = cdProtagonist
-            ? `${cdProtagonist} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. ${cdEntities.faceDesc}`
-            : cdEntities.faceDesc;
-        }
-        if (cdEntities.backgroundScene) cdBackgroundScene = cdEntities.backgroundScene;
-        if (cdEntities.foregroundProp) cdForegroundProp = cdEntities.foregroundProp;
-        if (cdEntities.colorGrade) cdColorGrade = cdEntities.colorGrade;
-      } catch (e) {
-        console.warn('[CinematicDrama] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    const cdTextLine = title && title.trim()
-      ? `\n▶ MINIMAL TEXT (if any):\n- ONLY this small element: "${title}" — rendered in plain white text, top-left corner, small size, as if a character quote or subtitle. Keep it subtle — it should NOT dominate.\n`
-      : '';
-
-    prompt = `You are a world-class Bollywood/cinematic YouTube thumbnail designer. Create a PHOTOREALISTIC, CINEMATIC thumbnail with ZERO or minimal text — the visuals tell the entire story.
-
-TOPIC: "${title}"
-
-════ COMPOSITION — 1920×1080, 16:9 ════
-
-▶ RIGHT SIDE (40-50% of frame): EXTREME CLOSE-UP FACE — THE EMOTIONAL ANCHOR
-- ${cdFaceDesc}
-- Extreme close-up: face fills the right 40-50% of the frame — eyes, nose, mouth fully visible, cropped just below chin
-- Expression MUST be intense and story-telling: beaten/bloodied, mystical/glowing eyes, crying, laughing, shocked, determined
-- Photorealistic skin texture, dramatic rim lighting (warm or cold based on mood)
-- This face IS the emotional hook — the viewer must feel something immediately
-
-▶ LEFT SIDE + BACKGROUND (60% of frame behind the face): THE DRAMATIC SCENE
-- ${cdBackgroundScene}
-- Multiple figures or elements composited in a naturalistic scene — NOT a studio background
-- Rich depth: foreground elements → middle ground characters → background sky/environment
-- The background scene extends behind the close-up face as well (the face is composited OVER it)
-${cdForegroundProp ? `\n▶ VERY FOREGROUND PROP (closest to viewer, partially in frame):\n- ${cdForegroundProp}\n- Slightly out of focus at very front, dramatic effect — a hand, an object, bleeding into frame from edge` : ''}
-${cdTextLine}
-▶ COLOR GRADE & MOOD:
-- ${cdColorGrade}
-- High contrast, richly saturated — think Bollywood movie poster or A24 film still
-- Deep shadows with punchy highlights — NOT flat or washed out
-
-════ STRICT RULES ════
-- ZERO large text overlay — NO title, NO caption boxes, NO channel name
-${title && title.trim() ? `- The ONLY allowed text: "${title}" — tiny, subtle, top corner` : '- ABSOLUTELY NO text anywhere on the image'}
-- Photorealistic — NOT illustrated, NOT 3D cartoon, NOT anime (unless script demands it)
-- Multi-layer depth: foreground / middle / background all populated with story elements
-- The thumbnail must be FULLY UNDERSTOOD without reading any text — pure visual storytelling
-- Cinematic quality — looks like a frame from a high-budget Bollywood or thriller film
-- 16:9 aspect ratio, 1920×1080${extraNote}`;
-
-  } else if (videoStyle === 'news_dramatic') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    const ndCelebrity = (guestName || hostName || '').trim();
-
-    // Parse pipe-separated headline | subheadline from title
-    const ndTitleClean = (title || '').trim();
-    const ndParts = ndTitleClean.split(/\s*\|\s*/);
-    let ndHeadline = (ndParts[0] || ndTitleClean).toUpperCase().trim();
-    let ndSubheadline = (ndParts[1] || '').toUpperCase().trim();
-
-    let ndBackgroundScene = 'A dramatic cinematic political/geopolitical scene — government buildings, crowds, flags, or conflict imagery — photorealistic, intense warm tones, fills the full background';
-    let ndCelebrityDescription = ndCelebrity
-      ? `${ndCelebrity} — photorealistic, match real public photographs EXACTLY. Large head + upper body, expression of shock or deep concern`
-      : 'The most prominent real person from this story — photorealistic, large head + upper body, intense expression';
-    let ndSceneMood = 'dark dramatic stormy atmosphere with warm orange glow';
-
-    if (scriptSnippet) {
-      onStep?.('analyzing');
-      try {
-        const entityResponse = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: [{
-            role: 'user',
-            parts: [{
-              text: `You are a YouTube thumbnail art director for an Indian breaking news channel (Career247 / ABP / India TV style).
-
-SCRIPT:
-${scriptSnippet}
-
-TOPIC TITLE: "${ndTitleClean}"
-FEATURED PERSON: ${ndCelebrity || '(infer from script — pick the most prominent real person in this story)'}
-
-Analyze the script and decide ALL of the following:
-
-1. BACKGROUND SCENE: A dramatic, photorealistic cinematic image that fills the entire frame as background. Must be 100% specific to THIS script's topic — could be war, protests, government building, courtroom, stock market crash, space scene, factory, border, hospital, parliament, etc. Describe exactly what's in the scene, the lighting, colors, mood. 2-3 vivid sentences.
-
-2. CELEBRITY/PERSON: The main person's real name, appearance (face features, hair, age, clothing), and their emotional expression. If they're a real public figure, note their signature look so the image model can match them accurately.
-
-3. HEADLINE (for BLUE BOX): A punchy 2-4 word ALL-CAPS breaking news headline capturing the MAIN EVENT from the script. Examples: "TRUMP BANS INDIA", "WAR DECLARED!!", "MARKET CRASHES", "INDIA STRIKES BACK". Extract from the script — NOT from example.
-
-4. SUBHEADLINE (for DARK BOX below blue): A punchy 2-5 word ALL-CAPS consequence or reaction from the script. Examples: "PAKISTAN IN SHOCK", "DOLLAR HITS 90", "MARKETS IN FREEFALL". Extract from the script.
-
-5. SCENE MOOD: One short phrase describing the dominant color/atmosphere of the background (e.g. "fiery orange war zone", "cold blue parliament crisis", "green jungle military", "grey urban riots")
-
-Reply ONLY in JSON, no markdown:
-{
-  "backgroundScene": "Vivid 2-3 sentence cinematic description — 100% specific to this script topic",
-  "celebrity": "Person name + appearance description + expression",
-  "headlineText": "2-4 WORD HEADLINE ALL CAPS",
-  "subheadlineText": "2-5 WORD SUBHEADLINE ALL CAPS",
-  "sceneMood": "short atmosphere phrase"
-}`
-            }]
-          }],
-          config: { responseMimeType: 'application/json' },
-        });
-        const ndRaw = (() => {
-          const raw = entityResponse.text?.trim() || '{}';
-          const m = raw.match(/\{[\s\S]*\}/);
-          return m ? m[0] : '{}';
-        })();
-        const ndEntities = JSON.parse(ndRaw);
-        if (ndEntities.backgroundScene) ndBackgroundScene = ndEntities.backgroundScene;
-        if (ndEntities.celebrity) {
-          ndCelebrityDescription = ndCelebrity
-            ? `${ndCelebrity} — MATCH REAL PUBLIC PHOTOGRAPHS EXACTLY. ${ndEntities.celebrity}`
-            : ndEntities.celebrity;
-        }
-        if (ndEntities.headlineText) ndHeadline = ndEntities.headlineText.toUpperCase();
-        if (ndEntities.subheadlineText) ndSubheadline = ndEntities.subheadlineText.toUpperCase();
-        if (ndEntities.sceneMood) ndSceneMood = ndEntities.sceneMood;
-      } catch (e) {
-        console.warn('[NewsDramatic] entity extraction failed, using fallback:', e);
-      }
-    }
-
-    prompt = `You are a world-class YouTube thumbnail designer replicating the exact visual style of viral Indian breaking news channels like Career247, ABP News, India TV. Create a PHOTOREALISTIC, CINEMATIC thumbnail.
-
-TOPIC: "${ndTitleClean}"
-
-════ EXACT LAYOUT — 1920×1080, 16:9 ════
-
-▶ FULL BACKGROUND (entire frame):
-${ndBackgroundScene}
-- This photorealistic scene fills the ENTIRE 1920×1080 frame edge-to-edge — like a real news photo
-- Atmospheric: ${ndSceneMood}
-- Ultra-detailed, high dynamic range, photojournalistic quality
-- NO solid color backgrounds — every pixel of background is this scene
-
-▶ LEFT SIDE TEXT BLOCKS (occupying left ~30% of frame, stacked vertically, center-left position):
-- BLOCK 1 — BRIGHT BLUE RECTANGLE (#1565C0 or #0D47A1):
-  - Solid bold blue filled rectangle, width ~28% of frame, tight padding
-  - Inside: "${ndHeadline}" in white bold ALL-CAPS Impact/Arial-Black font
-  - Text is very large, 2-3 lines, centered inside the blue block
-  - Blue rectangle has sharp edges — NO rounded corners, NO border, NO drop shadow
-- BLOCK 2 — DARK CHARCOAL RECTANGLE (#1a1a1a or #111111), directly below Block 1, same width:
-  - Inside: "${ndSubheadline}" in white bold ALL-CAPS font, slightly smaller than Block 1 text
-  - Same sharp-edged rectangle style, flush below Block 1 with zero gap
-- Both blocks together form a tall stacked text column on the left side
-
-▶ FEATURED PERSON (LARGE, center-left to center, IN FOREGROUND over everything):
-- ${ndCelebrityDescription}
-- VERY LARGE head and upper body — person's face should be at least 40% of frame height
-- Positioned CENTER to SLIGHTLY LEFT of center — person OVERLAPS both the text blocks on the left AND the background on the right
-- The person is COMPOSITED IN FRONT of everything — text blocks are partially behind their body/arms, background is fully behind
-- Expression: INTENSE — shocked, stressed, angry, concerned, or grim — matching the news story mood
-- Photorealistic skin, hair, clothing — looks like a real photograph, NOT illustrated
-- Slight dramatic rim lighting matching the background atmosphere
-- Person's body cuts INTO both zones — this overlapping creates the Career247 style depth
-
-════ STRICT RULES ════
-- BACKGROUND: real photorealistic scene, NOT solid color, NOT generic studio — 100% topic-specific
-- TEXT BLOCKS: solid filled rectangles, sharp edges, bold legible white text, proper ABP/Career247 news style
-- PERSON: LARGE, in FOREGROUND, overlapping text AND background — this layering is CRITICAL
-- Photorealistic throughout — NOT illustrated, NOT cartoon, NOT 3D render
-- NO channel name, NO logo, NO "By [Name]", NO watermarks ANYWHERE
-- 16:9 aspect ratio, 1920×1080${extraNote}`;
-
-  } else if (videoStyle === 'situational') {
-    const scriptSnippet = scriptText?.slice(0, 2000) || '';
-    prompt = `You are a world-class YouTube thumbnail designer specializing in personal story and emotional content.
-
-YOUR TASK:
-Create a powerful single-person YouTube thumbnail for the story/situation below. No reference image provided — design from scratch.
-
-CRITICAL — ANALYZE THE SCRIPT AND DETERMINE THE PERSON TYPE:
-Read the script carefully and identify WHO the main person is. Choose from:
-- Young man (22-30, modern casual clothes, city person)
-- Middle-class man (30-45, plain shirt or simple suit, ordinary look)
-- Wealthy/rich man (40-55, expensive suit, watch, polished look)
-- Young woman (22-32, modern professional or casual)
-- Middle-aged woman (35-50, everyday practical look)
-- Elderly man or woman (60+, aged face, life-worn look)
-- Working class / simple person (any age, plain worn clothes)
-Pick the type that EXACTLY matches who this story is about.
-
-HOOK TEXT: "${title}"
-${scriptSnippet ? `SCRIPT / TOPIC CONTENT:\n${scriptSnippet}` : ''}
-
-LAYOUT (follow strictly):
-- ONE person only — positioned on the RIGHT side of the frame, looking slightly left (toward the text), natural pose
-- Hook text on the LEFT side — bold, large, prominent, 2-3 lines max, high contrast color (yellow/white on dark background)
-- Background: dark, dramatic, moody — deep charcoal, dark teal, or deep maroon. NOT white.
-- Expression: matches the emotional weight — stressed, reflective, shocked, or determined based on the topic
-- A studio microphone visible near the person (subtle, not dominant)
-- NO second person. ONE compelling face that tells the whole story.
-
-STYLE RULES:
-- High contrast, cinematic quality, sharply focused
-- Photorealistic, NOT illustrated or cartoon
-- 16:9 aspect ratio, 1920×1080 quality
-- Bold, clean sans-serif typography for the hook text${extraNote}`;
-
-  } else if (videoStyle === 'debate') {
-    prompt = `You are a world-class YouTube thumbnail designer specializing in debate and confrontational content.
-
-YOUR TASK:
-Create a high-impact YouTube debate thumbnail — two people on opposite sides, tense confrontation energy.
-
-HOOK TEXT: "${title}"
-${hostName ? `LEFT PERSON: ${hostName}` : 'LEFT PERSON: Generate a realistic confident male debater'}
-${guestName ? `RIGHT PERSON: ${guestName}` : 'RIGHT PERSON: Generate a realistic confident male debater'}
-
-LAYOUT (follow strictly):
-1. LEFT SIDE: ${hostName || 'Person A'} — large face close-up, pointing aggressively or looking serious. Expression: confident, challenging.
-2. RIGHT SIDE: ${guestName || 'Person B'} — large face close-up, matching energy. Expression: defensive or equally confident.
-3. CENTER: Bold hook text "${title}" — large, split across two lines, in high-contrast color (red/yellow/white). Can have a thin divider line between the two faces.
-4. BACKGROUND: Dark gradient, deep blue or charcoal, with dramatic lighting hitting both faces.
-5. Optional: A subtle VS graphic or divider between the two people.
-
-STYLE RULES:
-- High contrast, cinematic quality, tense energy
-- Both faces must look photorealistic and different from each other
-- Text must be LARGE and clearly readable
-- NOT illustrated or cartoon
-- 16:9 aspect ratio, 1920×1080 quality${extraNote}`;
-
-  } else {
-    prompt = `
-    Create a high-quality, professional YouTube podcast thumbnail in the style of the Joe Rogan Experience.
-    
-    COMPOSITION:
-    1. **Subjects**: Two people facing each other in deep conversation. ${hostName ? `On the right is ${hostName}.` : 'On the right is a random realistic person fitting the topic.'} ${guestName ? `On the left is ${guestName}.` : 'On the left is a random realistic person fitting the topic.'}
-    2. **Title Card**: In the center, between the two people, there is a clean white rounded rectangle title card. 
-       - Inside the card, at the top, show the name "${guestName || 'Guest'}" with a small circular profile picture and a blue verified checkmark.
-       - Below that, the hook text "${title}" in large, bold, black and red sans-serif typography — make it BIG and eye-catching.
-    3. **Foreground**: Two professional black studio microphones (like Shure SM7B) should be visible in the bottom foreground, one for each person.
-    4. **Background**: A clean, pure white background.
-    5. **Style**: Photorealistic, cinematic lighting, high contrast, sharp details.
-    
-    The final image should look exactly like a professional podcast thumbnail from a top-tier show.${extraNote}
-    `;
-  }
-
-  // Signal image generation is starting (for non-referenceImage flows)
-  if (!referenceImage) {
-    onStep?.('generating');
-  }
+  const prompt = `${styleIntro}${conceptLine}${faceDir}${textDirective(title)} ${topicDirective(topicQuery)}${BASE_THUMB}`;
+
+  const parts: any[] = [];
+  if (styleRef) parts.push({ inlineData: { data: styleRef.data, mimeType: styleRef.mimeType } });
+  if (faceImage) parts.push({ inlineData: { data: faceImage.data, mimeType: faceImage.mimeType } });
+  parts.push({ text: prompt });
 
   try {
-    const parts: any[] = [];
-    // For professor_jiang style, prepend the reference photo so Gemini uses that face
-    if (professorImagePart) {
-      parts.push(professorImagePart);
-    }
-    parts.push({ text: prompt });
-
     const response = await ai.models.generateContent({
       model: getImageModel(),
-      contents: { parts: parts },
+      contents: { parts },
       config: {
         responseModalities: [Modality.IMAGE],
-        imageConfig: {
-          aspectRatio: "16:9",
-          personGeneration: IMAGE_PERSON_GENERATION,
-        },
+        imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
         safetySettings: IMAGE_SAFETY_SETTINGS,
-      }
+      },
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        const mimeType = part.inlineData.mimeType || 'image/png';
-        return `data:${mimeType};base64,${part.inlineData.data}`;
+        return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
       }
     }
   } catch (e: any) {
     if (e?.status === 'RESOURCE_EXHAUSTED' || e?.code === 429) {
       throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
     }
-    console.error("Thumbnail generation failed", e);
+    console.error('Thumbnail generation failed', e);
     throw e;
   }
 
-  throw new Error("No image generated");
+  throw new Error('No image generated');
 };
 
 export const generateVideoBackground = async (hostName: string, guestName: string): Promise<string> => {
@@ -8053,24 +5725,15 @@ export const generateStoryboardImage = async (
   const ai = getAi();
 
   const characterSection = characterGuide
-    ? `\nCharacter consistency — draw them exactly like this, same face/clothes/hair as every other scene: ${characterGuide}\n`
+    ? ` Character consistency — draw them exactly like this, same face/clothes/hair as every other scene: ${characterGuide}`
     : '';
 
-  // Scene comes first and plain — image models track the actual subject better
-  // when it isn't buried under a long numbered list of secondary instructions.
-  const fullPrompt = `
-Scene to draw: ${prompt}
-
-Draw this exact scene. Include everyone and everything mentioned in it — who/what is
-there, what they are doing, any objects involved, and where it's happening. Don't drop
-or simplify away any part of the scene.
-${characterSection}
-Art style: MS Paint — crude, simple, hand-drawn, basic bold colors, flat shading,
-unpolished, like it was drawn with a mouse. NOT a clean, polished, modern 2D vector
-illustration or story-book art.
-
-Plain white or very simple background. No text anywhere in the image. Aspect ratio ${aspectRatio}.
-`;
+  // Keep this as close to the raw scene prompt as possible — just one style
+  // line appended at the end. Explicitly saying "MS Paint" made the model
+  // render an actual Windows Paint application window (title bar, menus,
+  // blank margins) instead of just adopting the crude flat art style, so
+  // this describes the look directly instead.
+  const fullPrompt = `${prompt}.${characterSection} Simple flat 2D cartoon clip-art illustration style, bold black outlines, vibrant colorful flat colors, minimal shading, no text, no watermark, no app windows or UI chrome, full-bleed edge-to-edge with no borders or blank margins, aspect ratio ${aspectRatio}.`;
 
   const response = await ai.models.generateContent({
     model: getImageModel(),

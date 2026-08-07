@@ -61,17 +61,11 @@ const isQuotaError = (e: any) => /RESOURCE_EXHAUSTED|429|quota exceeded/i.test(e
 // (not per-scene) — at most MAX_PER_WINDOW generation attempts started in
 // any trailing WINDOW_MS. Vertex's quota for this image model is tight
 // enough that even "one at a time" wasn't safe; this caps it explicitly.
+// Only the background "Generate All" job goes through this — manual
+// per-scene clicks fire immediately/concurrently by design.
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 2;
 const recentAttempts: number[] = [];
-
-// Exported so manual per-scene "Generate" clicks (Storyboard.tsx's own
-// handleGenerateImage) share this same sliding window with the background
-// job — otherwise manual clicks fire unthrottled and burst straight into
-// Vertex's tight per-minute cap regardless of what the job is doing.
-export async function throttleGeneration(abort: () => boolean = () => false): Promise<void> {
-  return throttle(abort);
-}
 
 async function throttle(abort: () => boolean): Promise<void> {
   for (;;) {
@@ -116,7 +110,7 @@ export function stopGenJob(scriptSignature: string): void {
   if (currentJob && currentJob.scriptSignature === scriptSignature) currentJob.abort = true;
 }
 
-const QUOTA_RETRY_WAIT_MS = 60_000;
+const QUOTA_RETRY_WAIT_MS = 30_000;
 const MAX_QUOTA_RETRIES_PER_SCENE = 5;
 
 export function startGenJob(
@@ -149,7 +143,7 @@ export function startGenJob(
       while (!job.abort) {
         job.status = attempt === 0
           ? `Scene ${scene.sceneNumber}: generating…`
-          : `Scene ${scene.sceneNumber}: quota-limited, waited a minute — retrying (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
+          : `Scene ${scene.sceneNumber}: quota-limited, waited 30s — retrying (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
         notify(job);
 
         await throttle(() => job.abort);
@@ -175,7 +169,7 @@ export function startGenJob(
 
         if (result !== 'quota' || attempt >= MAX_QUOTA_RETRIES_PER_SCENE) break;
         attempt++;
-        job.status = `Scene ${scene.sceneNumber}: quota-limited — waiting a minute before retry (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
+        job.status = `Scene ${scene.sceneNumber}: quota-limited — waiting 30s before retry (${attempt}/${MAX_QUOTA_RETRIES_PER_SCENE})…`;
         notify(job);
         for (let waited = 0; waited < QUOTA_RETRY_WAIT_MS && !job.abort; waited += 500) {
           await new Promise(r => setTimeout(r, Math.min(500, QUOTA_RETRY_WAIT_MS - waited)));

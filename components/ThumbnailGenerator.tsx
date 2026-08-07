@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DebateSegment, ThumbnailState, YoutubeImportData } from '../types';
-import { generateThumbnail, generateTitles, generateThumbnailText, generateThumbnailInspiration, generateTitleTextPair, ThumbnailVideoStyle } from '../services/geminiService';
-import { fetchRandomStyleReference } from '../services/styleRefClient';
+import { generateThumbnail, generateThumbnailInspiration, generateTitleTextPair } from '../services/geminiService';
 import {
   Image, Loader2, RefreshCw, Download, ChevronLeft, X, ArrowRight,
-  Upload, FileText, AlignLeft, Zap, Copy, Check, Wand2, Info,
+  Upload, FileText, AlignLeft, Zap, Check, Wand2, User,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -28,13 +27,9 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   onBack,
 }) => {
   const {
-    titles = [],
     selectedTitle = '',
-    thumbnailTexts = [],
     selectedThumbnailText = '',
     comboPairs = [],
-    hostName = '',
-    guestName = '',
     topicName = '',
     thumbnailUrl,
     referenceImage,
@@ -43,45 +38,21 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<'inspecting' | 'analyzing' | 'generating' | null>(null);
-  const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
-  const [isGeneratingThumbnailText, setIsGeneratingThumbnailText] = useState(false);
   const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
   const [inspirationError, setInspirationError] = useState<string | null>(null);
   const [isGeneratingPair, setIsGeneratingPair] = useState(false);
   const [pairError, setPairError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [titleSource, setTitleSource] = useState<TitleSource>('script');
-  const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
-  const videoStyle: ThumbnailVideoStyle = thumbnailState.videoStyle || 'situational';
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Always-fresh ref so async handlers don't use stale state
   const thumbnailStateRef = useRef(thumbnailState);
   useEffect(() => { thumbnailStateRef.current = thumbnailState; }, [thumbnailState]);
 
-  const styleOptions: { value: ThumbnailVideoStyle; label: string; desc: string; color: string }[] = [
-    { value: 'situational', label: 'Situational', desc: 'Emotional & personal story', color: 'rose' },
-    { value: 'debate', label: 'Debate', desc: 'Confrontational & bold', color: 'amber' },
-    { value: 'podcast', label: 'Podcast', desc: 'Shocking clickbait', color: 'purple' },
-    { value: 'explained', label: 'Explained', desc: 'Big face + topic visual', color: 'emerald' },
-    { value: 'professor_jiang', label: '🎓 Prof. Jiang', desc: 'Fox News Alert — breaking news', color: 'red' },
-    { value: 'phone_studio', label: '📱 Phone Studio', desc: 'Phone + celebrity face + red/white impact text', color: 'pink' },
-    { value: 'phone_clean', label: '🤍 Phone Clean', desc: 'Phone left + white bg + bold text right', color: 'slate' },
-    { value: 'phone_clean_2', label: '🎙 Phone Clean 2', desc: 'Sitting presenter + lapel mic + phone left', color: 'violet' },
-    { value: 'phone_dual', label: '📲 Phone Dual', desc: '2 phones conversation + text center', color: 'cyan' },
-    { value: 'news_dramatic', label: '📰 News Dramatic', desc: 'Blue text box + celeb face + dramatic scene (Career247 style)', color: 'blue' },
-    { value: 'podcast_2', label: '🎙 Podcast 2', desc: 'Two hosts + center topic image insert (JRE/Lex Fridman style)', color: 'green' },
-    { value: 'cinematic_drama', label: '🎬 Cinematic Drama', desc: 'No/minimal text — extreme close-up face + dramatic scene (Bollywood/thriller style)', color: 'orange' },
-    { value: 'podcast_3', label: '🔴 Podcast Quote', desc: 'Red background + bold statement + yellow highlight word + speaker face (WSH style)', color: 'red' },
-    { value: 'podcast_4', label: '🧾 Viral Tweet', desc: 'Dark bg + two faces + giant social media post center (scandal/documentary style)', color: 'zinc' },
-    { value: 'corkboard_meta', label: '📌 Corkboard Meta', desc: 'Blue banner + cork board + annotated mini-thumbnail + presenter face (viral formula style)', color: 'yellow' },
-    { value: 'movie_review', label: '🎬 Cinematic Review', desc: 'Full dramatic bg + dark gold-border box with bold yellow hook (any topic — movie, book, event, brand)', color: 'amber' },
-    { value: 'curated_reference', label: '📌 Reference Style', desc: 'Auto-picks a real curated viral thumbnail as a style reference each time', color: 'indigo' },
-  ];
-
   const hasScript = script.length > 0;
   const hasTranscript = !!(youtubeData?.fullText && youtubeData.fullText.trim().length > 0);
   const hasEitherSource = hasScript || hasTranscript;
-  const isStyleCopyMode = !!referenceImage;
+  const hasFacePhoto = !!referenceImage;
 
   const computeScriptSignature = (segs: typeof script) =>
     segs.map(s => s.text).join('').substring(0, 400);
@@ -107,70 +78,14 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Only initialize speaker names on mount — NO auto-generate
   useEffect(() => {
-    const speakers = Array.from(new Set<string>(script.map(s => s.speaker))).filter(s => s !== 'Narrator');
-    const updates: Partial<ThumbnailState> = {};
-    let changed = false;
-
-    if (!hostName && speakers.length >= 1) { updates.hostName = speakers[0]; changed = true; }
-    if (!guestName && speakers.length >= 2) { updates.guestName = speakers[1]; changed = true; }
-    else if (!guestName && speakers.length === 1) { updates.guestName = speakers[0]; changed = true; }
-
-    const effectiveSource: TitleSource = hasScript ? 'script' : 'transcript';
-    setTitleSource(effectiveSource);
-
-    if (changed) onUpdateThumbnailState({ ...thumbnailState, ...updates });
+    setTitleSource(hasScript ? 'script' : 'transcript');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getSourceText = (source: TitleSource): string => {
     if (source === 'transcript' && hasTranscript) return youtubeData!.fullText;
     return script.map(s => `${s.speaker}: ${s.text}`).join('\n');
-  };
-
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedIndex(id);
-      setTimeout(() => setCopiedIndex(null), 1800);
-    });
-  };
-
-  const handleGenerateTitles = async () => {
-    if (!hasEitherSource) return;
-    setIsGeneratingTitles(true);
-    setGenerateError(null);
-    try {
-      const text = getSourceText(titleSource);
-      const generatedTitles = await generateTitles(text, videoStyle);
-      onUpdateThumbnailState({
-        ...thumbnailStateRef.current,
-        titles: generatedTitles,
-        scriptSignature: computeScriptSignature(script),
-      });
-    } catch (e: any) {
-      setGenerateError(e?.message || 'Title generation failed. Please try again.');
-    } finally {
-      setIsGeneratingTitles(false);
-    }
-  };
-
-  const handleGenerateThumbnailText = async () => {
-    if (!hasEitherSource) return;
-    setIsGeneratingThumbnailText(true);
-    setGenerateError(null);
-    try {
-      const text = getSourceText(titleSource);
-      const generatedTexts = await generateThumbnailText(text, videoStyle);
-      onUpdateThumbnailState({
-        ...thumbnailStateRef.current,
-        thumbnailTexts: generatedTexts,
-        scriptSignature: computeScriptSignature(script),
-      });
-    } catch (e: any) {
-      setGenerateError(e?.message || 'Thumbnail text generation failed. Please try again.');
-    } finally {
-      setIsGeneratingThumbnailText(false);
-    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,7 +106,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
   };
 
   const handleRemoveImage = () => {
-    onUpdateThumbnailState({ ...thumbnailState, referenceImage: null, extraInstructions: '' });
+    onUpdateThumbnailState({ ...thumbnailState, referenceImage: null });
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -200,28 +115,17 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     if (!textForThumbnail) return;
     setIsLoading(true);
     try {
-      let refImgData = referenceImage
+      const faceImgData = referenceImage
         ? { data: referenceImage.data, mimeType: referenceImage.mimeType }
         : undefined;
-
-      // Explained/Situational/Reference Style all know how to use a reference
-      // image for style/composition — auto-pick a real curated thumbnail when
-      // the user hasn't uploaded their own (a manual upload always wins, any
-      // style). Other styles have their own fixed, already-tuned layouts and
-      // are left untouched.
-      if (!refImgData && (videoStyle === 'explained' || videoStyle === 'situational' || videoStyle === 'curated_reference')) {
-        setLoadingStep('inspecting');
-        refImgData = (await fetchRandomStyleReference()) ?? undefined;
-      }
-
-      setLoadingStep(refImgData ? 'inspecting' : videoStyle === 'professor_jiang' ? 'analyzing' : 'generating');
       const scriptTextForGen = getSourceText(titleSource);
       const url = await generateThumbnail(
-        textForThumbnail, hostName, guestName, refImgData, extraInstructions,
+        textForThumbnail,
+        extraInstructions,
+        faceImgData,
         (step) => setLoadingStep(step),
-        videoStyle,
         scriptTextForGen,
-        topicName
+        topicName,
       );
       onUpdateThumbnailState({ ...thumbnailStateRef.current, thumbnailUrl: url });
     } catch (error: any) {
@@ -238,7 +142,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     setIsGeneratingPair(true);
     setPairError(null);
     try {
-      const pairResult = await generateTitleTextPair(sourceText, videoStyle);
+      const pairResult = await generateTitleTextPair(sourceText);
       if (pairResult.length === 0) {
         setPairError('Koi pair nahi aaya — dobara try karo.');
       } else {
@@ -271,7 +175,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     setIsGeneratingInspiration(true);
     setInspirationError(null);
     try {
-      const inspiration = await generateThumbnailInspiration(sourceText, videoStyle);
+      const inspiration = await generateThumbnailInspiration(sourceText);
       onUpdateThumbnailState({ ...thumbnailStateRef.current, extraInstructions: inspiration });
     } catch (err: any) {
       setInspirationError(err?.message || 'Inspiration generate nahi hui. Dobara try karo.');
@@ -284,7 +188,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
     if (!thumbnailUrl) return;
     const link = document.createElement('a');
     link.href = thumbnailUrl;
-    link.download = `thumbnail-${(guestName || 'video').replace(/\s+/g, '-').toLowerCase()}.png`;
+    link.download = `thumbnail-${(selectedTitle || 'video').replace(/\s+/g, '-').toLowerCase()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -340,42 +244,6 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
             {/* ── LEFT: Controls ── */}
             <div className="space-y-4">
 
-              {/* ── Content Style Selector ── */}
-              <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
-                <div>
-                  <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Content Style</p>
-                  <p className="text-xs text-gray-600 mt-0.5">Title aur thumbnail text ka tone is pe depend karta hai</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {styleOptions.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => onUpdateThumbnailState({ ...thumbnailState, videoStyle: opt.value, referenceImage: null })}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
-                        videoStyle === opt.value
-                          ? opt.color === 'rose'
-                            ? 'bg-rose-600/20 border-rose-500/60 text-white'
-                            : opt.color === 'amber'
-                            ? 'bg-amber-600/20 border-amber-500/60 text-white'
-                            : opt.color === 'emerald'
-                            ? 'bg-emerald-600/20 border-emerald-500/60 text-white'
-                            : opt.color === 'red'
-                            ? 'bg-red-600/20 border-red-500/60 text-white'
-                            : opt.color === 'slate'
-                            ? 'bg-slate-600/20 border-slate-400/60 text-white'
-                            : opt.color === 'cyan'
-                            ? 'bg-cyan-600/20 border-cyan-500/60 text-white'
-                            : 'bg-purple-600/20 border-purple-500/60 text-white'
-                          : 'bg-white/3 border-white/8 text-gray-400 hover:bg-white/6 hover:border-white/15'
-                      }`}
-                    >
-                      <span className="text-sm font-bold">{opt.label}</span>
-                      <span className="text-[10px] leading-tight opacity-70">{opt.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Source toggle */}
               {hasScript && hasTranscript && (
                 <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5">
@@ -399,15 +267,15 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 </div>
               )}
 
-              {/* ── COMBO: Generate Both Together ── */}
+              {/* ── Title + Thumbnail Text ── */}
               <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-500/25 rounded-2xl p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[11px] text-yellow-400/90 uppercase tracking-widest font-semibold flex items-center gap-1.5">
                       <Zap size={11} className="text-yellow-400" />
-                      Combo — Title + Thumbnail Text
+                      Title + Thumbnail Text
                     </p>
-                    <p className="text-xs text-gray-600 mt-0.5">Dono ek saath milenge — ek dusre ke complement hote hain</p>
+                    <p className="text-xs text-gray-600 mt-0.5">AI dono ek saath banayega — ek dusre ke complement hote hain</p>
                   </div>
                   <button
                     onClick={handleGeneratePair}
@@ -418,14 +286,14 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                       ? <Loader2 size={12} className="animate-spin" />
                       : <Zap size={12} />
                     }
-                    {comboPairs.length > 0 ? 'Regenerate' : 'Generate Both'}
+                    {comboPairs.length > 0 ? 'Regenerate' : 'Generate'}
                   </button>
                 </div>
 
                 {isGeneratingPair ? (
                   <div className="flex items-center gap-2 text-gray-500 py-3">
                     <Loader2 className="animate-spin" size={14} />
-                    <span className="text-sm">Combos + Titles + Descriptions ban rahe hain...</span>
+                    <span className="text-sm">Titles + Thumbnail Texts ban rahe hain...</span>
                   </div>
                 ) : comboPairs.length > 0 ? (
                   <div className="space-y-2">
@@ -460,137 +328,21 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 ) : pairError ? (
                   <p className="text-xs text-red-400 py-1">{pairError}</p>
                 ) : (
-                  <p className="text-xs text-gray-600 py-1">"Generate Both" dabao → 3 combos + titles + thumbnail descriptions ek saath milenge.</p>
-                )}
-              </div>
-
-              {/* ── STEP 1: Video Title ── */}
-              <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 1 — Video Title</p>
-                    <p className="text-xs text-gray-600 mt-0.5">Full title shown on YouTube</p>
-                  </div>
-                  <button
-                    onClick={handleGenerateTitles}
-                    disabled={isGeneratingTitles || !hasEitherSource}
-                    className="flex items-center gap-1.5 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
-                  >
-                    {isGeneratingTitles
-                      ? <Loader2 size={12} className="animate-spin" />
-                      : <Wand2 size={12} />
-                    }
-                    {titles.length > 0 ? 'Regenerate' : 'Generate'}
-                  </button>
-                </div>
-
-                {isGeneratingTitles ? (
-                  <div className="flex items-center gap-2 text-gray-500 py-3">
-                    <Loader2 className="animate-spin" size={14} />
-                    <span className="text-sm">Titles generate ho rahe hain...</span>
-                  </div>
-                ) : titles.length > 0 ? (
-                  <div className="space-y-2">
-                    {titles.map((title, idx) => (
-                      <div
-                        key={idx}
-                        className={`group flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                          selectedTitle === title
-                            ? 'bg-purple-600/20 border-purple-500/60 text-white'
-                            : 'bg-white/3 border-white/8 text-gray-300 hover:bg-white/6 hover:border-white/15'
-                        }`}
-                        onClick={() => onUpdateThumbnailState({ ...thumbnailState, selectedTitle: title })}
-                      >
-                        <span className="flex-1 text-sm leading-snug">{title}</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleCopy(title, `title-${idx}`); }}
-                          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
-                          title="Copy"
-                        >
-                          {copiedIndex === `title-${idx}`
-                            ? <Check size={13} className="text-green-400" />
-                            : <Copy size={13} className="text-gray-400" />
-                          }
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-600 py-2">Generate button dabao → AI 4 viral titles banayega</p>
+                  <p className="text-xs text-gray-600 py-1">"Generate" dabao → 3 title + thumbnail text combos milenge.</p>
                 )}
 
                 <input
                   type="text"
                   value={selectedTitle}
                   onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, selectedTitle: e.target.value })}
-                  placeholder="Or type a title directly..."
+                  placeholder="Ya khud title likho..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
                 />
-              </div>
-
-              {/* ── STEP 2: Thumbnail Text ── */}
-              <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] text-orange-400/80 uppercase tracking-widest font-semibold flex items-center gap-1.5">
-                      <Zap size={11} />
-                      Step 2 — Thumbnail Text
-                    </p>
-                    <p className="text-xs text-gray-600 mt-0.5">Thumbnail image par bada dikhne wala short hook</p>
-                  </div>
-                  <button
-                    onClick={handleGenerateThumbnailText}
-                    disabled={isGeneratingThumbnailText || !hasEitherSource}
-                    className="flex items-center gap-1.5 bg-orange-600/20 hover:bg-orange-600/40 border border-orange-500/30 text-orange-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
-                  >
-                    {isGeneratingThumbnailText
-                      ? <Loader2 size={12} className="animate-spin" />
-                      : <Wand2 size={12} />
-                    }
-                    {thumbnailTexts.length > 0 ? 'Regenerate' : 'Generate'}
-                  </button>
-                </div>
-
-                {isGeneratingThumbnailText ? (
-                  <div className="flex items-center gap-2 text-gray-500 py-3">
-                    <Loader2 className="animate-spin" size={14} />
-                    <span className="text-sm">Clickbait lines generate ho rahe hain...</span>
-                  </div>
-                ) : thumbnailTexts.length > 0 ? (
-                  <div className="space-y-2">
-                    {thumbnailTexts.map((text, idx) => (
-                      <div
-                        key={idx}
-                        className={`group flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                          selectedThumbnailText === text
-                            ? 'bg-orange-600/20 border-orange-500/60 text-white'
-                            : 'bg-white/3 border-white/8 text-gray-300 hover:bg-white/6 hover:border-white/15'
-                        }`}
-                        onClick={() => onUpdateThumbnailState({ ...thumbnailState, selectedThumbnailText: text })}
-                      >
-                        <span className="flex-1 text-sm font-bold">{text}</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleCopy(text, `thumb-${idx}`); }}
-                          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
-                          title="Copy"
-                        >
-                          {copiedIndex === `thumb-${idx}`
-                            ? <Check size={13} className="text-green-400" />
-                            : <Copy size={13} className="text-gray-400" />
-                          }
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-600 py-2">Generate dabao → 5 short clickbait lines milenge (thumbnail par jaayenge)</p>
-                )}
-
                 <input
                   type="text"
                   value={selectedThumbnailText}
                   onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, selectedThumbnailText: e.target.value })}
-                  placeholder='Ya khud likho... (e.g. "He QUIT Everything")'
+                  placeholder='Ya khud thumbnail text likho... (e.g. "He QUIT Everything")'
                   className="w-full bg-white/5 border border-orange-500/20 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-orange-500 transition-colors placeholder-gray-600"
                 />
 
@@ -602,299 +354,29 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                 )}
               </div>
 
-              {/* ── STEP 3: Speakers (Podcast only) ── */}
-              {videoStyle === 'podcast' && (
-                <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
-                  <div>
-                    <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 3 — Speakers</p>
-                    <p className="text-xs text-gray-600 mt-0.5">Podcast style mein naam zaroori hai</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Host (right side)</label>
-                      <input
-                        type="text"
-                        value={hostName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
-                        placeholder="Joe Rogan"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Guest (left side)</label>
-                      <input
-                        type="text"
-                        value={guestName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
-                        placeholder="Guest ka naam..."
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 3: Phone Studio — Celebrity + Topic + Combo + Generate ── */}
-              {videoStyle === 'phone_studio' && (
-                <div className="bg-[#0d0d0d] border border-pink-500/25 rounded-2xl p-5 space-y-4">
-                  <div>
-                    <p className="text-[11px] text-pink-400 uppercase tracking-widest font-semibold">Step 3 — Phone Studio Setup</p>
-                    <p className="text-xs text-gray-600 mt-0.5">Celebrity face (right) aur phone screen topic (left) — dono set karo</p>
-                  </div>
-
-                  {/* Celebrity + Topic inputs */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Celebrity / Featured Person</label>
-                      <input
-                        type="text"
-                        value={guestName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
-                        placeholder="e.g. Trump, Elon Musk, Joe Rogan"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-pink-500 transition-colors placeholder-gray-600"
-                      />
-                      <p className="text-[10px] text-gray-600">Right side pe face aayega</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Topic (phone screen)</label>
-                      <input
-                        type="text"
-                        value={topicName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, topicName: e.target.value })}
-                        placeholder="e.g. Aliens, Moon Base, War"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-pink-400 transition-colors placeholder-gray-600"
-                      />
-                      <p className="text-[10px] text-gray-600">Left phone screen pe kya dikhega</p>
-                    </div>
-                  </div>
-
-                  {/* Mini Combo — Title + Thumbnail Text */}
-                  <div className="border-t border-white/5 pt-4 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] text-yellow-400/90 font-semibold flex items-center gap-1.5 uppercase tracking-widest">
-                        <Zap size={11} className="text-yellow-400" /> Title + Thumbnail Text Combo
-                      </p>
-                      <button
-                        onClick={handleGeneratePair}
-                        disabled={isGeneratingPair || !hasEitherSource}
-                        className="flex items-center gap-1.5 bg-yellow-500/20 hover:bg-yellow-500/35 border border-yellow-400/40 text-yellow-300 text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
-                      >
-                        {isGeneratingPair ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                        {comboPairs.length > 0 ? 'Regenerate' : 'Generate'}
-                      </button>
-                    </div>
-
-                    {isGeneratingPair ? (
-                      <div className="flex items-center gap-2 text-gray-500 py-2">
-                        <Loader2 className="animate-spin" size={13} />
-                        <span className="text-xs">Combos ban rahe hain...</span>
-                      </div>
-                    ) : comboPairs.length > 0 ? (
-                      <div className="space-y-2">
-                        {comboPairs.map((pair, idx) => {
-                          const isSelected = selectedTitle === pair.title && selectedThumbnailText === pair.thumbnailText;
-                          return (
-                            <div
-                              key={idx}
-                              onClick={() => handleSelectPair(pair)}
-                              className={`cursor-pointer rounded-xl border p-3 transition-all space-y-1 ${
-                                isSelected
-                                  ? 'bg-yellow-600/20 border-yellow-400/60'
-                                  : 'bg-white/3 border-white/8 hover:bg-white/6 hover:border-white/15'
-                              }`}
-                            >
-                              <p className="text-xs text-gray-400 leading-snug">{pair.title}</p>
-                              <p className={`text-sm font-black tracking-tight ${isSelected ? 'text-yellow-300' : 'text-white'}`}>{pair.thumbnailText}</p>
-                              {isSelected && (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-semibold">
-                                  <Check size={9} /> Selected
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : pairError ? (
-                      <p className="text-xs text-red-400">{pairError}</p>
-                    ) : (
-                      <p className="text-xs text-gray-600">"Generate" dabao → title + thumbnail text combo milega</p>
-                    )}
-                  </div>
-
-                  {/* Generate Thumbnail button inside card */}
-                  <div className="border-t border-white/5 pt-4">
-                    <button
-                      onClick={handleGenerateThumbnail}
-                      disabled={isLoading || !canGenerate}
-                      className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
-                    >
-                      {isLoading ? (
-                        <><Loader2 className="animate-spin" size={16} /> Generating...</>
-                      ) : (
-                        <><Image size={16} /> Generate Phone Studio Thumbnail</>
-                      )}
-                    </button>
-                    {!canGenerate && (
-                      <p className="text-center text-[10px] text-gray-600 mt-2">Pehle combo select karo ya title/text likho</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 3: Phone Clean inputs ── */}
-              {videoStyle === 'phone_clean' && (
-                <div className="bg-[#0d0d0d] border border-slate-500/15 rounded-2xl p-5 space-y-3">
-                  <div>
-                    <p className="text-[11px] text-slate-300 uppercase tracking-widest font-semibold">Step 3 — Characters</p>
-                    <p className="text-xs text-gray-600 mt-0.5">Phone caller (left side) aur optional creator (top-right)</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Phone Caller / Entity</label>
-                      <input
-                        type="text"
-                        value={guestName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
-                        placeholder="e.g. OpenAI, Google, Elon Musk"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-slate-400 transition-colors placeholder-gray-600"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Creator (top-right, optional)</label>
-                      <input
-                        type="text"
-                        value={hostName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
-                        placeholder="e.g. Prof. Jiang (leave blank = none)"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-slate-400 transition-colors placeholder-gray-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 3: Phone Dual inputs ── */}
-              {videoStyle === 'phone_dual' && (
-                <div className="bg-[#0d0d0d] border border-cyan-500/15 rounded-2xl p-5 space-y-3">
-                  <div>
-                    <p className="text-[11px] text-cyan-400 uppercase tracking-widest font-semibold">Step 3 — Two Characters</p>
-                    <p className="text-xs text-gray-600 mt-0.5">Left phone (speaking) aur right phone (listening)</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Left Phone — Speaking</label>
-                      <input
-                        type="text"
-                        value={guestName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
-                        placeholder="e.g. Donald Trump, Elon Musk"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-gray-500 font-medium">Right Phone — Listening</label>
-                      <input
-                        type="text"
-                        value={hostName}
-                        onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
-                        placeholder="e.g. White Alien, AI Bot, Joe Biden"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500 transition-colors placeholder-gray-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 3: Universal People / Context (all other styles) ── */}
-              {(() => {
-                type PeopleConfig = {
-                  p1Label: string; p1Placeholder: string;
-                  p2Label?: string; p2Placeholder?: string;
-                  topicLabel?: string; topicPlaceholder?: string;
-                };
-                const peopleConfig: Partial<Record<ThumbnailVideoStyle, PeopleConfig>> = {
-                  situational:     { p1Label: 'Featured Person (optional)', p1Placeholder: 'e.g. Nikhil Kamath, Ankit Baiyanpuria...' },
-                  debate:          { p1Label: 'Person A (Left)', p1Placeholder: 'e.g. Sandeep Maheshwari', p2Label: 'Person B (Right)', p2Placeholder: 'e.g. Vivek Bindra' },
-                  explained:       { p1Label: 'Expert / Host (optional)', p1Placeholder: 'e.g. Dhruv Rathee, or leave blank' },
-                  professor_jiang: { p1Label: 'Featured Leader / Analyst (optional)', p1Placeholder: 'e.g. Trump, Modi, Powell...' },
-                  news_dramatic:   { p1Label: 'Featured Person / Leader (optional)', p1Placeholder: 'e.g. Trump, Modi, Elon Musk...' },
-                  podcast_2:       { p1Label: 'Host', p1Placeholder: 'e.g. Joe Rogan', p2Label: 'Guest', p2Placeholder: 'e.g. Elon Musk' },
-                  cinematic_drama: { p1Label: 'Main Character (optional)', p1Placeholder: 'e.g. Ranbir Kapoor, or leave blank' },
-                  podcast_3:       { p1Label: 'Speaker / Guest Name (optional)', p1Placeholder: 'e.g. Raoul Pal, Scaramucci...' },
-                  podcast_4:       { p1Label: 'Subject — Left Face (optional)', p1Placeholder: 'e.g. V.G. Siddhartha, Byju...', p2Label: 'Narrator — Right Face (optional)', p2Placeholder: 'e.g. host name, or leave blank' },
-                  corkboard_meta:  { p1Label: 'Presenter (optional)', p1Placeholder: 'e.g. channel host name, or leave blank' },
-                  movie_review:    { p1Label: 'Topic / Film / Event (optional)', p1Placeholder: 'e.g. Ramayana, Apple, India-Pakistan War...', topicLabel: 'Topic / Film / Event', topicPlaceholder: 'e.g. Ramayana, Apple, Bitcoin...' },
-                  phone_clean_2:   { p1Label: 'Phone Caller / Entity', p1Placeholder: 'e.g. OpenAI, Google, Elon Musk', p2Label: 'Creator (optional)', p2Placeholder: 'e.g. Prof. Jiang, or leave blank' },
-                };
-                const cfg = peopleConfig[videoStyle];
-                if (!cfg) return null;
-                const isMovieReview = videoStyle === 'movie_review';
-                return (
-                  <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
-                    <div>
-                      <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 3 — People / Context</p>
-                      <p className="text-xs text-gray-600 mt-0.5">Optional — blank chhodo toh script se auto-detect hoga</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {isMovieReview ? (
-                        <div className="col-span-2 space-y-1.5">
-                          <label className="text-xs text-gray-500 font-medium">Topic / Film / Event (optional)</label>
-                          <input
-                            type="text"
-                            value={topicName}
-                            onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, topicName: e.target.value })}
-                            placeholder="e.g. Ramayana, Apple, India-Pakistan War..."
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-colors placeholder-gray-600"
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="space-y-1.5">
-                            <label className="text-xs text-gray-500 font-medium">{cfg.p1Label}</label>
-                            <input
-                              type="text"
-                              value={guestName}
-                              onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, guestName: e.target.value })}
-                              placeholder={cfg.p1Placeholder}
-                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-colors placeholder-gray-600"
-                            />
-                          </div>
-                          {cfg.p2Label && (
-                            <div className="space-y-1.5">
-                              <label className="text-xs text-gray-500 font-medium">{cfg.p2Label}</label>
-                              <input
-                                type="text"
-                                value={hostName}
-                                onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, hostName: e.target.value })}
-                                placeholder={cfg.p2Placeholder}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/30 transition-colors placeholder-gray-600"
-                              />
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* ── STEP 4: Style + Extra Instructions ── */}
+              {/* ── Topic + Scene / Face Photo ── */}
               <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-5 space-y-3">
                 <div>
-                  <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Step 4 — Prompt & Style</p>
+                  <p className="text-[11px] text-gray-500 uppercase tracking-widest font-semibold">Topic & Scene</p>
                   <p className="text-xs text-gray-600 mt-0.5">
-                    {isStyleCopyMode
-                      ? 'Style Copy Mode — reference image ki style copy hogi, topic nayi hogi'
-                      : 'Combo select karo → prompt auto-fill hoga. Ya khud likhо / edit karo.'}
+                    Isi se best-matching style aur scene decide hota hai — combo select karo → auto-fill hoga, ya khud likho.
                   </p>
                 </div>
 
-                {/* Extra instructions — always visible */}
+                <div className="space-y-1.5">
+                  <label className="text-xs text-gray-500 font-medium">Topic (optional)</label>
+                  <input
+                    type="text"
+                    value={topicName}
+                    onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, topicName: e.target.value })}
+                    placeholder="e.g. Crypto crash, Elon Musk, Horror story..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500 transition-colors placeholder-gray-600"
+                  />
+                </div>
+
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
-                      Thumbnail Prompt <span className="text-gray-700">(combo se auto-fill ya khud likho)</span>
-                    </label>
+                    <label className="text-xs text-gray-500 font-medium">Scene description</label>
                     <button
                       onClick={handleInspire}
                       disabled={isGeneratingInspiration}
@@ -911,7 +393,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   <textarea
                     value={extraInstructions}
                     onChange={(e) => onUpdateThumbnailState({ ...thumbnailState, extraInstructions: e.target.value })}
-                    placeholder="Combo select karo → yahan auto-fill hoga. Ya khud likho: e.g. Dark background, red text, stressed person on right..."
+                    placeholder="Combo select karo → yahan auto-fill hoga. Ya khud likho: e.g. Stressed man staring at a crashing stock chart..."
                     rows={4}
                     className={`w-full bg-white/5 border rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none transition-colors placeholder-gray-600 resize-none ${
                       extraInstructions ? 'border-orange-500/40 focus:border-orange-500' : 'border-white/10 focus:border-orange-500/50'
@@ -922,9 +404,9 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   )}
                 </div>
 
-                {/* Reference image area */}
+                {/* Face photo upload */}
                 <div className="space-y-2">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Style Copy (optional)</p>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Your Face Photo (optional)</p>
                   {!referenceImage ? (
                     <div
                       className="w-full border-2 border-dashed border-white/8 rounded-xl p-4 flex items-center justify-center text-gray-600 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all cursor-pointer gap-3"
@@ -932,16 +414,16 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                     >
                       <Upload size={16} />
                       <div>
-                        <p className="text-xs font-medium text-gray-500">Reference thumbnail upload karo</p>
+                        <p className="text-xs font-medium text-gray-500">Apna face photo upload karo</p>
                         <p className="text-[10px] text-gray-700 mt-0.5">JPEG · PNG · WEBP — optional</p>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-orange-500/30 group">
-                        <img src={referenceImage.url} alt="Reference" className="w-full h-full object-cover" />
-                        <div className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Copy size={9} /> Style Copy Mode
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-purple-500/30 group">
+                        <img src={referenceImage.url} alt="Face" className="w-full h-full object-cover" />
+                        <div className="absolute top-2 left-2 bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <User size={9} /> Face Mode
                         </div>
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button
@@ -952,12 +434,7 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                           </button>
                         </div>
                       </div>
-                      <div className="flex items-start gap-2 bg-orange-500/8 border border-orange-500/20 rounded-lg px-3 py-2">
-                        <Info size={12} className="text-orange-400 shrink-0 mt-0.5" />
-                        <p className="text-xs text-orange-300/80">
-                          Only the <strong>visual style</strong> will be copied (color, layout, font style). Topic and faces will stay new.
-                        </p>
-                      </div>
+                      <p className="text-xs text-purple-300/80">Thumbnail me yahi face main subject ke roop me use hoga.</p>
                     </div>
                   )}
                 </div>
@@ -986,14 +463,13 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   <>
                     <Image size={18} />
                     Generate Thumbnail
-                    {isStyleCopyMode && <span className="text-xs bg-orange-500/30 px-1.5 py-0.5 rounded ml-1">Style Copy</span>}
                   </>
                 )}
               </button>
 
               {!canGenerate && (
                 <p className="text-center text-xs text-gray-600">
-                  Thumbnail text ya title chahiye (Step 1 ya Step 2)
+                  Pehle title ya thumbnail text chahiye
                 </p>
               )}
 
@@ -1051,12 +527,12 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                           <p className="text-white font-black text-xl leading-tight">{textForThumbnail}</p>
                         </div>
                       )}
-                      {isStyleCopyMode && (
-                        <div className="p-3 bg-orange-500/8 border border-orange-500/20 rounded-xl text-left">
-                          <p className="text-[10px] text-orange-400 uppercase tracking-wider mb-1 font-semibold flex items-center gap-1">
-                            <Copy size={9} /> Style Copy Mode Active
+                      {hasFacePhoto && (
+                        <div className="p-3 bg-purple-500/8 border border-purple-500/20 rounded-xl text-left">
+                          <p className="text-[10px] text-purple-400 uppercase tracking-wider mb-1 font-semibold flex items-center gap-1">
+                            <User size={9} /> Face Mode Active
                           </p>
-                          <p className="text-gray-400 text-xs">Reference image ki style use hogi — topic nayi hogi</p>
+                          <p className="text-gray-400 text-xs">Uploaded photo ka face main subject banega</p>
                         </div>
                       )}
                     </motion.div>
@@ -1067,23 +543,21 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
                   <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 z-10">
                     <Loader2 className="animate-spin text-purple-400" size={40} />
                     <div className="text-center space-y-1">
-                      {loadingStep === 'inspecting' ? (
+                      {loadingStep === 'analyzing' ? (
                         <>
-                          <p className="text-yellow-300 text-[10px] font-bold uppercase tracking-widest">Step 1 of 2</p>
-                          <p className="text-white font-semibold text-sm">Reference image inspect ho rahi hai...</p>
-                          <p className="text-gray-400 text-xs">Style extract ho raha hai</p>
+                          <p className="text-yellow-300 text-[10px] font-bold uppercase tracking-widest">Step 1 of 3</p>
+                          <p className="text-white font-semibold text-sm">Scene concept ban raha hai...</p>
+                          <p className="text-gray-400 text-xs">Script se visuals identify ho rahe hain</p>
                         </>
-                      ) : loadingStep === 'analyzing' ? (
+                      ) : loadingStep === 'inspecting' ? (
                         <>
-                          <p className="text-yellow-300 text-[10px] font-bold uppercase tracking-widest">Step 1 of 2</p>
-                          <p className="text-white font-semibold text-sm">Script analyze ho rahi hai...</p>
-                          <p className="text-gray-400 text-xs">Topic se visuals identify ho rahe hain</p>
+                          <p className="text-yellow-300 text-[10px] font-bold uppercase tracking-widest">Step 2 of 3</p>
+                          <p className="text-white font-semibold text-sm">Best-matching style dhoondi ja rahi hai...</p>
+                          <p className="text-gray-400 text-xs">Topic ke hisaab se real thumbnail style pick ho raha hai</p>
                         </>
                       ) : (
                         <>
-                          <p className="text-green-400 text-[10px] font-bold uppercase tracking-widest">
-                            {isStyleCopyMode || videoStyle === 'professor_jiang' ? 'Step 2 of 2' : 'Generating'}
-                          </p>
+                          <p className="text-green-400 text-[10px] font-bold uppercase tracking-widest">Step 3 of 3</p>
                           <p className="text-white font-semibold text-sm">Thumbnail generate ho rahi hai...</p>
                           <p className="text-gray-400 text-xs">15–30 seconds lag sakte hain</p>
                         </>

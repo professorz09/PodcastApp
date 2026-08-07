@@ -38,7 +38,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3.6-flash' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite'>('gemini-3.6-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -931,7 +931,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov';
+                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov';
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
                       if (newStyle === 'situational') { setSpeakerCount(3); }
@@ -942,6 +942,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       if (newStyle === 'explained_solo') { setSpeakerCount(1); }
                       if (newStyle === 'narration') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'monkey_explain') { setSpeakerCount(1); setIncludeNarrator(false); }
+                      if (newStyle === 'viral_recap') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'image') { setSpeakerCount(1); setIncludeNarrator(false); }
                       if (newStyle === 'podcast_breakdown') { setSpeakerCount(2); }
                       if (newStyle === 'documentary') { setSpeakerCount(2); }
@@ -965,6 +966,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="narration">📖 Narration (Solo)</option>
                     <option value="monkey_explain">🐒 Monkey Explain (Solo)</option>
                     <option value="crime_documentary">🔪 Crime Documentary (Solo)</option>
+                    <option value="viral_recap">🔥 Viral Recap (Solo)</option>
                     <option value="deep_explainer">🔍 Deep Explainer</option>
                     <option value="image">🖼 Imagen Style (Solo)</option>
                     <option value="documentary">Documentary</option>
