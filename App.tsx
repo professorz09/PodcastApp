@@ -9,6 +9,7 @@ const ScriptEditor     = lazy(() => import('./components/ScriptEditor'));
 const ThumbnailGenerator = lazy(() => import('./components/ThumbnailGenerator'));
 const AudioGenerator   = lazy(() => import('./components/AudioGenerator'));
 const DebateVisualizer = lazy(() => import('./components/DebateVisualizer'));
+const EnglishVideoMaker = lazy(() => import('./components/EnglishVideoMaker'));
 const Storyboard       = lazy(() => import('./components/Storyboard'));
 const Shorts           = lazy(() => import('./components/Shorts'));
 const LyricsGenerator  = lazy(() => import('./components/LyricsGenerator'));
@@ -128,6 +129,8 @@ const App: React.FC = () => {
         const details = config.specificDetails ?? '';
         const leStyleMatch = details.match(/LEARN_ENGLISH_STYLE:(\w+)/);
         const leStyle = leStyleMatch?.[1] || 'situational';
+        const leLanguageMatch = details.match(/LEARN_ENGLISH_LANGUAGE:(\w+)/);
+        const leLanguage = (leLanguageMatch?.[1] === 'english' ? 'english' : 'hinglish') as 'hinglish' | 'english';
         const generateQuestions = /LEARN_ENGLISH_QUESTIONS:true/.test(details);
 
         const generatedScript = await generateLearnEnglishScript(
@@ -138,6 +141,7 @@ const App: React.FC = () => {
           config.duration,
           config.model,
           leStyle,
+          leLanguage,
         );
         if (!generatedScript.length) throw new Error('Learn English: Script generate nahi hua — dobara try karo.');
         setScript(generatedScript);
@@ -589,7 +593,7 @@ Return JSON only (no markdown):
       )}
 
       {appState === AppState.ENGLISH_VIDEO && (
-        <DebateVisualizer
+        <EnglishVideoMaker
           script={script}
           onBack={() => setAppState(AppState.AUDIO)}
           youtubeData={youtubeData}

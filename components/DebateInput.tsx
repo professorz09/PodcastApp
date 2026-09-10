@@ -73,11 +73,12 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
   // ── Learn English state — kept fully separate from the other tabs' state ────
   const [leTopic, setLeTopic] = useState('');
-  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual'>('situational');
+  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate'>('situational');
   const [leDuration, setLeDuration] = useState<number>(5);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
   const [leNarrator, setLeNarrator] = useState(false);
   const [leGenerateQuestions, setLeGenerateQuestions] = useState(true);
+  const [leLanguage, setLeLanguage] = useState<'hinglish' | 'english'>('hinglish');
 
   const languages = [
     'English',
@@ -174,7 +175,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       }
       onGenerate({
         topic: leTopic.trim(),
-        specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}`,
+        specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}\nLEARN_ENGLISH_LANGUAGE:${leLanguage}${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}`,
         duration: leDuration,
         includeNarrator: leNarrator,
         model,
@@ -467,6 +468,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <option value="roleplay">Roleplay Practice</option>
                   <option value="interview">Formal / Interview</option>
                   <option value="casual">Casual Chat</option>
+                  <option value="debate">Debate</option>
                 </select>
               </div>
               <div>
@@ -553,6 +555,25 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   >3.8 Flash</button>
                 </div>
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Explanation Language</label>
+              <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
+                <button
+                  onClick={() => setLeLanguage('hinglish')}
+                  className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                    leLanguage === 'hinglish' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >Hindi + English</button>
+                <button
+                  onClick={() => setLeLanguage('english')}
+                  className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                    leLanguage === 'english' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >English Only</button>
+              </div>
+              <p className="text-[10px] text-gray-600 mt-1.5">Dialogue hamesha English mein hi rahega — yeh sirf Narrator ki phrase-explanations/quiz ki language control karta hai.</p>
             </div>
 
             <button

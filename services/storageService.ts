@@ -143,6 +143,14 @@ export const clearShortsScenes = async (): Promise<void> => {
 
 let _activeStateBlobUrls: string[] = [];
 
+// Guards against out-of-order writes: script updates fire in quick succession
+// while audio generates segment-by-segment, each kicking off an async
+// saveState() that fetches every segment's blob before writing. Without this,
+// an earlier (less-complete) call can resolve after a later (more-complete)
+// one and clobber it in IndexedDB — segments that had audio look "missing"
+// after a refresh. Only the most recently started call is allowed to persist.
+let _saveSeq = 0;
+
 export const saveState = async (
   appState: AppState,
   script: DebateSegment[],
@@ -151,6 +159,7 @@ export const saveState = async (
   phoneSourceClips?: PhoneStudioSourceClip[],
   phoneVideoFile?: File | null,
 ) => {
+  const mySeq = ++_saveSeq;
   try {
     const scriptToStore = await Promise.all(script.map(async (seg) => {
       let audioBlob = null;
@@ -164,6 +173,10 @@ export const saveState = async (
       }
       return { ...seg, audioBlob, audioUrl: undefined };
     }));
+
+    // A newer saveState() call started while this one was still fetching
+    // blobs — it will write the fresher snapshot, so abandon this stale one.
+    if (mySeq !== _saveSeq) return;
 
     const thumbnailStateToStore = thumbnailState
       ? { ...thumbnailState, referenceImage: null }

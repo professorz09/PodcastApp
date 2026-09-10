@@ -5214,6 +5214,7 @@ export const generateLearnEnglishScript = async (
   duration: number = 5,        // minutes — rough length guide
   model: string = 'gemini-3.8-flash',
   leStyle: string = 'situational',
+  leLanguage: 'hinglish' | 'english' = 'hinglish', // language of Narrator's teaching asides/quiz — dialogue is ALWAYS English
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -5221,14 +5222,20 @@ export const generateLearnEnglishScript = async (
   const rolesLine = speakerCount <= 1
     ? 'Just ONE speaker: "You" — a monologue / self-practice speech about the situation.'
     : speakerCount === 2
-      ? 'TWO speakers: "You" (the English learner) and ONE other character who drives the situation (e.g. "Boss", "Police Officer", "Waiter", "Date", "Interviewer", "Stranger"). Pick a role that fits the topic and keep that exact name consistent throughout. The scene is a DIRECT exchange between "You" and this character — do not add a third person or narrator bridging the conversation, it breaks immersion.'
+      ? leStyle === 'debate'
+        ? 'TWO speakers: "You" (the English learner) and ONE "Opponent" who argues the other side of the topic. Keep the opponent\'s name consistent throughout. This is a direct back-and-forth debate, not a moderated one — no third person bridging it.'
+        : 'TWO speakers: "You" (the English learner) and ONE other character who drives the situation (e.g. "Boss", "Police Officer", "Waiter", "Date", "Interviewer", "Stranger"). Pick a role that fits the topic and keep that exact name consistent throughout. The scene is a DIRECT exchange between "You" and this character — do not add a third person or narrator bridging the conversation, it breaks immersion.'
       : '"You" (the English learner) plus TWO other characters that fit the situation. Pick natural, consistent role names for the topic.';
 
   const introLine = includeNarrator
     ? 'Segment 1 MUST be spoken by "Narrator", tag "intro", just 1-2 sentences (10-15 seconds spoken) — a cinematic story hook that sets the scene (e.g. "It was just another Monday morning... until my boss called me into his office."). After that, hand off entirely to the characters — Narrator should not interrupt the scene again except for the "narrator" teaching asides described below.'
     : 'Do NOT include an intro segment — start directly with the first line of dialogue (tag "dialogue").';
 
-  const teachingLine = `Roughly every 3-5 lines of dialogue, when a genuinely useful idiom/phrase/expression just got used, insert ONE short "Narrator" aside, tag "narrator" — like a teacher briefly popping in. Its "text" should be a one-line spoken remark (e.g. "Notice how she said 'let you go' — that's a polite way to say someone is fired."), AND it must carry an "explanation" object: {"phrase": the exact expression, "meaning": short plain-English meaning, "example": one more example sentence using it}. Keep these asides brief and don't overuse them — this whole category should be roughly 10% of all segments. Immediately after each aside, return straight back to the story.`;
+  const languageLine = leLanguage === 'hinglish'
+    ? 'IMPORTANT: All "dialogue"/"intro" segments (the actual scene) must be in English — that never changes, it\'s what the learner is practicing. BUT every "narrator" aside\'s spoken "text" and its explanation.meaning must be written in Hindi (Devanagari script, natural Hinglish tone) — Hindi speakers learning English understand meanings best explained in Hindi. explanation.phrase and explanation.example stay in English (they ARE the English being taught). Same for "quiz" segments: the question text should be in Hindi, options/answer can stay in English where they quote the English phrase being tested.'
+    : 'Everything — dialogue, narrator asides, and quiz — should be in English.';
+
+  const teachingLine = `Roughly every 3-5 lines of dialogue, when a genuinely useful idiom/phrase/expression just got used, insert ONE short "Narrator" aside, tag "narrator" — like a teacher briefly popping in. Its "text" should be a one-line spoken remark (e.g. "Notice how she said 'let you go' — that's a polite way to say someone is fired."), AND it must carry an "explanation" object: {"phrase": the exact expression, "meaning": short plain meaning, "example": one more example sentence using it}. Keep these asides brief and don't overuse them — this whole category should be roughly 10% of all segments. Immediately after each aside, return straight back to the story.`;
 
   const questionsLine = generateQuestions
     ? `\n\nAfter the dialogue ends, add 2-4 final segments spoken by "Narrator", tag "quiz" (roughly 10% of all segments) — short comprehension/recall questions based on the conversation just shown (e.g. "What did the boss say instead of 'You're fired'?"). Each must carry a "quiz" object: {"question": the question text, "options": 2-4 short possible answers (optional, only if it naturally fits as multiple-choice), "answer": the correct answer}. "text" should just be the spoken question itself.`
@@ -5239,6 +5246,7 @@ export const generateLearnEnglishScript = async (
     roleplay: 'A roleplay-practice scene — slightly more structured, clearly modeling both sides of a common exchange.',
     interview: 'A more formal register — like a job interview or official conversation, polite and professional English.',
     casual: 'Casual, relaxed conversational English between people who know each other.',
+    debate: 'A friendly but spirited debate between "You" and an "Opponent" arguing opposite sides of the topic — teaches persuasive/argumentative English: agreeing, disagreeing, making a point, conceding a point, rebutting.',
   }[leStyle] || 'Everyday situational English.';
 
   const prompt = `You are writing an ENGLISH-LEARNING practice video script, based on this topic/situation: "${topic}".
@@ -5246,6 +5254,7 @@ export const generateLearnEnglishScript = async (
 ${rolesLine}
 ${introLine}
 Style: ${styleLine}
+${languageLine}
 Roughly ${turnsGuide} lines of dialogue total (tag "dialogue" for all of these). Use natural, everyday English — not stiff or textbook-like — full of expressions a learner would genuinely want to practice. 80% of all segments should be plain "dialogue" between the characters, driving a real mini-story with a clear beginning, tension, and resolution.
 
 ${teachingLine}${questionsLine}
