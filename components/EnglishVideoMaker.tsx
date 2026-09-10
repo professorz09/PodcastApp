@@ -3077,6 +3077,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               {script.map((seg, idx) => {
                 const spIdx = activeSpeakers.indexOf(seg.speaker);
                 const colors = ['bg-blue-900/30 text-blue-400', 'bg-red-900/30 text-red-400', 'bg-purple-900/30 text-purple-400'];
+                const isIntroSeg = seg.learnEnglish?.segmentType === 'intro';
                 return (
                   <button
                     key={seg.id}
@@ -3084,6 +3085,12 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                       if (audioRef.current && segmentOffsets[idx] !== undefined) {
                         audioRef.current.currentTime = segmentOffsets[idx] + 0.1;
                         setCurrentSegmentIndex(idx);
+                        // Selecting the intro chip while the Speakers tab (irrelevant to
+                        // it) is open used to just sit there showing You/Chloe cards —
+                        // jump straight to the Intro tab so its settings are what's shown.
+                        if (seg.learnEnglish?.segmentType === 'intro') {
+                          setSettingsTab('intro');
+                        }
                       }
                     }}
                     className={`relative flex flex-col items-center gap-0.5 p-1.5 rounded-lg border transition-all min-w-[52px] ${
@@ -3093,9 +3100,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                     }`}
                   >
                     <div className={`w-full h-6 rounded-md flex items-center justify-center text-[9px] font-bold ${
-                      seg.speaker === 'Narrator' ? 'bg-gray-800 text-gray-400' : (colors[spIdx] || colors[1])
+                      seg.speaker === 'Narrator'
+                        ? (isIntroSeg ? 'bg-cyan-900/30 text-cyan-400' : 'bg-gray-800 text-gray-400')
+                        : (colors[spIdx] || colors[1])
                     }`}>
-                      {seg.speaker === 'Narrator' ? 'N' : (speakerLabels[spIdx]?.charAt(0) || seg.speaker.charAt(0))}
+                      {seg.speaker === 'Narrator' ? (isIntroSeg ? 'I' : 'N') : (speakerLabels[spIdx]?.charAt(0) || seg.speaker.charAt(0))}
                     </div>
                     <div className="text-[8px] text-gray-600 font-mono">{Math.round(seg.duration || 0)}s</div>
                     {currentSegmentIndex === idx && (

@@ -752,7 +752,8 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     return { card: 'bg-orange-950/30 border-orange-800/30', icon: 'bg-orange-900/40 text-orange-400' };
   };
 
-  const speakerTimelineColor = (role: string) => {
+  const speakerTimelineColor = (role: string, isIntro?: boolean) => {
+    if (isIntro) return { dot: 'bg-cyan-900/20 text-cyan-400', card: 'bg-cyan-950/5 border-cyan-900/20 hover:border-cyan-500/30', label: 'text-cyan-400' };
     if (isNarrator(role)) return { dot: 'bg-gray-800 text-gray-400', card: 'bg-[#0a0a0a] border-white/5 hover:border-white/10', label: 'text-gray-500' };
     const idx = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(role);
     if (idx === 0) return { dot: 'bg-blue-900/20 text-blue-400', card: 'bg-blue-950/5 border-blue-900/20 hover:border-blue-500/30', label: 'text-blue-400' };
@@ -1130,7 +1131,8 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                   const isLast = idx === script.length - 1;
                   const isExpanded = expandedSegments[seg.id];
                   const isPlaying = playingSegment === seg.id;
-                  const colors = speakerTimelineColor(seg.speaker);
+                  const isIntroSeg = seg.learnEnglish?.segmentType === 'intro';
+                  const colors = speakerTimelineColor(seg.speaker, isIntroSeg);
 
                   return (
                     <div key={seg.id} className="flex gap-3 group">
@@ -1140,7 +1142,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                           <div className="absolute top-10 bottom-[-16px] w-px bg-gray-800/50 z-0 group-hover:bg-gray-700/50 transition-colors" />
                         )}
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold z-10 relative ring-4 ring-[#0c0c0e] transition-transform group-hover:scale-110 ${colors.dot}`}>
-                          {isNarrator(seg.speaker) ? 'N' : seg.speaker.charAt(0)}
+                          {isIntroSeg ? 'I' : isNarrator(seg.speaker) ? 'N' : seg.speaker.charAt(0)}
                         </div>
                       </div>
 
@@ -1148,7 +1150,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                       <div className={`flex-1 mb-4 p-3 md:p-4 rounded-xl border transition-all duration-200 ${colors.card}`}>
                         <div className="flex items-center justify-between mb-2">
                           <span className={`text-xs font-bold uppercase tracking-wider ${colors.label}`}>
-                            {seg.speaker}
+                            {isIntroSeg ? 'Intro' : seg.speaker}
                           </span>
                           {hasAudio && (
                             <span className="text-[10px] font-mono text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded-full flex items-center gap-1">
