@@ -7068,3 +7068,310 @@ Return ONLY a JSON array. No markdown. No preamble. Just:
     }))
     .filter(t => t.text.length > 0);
 };
+
+// ─── Podcast Pro — best-moment finder → tightener → POV1/POV2 reaction script ─
+// Fully-automatic pipeline: given a raw transcript, (1) find the best
+// standalone-clip-worthy stretches, (2) tighten the top pick down to a
+// duration budget without losing substance, (3) write a two-voice POV1/POV2
+// reaction script over just the kept parts.
+
+export interface PodcastBestSegment {
+  label: string;
+  start_sec: number;
+  end_sec: number;
+  reason: string;
+}
+
+export interface PodcastKeepRange { start_sec: number; end_sec: number; }
+
+const buildTimestampedLines = (segs: PodcastTranscriptSeg[]): string =>
+  segs.map(s => `${fmtTs(s.start)} ${s.text.replace(/\s+/g, ' ').trim()}`).join('\n');
+
+const capTranscript = (text: string, maxChars = 90000): string =>
+  text.length > maxChars ? text.slice(0, maxChars) + '\n…[transcript truncated for length]' : text;
+
+export const findBestPodcastSegments = async (
+  segments: PodcastTranscriptSeg[],
+  maxSpanSec: number,
+): Promise<PodcastBestSegment[]> => {
+  if (!segments.length) return [];
+  const transcript_text = capTranscript(buildTimestampedLines(segments));
+
+  const prompt = `You are analyzing the full timestamped transcript of a podcast episode to find
+the best self-contained stretches for a short reaction/commentary video.
+
+Identify up to 5 of the BEST, most distinct segments — each a single coherent topic, story, or exchange that
+works as a standalone clip, no longer than ${maxSpanSec} seconds. Rank them best (most compelling,
+surprising, or discussion-worthy) first. Pick genuinely DIFFERENT topics from each other, not overlapping
+picks of the same exchange.
+
+For each, give: a short label (max 8 words) naming the topic, the start_sec and end_sec it spans (from the
+transcript timestamps below — pick natural boundaries, e.g. where the conversation turns to a new topic, not
+mid-sentence), and a one-sentence reason it's compelling.
+
+Timestamped transcript ("MM:SS text" per line):
+${transcript_text}
+
+Return ONLY a JSON array of up to 5 objects, ranked best first, no prose, no markdown fences:
+[{"label": "...", "start_sec": <float>, "end_sec": <float>, "reason": "..."}, ...]`;
+
+  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+    responseMimeType: 'application/json',
+  });
+  const raw = extractGeminiText(data);
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  let parsed: any[];
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\[[\s\S]*\]/);
+    if (!m) throw new Error('Best-moment finder: invalid JSON from Gemini');
+    parsed = JSON.parse(m[0]);
+  }
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error('Best-moment finder: Gemini returned no segments');
+
+  return parsed
+    .map((s: any): PodcastBestSegment => ({
+      label: (s.label || '').toString().trim() || 'Untitled moment',
+      start_sec: Number(s.start_sec) || 0,
+      end_sec: Number(s.end_sec) || 0,
+      reason: (s.reason || '').toString().trim(),
+    }))
+    .filter(s => s.end_sec > s.start_sec);
+};
+
+export const tightenPodcastSegment = async (
+  segments: PodcastTranscriptSeg[],
+  candidate: PodcastBestSegment,
+  maxSpanSec: number,
+  paddingSec: number = 90,
+): Promise<PodcastKeepRange[]> => {
+  const fallback: PodcastKeepRange[] = [{ start_sec: candidate.start_sec, end_sec: candidate.end_sec }];
+  if (!segments.length) return fallback;
+
+  const windowStart = Math.max(0, candidate.start_sec - paddingSec);
+  const windowEnd = candidate.end_sec + paddingSec;
+  const windowSegs = segments.filter(s => {
+    const mid = s.start + (s.duration || 0) / 2;
+    return mid >= windowStart && mid <= windowEnd;
+  });
+  const transcript_text = capTranscript(buildTimestampedLines(windowSegs.length ? windowSegs : segments));
+
+  const prompt = `A broad candidate stretch of a podcast episode was picked as worth building
+a video around — the host/guest discussing ONE topic. Your job is to select which PARTS of it to actually KEEP
+so the full discussion of that topic stays completely covered, while cutting out slow, repetitive, or
+tangential parts — the total KEPT duration must be no more than ${maxSpanSec} seconds (${(maxSpanSec / 60).toFixed(1)} min).
+Nothing important about the topic should end up missing; this is about tightening, not shortening the
+substance.
+
+Candidate topic: "${candidate.label}"
+Rough original range: ${candidate.start_sec}s to ${candidate.end_sec}s
+
+Timestamped transcript around that range ("MM:SS text" per line, wider than the candidate so you can see where
+it actually starts/ends):
+${transcript_text}
+
+Return a list of KEEP ranges, in chronological order, each a natural stretch (never cut mid-sentence). One
+range if the whole thing is worth keeping as-is; more than one only if there's a genuinely slow/off-topic
+stretch in the middle worth cutting. Ranges must not overlap, and their combined duration must be
+<= ${maxSpanSec} seconds.
+
+Return ONLY a JSON object, no prose, no markdown fences:
+{"keep_ranges": [{"start_sec": <float>, "end_sec": <float>}, ...]}`;
+
+  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+    responseMimeType: 'application/json',
+  });
+  const raw = extractGeminiText(data);
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  let parsed: { keep_ranges: any[] };
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Tighten segment: invalid JSON from Gemini');
+    parsed = JSON.parse(m[0]);
+  }
+
+  const ranges = (parsed?.keep_ranges || [])
+    .map((r: any): PodcastKeepRange => ({ start_sec: Number(r.start_sec) || 0, end_sec: Number(r.end_sec) || 0 }))
+    .filter(r => r.end_sec > r.start_sec)
+    .sort((a, b) => a.start_sec - b.start_sec);
+
+  return ranges.length ? ranges : fallback;
+};
+
+export const generatePOVReactionScript = async (args: {
+  segments: PodcastTranscriptSeg[];
+  keepRanges: PodcastKeepRange[];
+  label: string;
+  podcastTitle?: string;
+  podcastHost?: string;
+  podcastGuests?: string[];
+  pov1Name?: string;
+  pov2Name?: string;
+  useGoogleGrounding?: boolean;
+  language?: string;
+}): Promise<{ speaker: 'pov1' | 'pov2'; text: string; timestamp_sec?: number }[]> => {
+  const { segments, keepRanges, label, podcastTitle, podcastHost, podcastGuests, useGoogleGrounding } = args;
+  const languageName = (args.language || '').trim() || 'English';
+
+  const keptSegs = segments.filter(s => {
+    const mid = s.start + (s.duration || 0) / 2;
+    return keepRanges.some(r => mid >= r.start_sec && mid <= r.end_sec);
+  });
+  if (!keptSegs.length) throw new Error('POV script: kept transcript is empty');
+  const transcript_text = capTranscript(buildTimestampedLines(keptSegs));
+
+  const totalKeptSec = keepRanges.reduce((a, r) => a + (r.end_sec - r.start_sec), 0);
+  const subTopicNote = totalKeptSec < 90
+    ? 'likely just 1-2 sub-topics for a clip this short — do not force more than the content actually has'
+    : totalKeptSec < 240
+      ? 'likely 2-3 distinct sub-topics'
+      : 'likely 3-5 distinct sub-topics';
+  const turnCountNote = `TURN COUNT: aim for roughly one full exchange (2-6 turns, per the adaptive-tone rule above) per sub-topic — for a clip about ${fmtTs(totalKeptSec)} long, a natural total is somewhere around ${Math.max(6, Math.round(totalKeptSec / 12))} turns. Don't pad to hit a number — stop once the sub-topics are genuinely covered.`;
+
+  const researchBlock = useGoogleGrounding
+    ? 'RESEARCH: Google Search grounding is available — use it to pull real, current facts, sources, and context for the FILL MISSING CONTEXT / FACT-CHECK jobs below. Only cite what search actually surfaces.\n'
+    : 'RESEARCH: no live search for this run — rely on your own knowledge, and if you are not confident something is accurate, say so plainly rather than inventing a specific.\n';
+
+  const extraContextParts = [
+    podcastTitle && `Podcast: "${podcastTitle}"`,
+    podcastHost && `Host: ${podcastHost}`,
+    podcastGuests && podcastGuests.length ? `Guest(s): ${podcastGuests.join(', ')}` : null,
+    `Clip topic: "${label}"`,
+  ].filter(Boolean);
+  const extraContextBlock = extraContextParts.length ? `CONTEXT:\n${extraContextParts.join('\n')}\n` : '';
+
+  const prompt = `You are writing a two-person reaction/analysis script for two distinct voices,
+POV1 and POV2, reacting to and discussing a real podcast clip. They are NOT recreating the podcast — they are
+two sharp, well-informed people talking ABOUT what was said, already mid-conversation about it.
+
+POV1 tends to run point — picking up on what was just said, filling in real missing context, adding what they
+themselves know that goes beyond what was already said in the clip. POV2 is the more skeptical read — pushing
+back with real counter-reasoning, spotting gaps or flawed claims — BUT NOT ALWAYS: when a point is genuinely
+solid, POV2 just agrees and supports it, backing it up with their own better knowledge rather than repeating
+what was already said. Auto-disagreement reads as fake and is forbidden; so is auto-agreement everywhere —
+react to what's ACTUALLY being said, not from a fixed role. Mix who plays which role turn to turn; this is a
+real exchange, not two fixed positions repeating themselves.
+
+ADAPT THE TONE TO WHAT'S ACTUALLY BEING DISCUSSED — don't force the same "debate" shape onto every sub-topic,
+and stay flexible enough that this works whether the clip is a serious interview, casual banter, or a personal
+story, not just one fixed genre:
+  - A checkable factual/statistical claim → genuine debate is fair game: push back, fact-check, disagree with
+    real reasoning.
+  - A personal story or experience (something that happened to them, an opinion about their own life/taste) —
+    don't argue with it or nitpick it. React with warm curiosity, or add a genuinely interesting related
+    thought/knowledge. The ONLY exception: if it's dressed up as a big, confident-sounding factual or
+    pseudo-scientific claim with nothing real backing it — call that out plainly, once, then move on. Don't
+    turn an ordinary personal anecdote into a fact-checking session.
+  - Casual banter or a joke in the clip → just react to it naturally (amused, surprised, whatever fits) — not
+    every line needs a counter-argument.
+  Both speakers should recognize which of these a sub-topic is and match their energy to it — arguing about
+  EVERYTHING, all the time, reads exhausting and fake. Real conversations move between real pushback, easy
+  agreement, and just riffing on something interesting.
+
+KEEP THE LANGUAGE SIMPLE — plain, everyday words a normal listener actually uses, not academic or jargon-heavy
+phrasing. Don't turn a sub-topic into a vocabulary lesson or a debate about terminology — if a term genuinely
+needs explaining, the quick one-line bridge below is enough; otherwise there's usually a normal person's
+OPINION or REACTION to have, not a definition to argue about.
+
+The extra context below usually includes the ACTUAL TRANSCRIPT of this specific clip — that is your primary
+material. Identify SPECIFIC sub-topics from it (specific claims, framings, or moments — ${subTopicNote}). For
+EACH sub-topic:
+  - One side introduces it by referencing what was actually said, specifically — not generically. "What he
+    just said about [specific claim]..." / "The part where [specific moment]..." — never philosophizing about
+    the broader topic in a way that could be copy-pasted onto any other episode about roughly the same subject.
+  - If that sub-topic mentions a term, event, or name a smart-but-non-expert listener likely doesn't know, the
+    introducing turn drops a quick 1-2 sentence plain-English bridge for it BEFORE the analysis lands — once
+    per term, conversational ("quick context — that's basically X —"), never textbook-toned.
+  - The other reacts to that SPECIFIC claim — never vague filler ("that's interesting", "I see your point").
+  - Go BACK AND FORTH on it for as many turns as that sub-topic actually earns (per the adaptive-tone rule
+    above): 2-4 turns of surface point → pushback/fact-check → counter → concession for a genuinely debatable
+    claim; fewer, warmer turns for a personal story or casual moment that doesn't call for pushback at all.
+    It's good for one side to concede a specific point before raising a sharper one — real disagreement has
+    texture, it isn't wall-to-wall opposition.
+
+Two concrete jobs a turn can do, grounded in the research block below:
+  - FILL MISSING CONTEXT: the clip mentions something real without explaining it — supply the actual missing
+    piece, specifically. "What he just said about the UAE — that's referring to [real event]. [Real outlet]
+    covered it at the time, and [specific real person] was involved."
+  - FACT-CHECK A CLAIM: the clip states something checkable — say whether it holds up, citing what the
+    research block actually supports (a real source name if one is given). "That claim that sugar is
+    healthy — there's no real science behind that; [real source, if given] actually found the opposite."
+Never invent a specific study, institution, name, or statistic that isn't in the research/context below —
+vague ("there's real research on this") beats a fabricated specific ("a University of X study found...") every
+time; if the research doesn't cover something, say plainly it's unverified rather than making it up.
+
+Every turn must earn its slot — NO PADDING. Banned filler that adds nothing: "That's a great point", "I
+totally agree, and I'd add...", "Exactly, and what's interesting is...", "Yeah no for sure...". VARY RHYTHM —
+mix short one-sentence jabs with longer 3-5 sentence turns; uniform-length turns read robotic and scripted.
+
+OPENING — IN MEDIAS RES: the first turn drops straight into the specific claim being discussed, as if this
+conversation was already underway. NEVER open with "So I was listening to...", "We just watched this clip...",
+"On [show], the part where...", "Today we're talking about...", or anything that introduces/announces the
+clip to a viewer — that reads like a reaction-video intro, not two people already deep in conversation.
+
+EXAMPLE OF THE RIGHT FEEL (the actual claim/topic/names below are placeholders — write about what THIS clip
+actually said, never reuse this example's content, only its shape: specific, varied turn length, real texture):
+  POV1: Okay, the bit where he said [specific claim] — that's a sharper point than people are giving him credit for.
+  POV2: Sharper? It only sounds sharp because he skipped a step — [specific counter-reasoning naming the gap].
+  POV1: Fair, that gap's real. But even with it, the core mechanism still holds up, because [reason] — and that
+    part people are sleeping on.
+  POV2: Okay, I'll give you that much.
+Notice the shape: short jab, medium pushback, a longer turn that both concedes AND argues further, then a
+short close. That mix of short and long IN THE SAME EXCHANGE — not every turn the same length — is what makes
+it read as real people, not a scripted back-and-forth.
+
+${turnCountNote}
+
+CLOSING: the FINAL POV1 and FINAL POV2 turns land as a short, punchy bottom-line take each — POV1 on what
+actually held up / was worth taking seriously, POV2 on what's still shaky or worth being careful about. Adapt
+to what the clip actually was; don't force a disagreement that isn't genuinely there.
+
+If a TIMESTAMPED transcript of this clip is given below (lines starting "MM:SS"), give every turn a
+"timestamp_sec" — the real moment (matching one of those marks) it's actually reacting to or discussing.
+Spread turns across DIFFERENT moments rather than clustering on one, unless the discussion genuinely keeps
+returning to the same moment. Write the exchange in roughly the SAME chronological order as the transcript —
+a turn responding to another should sit at essentially the same moment as the turn it's responding to, not a
+different one. If no timestamped transcript is given, omit "timestamp_sec" entirely (don't guess one).
+
+Language: ${languageName}. Tone: serious, thoughtful, genuinely engaging — never a comedy bit, never mean-
+spirited toward the real people in the clip; disagree with IDEAS, not attack people.
+${researchBlock}${extraContextBlock}
+TIMESTAMPED TRANSCRIPT OF THIS CLIP ("MM:SS text" per line):
+${transcript_text}
+
+Return ONLY a JSON array, no prose, no markdown fences — omit "timestamp_sec" on any turn it doesn't apply to:
+[{"speaker": "pov1", "text": "...", "timestamp_sec": 42}, {"speaker": "pov2", "text": "...", "timestamp_sec": 97}, ...]`;
+
+  const config: any = {};
+  if (useGoogleGrounding) {
+    config.tools = [{ googleSearch: {} }];
+  } else {
+    config.responseMimeType = 'application/json';
+  }
+
+  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+  const raw = extractGeminiText(data);
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  let parsed: any[];
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\[[\s\S]*\]/);
+    if (!m) throw new Error('POV script: invalid JSON from Gemini');
+    parsed = JSON.parse(m[0]);
+  }
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error('POV script: empty script');
+
+  return parsed
+    .map((t: any) => {
+      const speaker: 'pov1' | 'pov2' = (t.speaker || '').toString().trim().toLowerCase() === 'pov2' ? 'pov2' : 'pov1';
+      const timestamp_sec = Number.isFinite(Number(t.timestamp_sec)) && t.timestamp_sec !== undefined && t.timestamp_sec !== null
+        ? Number(t.timestamp_sec)
+        : undefined;
+      return { speaker, text: (t.text || '').toString().trim(), timestamp_sec };
+    })
+    .filter(t => t.text.length > 0);
+};

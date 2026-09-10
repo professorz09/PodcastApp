@@ -12,6 +12,9 @@ import {
   analyzePodcastChapters,
   generatePodcastDeepAnalysisScript,
   generateClipTakeScript,
+  findBestPodcastSegments,
+  tightenPodcastSegment,
+  generatePOVReactionScript,
   detectPodcastSpeakers,
   generateIntroFromTranscript,
   generateSpeech,
@@ -120,6 +123,13 @@ const CONVO_STYLES: {
     label: 'Clip Reaction (1 Speaker, ~5 min)',
     desc: 'YouTube clip → one speaker introduces it, gives their take, ends with takeaways',
     prompt: '', // unused — handled by generateClipTakeScript via PodcastAnalysisFlow
+  },
+  {
+    id: 'podcast_pro',
+    emoji: '🎙️⭐',
+    label: 'Podcast Pro',
+    desc: 'Fully automatic — upload a video, AI finds the best moment, tightens it, and writes a POV1 vs POV2 reaction script',
+    prompt: '', // unused — handled by findBestPodcastSegments / tightenPodcastSegment / generatePOVReactionScript
   },
   {
     id: 'what_if',
@@ -347,6 +357,12 @@ const speakerToPhoneId = (speaker: string) =>
 // Random battery % (28-99) — each phone gets its own on creation/shuffle so
 // the call mockup doesn't look identical across renders.
 const randomBattery = () => `${Math.floor(Math.random() * (99 - 28 + 1)) + 28}%`;
+
+// Podcast Pro — max raw-clip length (seconds) the best-moment finder and
+// tightener are allowed to work with. The generated POV1/POV2 discussion
+// itself runs longer (it's a conversation ABOUT the clip), this only bounds
+// how much of the source transcript feeds into it.
+const PODCAST_PRO_MAX_SPAN_SEC = 300;
 
 // Default model assignments per speaker index
 const DEFAULT_MODELS = ['chatgpt', 'gemini', 'claude', 'grok', 'deepseek', 'llama'];
@@ -922,7 +938,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
 // ─── PodcastAnalysisFlow ─────────────────────────────────────────────────────
 
-type PodcastVariant = 'adaptive' | 'funny' | 'friendly' | 'clip_take';
+type PodcastVariant = 'adaptive' | 'funny' | 'friendly' | 'clip_take' | 'podcast_pro';
 
 interface PodcastFlowProps {
   sel: { emoji: string; label: string; desc: string };
@@ -992,6 +1008,9 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   // Clip Reaction: only the analyst (reacting speaker) name is user-input.
   // Person-in-clip / verb / topic are auto-detected from the transcript by Gemini.
   const isClip = variant === 'clip_take';
+  // Podcast Pro: fully automatic — AI finds + tightens the best moment itself,
+  // so the chapters phase is skipped entirely (see the "cuts" phase button below).
+  const isPro = variant === 'podcast_pro';
   const [analystName, setAnalystName] = useState('Sam');
 
   const [cuts, setCuts] = useState<PodcastCutRange[]>([]);
@@ -1445,7 +1464,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
             <div>
-              <div style={{ fontSize: 10, color: 'rgba(86,239,140,0.7)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>👍 Supporter</div>
+              <div style={{ fontSize: 10, color: 'rgba(86,239,140,0.7)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{isPro ? '🎯 POV 1' : '👍 Supporter'}</div>
               <input
                 value={supporterName}
                 onChange={e => setSupporterName(e.target.value)}
@@ -1458,7 +1477,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
               />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: 'rgba(252,165,165,0.8)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>🗡️ Critic</div>
+              <div style={{ fontSize: 10, color: 'rgba(252,165,165,0.8)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{isPro ? '🎯 POV 2' : '🗡️ Critic'}</div>
               <input
                 value={criticName}
                 onChange={e => setCriticName(e.target.value)}
@@ -1696,8 +1715,14 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
           </div>
 
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-            <b style={{ color: '#fde68a' }}>Optional:</b> Ads, intros, ya boring parts cut karo (M:SS format). Kuch nahi dalna ho to direct <b>🧠 Analyze Chapters</b> daba do — pura video use hoga.
-            <br />Ya <b style={{ color: '#c4b5fd' }}>Skip Chapter</b> dabake seedha Step 4 par jaa ke full-video deep analysis bana sakte ho.
+            {isPro ? (
+              <>Ads, intros, ya boring parts cut karo (M:SS format) — optional. Phir <b style={{ color: '#c4b5fd' }}>Continue</b> dabao, AI khud best moment dhoond ke, tighten karke, POV1 vs POV2 script bana dega.</>
+            ) : (
+              <>
+                <b style={{ color: '#fde68a' }}>Optional:</b> Ads, intros, ya boring parts cut karo (M:SS format). Kuch nahi dalna ho to direct <b>🧠 Analyze Chapters</b> daba do — pura video use hoga.
+                <br />Ya <b style={{ color: '#c4b5fd' }}>Skip Chapter</b> dabake seedha Step 4 par jaa ke full-video deep analysis bana sakte ho.
+              </>
+            )}
           </div>
 
           {/* Add cut */}
@@ -1764,31 +1789,34 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
-            <button
-              onClick={handleAnalyze}
-              disabled={analyzing}
-              style={{
-                padding: '11px', borderRadius: 10, border: 'none',
-                background: analyzing ? 'rgba(239,68,68,0.3)' : '#ef4444',
-                color: '#fff', fontSize: 13, fontWeight: 800,
-                cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              {analyzing
-                ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gemini…</>
-                : <>🧠 Analyze Chapters</>}
-            </button>
+          <div style={{ display: 'grid', gridTemplateColumns: isPro ? '1fr' : 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
+            {!isPro && (
+              <button
+                onClick={handleAnalyze}
+                disabled={analyzing}
+                style={{
+                  padding: '11px', borderRadius: 10, border: 'none',
+                  background: analyzing ? 'rgba(239,68,68,0.3)' : '#ef4444',
+                  color: '#fff', fontSize: 13, fontWeight: 800,
+                  cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                {analyzing
+                  ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gemini…</>
+                  : <>🧠 Analyze Chapters</>}
+              </button>
+            )}
             <button
               onClick={() => { setChapters([]); setSelectedIdxs([]); setPhase('ready'); }}
               disabled={analyzing}
               style={{
                 padding: '11px', borderRadius: 10, border: '1px solid rgba(168,85,247,0.3)',
-                background: 'rgba(168,85,247,0.1)', color: '#c4b5fd', fontSize: 12, fontWeight: 700,
+                background: isPro ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'rgba(168,85,247,0.1)',
+                color: isPro ? '#fff' : '#c4b5fd', fontSize: isPro ? 13 : 12, fontWeight: isPro ? 800 : 700,
                 cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
               }}
-            >⏩ Skip Chapter → Step 4 (Full Video)</button>
+            >{isPro ? '🎯 Continue — Find Best Moment' : '⏩ Skip Chapter → Step 4 (Full Video)'}</button>
           </div>
         </>
       )}
@@ -1897,11 +1925,13 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
               ✨ Step 4 — Generate Script
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.45 }}>
-              {selectedIdxs.length === 0
-                ? '0 chapters selected → puri transcript par deep analysis banegi'
-                : selectedIdxs.length === 2
-                  ? `${selectedIdxs.length} chapters selected — combined deep analysis banegi`
-                  : '1 chapter selected — deep analysis script banegi'}
+              {isPro
+                ? 'Generate dabate hi AI best moment dhoondega, tighten karega, aur POV1 vs POV2 reaction script likhega — sab automatic.'
+                : selectedIdxs.length === 0
+                  ? '0 chapters selected → puri transcript par deep analysis banegi'
+                  : selectedIdxs.length === 2
+                    ? `${selectedIdxs.length} chapters selected — combined deep analysis banegi`
+                    : '1 chapter selected — deep analysis script banegi'}
               <br />Generate ke baad Script Editor khulega — wahaan review/edit karke aap Phone Studio open kar sakte ho.
             </div>
           </div>
@@ -2025,14 +2055,14 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
                 flex: 1, padding: '7px 10px', borderRadius: 8,
                 background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)',
               }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>SUPPORTER</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{isPro ? 'POV 1' : 'SUPPORTER'}</div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>{supporterName}</div>
               </div>
               <div style={{
                 flex: 1, padding: '7px 10px', borderRadius: 8,
                 background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
               }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>CRITIC</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{isPro ? 'POV 2' : 'CRITIC'}</div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>{criticName}</div>
               </div>
             </div>
@@ -2278,7 +2308,8 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
   const isPodcastAnalysis = genStyle === 'podcast_analysis'
     || genStyle === 'podcast_analysis_funny'
     || genStyle === 'podcast_analysis_friendly'
-    || genStyle === 'clip_reaction';
+    || genStyle === 'clip_reaction'
+    || genStyle === 'podcast_pro';
 
   return (
     <div
@@ -2365,7 +2396,8 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
             genStyle === 'podcast_analysis_funny' ? 'funny'
               : genStyle === 'podcast_analysis_friendly' ? 'friendly'
                 : genStyle === 'clip_reaction' ? 'clip_take'
-                  : 'adaptive'
+                  : genStyle === 'podcast_pro' ? 'podcast_pro'
+                    : 'adaptive'
           }
           onChangeStyle={() => setGenStep(1)}
           onGenerate={onPodcastGenerate}
@@ -3706,6 +3738,84 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           setScript(newScript);
           setTab('visual');
           toast.success(`✓ ${newScript.length} turns ka clip-reaction script ready hai!`);
+        }
+        return;
+      }
+
+      // ── Podcast Pro (fully automatic best-moment → tighten → POV1/POV2) ──
+      if (args.variant === 'podcast_pro') {
+        toast.info('Best moment dhoond raha hai…');
+        const candidates = await findBestPodcastSegments(args.segments, PODCAST_PRO_MAX_SPAN_SEC);
+        if (!candidates.length) throw new Error('Koi standout moment nahi mila is transcript mein');
+        const best = candidates[0];
+
+        toast.info(`✓ "${best.label}" — ab tighten kar raha hai…`);
+        const keepRanges = await tightenPodcastSegment(args.segments, best, PODCAST_PRO_MAX_SPAN_SEC);
+
+        toast.info('POV1 vs POV2 script likh raha hai…');
+        const turns = await generatePOVReactionScript({
+          segments: args.segments,
+          keepRanges,
+          label: best.label,
+          podcastTitle: args.podcastTitle,
+          podcastHost: args.podcastHost || undefined,
+          podcastGuests: args.podcastGuests.length ? args.podcastGuests : undefined,
+          useGoogleGrounding: args.useGrounding,
+        });
+        if (!turns.length) throw new Error('POV script empty hai');
+
+        const pov1Name = args.supporterName || 'POV1';
+        const pov2Name = args.criticName || 'POV2';
+        const pov1PhoneId = speakerToPhoneId(pov1Name);
+        const pov2PhoneId = speakerToPhoneId(pov2Name);
+        const bluePreset   = PRESET_COLORS.find(p => p.label === 'Blue')   ?? PRESET_COLORS[0];
+        const orangePreset = PRESET_COLORS.find(p => p.label === 'Orange') ?? PRESET_COLORS[3];
+        const newPhones: PhoneConfig[] = [
+          {
+            id: pov1PhoneId, name: pov1Name,
+            style: 'aurora', color: bluePreset.color, screenColor: bluePreset.screen,
+            rotation: -4, showControls: true, battery: randomBattery(),
+          },
+          {
+            id: pov2PhoneId, name: pov2Name,
+            style: 'gemini', color: orangePreset.color, screenColor: orangePreset.screen,
+            rotation: 5, showControls: true, battery: randomBattery(),
+          },
+        ];
+        const newScript: ScriptTurn[] = turns.map((t, i) => {
+          const phoneId = t.speaker === 'pov2' ? pov2PhoneId : pov1PhoneId;
+          const estDur = Math.max(3000, t.text.length * 72);
+          return {
+            id: `podcastpro_${i}_${Date.now()}`,
+            phoneId,
+            text: t.text,
+            isNarrator: false,
+            durationMs: estDur,
+            audioUrl: undefined,
+            wordTimings: estimateWordTimings(t.text, estDur / 1000),
+          };
+        });
+
+        const clipSourceClips: PhoneStudioSourceClip[] = keepRanges.map((r, i) => ({
+          title: keepRanges.length > 1 ? `${best.label} (${i + 1})` : best.label,
+          startSec: r.start_sec,
+          endSec: r.end_sec,
+        }));
+
+        if (embedded && onGeneratorComplete) {
+          onGeneratorComplete(newScript, newPhones, { sourceClips: clipSourceClips });
+          toast.success(`✓ ${newScript.length} turns ka Podcast Pro script ready hai!`);
+        } else {
+          setSourceClips(clipSourceClips);
+          if (args.videoFile) {
+            setUploadedVideoForClip(args.videoFile);
+            const url = URL.createObjectURL(args.videoFile);
+            setUploadedVideoUrlForClip(url);
+          }
+          setPhones(newPhones);
+          setScript(newScript);
+          setTab('visual');
+          toast.success(`✓ ${newScript.length} turns ka Podcast Pro script ready hai!`);
         }
         return;
       }
