@@ -270,6 +270,13 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   }, [theme, activeSpeakers.length]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Mirrors whether a drag/resize is in progress, read by the native (non-
+  // passive) touchmove listener below — React's onTouchMove is registered
+  // passive, so calling preventDefault() inside it does nothing on iOS
+  // Safari, which lets the OS's own vertical-scroll gesture win over our
+  // drag on the Y axis (X still worked since there's nothing to scroll
+  // sideways). This ref lets a real addEventListener call preventDefault().
+  const isInteractingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -2340,29 +2347,34 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
         // BR
         if (Math.abs(x - (bx + bw)) < handleSize && y >= (by + bh - handleSize) && y <= (by + bh + 200)) {
+            isInteractingRef.current = true;
             setResizingSubtitle('br');
             return;
         }
         // BL
         if (Math.abs(x - bx) < handleSize && y >= (by + bh - handleSize) && y <= (by + bh + 200)) {
+            isInteractingRef.current = true;
             setResizingSubtitle('bl');
             return;
         }
         // TR
         if (Math.abs(x - (bx + bw)) < handleSize && Math.abs(y - by) < handleSize) {
+            isInteractingRef.current = true;
             setResizingSubtitle('tr');
             return;
         }
         // TL
         if (Math.abs(x - bx) < handleSize && Math.abs(y - by) < handleSize) {
+            isInteractingRef.current = true;
             setResizingSubtitle('tl');
             return;
         }
 
         // Check Subtitle Drag
         if (x > bx && x < bx + bw && y > by && y < by + bh + 200) {
+            isInteractingRef.current = true;
             setDraggingSubtitle(true);
-            setDragOffset({ x: x - bx, y: y - subtitleConfig.y }); 
+            setDragOffset({ x: x - bx, y: y - subtitleConfig.y });
             return;
         }
     }
@@ -2407,6 +2419,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             }
 
             if (hit) {
+                isInteractingRef.current = true;
                 setDragging(i);
                 return;
             }
@@ -2515,10 +2528,28 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   };
 
   const handlePointerUp = () => {
+      isInteractingRef.current = false;
       setDragging(null);
       setDraggingSubtitle(false);
       setResizingSubtitle(null);
   };
+
+  // Native (non-passive) touchmove listener: React's onTouchMove prop is
+  // registered as a passive listener, so preventDefault() called from inside
+  // it is silently ignored — on iOS Safari that lets the page's own
+  // vertical-scroll gesture win over a subtitle-box drag whenever the touch
+  // moves mostly up/down, even with `touch-action: none` in CSS on some
+  // WebKit versions. Only preventDefault while actually dragging/resizing,
+  // so normal page scrolling elsewhere is unaffected.
+  useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const onTouchMoveNative = (e: TouchEvent) => {
+          if (isInteractingRef.current) e.preventDefault();
+      };
+      canvas.addEventListener('touchmove', onTouchMoveNative, { passive: false });
+      return () => canvas.removeEventListener('touchmove', onTouchMoveNative);
+  }, []);
 
   const getSupportedMimeType = () => {
     const types = [
