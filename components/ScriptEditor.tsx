@@ -412,7 +412,8 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     return { words, seconds };
   };
 
-  const speakerAccent = (speaker: string) => {
+  const speakerAccent = (speaker: string, isIntro?: boolean) => {
+    if (isIntro) return { bar: 'bg-cyan-500', badge: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' };
     if (isNarrator(speaker)) return { bar: 'bg-zinc-600', badge: 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50' };
     const idx = uniqueSpeakers.indexOf(speaker);
     const palette = [
@@ -500,7 +501,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
           {script.map((seg, idx) => {
             const displayText = translateView && translatedTexts?.[idx] != null ? translatedTexts[idx] : seg.text;
             const stats = getStats(seg.text);
-            const accent = speakerAccent(seg.speaker);
+            const accent = speakerAccent(seg.speaker, seg.learnEnglish?.segmentType === 'intro');
             const isRewiting = isRewriting && activeRewriteId === seg.id;
 
             return (
@@ -519,7 +520,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                       className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5 border transition-all ${accent.badge} ${editMode && !translateView ? 'cursor-pointer hover:brightness-125 active:scale-95' : 'cursor-default'}`}
                     >
                       <User size={11} />
-                      {seg.speaker}
+                      {seg.learnEnglish?.segmentType === 'intro' ? 'Intro' : seg.speaker}
                       {editMode && !translateView && <RefreshCw size={9} className="opacity-40" />}
                     </button>
 
