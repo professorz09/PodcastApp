@@ -21,7 +21,6 @@ import {
   generateTitleTextPair,
   generateThumbnail,
   PodcastTranscriptSeg,
-  PodcastCutRange,
   PodcastChapter,
 } from '../services/geminiService';
 import {
@@ -1248,18 +1247,8 @@ const fmtSec = (s: number) => {
   return `${m}:${String(r).padStart(2, '0')}`;
 };
 
-const parseTsInput = (txt: string): number | null => {
-  const t = txt.trim();
-  if (!t) return null;
-  const parts = t.split(':').map(p => +p);
-  if (parts.some(Number.isNaN)) return null;
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return parts[0];
-};
-
 const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChangeStyle, generating, onGenerate }) => {
-  const [phase, setPhase] = useState<'url' | 'cuts' | 'chapters' | 'ready'>('url');
+  const [phase, setPhase] = useState<'url' | 'chapters' | 'ready'>('url');
   // Which tab of the combined Video Source card is showing on the 'url' phase.
   const [sourceMode, setSourceMode] = useState<'link' | 'video'>('link');
   const [podcastUrl, setPodcastUrl] = useState('');
@@ -1281,13 +1270,9 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   // Person-in-clip / verb / topic are auto-detected from the transcript by Gemini.
   const isClip = variant === 'clip_take';
   // Podcast Pro: fully automatic — AI finds + tightens the best moment itself,
-  // so the chapters phase is skipped entirely (see the "cuts" phase button below).
+  // so the chapters phase is skipped entirely — goes straight to 'ready'.
   const isPro = variant === 'podcast_pro';
   const [analystName, setAnalystName] = useState('Sam');
-
-  const [cuts, setCuts] = useState<PodcastCutRange[]>([]);
-  const [cutStartTxt, setCutStartTxt] = useState('');
-  const [cutEndTxt, setCutEndTxt] = useState('');
 
   const [chapters, setChapters] = useState<PodcastChapter[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -1353,7 +1338,6 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       setPodcastDescription(fetchedDesc);
       setPodcastUploader(fetchedUploader);
       if (!podcastTitle.trim() && fetchedTitle) setPodcastTitle(fetchedTitle);
-      setPhase('cuts');
       toast.success(`✓ Transcript fetched (${segs.length} segments, ${fmtSec(segs[segs.length - 1].start)})`);
 
       // Background: auto-detect host + guest names (don't block UI)
@@ -1375,6 +1359,16 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
           }
         }).catch(() => { /* silent */ }).finally(() => setDetectingSpeakers(false));
       }
+
+      // No separate "cuts" step anymore — go straight on: Pro finds its own best
+      // moment automatically, everyone else gets chapters analyzed right away.
+      setFetching(false);
+      if (isPro) {
+        setPhase('ready');
+      } else {
+        handleAnalyze(segs, titleForDetect);
+      }
+      return;
     } catch (e: any) {
       toast.error(e.message || 'Transcript fetch failed');
     } finally {
@@ -1436,9 +1430,15 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
 
     if (!segs.length) { toast.error('File mein koi transcript nahi mila'); return; }
     setSegments(segs);
-    if (!podcastTitle.trim()) setPodcastTitle(file.name.replace(/\.[^.]+$/, ''));
-    setPhase('cuts');
+    const titleForThis = podcastTitle.trim() || file.name.replace(/\.[^.]+$/, '');
+    if (!podcastTitle.trim()) setPodcastTitle(titleForThis);
     toast.success(`✓ ${segs.length} segments file se load hue`);
+
+    if (isPro) {
+      setPhase('ready');
+    } else {
+      handleAnalyze(segs, titleForThis);
+    }
   };
 
   // ── 1c. Video file upload — extract audio → Google STT → transcript ────────
@@ -1512,9 +1512,15 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
 
       const segs = wordTimingsToSegments(wordTimings);
       setSegments(segs);
-      if (!podcastTitle.trim()) setPodcastTitle(file.name.replace(/\.[^.]+$/, ''));
-      setPhase('cuts');
+      const titleForThis = podcastTitle.trim() || file.name.replace(/\.[^.]+$/, '');
+      if (!podcastTitle.trim()) setPodcastTitle(titleForThis);
       toast.success(`✓ Video transcript ready! ${segs.length} segments, ${fmtSec(videoDuration)}`);
+
+      if (isPro) {
+        setPhase('ready');
+      } else {
+        handleAnalyze(segs, titleForThis);
+      }
     } catch (e: any) {
       // Keep uploadedVideoFile set so user can retry without re-uploading
       setVideoTranscribeFailed(true);
@@ -1526,25 +1532,15 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
     }
   };
 
-  // ── 2. Cuts management ─────────────────────────────────────────────────────
-  const handleAddCut = () => {
-    const s = parseTsInput(cutStartTxt);
-    const e = parseTsInput(cutEndTxt);
-    if (s == null || e == null) { toast.error('Format: M:SS — e.g. 12:30'); return; }
-    if (e <= s) { toast.error('End time start ke baad honi chahiye'); return; }
-    setCuts(prev => [...prev, { startSec: s, endSec: e }].sort((a, b) => a.startSec - b.startSec));
-    setCutStartTxt(''); setCutEndTxt('');
-  };
-
-  const handleRemoveCut = (i: number) => setCuts(prev => prev.filter((_, idx) => idx !== i));
-
-  // ── 3. Analyze chapters ────────────────────────────────────────────────────
-  const handleAnalyze = async (overrideCuts?: PodcastCutRange[]) => {
-    if (!segments.length) return;
-    const cutsToUse = overrideCuts !== undefined ? overrideCuts : cuts;
+  // ── 2. Analyze chapters — runs automatically right after transcript is ready,
+  //    no separate manual "cuts" step anymore. ────────────────────────────────
+  const handleAnalyze = async (overrideSegments?: PodcastTranscriptSeg[], overrideTitle?: string) => {
+    const segsToUse = overrideSegments !== undefined ? overrideSegments : segments;
+    if (!segsToUse.length) return;
+    const titleToUse = overrideTitle !== undefined ? overrideTitle : podcastTitle;
     setAnalyzing(true);
     try {
-      const chaps = await analyzePodcastChapters(segments, cutsToUse, podcastTitle || 'this podcast');
+      const chaps = await analyzePodcastChapters(segsToUse, [], titleToUse || 'this podcast');
       if (!chaps.length) throw new Error('Koi chapters detect nahi hue');
       setChapters(chaps);
       setSelectedIdxs([0]);
@@ -1640,10 +1636,10 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
 
       {/* Sub-step indicator */}
       <div style={{ display: 'flex', gap: 4, fontSize: 10 }}>
-        {(['url', 'cuts', 'chapters', 'ready'] as const).map((p, i) => {
-          const labels = ['URL', 'Cuts', 'Chapters', 'Generate'];
+        {(['url', 'chapters', 'ready'] as const).map((p, i) => {
+          const labels = ['Source', 'Chapters', 'Generate'];
           const active = phase === p;
-          const passed = ['url', 'cuts', 'chapters', 'ready'].indexOf(phase) > i;
+          const passed = ['url', 'chapters', 'ready'].indexOf(phase) > i;
           return (
             <div key={p} style={{
               flex: 1, padding: '5px 4px', borderRadius: 6, textAlign: 'center',
@@ -1661,6 +1657,13 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       {/* ── PHASE: URL ── */}
       {phase === 'url' && (
         <>
+          {analyzing && (
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#c4b5fd', flexShrink: 0 }} />
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd' }}>Transcript ready — chapters automatically analyze ho rahe hain…</div>
+            </div>
+          )}
+
           {/* Combined Video Source card — YouTube link OR upload a video, one tabbed card */}
           <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
             <div style={{ display: 'flex' }}>
@@ -1701,19 +1704,21 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
                   />
                   <button
                     onClick={handleFetch}
-                    disabled={fetching || !podcastUrl.trim()}
+                    disabled={fetching || analyzing || !podcastUrl.trim()}
                     style={{
                       padding: '11px', borderRadius: 12, border: 'none',
-                      background: fetching ? 'rgba(239,68,68,0.3)' : '#ef4444',
+                      background: (fetching || analyzing) ? 'rgba(239,68,68,0.3)' : '#ef4444',
                       color: '#fff', fontSize: 13, fontWeight: 800,
-                      cursor: fetching ? 'default' : 'pointer', fontFamily: 'inherit',
+                      cursor: (fetching || analyzing) ? 'default' : 'pointer', fontFamily: 'inherit',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       opacity: !podcastUrl.trim() ? 0.4 : 1,
                     }}
                   >
                     {fetching
                       ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Transcript fetch ho raha hai…</>
-                      : <>🚀 Start Analyse</>}
+                      : analyzing
+                        ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Chapters analyze ho rahe hain…</>
+                        : <>🚀 Start Analyse</>}
                   </button>
 
                   <input
@@ -1931,169 +1936,6 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
         </>
       )}
 
-      {/* ── PHASE: CUTS (skippable) ── */}
-      {phase === 'cuts' && (
-        <>
-          <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}>
-              {uploadedVideoFile ? '🎬 Video + ' : ''}✓ Transcript Ready
-            </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-              {segments.length} segments · Total {fmtSec(totalSec)}
-              {uploadedVideoFile && <span style={{ color: '#86efac', marginLeft: 6 }}>· {uploadedVideoFile.name}</span>}
-            </div>
-          </div>
-
-          {/* Detected Host / Guest banner — editable */}
-          <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd' }}>
-                🎙️ Podcast People {detectingSpeakers && <Loader2 size={11} style={{ animation: 'spin 1s linear infinite', verticalAlign: 'middle', marginLeft: 4 }} />}
-              </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-                {detectingSpeakers ? 'Detect ho raha hai…' : 'Auto-detected — fix kar sakte ho'}
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 9, color: 'rgba(147,197,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Host</div>
-                <input
-                  value={podcastHost}
-                  onChange={e => setPodcastHost(e.target.value)}
-                  placeholder="e.g. Lex Fridman"
-                  style={{
-                    width: '100%', padding: '7px 10px', borderRadius: 7, boxSizing: 'border-box',
-                    background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
-                    color: '#fff', fontSize: 11, outline: 'none', fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 9, color: 'rgba(147,197,253,0.7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Guest(s) — comma separated</div>
-                <input
-                  value={podcastGuests.join(', ')}
-                  onChange={e => setPodcastGuests(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                  placeholder="e.g. Elon Musk, Naval Ravikant"
-                  style={{
-                    width: '100%', padding: '7px 10px', borderRadius: 7, boxSizing: 'border-box',
-                    background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
-                    color: '#fff', fontSize: 11, outline: 'none', fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-            </div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 6, lineHeight: 1.4 }}>
-              Conversation me ye naam use honge jab analysts podcast hosts/guest ko refer karenge.
-            </div>
-          </div>
-
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-            {isPro ? (
-              <>Ads, intros, ya boring parts cut karo (M:SS format) — optional. Phir <b style={{ color: '#c4b5fd' }}>Continue</b> dabao, AI khud best moment dhoond ke, tighten karke, POV1 vs POV2 script bana dega.</>
-            ) : (
-              <>
-                <b style={{ color: '#fde68a' }}>Optional:</b> Ads, intros, ya boring parts cut karo (M:SS format). Kuch nahi dalna ho to direct <b>🧠 Analyze Chapters</b> daba do — pura video use hoga.
-                <br />Ya <b style={{ color: '#c4b5fd' }}>Skip Chapter</b> dabake seedha Step 4 par jaa ke full-video deep analysis bana sakte ho.
-              </>
-            )}
-          </div>
-
-          {/* Add cut */}
-          <div style={{ borderRadius: 10, border: '1px dashed rgba(255,255,255,0.15)', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: '100%' }}>
-              <input
-                value={cutStartTxt}
-                onChange={e => setCutStartTxt(e.target.value)}
-                placeholder="Start (e.g. 2:15)"
-                style={{
-                  flex: '1 1 120px', minWidth: 0,
-                  padding: '8px 10px', borderRadius: 7, boxSizing: 'border-box',
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'monospace',
-                }}
-              />
-              <input
-                value={cutEndTxt}
-                onChange={e => setCutEndTxt(e.target.value)}
-                placeholder="End (e.g. 4:30)"
-                style={{
-                  flex: '1 1 120px', minWidth: 0,
-                  padding: '8px 10px', borderRadius: 7, boxSizing: 'border-box',
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'monospace',
-                }}
-              />
-              <button
-                onClick={handleAddCut}
-                style={{
-                  flex: '0 0 auto', whiteSpace: 'nowrap',
-                  padding: '8px 12px', borderRadius: 7, border: 'none',
-                  background: 'rgba(239,68,68,0.2)', color: '#fca5a5', fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >+ Cut</button>
-            </div>
-          </div>
-
-          {/* Cut list */}
-          {cuts.length > 0 && (
-            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden' }}>
-              {cuts.map((c, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
-                  borderBottom: i < cuts.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                }}>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>#{i + 1}</span>
-                  <span style={{ flex: 1, fontFamily: 'monospace', fontSize: 11, color: '#fca5a5' }}>
-                    {fmtSec(c.startSec)} → {fmtSec(c.endSec)}
-                    <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>
-                      ({fmtSec(c.endSec - c.startSec)} cut)
-                    </span>
-                  </span>
-                  <button
-                    onClick={() => handleRemoveCut(i)}
-                    style={{
-                      background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-                      cursor: 'pointer', fontSize: 14, padding: 0,
-                    }}
-                  >✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: isPro ? '1fr' : 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
-            {!isPro && (
-              <button
-                onClick={handleAnalyze}
-                disabled={analyzing}
-                style={{
-                  padding: '11px', borderRadius: 10, border: 'none',
-                  background: analyzing ? 'rgba(239,68,68,0.3)' : '#ef4444',
-                  color: '#fff', fontSize: 13, fontWeight: 800,
-                  cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-              >
-                {analyzing
-                  ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gemini…</>
-                  : <>🧠 Analyze Chapters</>}
-              </button>
-            )}
-            <button
-              onClick={() => { setChapters([]); setSelectedIdxs([]); setPhase('ready'); }}
-              disabled={analyzing}
-              style={{
-                padding: '11px', borderRadius: 10, border: '1px solid rgba(168,85,247,0.3)',
-                background: isPro ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'rgba(168,85,247,0.1)',
-                color: isPro ? '#fff' : '#c4b5fd', fontSize: isPro ? 13 : 12, fontWeight: isPro ? 800 : 700,
-                cursor: analyzing ? 'default' : 'pointer', fontFamily: 'inherit',
-              }}
-            >{isPro ? '🎯 Continue — Find Best Moment' : '⏩ Skip Chapter → Step 4 (Full Video)'}</button>
-          </div>
-        </>
-      )}
-
       {/* ── PHASE: CHAPTERS (selection only) ── */}
       {phase === 'chapters' && (
         <>
@@ -2161,14 +2003,14 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
           {/* Nav buttons */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button
-              onClick={() => setPhase('cuts')}
+              onClick={() => setPhase('url')}
               style={{
                 flex: '0 0 auto', whiteSpace: 'nowrap',
                 padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
                 background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'inherit',
               }}
-            >← Cuts</button>
+            >← Source</button>
             <button
               onClick={() => setPhase('ready')}
               style={{
