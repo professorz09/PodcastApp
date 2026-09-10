@@ -3205,8 +3205,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           </div>
 
           {/* ── Intro Settings — standalone, fully separate from Speakers/
-               Background/Subtitle/Options (not one of that tab group). ── */}
-          {introSegments.length > 0 && (
+               Background/Subtitle/Options (not one of that tab group), and
+               only visible while the currently-selected chip is the intro
+               segment itself — it disappears entirely on any other chip. ── */}
+          {currentSegment?.learnEnglish?.segmentType === 'intro' && (
             <div className="bg-[#0d0d0d] border border-cyan-500/20 rounded-2xl overflow-hidden">
               <button
                 onClick={() => setShowIntroSection(!showIntroSection)}
