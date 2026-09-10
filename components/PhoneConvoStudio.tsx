@@ -411,7 +411,10 @@ const fmtTime = (ms: number) => {
 
 // ─── IntroFlow — Optional Intro Video (Step 2 / Cuts) ────────────────────────
 // Pipeline: gemini-3.1-flash-lite + Google grounding → TTS → STT → 1080p MP4.
-// Single phone called "Intro" (aurora purple). Per-step status + retry.
+// When the source video is available, the render is real footage — a frozen
+// frame from wherever the clip starts (host on screen), with the intro line
+// as a caption over it. Falls back to the synthetic "Intro" phone mockup
+// when there's no uploaded video (e.g. YouTube-URL-only sources).
 
 type IntroStepKey = 'text' | 'tts' | 'stt' | 'render';
 type IntroStepStatus = 'pending' | 'running' | 'done' | 'failed';
@@ -432,9 +435,81 @@ interface IntroFlowProps {
   selectionLabel?: string;
   onBlobReady?: (blob: Blob) => void;
   buttonOnly?: boolean; // renders just the action button + minimal status (no card)
+  /** Source video — when given, the intro freezes a real frame from it
+   *  (near selectedRanges[0].startSec) instead of the synthetic phone mockup. */
+  videoFile?: File | null;
 }
 
-const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel, onBlobReady, buttonOnly }) => {
+// Grabs a frame from `file` at `atSec`, drawn cover-fit into a W×H canvas —
+// used as the still background for a real-footage intro.
+const captureVideoFrame = (file: File, atSec: number, W: number, H: number): Promise<HTMLCanvasElement> =>
+  new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.src = URL.createObjectURL(file);
+    let settled = false;
+    const cleanup = () => { try { URL.revokeObjectURL(video.src); } catch {} };
+    video.onloadedmetadata = () => {
+      const dur = isFinite(video.duration) ? video.duration : atSec + 1;
+      video.currentTime = Math.min(Math.max(0, atSec), Math.max(0, dur - 0.1));
+    };
+    video.onseeked = () => {
+      if (settled) return;
+      settled = true;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const cctx = c.getContext('2d')!;
+      const vw = video.videoWidth || W, vh = video.videoHeight || H;
+      const scale = Math.max(W / vw, H / vh);
+      const dw = vw * scale, dh = vh * scale;
+      const dx = (W - dw) / 2, dy = (H - dh) / 2;
+      cctx.fillStyle = '#000';
+      cctx.fillRect(0, 0, W, H);
+      cctx.drawImage(video, dx, dy, dw, dh);
+      cleanup();
+      resolve(c);
+    };
+    video.onerror = () => { if (!settled) { settled = true; cleanup(); reject(new Error('Footage frame capture failed')); } };
+    setTimeout(() => { if (!settled) { settled = true; cleanup(); reject(new Error('Footage frame capture timeout')); } }, 15_000);
+  });
+
+// Static caption drawn over a frozen footage frame — bottom third, word-wrapped,
+// gradient scrim behind it so it reads on any background.
+const drawFootageCaption = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, W: number, H: number, text: string) => {
+  const barH = H * 0.26;
+  const grad = ctx.createLinearGradient(0, H - barH, 0, H);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.78)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H - barH, W, barH);
+
+  const fontSize = W * 0.034;
+  ctx.font = `700 ${fontSize}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = fontSize * 0.2;
+
+  const maxWidth = W * 0.82;
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w;
+    if (cur && ctx.measureText(test).width > maxWidth) { lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+
+  const lineHeight = fontSize * 1.35;
+  const startY = H - barH / 2 - ((lines.length - 1) * lineHeight) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, W / 2, startY + i * lineHeight));
+  ctx.shadowBlur = 0;
+};
+
+const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHost, podcastGuests, selectedRanges, selectionLabel, onBlobReady, buttonOnly, videoFile }) => {
   const [running, setRunning] = useState(false);
   const [bgColor, setBgColor] = useState('#ffffff');
   const [steps, setSteps] = useState<Record<IntroStepKey, { status: IntroStepStatus; detail?: string; error?: string }>>({
@@ -663,6 +738,20 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
           // Offscreen canvas + renderer
           const W = 1920, H = 1080, FPS = 30;
+
+          // Real-footage intro: freeze a frame from the source video (just
+          // inside where the clip starts) instead of the synthetic phone
+          // mockup. Falls back to the mockup if capture fails or no video.
+          let footageFrame: HTMLCanvasElement | null = null;
+          if (videoFile) {
+            const introStartSec = selectedRanges?.[0]?.startSec ?? 0;
+            try {
+              footageFrame = await captureVideoFrame(videoFile, introStartSec + 1.5, W, H);
+            } catch (e) {
+              console.warn('[IntroFlow] footage frame capture failed, falling back to phone mockup', e);
+            }
+          }
+
           const exportCanvas = document.createElement('canvas');
           exportCanvas.width = W;
           exportCanvas.height = H;
@@ -676,7 +765,8 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             subtitleConfig: { enabled: true, size: 1.6, background: 'dark', textColor: '#ffffff' },
             phoneZPulse: false,
           };
-          const exportRenderer = new CanvasRenderer(exportCanvas, state);
+          const exportRenderer = footageFrame ? null : new CanvasRenderer(exportCanvas, state);
+          const introTextForCaption = introTextRef.current || '';
 
           const blob = await renderVideoOffline({
             canvas: exportCanvas,
@@ -688,10 +778,15 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             width: W,
             height: H,
             renderCallback: (_time, _level, _vid, offCtx) => {
-              exportRenderer.currentTime = _time * 1000;
-              exportRenderer.audioLevel = _level;
-              exportRenderer.drawFrame();
-              offCtx.drawImage(exportCanvas, 0, 0, W, H);
+              if (footageFrame) {
+                offCtx.drawImage(footageFrame, 0, 0, W, H);
+                drawFootageCaption(offCtx, W, H, introTextForCaption);
+              } else if (exportRenderer) {
+                exportRenderer.currentTime = _time * 1000;
+                exportRenderer.audioLevel = _level;
+                exportRenderer.drawFrame();
+                offCtx.drawImage(exportCanvas, 0, 0, W, H);
+              }
             },
             onProgress: p => {
               patchStep('render', { status: 'running', detail: `${Math.round(p * 100)}%` });
@@ -2098,28 +2193,39 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
           </div>
 
           {/* Optional Intro Video — generated from SELECTED chapters only,
-              so the topic in the intro line matches what the user picked. */}
-          <IntroFlow
-            segments={segments}
-            podcastTitle={podcastTitle}
-            podcastHost={podcastHost}
-            podcastGuests={podcastGuests}
-            selectedRanges={
-              selectedIdxs.length === 0
-                ? [{ startSec: 0, endSec: totalSec }]
-                : [...selectedIdxs].sort((a, b) => a - b)
-                    .map(i => chapters[i])
-                    .filter(Boolean)
-                    .map(c => ({ startSec: c.startSec, endSec: c.endSec }))
-            }
-            selectionLabel={
-              selectedIdxs.length === 0
-                ? 'full episode'
-                : selectedIdxs.length === 1
-                  ? '1 selected chapter'
-                  : `${selectedIdxs.length} selected chapters`
-            }
-          />
+              so the topic in the intro line matches what the user picked.
+              Skipped for Podcast Pro: it doesn't know the AI-picked/tightened
+              moment yet at this point — see the Export tab's IntroFlow, which
+              uses the real sourceClips set once Generate has run. */}
+          {!isPro && (
+            <IntroFlow
+              segments={segments}
+              podcastTitle={podcastTitle}
+              podcastHost={podcastHost}
+              podcastGuests={podcastGuests}
+              videoFile={uploadedVideoFile}
+              selectedRanges={
+                selectedIdxs.length === 0
+                  ? [{ startSec: 0, endSec: totalSec }]
+                  : [...selectedIdxs].sort((a, b) => a - b)
+                      .map(i => chapters[i])
+                      .filter(Boolean)
+                      .map(c => ({ startSec: c.startSec, endSec: c.endSec }))
+              }
+              selectionLabel={
+                selectedIdxs.length === 0
+                  ? 'full episode'
+                  : selectedIdxs.length === 1
+                    ? '1 selected chapter'
+                    : `${selectedIdxs.length} selected chapters`
+              }
+            />
+          )}
+          {isPro && (
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+              🎬 Intro video Export tab mein milega — Generate ke baad, jab AI ka pick ka best moment pata chal jaye.
+            </div>
+          )}
 
           {/* ── Combo + Thumbnail card ── */}
           <div style={{ borderRadius: 12, border: '1px solid rgba(234,179,8,0.25)', background: 'rgba(234,179,8,0.05)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -4942,6 +5048,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 podcastTitle={podcastTitle}
                 podcastHost={podcastHost}
                 podcastGuests={podcastGuests}
+                videoFile={uploadedVideoForClip}
                 selectedRanges={sourceClips.length > 0 ? sourceClips.map(c => ({ startSec: c.startSec, endSec: c.endSec })) : undefined}
                 selectionLabel={sourceClips.length > 0 ? sourceClips[0].title : undefined}
                 onBlobReady={blob => setIntroVideoBlob(blob)}
