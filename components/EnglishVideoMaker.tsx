@@ -846,6 +846,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // during that segment's own playback instead of one static image.
   const [introScenesProgress, setIntroScenesProgress] = useState<Record<string, { done: number; total: number }>>({});
 
+  // Step 1: just the breakdown — prompts + time ranges, no images yet. The
+  // Timeline list appears right after this (fast) step so the user sees the
+  // scene plan immediately, instead of staring at one spinner until both the
+  // breakdown AND every image are done.
   const handleGenerateIntroScenes = async (segId: string) => {
     const seg = script.find(s => s.id === segId);
     if (!seg) return;
@@ -856,33 +860,47 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       // genuinely takes a while; 45s was cutting it off mid-thought on
       // every single attempt, not just real stalls.
       const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 90000, 'Scene breakdown');
-      setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: breakdown.length } }));
-
-      // Images generate in parallel (not one-by-one) — sequential generation
-      // of several scene images compounded into a very long wait for a
-      // multi-beat intro; each image is independent, so there's no reason
-      // to wait for one before starting the next.
-      const scenesWithImages = await Promise.all(breakdown.map(async (scene) => {
-        try {
-          const imageUrl = await withRetry(() => generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 2, 60000, 'Scene image');
-          setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: breakdown.length } }));
-          return { ...scene, imageUrl };
-        } catch (e) {
-          console.error('Intro scene image failed', e);
-          setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: breakdown.length } }));
-          return { ...scene, imageUrl: undefined };
-        }
-      }));
-
       setScript(prev => prev.map(s => s.id === segId
-        ? {
-            ...s,
-            learnEnglish: { ...s.learnEnglish!, introScenes: scenesWithImages },
-            visualConfig: { ...s.visualConfig, backgroundUrl: scenesWithImages?.[0]?.imageUrl, backgroundColor: undefined },
-          }
+        ? { ...s, learnEnglish: { ...s.learnEnglish!, introScenes: breakdown } }
         : s));
     } catch (e: any) {
       toast.error(`Scene generation failed: ${e.message}`);
+    } finally {
+      setIntroImageLoading(prev => ({ ...prev, [segId]: false }));
+    }
+  };
+
+  // Step 2: generate the actual images for scenes that already have their
+  // prompt/timing from step 1 — a separate action, run once the Timeline is
+  // visible, not bundled invisibly into step 1.
+  const handleGenerateIntroSceneImages = async (segId: string) => {
+    const seg = script.find(s => s.id === segId);
+    const scenes = seg?.learnEnglish?.introScenes;
+    if (!seg || !scenes?.length) return;
+    setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
+    setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: scenes.length } }));
+    try {
+      // Parallel, not one-by-one — each image is independent, sequential
+      // generation just compounds the wait for a multi-beat intro.
+      await Promise.all(scenes.map(async (scene, sceneIdx) => {
+        try {
+          const imageUrl = await withRetry(() => generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 2, 60000, 'Scene image');
+          setScript(prev => prev.map(s => {
+            if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
+            const newScenes = [...s.learnEnglish.introScenes];
+            newScenes[sceneIdx] = { ...newScenes[sceneIdx], imageUrl };
+            return {
+              ...s,
+              learnEnglish: { ...s.learnEnglish, introScenes: newScenes },
+              visualConfig: sceneIdx === 0 ? { ...s.visualConfig, backgroundUrl: imageUrl, backgroundColor: undefined } : s.visualConfig,
+            };
+          }));
+        } catch (e) {
+          console.error('Intro scene image failed', e);
+        } finally {
+          setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: scenes.length } }));
+        }
+      }));
     } finally {
       setIntroImageLoading(prev => ({ ...prev, [segId]: false }));
     }
@@ -3247,38 +3265,16 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
               {showIntroSection && (
                 <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
-                  {introSegments.map((seg) => (
+                  {introSegments.map((seg) => {
+                    const hasScenes = !!seg.learnEnglish?.introScenes?.length;
+                    const hasAnyImage = !!seg.learnEnglish?.introScenes?.some(sc => sc.imageUrl);
+                    return (
                     <div key={seg.id} className="space-y-2">
                       <p className="text-xs text-gray-400 italic line-clamp-2">"{seg.text}"</p>
 
-                      {seg.visualConfig?.backgroundUrl && !introImageLoading[seg.id] && (
-                        <div className="relative aspect-video bg-black rounded-2xl overflow-hidden">
-                          <img src={seg.visualConfig.backgroundUrl} alt="Intro" className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => handleClearIntroScenes(seg.id)}
-                            className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
-                          >
-                            <X size={10} className="text-white" />
-                          </button>
-                        </div>
-                      )}
-
-                      <button
-                        onClick={() => handleGenerateIntroScenes(seg.id)}
-                        disabled={!!introImageLoading[seg.id]}
-                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
-                      >
-                        {introImageLoading[seg.id]
-                          ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id] ? `Scene ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating…'}</>
-                          : <><Wand2 size={11} /> Generate Scenes</>
-                        }
-                      </button>
-                      {!seg.phraseTimings?.length && (
-                        <p className="text-[10px] text-amber-500/70">Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes exact bole gaye words ke saath match honge.</p>
-                      )}
-
-                      {/* ── Scenes Timeline (mirrors Storyboard's list) ── */}
-                      {!!seg.learnEnglish?.introScenes?.length && (
+                      {/* ── Scenes Timeline (mirrors Storyboard's list) — shown as
+                           soon as scenes exist, before images are generated ── */}
+                      {hasScenes && (
                         <div className="bg-black border border-white/5 rounded-2xl overflow-hidden">
                           <div className="px-3.5 py-2.5 border-b border-white/5 flex items-center justify-between">
                             <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Timeline · {seg.learnEnglish.introScenes.length} scenes</span>
@@ -3315,8 +3311,36 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           </div>
                         </div>
                       )}
+
+                      {!hasScenes ? (
+                        <button
+                          onClick={() => handleGenerateIntroScenes(seg.id)}
+                          disabled={!!introImageLoading[seg.id]}
+                          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
+                        >
+                          {introImageLoading[seg.id]
+                            ? <><Loader2 size={11} className="animate-spin" /> Generating…</>
+                            : <><Wand2 size={11} /> Generate Scenes</>
+                          }
+                        </button>
+                      ) : !hasAnyImage ? (
+                        <button
+                          onClick={() => handleGenerateIntroSceneImages(seg.id)}
+                          disabled={!!introImageLoading[seg.id]}
+                          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
+                        >
+                          {introImageLoading[seg.id]
+                            ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id] ? `Image ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating…'}</>
+                            : <><Wand2 size={11} /> Generate Images</>
+                          }
+                        </button>
+                      ) : null}
+                      {!seg.phraseTimings?.length && !hasScenes && (
+                        <p className="text-[10px] text-amber-500/70">Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes exact bole gaye words ke saath match honge.</p>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
