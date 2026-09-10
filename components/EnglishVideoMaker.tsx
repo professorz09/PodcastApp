@@ -6,7 +6,7 @@ import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
-import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage } from '../services/geminiService';
+import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { saveEnglishVideoVisuals, loadEnglishVideoVisuals } from '../services/storageService';
@@ -207,7 +207,12 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [segmentScores, setSegmentScores] = useState<number[]>([]);
   const [showScorecard, setShowScorecard] = useState(false);
   const [scorecardData, setScorecardData] = useState<{ scores: { model: string, score: number }[], average: number } | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
+  // Auto-expand straight into the Intro tab when the video opens on its
+  // intro segment — otherwise the panel stays collapsed and the user has to
+  // manually expand it just to see the settings that are already relevant.
+  const [showSettings, setShowSettings] = useState(() =>
+    initialScript[0]?.learnEnglish?.segmentType === 'intro'
+  );
   const [questionMode, setQuestionMode] = useState(false);
 
   // When Neon theme is selected, default speakers & subtitle background to OFF
@@ -777,13 +782,22 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // cinematic-style AI generator instead of the flat-cartoon one used for
   // bulk "Generate All Images".
   const [introImageLoading, setIntroImageLoading] = useState<Record<string, boolean>>({});
+  const [introImageAspectRatio, setIntroImageAspectRatio] = useState<'16:9' | '9:16' | '3:4' | '1:1'>('16:9');
+  const [useLiteImageModel, setUseLiteImageModelState] = useState(isUsingLiteImageModel);
+  const toggleLiteImageModel = () => {
+    setUseLiteImageModelState(prev => {
+      const next = !prev;
+      setUseLiteImageModel(next);
+      return next;
+    });
+  };
 
   const handleGenerateIntroImage = async (segId: string) => {
     const seg = script.find(s => s.id === segId);
     if (!seg) return;
     setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
     try {
-      const dataUrl = await generateCinematicSceneImage(seg.text);
+      const dataUrl = await generateCinematicSceneImage(seg.text, introImageAspectRatio);
       setScript(prev => prev.map(s => s.id === segId
         ? { ...s, visualConfig: { ...s.visualConfig, backgroundUrl: dataUrl, backgroundColor: undefined } }
         : s));
@@ -3351,6 +3365,34 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                 {settingsTab === 'intro' && (
                   <div className="space-y-4">
                     <p className="text-[10px] text-gray-500">Yeh sirf Narrator ke opening hook line (intro-tagged segment) ke liye hai — cinematic AI image ya apni photo/scene upload karo, jo sirf uss segment ki background bani rahegi.</p>
+
+                    {/* ── Image Generation settings (Storyboard-style) ── */}
+                    <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-4 space-y-4">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-2">Image Ratio</label>
+                        <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
+                          {(['16:9', '9:16', '3:4', '1:1'] as const).map(r => (
+                            <button key={r} onClick={() => setIntroImageAspectRatio(r)}
+                              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${introImageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                              {r}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between bg-black border border-white/5 rounded-xl px-3.5 py-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-300">Lite Image Model</p>
+                          <p className="text-[10px] text-gray-600 mt-0.5">Faster/cheaper, different rate limit — applies to Storyboard, Shorts &amp; Thumbnail too</p>
+                        </div>
+                        <button
+                          onClick={toggleLiteImageModel}
+                          className={`relative w-9 h-5 rounded-full shrink-0 transition-all ${useLiteImageModel ? 'bg-purple-600' : 'bg-white/15'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${useLiteImageModel ? 'translate-x-4' : ''}`} />
+                        </button>
+                      </div>
+                    </div>
+
                     {introSegments.map((seg) => (
                       <div key={seg.id} className="space-y-2">
                         <p className="text-xs text-gray-400 italic line-clamp-2">"{seg.text}"</p>

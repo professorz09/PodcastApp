@@ -4946,10 +4946,13 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
  * realistic cinematic look instead of mixing crude cartoon illustrations
  * with the realistic speaker avatars/backgrounds.
  */
-export const generateCinematicSceneImage = async (sceneText: string): Promise<string> => {
+export const generateCinematicSceneImage = async (
+  sceneText: string,
+  aspectRatio: '16:9' | '9:16' | '3:4' | '1:1' = '16:9',
+): Promise<string> => {
   const ai = getAi();
 
-  const prompt = `Cinematic 16:9 movie-still that visually depicts this moment from a scene: "${sceneText}".
+  const prompt = `Cinematic ${aspectRatio} movie-still that visually depicts this moment from a scene: "${sceneText}".
 Framing: wide establishing shot or a dramatic close-up — whichever best captures the moment described — with clean space for subtitle text near the bottom third.
 Lighting: cinematic, moody, movie-trailer quality — strong directional light, real shadows, shallow depth of field where appropriate.
 Style: semi-realistic digital cinematography, sharp detail, professional color grade. No text, no watermarks, no logos.
@@ -4960,7 +4963,7 @@ This should feel like a real frame from a movie or TV drama depicting this exact
     contents: { parts: [{ text: prompt }] },
     config: {
       responseModalities: [Modality.IMAGE],
-      imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
+      imageConfig: { aspectRatio, personGeneration: IMAGE_PERSON_GENERATION },
       safetySettings: IMAGE_SAFETY_SETTINGS,
     }
   });
