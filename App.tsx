@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import type { Session } from '@supabase/supabase-js';
 import Layout from './components/Layout';
-import Login from './components/Login';
 import VideoClipImporter from './components/VideoClipImporter';
-import { supabase } from './services/supabaseClient';
 
 // Lazy-load heavy components so initial bundle stays small
 const ContentImporter  = lazy(() => import('./components/ContentImporter'));
@@ -21,7 +18,7 @@ const ShortsStudio     = lazy(() => import('./components/ShortsStudio'));
 import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, PhoneStudioSourceClip, ThumbnailState, YoutubeImportData } from './types';
-import { saveState, loadState, clearState, syncStateFromCloudIfNewer } from './services/storageService';
+import { saveState, loadState, clearState } from './services/storageService';
 import { Key, RotateCcw, AlertTriangle, X } from 'lucide-react';
 import { ToastContainer, toast } from './components/Toast';
 
@@ -63,22 +60,9 @@ const App: React.FC = () => {
   const [shortsContext, setShortsContext] = useState<TranscriptChunk | null>(null);
   const [preloadedClips, setPreloadedClips] = useState<ShortsSegment[]>([]);
 
-  // Auth gate — session undefined = still checking, null = logged out, Session = logged in.
-  // Project data only ever loads/loops once a real session exists (RLS requires it).
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
   const hasLoadedProjectRef = useRef(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setSession(newSession);
-      if (event === 'SIGNED_OUT') hasLoadedProjectRef.current = false;
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  // Shared by the initial load and the background cloud-catchup sync below —
-  // applies whatever loadState()/syncStateFromCloudIfNewer() resolved with.
+  // Applies whatever loadState() resolved with.
   const applyLoadedState = (stored: Awaited<ReturnType<typeof loadState>>) => {
     if (!stored) return;
     // Restore youtubeData regardless of script length
@@ -113,24 +97,16 @@ const App: React.FC = () => {
     }
   };
 
-  // Load state once we have a session (not on every token refresh — a token
-  // refresh fires this same event with a new session reference, and re-running
-  // init() would clobber in-progress local edits with a stale cloud re-fetch).
-  // loadState() itself is local-first (instant on a device that's used the app
-  // before) — the network is only touched here if there's nothing cached yet.
+  // Load state once, on mount.
   useEffect(() => {
-    if (!session || hasLoadedProjectRef.current) return;
+    if (hasLoadedProjectRef.current) return;
     hasLoadedProjectRef.current = true;
     const init = async () => {
       applyLoadedState(await loadState());
       setIsInitialized(true);
-
-      // Background catch-up: cheap check for changes pushed from another
-      // device since our last sync — never blocks the render above.
-      applyLoadedState(await syncStateFromCloudIfNewer());
     };
     init();
-  }, [session]);
+  }, []);
 
   // Save state on change
   useEffect(() => {
@@ -364,7 +340,7 @@ Return JSON only (no markdown):
     setAppState(AppState.VIDEO_CLIP_IMPORT);
   };
 
-  if (session === undefined || (session && !isInitialized)) {
+  if (!isInitialized) {
     return (
       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 rounded-2xl bg-white text-black flex items-center justify-center shadow-lg shadow-purple-900/20">
@@ -375,13 +351,9 @@ Return JSON only (no markdown):
           <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
           <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
-        <p className="text-gray-600 text-sm font-medium">{session ? 'Restoring your project…' : 'Checking session…'}</p>
+        <p className="text-gray-600 text-sm font-medium">Restoring your project…</p>
       </div>
     );
-  }
-
-  if (!session) {
-    return <Login />;
   }
 
   return (

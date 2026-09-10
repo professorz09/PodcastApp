@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { DebateSegment, StoryboardScene } from '../types';
 import { generateStoryboardScenes, generateStoryboardImage, generateStoryboardScenesTimeBased, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
-import { saveScenes, loadScenes, syncScenesFromCloudIfNewer, getScriptSignature } from '../services/storageService';
+import { saveScenes, loadScenes, getScriptSignature } from '../services/storageService';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { startGenJob, stopGenJob, subscribeGenJob, getGenJobSnapshot } from '../services/storyboardGenJobs';
 import { toast } from './Toast';
@@ -888,12 +888,7 @@ const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
       const firstImage = restored.find(sc => sc.imageUrl)?.imageUrl;
       if (firstImage) detectAspectRatioFromImage(firstImage).then(r => { if (r) setImageAspectRatio(r); });
     };
-    loadScenes(script).then(saved => {
-      applyRestored(saved);
-      // Background catch-up in case another device generated more scenes —
-      // cheap check, only re-fetches (with images) if actually newer.
-      syncScenesFromCloudIfNewer(script).then(applyRestored);
-    });
+    loadScenes(script).then(applyRestored);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
