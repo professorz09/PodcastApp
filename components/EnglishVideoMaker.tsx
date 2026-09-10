@@ -6,7 +6,7 @@ import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
-import { generateSegmentImage, generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene } from '../services/geminiService';
+import { generateSegmentImage, generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateIntroCinematicImage } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { saveEnglishVideoVisuals, loadEnglishVideoVisuals } from '../services/storageService';
@@ -236,7 +236,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [exportQuality, setExportQuality] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [showExportSettings, setShowExportSettings] = useState(false);
   // Settings tab state
-  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'>('speakers');
+  const [settingsTab, setSettingsTab] = useState<'speakers'|'intro'|'background'|'subtitle'|'options'>('speakers');
   const [statusMessage, setStatusMessage] = useState("");
   // Rendered video blob kept in memory for merge
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
@@ -760,6 +760,50 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       img.src = objectUrl;
       img.onload = () => setNarratorImage(img);
     }
+  };
+
+  // Intro tab — a cinematic hook image for "intro"-tagged segments, set as
+  // that specific segment's own visualConfig.backgroundUrl. This is the
+  // existing per-segment background mechanism (same as the generic
+  // Background-tab segment editor further down) — the Intro tab just
+  // surfaces it up front, pre-filtered to intro segments, with its own
+  // cinematic-style AI generator instead of the flat-cartoon one used for
+  // bulk "Generate All Images".
+  const [introImageLoading, setIntroImageLoading] = useState<Record<string, boolean>>({});
+
+  const handleGenerateIntroImage = async (segId: string) => {
+    const seg = script.find(s => s.id === segId);
+    if (!seg) return;
+    setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
+    try {
+      const dataUrl = await generateIntroCinematicImage(seg.text);
+      setScript(prev => prev.map(s => s.id === segId
+        ? { ...s, visualConfig: { ...s.visualConfig, backgroundUrl: dataUrl, backgroundColor: undefined } }
+        : s));
+    } catch (e: any) {
+      toast.error(`Intro image generation failed: ${e.message}`);
+    } finally {
+      setIntroImageLoading(prev => ({ ...prev, [segId]: false }));
+    }
+  };
+
+  const handleIntroImageUpload = (e: React.ChangeEvent<HTMLInputElement>, segId: string) => {
+    if (e.target.files && e.target.files[0]) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const result = ev.target?.result as string;
+        setScript(prev => prev.map(s => s.id === segId
+          ? { ...s, visualConfig: { ...s.visualConfig, backgroundUrl: result, backgroundColor: undefined } }
+          : s));
+      };
+      reader.readAsDataURL(e.target.files[0]);
+    }
+  };
+
+  const handleClearIntroImage = (segId: string) => {
+    setScript(prev => prev.map(s => s.id === segId
+      ? { ...s, visualConfig: { ...s.visualConfig, backgroundUrl: undefined } }
+      : s));
   };
 
   const handleLabelChange = (index: number, value: string) => {
@@ -2941,7 +2985,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       }
   };
 
-  const TABS = ['Speakers', 'Background', 'Subtitle', 'Options'] as const;
+  const introSegments = script.filter(s => s.learnEnglish?.segmentType === 'intro');
+  const TABS: readonly string[] = introSegments.length > 0
+    ? (['Speakers', 'Intro', 'Background', 'Subtitle', 'Options'] as const)
+    : (['Speakers', 'Background', 'Subtitle', 'Options'] as const);
 
   return (
     <div className="w-full h-full bg-black text-white flex flex-col overflow-hidden">
@@ -3280,6 +3327,57 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         </>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* ── INTRO TAB — dedicated cinematic hook-shot images for "intro"-tagged
+                     segments only, separate from the per-speaker Background tab. ── */}
+                {settingsTab === 'intro' && (
+                  <div className="space-y-4">
+                    <p className="text-[10px] text-gray-500">Yeh sirf Narrator ke opening hook line (intro-tagged segment) ke liye hai — cinematic AI image ya apni photo/scene upload karo, jo sirf uss segment ki background bani rahegi.</p>
+                    {introSegments.map((seg) => (
+                      <div key={seg.id} className="space-y-2">
+                        <p className="text-xs text-gray-400 italic line-clamp-2">"{seg.text}"</p>
+                        <div className="relative aspect-video bg-[#111] rounded-2xl border-2 border-dashed border-white/10 overflow-hidden">
+                          {introImageLoading[seg.id] ? (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[#111]">
+                              <Loader2 size={20} className="text-purple-400 animate-spin" />
+                              <span className="text-[10px] text-gray-500">AI…</span>
+                            </div>
+                          ) : seg.visualConfig?.backgroundUrl ? (
+                            <>
+                              <img src={seg.visualConfig.backgroundUrl} alt="Intro" className="w-full h-full object-cover" />
+                              <button
+                                onClick={() => handleClearIntroImage(seg.id)}
+                                className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
+                              >
+                                <X size={10} className="text-white" />
+                              </button>
+                            </>
+                          ) : (
+                            <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer gap-2 hover:bg-white/5 transition-colors">
+                              <Upload size={22} className="text-gray-500" />
+                              <span className="text-xs text-gray-500">Intro image</span>
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleIntroImageUpload(e, seg.id)} />
+                            </label>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => handleGenerateIntroImage(seg.id)}
+                            disabled={!!introImageLoading[seg.id]}
+                            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-bold bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/20 text-purple-300 transition-all disabled:opacity-40 disabled:cursor-wait"
+                          >
+                            {introImageLoading[seg.id] ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+                            AI Cinematic Image
+                          </button>
+                          <label className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
+                            <Upload size={11} /> Upload
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleIntroImageUpload(e, seg.id)} />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 

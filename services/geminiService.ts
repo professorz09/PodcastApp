@@ -4939,6 +4939,40 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
 };
 
 /**
+ * Cinematic 16:9 hook-shot for a Learn English "intro" segment — a dedicated
+ * generator (separate from the per-speaker avatar/background and from the
+ * flat-cartoon Storyboard style) so the opening hook gets its own realistic,
+ * movie-still look based on what the Narrator's intro line actually
+ * describes, matching English Video's established cinematic aesthetic.
+ */
+export const generateIntroCinematicImage = async (introText: string): Promise<string> => {
+  const ai = getAi();
+
+  const prompt = `Cinematic 16:9 movie-still hook shot that visually depicts this opening narration line: "${introText}".
+Framing: wide establishing shot or a dramatic close-up — whichever best captures the moment described — with clean space for subtitle text near the bottom third.
+Lighting: cinematic, moody, movie-trailer quality — strong directional light, real shadows, shallow depth of field where appropriate.
+Style: semi-realistic digital cinematography, sharp detail, professional color grade. No text, no watermarks, no logos.
+This is a story-hook frame for a video intro — it should feel like the first frame of a movie trailer for this exact moment.`;
+
+  const response = await ai.models.generateContent({
+    model: getImageModel(),
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      responseModalities: [Modality.IMAGE],
+      imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
+      safetySettings: IMAGE_SAFETY_SETTINGS,
+    }
+  });
+
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if (part.inlineData) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+  throw new Error('No image generated');
+};
+
+/**
  * Full-frame (16:9) scene background featuring a given speaker — used by
  * English Video's per-speaker background feature: when that speaker talks,
  * this image fills the whole frame instead of a floating avatar box, using
