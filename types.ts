@@ -91,6 +91,10 @@ export interface DebateSegment {
     segmentType: 'intro' | 'dialogue' | 'narrator' | 'quiz';
     explanation?: { phrase: string; meaning: string; example?: string };
     quiz?: { question: string; options?: string[]; answer: string };
+    /** Multiple cinematic images across a single (usually longer) intro
+     *  segment's own duration — like a mini-Storyboard scoped to just the
+     *  intro line, auto-broken into beats instead of one static image. */
+    introScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string }[];
   };
   visualConfig?: {
     backgroundUrl?: string;

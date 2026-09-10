@@ -4939,6 +4939,73 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
 };
 
 /**
+ * Auto-breaks a Learn English intro narration line into however many
+ * cinematic scene-beats it naturally needs (not a manually chosen count) —
+ * a mini-Storyboard scoped to just the intro's own spoken duration, so a
+ * longer intro gets multiple images switching over time instead of one
+ * static image for the whole line.
+ */
+export interface IntroSceneBreakdown {
+  startOffset: number;
+  endOffset: number;
+  prompt: string;
+}
+
+export const generateIntroSceneBreakdown = async (
+  introText: string,
+  durationSec: number,
+  phraseTimings?: { text: string; start: number; end: number }[],
+): Promise<IntroSceneBreakdown[]> => {
+  const ai = getAi();
+  const dur = Math.max(1, durationSec || 10);
+
+  // With real per-phrase timing (from Voice Gen's "Sync" step) the visuals
+  // can switch exactly when the spoken words actually change beat, instead
+  // of the AI guessing proportional timing from text alone — ask it to pick
+  // boundaries only at those exact timestamps so every scene cut lines up
+  // with a real word boundary in the audio.
+  const timingSection = phraseTimings?.length
+    ? `\n\nEXACT SPOKEN TIMING (use these real timestamps — every scene boundary you choose MUST be exactly one of these phrase start/end times, not a made-up number):\n${phraseTimings.map((p, i) => `[${i}] ${p.start.toFixed(2)}s–${p.end.toFixed(2)}s: "${p.text}"`).join('\n')}\nGroup consecutive phrases into each scene-beat — a scene's startOffset must equal some phrase's start and its endOffset must equal some (possibly later) phrase's end, so the visual change always lands exactly on a real word boundary in the spoken audio, never mid-word.`
+    : '';
+
+  const prompt = `You are a professional storyboard artist breaking a video's opening narration into a sequence of cinematic scene-beats.
+
+Narration: "${introText}"
+Total spoken duration: ${dur.toFixed(1)} seconds — it starts at 0s and ends at ${dur.toFixed(1)}s. Your scenes together must cover this whole range with no gaps or overlaps.${timingSection}
+
+TASK:
+Decide how many distinct visual beats this narration naturally breaks into — usually 2 to 5, based on how many genuinely different moments/images the line actually describes. A short punchy line might only need 1-2 beats; a longer scene-setting narration might need 4-5. Don't force more beats than the content actually has, and don't cram unrelated moments into one beat.
+For each beat, give a time range (startOffset/endOffset in seconds${phraseTimings?.length ? ' — snapped exactly to the real phrase timestamps above' : ', roughly proportional to how long that part of the line takes to say'}) and a cinematic image prompt describing that exact visual moment, matching precisely what those specific words describe — realistic movie-still style, specific enough to generate a real image from (setting, who/what is visible, mood), not vague or generic.
+
+Return JSON only (no markdown), an array of {"startOffset": number, "endOffset": number, "prompt": string} in time order.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.8-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } },
+  });
+
+  let raw = response.text || '[]';
+  raw = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+  let parsed: any[];
+  try { parsed = JSON.parse(raw); }
+  catch {
+    const m = raw.match(/\[[\s\S]*\]/);
+    parsed = m ? JSON.parse(m[0]) : [];
+  }
+
+  const scenes: IntroSceneBreakdown[] = parsed
+    .filter(s => s && typeof s.prompt === 'string')
+    .map(s => ({
+      startOffset: Math.max(0, Number(s.startOffset) || 0),
+      endOffset: Math.min(dur, Number(s.endOffset) || dur),
+      prompt: s.prompt,
+    }));
+
+  return scenes.length > 0 ? scenes : [{ startOffset: 0, endOffset: dur, prompt: introText }];
+};
+
+/**
  * Cinematic 16:9 movie-still for a Learn English scene line — used for the
  * Intro tab's hook shot AND (unlike the flat-cartoon MS-Paint-style
  * generateSegmentImage) for English Video's general per-segment/bulk image

@@ -57,8 +57,24 @@ export const drawDebateFrame = (
   config: VisualConfig,
   assets: RenderAssets
 ) => {
-  const currentSegment = script[currentSegmentIndex];
-  if (!currentSegment) return;
+  const rawSegment = script[currentSegmentIndex];
+  if (!rawSegment) return;
+
+  // Learn English "Generate Scenes" — a segment (usually the intro) can carry
+  // multiple cinematic scene-beats across its own duration instead of one
+  // static image. Pick whichever beat covers the current moment within this
+  // segment and use ITS image for this frame, via the same
+  // visualConfig.backgroundUrl mechanism every theme already reads.
+  let currentSegment = rawSegment;
+  const introScenes = rawSegment.learnEnglish?.introScenes;
+  if (introScenes?.length) {
+      const segStart = segmentOffsets[currentSegmentIndex] ?? 0;
+      const localTime = time - segStart;
+      const scene = introScenes.find(s => localTime >= s.startOffset && localTime < s.endOffset) || introScenes[introScenes.length - 1];
+      if (scene?.imageUrl && assets.segmentBackgrounds.has(scene.imageUrl)) {
+          currentSegment = { ...rawSegment, visualConfig: { ...rawSegment.visualConfig, backgroundUrl: scene.imageUrl } };
+      }
+  }
 
   // Determine Theme
   const themeId = currentSegment.visualConfig?.themeId || config.theme;
@@ -89,12 +105,19 @@ export const drawDebateFrame = (
       };
   }
 
+  // Themes independently re-read script[currentSegmentIndex] internally, so
+  // swap the resolved (possibly scene-overridden) segment into the array at
+  // that index rather than passing currentSegment separately.
+  const effectiveScript = currentSegment === rawSegment
+      ? script
+      : script.map((s, i) => (i === currentSegmentIndex ? currentSegment : s));
+
   // Draw using the theme
   theme.draw({
       ctx,
       time,
       audioLevel,
-      script,
+      script: effectiveScript,
       segmentOffsets,
       currentSegmentIndex,
       totalDuration,
@@ -106,5 +129,5 @@ export const drawDebateFrame = (
 
   // Additive Learn English overlay (narrator teaching card / quiz panel) — no-ops
   // for scripts without learnEnglish tags, so this never affects other renders.
-  drawLearnEnglishOverlay(ctx, script, segmentOffsets, currentSegmentIndex, time, assets.narratorImage ?? null);
+  drawLearnEnglishOverlay(ctx, effectiveScript, segmentOffsets, currentSegmentIndex, time, assets.narratorImage ?? null);
 };

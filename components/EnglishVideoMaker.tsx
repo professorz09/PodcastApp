@@ -6,7 +6,7 @@ import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
-import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
+import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage, generateIntroSceneBreakdown, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { saveEnglishVideoVisuals, loadEnglishVideoVisuals } from '../services/storageService';
@@ -466,6 +466,27 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       }
   }, [currentSegmentIndex, currentSegment?.visualConfig?.backgroundUrl]);
 
+  // Load ALL of the current segment's "Generate Scenes" intro images at once
+  // (not just one at a time) — playback needs every scene's image ready
+  // before it can switch between them as time progresses within the segment.
+  const [introSceneImages, setIntroSceneImages] = useState<Map<string, HTMLImageElement>>(new Map());
+  const introScenesKey = currentSegment?.learnEnglish?.introScenes?.map(s => s.imageUrl).join('|') || '';
+  useEffect(() => {
+      const scenes = currentSegment?.learnEnglish?.introScenes;
+      if (!scenes?.length) { setIntroSceneImages(new Map()); return; }
+      let cancelled = false;
+      const map = new Map<string, HTMLImageElement>();
+      Promise.all(scenes.map(sc => new Promise<void>((resolve) => {
+          if (!sc.imageUrl) { resolve(); return; }
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => { map.set(sc.imageUrl!, img); resolve(); };
+          img.onerror = () => resolve();
+          img.src = sc.imageUrl;
+      }))).then(() => { if (!cancelled) setIntroSceneImages(map); });
+      return () => { cancelled = true; };
+  }, [currentSegmentIndex, introScenesKey]);
+
   // Initialize Audio Context
   const initAudioContext = useCallback(() => {
     if (!audioRef.current || audioContextRef.current) return;
@@ -827,6 +848,74 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       : s));
   };
 
+  // "Generate Scenes" — mini-Storyboard scoped to one (usually longer) intro
+  // segment: auto-decides how many cinematic beats the line needs (not a
+  // manual count) and generates one image per beat, switching over time
+  // during that segment's own playback instead of one static image.
+  const [introScenesProgress, setIntroScenesProgress] = useState<Record<string, { done: number; total: number }>>({});
+
+  const handleGenerateIntroScenes = async (segId: string) => {
+    const seg = script.find(s => s.id === segId);
+    if (!seg) return;
+    setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
+    try {
+      const duration = seg.duration && seg.duration > 0 ? seg.duration : Math.max(6, seg.text.split(/\s+/).length / 2.3);
+      const breakdown = await generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings);
+      setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: breakdown.length } }));
+
+      const scenesWithImages: NonNullable<DebateSegment['learnEnglish']>['introScenes'] = [];
+      for (const scene of breakdown) {
+        try {
+          const imageUrl = await generateCinematicSceneImage(scene.prompt, introImageAspectRatio);
+          scenesWithImages!.push({ ...scene, imageUrl });
+        } catch (e) {
+          console.error('Intro scene image failed', e);
+          scenesWithImages!.push({ ...scene });
+        }
+        setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: breakdown.length } }));
+      }
+
+      setScript(prev => prev.map(s => s.id === segId
+        ? {
+            ...s,
+            learnEnglish: { ...s.learnEnglish!, introScenes: scenesWithImages },
+            visualConfig: { ...s.visualConfig, backgroundUrl: scenesWithImages?.[0]?.imageUrl, backgroundColor: undefined },
+          }
+        : s));
+    } catch (e: any) {
+      toast.error(`Scene generation failed: ${e.message}`);
+    } finally {
+      setIntroImageLoading(prev => ({ ...prev, [segId]: false }));
+    }
+  };
+
+  const handleRegenerateIntroScene = async (segId: string, sceneIdx: number) => {
+    const seg = script.find(s => s.id === segId);
+    const scene = seg?.learnEnglish?.introScenes?.[sceneIdx];
+    if (!seg || !scene) return;
+    const key = `${segId}-${sceneIdx}`;
+    setIntroImageLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const imageUrl = await generateCinematicSceneImage(scene.prompt, introImageAspectRatio);
+      setScript(prev => prev.map(s => {
+        if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
+        const newScenes = [...s.learnEnglish.introScenes];
+        newScenes[sceneIdx] = { ...newScenes[sceneIdx], imageUrl };
+        return { ...s, learnEnglish: { ...s.learnEnglish, introScenes: newScenes } };
+      }));
+    } catch (e: any) {
+      toast.error(`Scene image regeneration failed: ${e.message}`);
+    } finally {
+      setIntroImageLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleClearIntroScenes = (segId: string) => {
+    setScript(prev => prev.map(s => s.id === segId
+      ? { ...s, learnEnglish: { ...s.learnEnglish!, introScenes: undefined } }
+      : s));
+  };
+
   const handleLabelChange = (index: number, value: string) => {
       setSpeakerLabels(prev => {
           const newLabels = [...prev];
@@ -978,7 +1067,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         backgroundVideo,
         backgroundColor: globalBackgroundColor,
         speakerImages,
-        segmentBackgrounds: new Map(),
+        segmentBackgrounds: new Map(introSceneImages),
         narratorImage,
         speakerBackgrounds: speakerBackgroundsMap,
     };
@@ -1011,7 +1100,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       speakerScale, showTimer, showSideStats, showVuMeter, vuMeterStyle, showSpeakerImages, showSpeakers, showScores, backgroundDim, speakerPositions, showNameLabels,
       background, speakerImages, currentSegmentBackground, segmentOffsets, currentSegmentIndex, segmentScores, activeSpeakers, showSettings, globalBackgroundColor, questionMode,
       globalThemeConfig, narratorTextColor, showMinimalSpeakerName, showMinimalSideVU,
-      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB, nameBadgeColorC, narratorImage, speakerBackgroundsMap
+      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB, nameBadgeColorC, narratorImage, speakerBackgroundsMap, introSceneImages
   ]);
 
   /* OLD RENDER
@@ -2737,22 +2826,27 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             speakerBackgrounds: speakerBackgroundsMap,
         };
 
-        // Load all segment backgrounds
-        const bgPromises = script.map(async (seg) => {
-            const url = seg.visualConfig?.backgroundUrl;
-            if (url && !assets.segmentBackgrounds.has(url)) {
-                try {
-                    const img = new Image();
-                    img.crossOrigin = "anonymous";
-                    img.src = url;
-                    await new Promise((resolve, reject) => {
-                        img.onload = resolve;
-                        img.onerror = reject;
-                    });
-                    assets.segmentBackgrounds.set(url, img);
-                } catch (e) {
-                    console.warn("Failed to load bg", url);
-                }
+        // Load all segment backgrounds (including every "Generate Scenes"
+        // intro-scene image, not just the single fallback backgroundUrl —
+        // export needs every scene ready to switch between over time).
+        const bgUrls = new Set<string>();
+        script.forEach(seg => {
+            if (seg.visualConfig?.backgroundUrl) bgUrls.add(seg.visualConfig.backgroundUrl);
+            seg.learnEnglish?.introScenes?.forEach(sc => { if (sc.imageUrl) bgUrls.add(sc.imageUrl); });
+        });
+        const bgPromises = Array.from(bgUrls).map(async (url) => {
+            if (assets.segmentBackgrounds.has(url)) return;
+            try {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.src = url;
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                });
+                assets.segmentBackgrounds.set(url, img);
+            } catch (e) {
+                console.warn("Failed to load bg", url);
             }
         });
         await Promise.all(bgPromises);
@@ -3422,18 +3516,70 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         </div>
                         <div className="flex gap-1.5">
                           <button
+                            onClick={() => handleGenerateIntroScenes(seg.id)}
+                            disabled={!!introImageLoading[seg.id]}
+                            className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-lg text-[11px] font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
+                          >
+                            {introImageLoading[seg.id]
+                              ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id] ? `Scene ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating…'}</>
+                              : <><Wand2 size={11} /> Generate Scenes</>
+                            }
+                          </button>
+                          <button
                             onClick={() => handleGenerateIntroImage(seg.id)}
                             disabled={!!introImageLoading[seg.id]}
-                            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-bold bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/20 text-purple-300 transition-all disabled:opacity-40 disabled:cursor-wait"
+                            title="Single static image instead of multiple scenes"
+                            className="px-3 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 transition-all disabled:opacity-40"
                           >
-                            {introImageLoading[seg.id] ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-                            AI Cinematic Image
+                            1 Image
                           </button>
-                          <label className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
-                            <Upload size={11} /> Upload
+                          <label className="px-3 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
+                            <Upload size={11} />
                             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleIntroImageUpload(e, seg.id)} />
                           </label>
                         </div>
+                        {!seg.phraseTimings?.length && (
+                          <p className="text-[10px] text-amber-500/70">Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes tab exact bole gaye words ke saath match honge.</p>
+                        )}
+
+                        {/* ── Scenes Timeline (mirrors Storyboard's list) ── */}
+                        {!!seg.learnEnglish?.introScenes?.length && (
+                          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
+                            <div className="px-3.5 py-2.5 border-b border-white/5 flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Timeline · {seg.learnEnglish.introScenes.length} scenes</span>
+                              <button onClick={() => handleClearIntroScenes(seg.id)} className="text-[10px] text-gray-600 hover:text-red-400 font-bold uppercase">Clear</button>
+                            </div>
+                            <div className="divide-y divide-white/5">
+                              {seg.learnEnglish.introScenes.map((scene, sceneIdx) => {
+                                const sceneKey = `${seg.id}-${sceneIdx}`;
+                                return (
+                                  <div key={sceneIdx} className="flex items-center gap-2.5 px-3.5 py-2.5">
+                                    <div className="relative w-14 h-9 shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/10">
+                                      {introImageLoading[sceneKey] ? (
+                                        <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={12} className="text-purple-400 animate-spin" /></div>
+                                      ) : scene.imageUrl ? (
+                                        <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center text-gray-700"><Video size={12} /></div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] text-gray-500 font-mono">#{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s</p>
+                                      <p className="text-[11px] text-gray-400 truncate">{scene.prompt}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRegenerateIntroScene(seg.id, sceneIdx)}
+                                      disabled={!!introImageLoading[sceneKey]}
+                                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/20 text-purple-300 transition-all disabled:opacity-40"
+                                    >
+                                      <RefreshCw size={11} className={introImageLoading[sceneKey] ? 'animate-spin' : ''} />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
