@@ -2840,6 +2840,22 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [clipping, setClipping] = useState(false);
   const [clipProgress, setClipProgress] = useState(0);
   const [addLetterbox, setAddLetterbox] = useState(false);
+  // Which timeline segment the Settings tab is configuring — 'discussion'
+  // is the existing Phones/Background/Subtitles panel; 'intro' and
+  // 'footage' are their own contextual panels, selected via the two extra
+  // chips prepended to the timeline strip.
+  const [activeSettingsSection, setActiveSettingsSection] = useState<'discussion' | 'intro' | 'footage'>('discussion');
+  const replaceVideoInputRef = useRef<HTMLInputElement>(null);
+  const [rawClipDurationSec, setRawClipDurationSec] = useState(0);
+  useEffect(() => {
+    if (!uploadedVideoForClip) { setRawClipDurationSec(0); return; }
+    const url = uploadedVideoUrlForClip ?? URL.createObjectURL(uploadedVideoForClip);
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.src = url;
+    v.onloadedmetadata = () => setRawClipDurationSec(isFinite(v.duration) ? v.duration : 0);
+  }, [uploadedVideoForClip, uploadedVideoUrlForClip]);
+
   // Playable previews — Raw Clip and the final combined video, so the
   // Export tab shows what was actually produced, not just a download link.
   // Refs mirror the latest URL so the unmount cleanup (empty-deps effect)
@@ -4206,14 +4222,62 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           </div>
         </div>
 
-        {/* Timeline chips */}
+        {/* Timeline chips — Intro + Footage (virtual, not part of the phone-call
+            canvas timeline) prepended before the Discussion turn chips. Clicking
+            them switches Settings to that segment's contextual panel instead of
+            seeking playback; clicking a Discussion chip does both (seek + switch
+            Settings back to the phone-call panel). */}
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 6, paddingBottom: 2 }}>
+          {/* Intro chip */}
+          <button
+            onClick={() => { setActiveSettingsSection('intro'); setTab('visual'); }}
+            style={{
+              flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              width: 44, padding: '5px 4px', borderRadius: 10, cursor: 'pointer',
+              border: `1px solid ${activeSettingsSection === 'intro' ? '#a855f7aa' : 'rgba(255,255,255,0.05)'}`,
+              background: activeSettingsSection === 'intro' ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)',
+              position: 'relative', transition: 'all 0.15s',
+              opacity: introVideoBlob || activeSettingsSection === 'intro' ? 1 : 0.55,
+            }}
+          >
+            <div style={{
+              width: 24, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(168,85,247,0.28)', border: '1px solid rgba(168,85,247,0.44)',
+              color: '#c4b5fd', fontSize: 12, marginBottom: 2,
+            }}>🎬</div>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Intro</span>
+          </button>
+
+          {/* Footage chip */}
+          <button
+            onClick={() => { setActiveSettingsSection('footage'); setTab('visual'); }}
+            style={{
+              flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              width: 44, padding: '5px 4px', borderRadius: 10, cursor: 'pointer',
+              border: `1px solid ${activeSettingsSection === 'footage' ? '#ef4444aa' : 'rgba(255,255,255,0.05)'}`,
+              background: activeSettingsSection === 'footage' ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.03)',
+              position: 'relative', transition: 'all 0.15s',
+              opacity: uploadedVideoForClip || activeSettingsSection === 'footage' ? 1 : 0.55,
+            }}
+          >
+            <div style={{
+              width: 24, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(239,68,68,0.28)', border: '1px solid rgba(239,68,68,0.44)',
+              color: '#fca5a5', fontSize: 12, marginBottom: 2,
+            }}>🎞️</div>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+              {sourceClips.length > 0 ? fmtTime(((sourceClips[0]?.endSec ?? 0) - (sourceClips[0]?.startSec ?? 0)) * 1000) : 'Footage'}
+            </span>
+          </button>
+
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.08)', flexShrink: 0, margin: '2px 2px' }} />
+
           {timelineItems.map(item => {
-            const active = currentTime >= item.start && currentTime < item.end;
+            const active = activeSettingsSection === 'discussion' && currentTime >= item.start && currentTime < item.end;
             return (
               <button
                 key={item.id}
-                onClick={() => seekWithAudio(item.start)}
+                onClick={() => { setActiveSettingsSection('discussion'); seekWithAudio(item.start); }}
                 style={{
                   flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
                   width: 44, padding: '5px 4px', borderRadius: 10,
@@ -4292,6 +4356,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               </div>
             </div>
 
+            {activeSettingsSection === 'discussion' && (
+            <>
             {/* Sub-tabs */}
             <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 4 }}>
               {(['phones', 'background', 'subtitle'] as const).map(s => (
@@ -4767,197 +4833,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   );
                 })()}
 
-                {/* ── Source Video Clip (only when user uploaded a video) ── */}
-                {uploadedVideoForClip && sourceClips.length > 0 && (
-                  <div style={{ borderRadius: 12, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.05)', padding: 12 }}>
-                    <div style={{ fontSize: 11, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 6 }}>🎬 Source Video Clip</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>
-                      Uploaded video se selected chapter ka segment trim karke download karo. Yeh "middle part" hoga final 3-part video mein.
-                    </div>
-                    {/* Letterbox toggle */}
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, cursor: 'pointer' }}>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Black Border (Letterbox)</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Upar/niche ~8% black bars add karo clip mein</div>
-                      </div>
-                      <div
-                        onClick={() => setAddLetterbox(p => !p)}
-                        style={{
-                          width: 36, height: 20, borderRadius: 50, position: 'relative', cursor: 'pointer', flexShrink: 0,
-                          background: addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s',
-                        }}
-                      >
-                        <div style={{ position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', left: addLetterbox ? 18 : 2, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
-                      </div>
-                    </label>
-                    {/* Clip list */}
-                    {sourceClips.map((c, i) => (
-                      <div key={i} style={{
-                        padding: '8px 10px', borderRadius: 8,
-                        background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)',
-                        marginBottom: i < sourceClips.length - 1 ? 6 : 0,
-                      }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{c.title}</div>
-                        <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.5)' }}>
-                          {fmtSec(c.startSec)} → {fmtSec(c.endSec)}
-                          <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.3)' }}>({fmtSec(c.endSec - c.startSec)})</span>
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      disabled={clipping}
-                      onClick={async () => {
-                        if (clipping || !uploadedVideoForClip || !sourceClips.length) return;
-                        setClipping(true);
-                        setClipProgress(0);
-                        try {
-                          const c = sourceClips[0];
-                          const startSec = c.startSec;
-                          const endSec = c.endSec;
-                          const file = uploadedVideoForClip;
-
-                          // Build hidden video element — must be in DOM for Firefox audio
-                          const video = document.createElement('video');
-                          video.src = uploadedVideoUrlForClip ?? URL.createObjectURL(file);
-                          video.muted = false;
-                          video.playsInline = true;
-                          video.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px';
-                          document.body.appendChild(video);
-
-                          try {
-                            await new Promise<void>((res, rej) => {
-                              video.onloadedmetadata = () => res();
-                              video.onerror = () => rej(new Error('Video load nahi hua'));
-                              setTimeout(() => rej(new Error('Video load timeout')), 20_000);
-                            });
-
-                            // captureStream — Chrome uses captureStream(), Firefox uses mozCaptureStream()
-                            const captureFn = (video as any).captureStream?.bind(video)
-                              ?? (video as any).mozCaptureStream?.bind(video);
-                            if (!captureFn) throw new Error('Is browser me video capture support nahi hai — Chrome ya Edge use karo');
-
-                            const fps = 30;
-                            const rawStream: MediaStream = captureFn(fps);
-
-                            // Verify audio track is present
-                            if (!rawStream.getAudioTracks().length) {
-                              throw new Error('Video mein audio track nahi mila — ensure video has audio');
-                            }
-
-                            // Optional canvas letterbox: draw black bars top+bottom ~8%
-                            let recordStream = rawStream;
-                            let letterboxCanvas: HTMLCanvasElement | null = null;
-                            let letterboxRafId: number | null = null;
-                            if (addLetterbox) {
-                              const vw = video.videoWidth || 1280;
-                              const vh = video.videoHeight || 720;
-                              letterboxCanvas = document.createElement('canvas');
-                              letterboxCanvas.width = vw;
-                              letterboxCanvas.height = vh;
-                              const ctx2d = letterboxCanvas.getContext('2d')!;
-                              const barH = Math.round(vh * 0.08);
-                              const drawH = vh - barH * 2;
-                              const drawFrame = () => {
-                                ctx2d.fillStyle = '#000';
-                                ctx2d.fillRect(0, 0, vw, vh);
-                                ctx2d.drawImage(video, 0, barH, vw, drawH);
-                                letterboxRafId = requestAnimationFrame(drawFrame);
-                              };
-                              drawFrame();
-                              const canvasStream = letterboxCanvas.captureStream(fps);
-                              rawStream.getAudioTracks().forEach((t: MediaStreamTrack) => canvasStream.addTrack(t));
-                              recordStream = canvasStream;
-                            }
-
-                            const chunks: Blob[] = [];
-                            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-                              ? 'video/webm;codecs=vp9,opus'
-                              : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-                                ? 'video/webm;codecs=vp8,opus'
-                                : MediaRecorder.isTypeSupported('video/webm')
-                                  ? 'video/webm'
-                                  : 'video/mp4';
-                            const recorder = new MediaRecorder(recordStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
-                            recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
-
-                            await new Promise<void>((resolve, reject) => {
-                              recorder.onstop = () => {
-                                if (letterboxRafId !== null) cancelAnimationFrame(letterboxRafId);
-                                const blob = new Blob(chunks, { type: mimeType });
-                                const a = document.createElement('a');
-                                a.href = URL.createObjectURL(blob);
-                                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                                a.download = `clip-${c.title.replace(/[^a-z0-9]/gi, '-').slice(0, 40)}.${ext}`;
-                                document.body.appendChild(a);
-                                a.click();
-                                document.body.removeChild(a);
-                                resolve();
-                              };
-                              recorder.onerror = () => reject(new Error('Recording error aya'));
-
-                              recorder.start(200);
-                              video.currentTime = startSec;
-                              video.onseeked = () => { video.play().catch(() => {}); };
-
-                              const durSec = endSec - startSec;
-                              const tick = setInterval(() => {
-                                const elapsed = video.currentTime - startSec;
-                                setClipProgress(Math.min(99, Math.round((elapsed / durSec) * 100)));
-                                if (video.currentTime >= endSec) {
-                                  clearInterval(tick);
-                                  video.pause();
-                                  if (recorder.state !== 'inactive') recorder.stop();
-                                }
-                              }, 250);
-                            });
-
-                            toast.success('✓ Video clip download ho gayi!');
-                          } finally {
-                            video.pause();
-                            document.body.removeChild(video);
-                          }
-                        } catch (e: any) {
-                          toast.error(e.message || 'Clip trim failed');
-                        } finally {
-                          setClipping(false);
-                          setClipProgress(0);
-                        }
-                      }}
-                      style={{
-                        marginTop: 10, width: '100%',
-                        padding: '10px', borderRadius: 10, border: 'none',
-                        background: clipping ? 'rgba(239,68,68,0.3)' : '#ef4444',
-                        color: '#fff', fontSize: 12, fontWeight: 800,
-                        cursor: clipping ? 'default' : 'pointer', fontFamily: 'inherit',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      }}
-                    >
-                      {clipping
-                        ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Clip trim ho rahi hai… {clipProgress}%</>
-                        : <><Download size={13} /> Trim & Download Clip ({sourceClips[0] ? fmtSec(sourceClips[0].endSec - sourceClips[0].startSec) : ''})</>}
-                    </button>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 6, lineHeight: 1.4 }}>
-                      Real-time recording — clip ki duratio jitna time lagega. Audio + Video dono honge.
-                    </div>
-                    {/* 3-Part video guide */}
-                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>📋 Final 3-Part Video Guide (CapCut/DaVinci)</div>
-                      {[
-                        { n: 1, icon: '🎤', label: 'Intro', desc: 'Optional Intro MP4 ↑ (from Settings → Optional Intro Video)' },
-                        { n: 2, icon: '🎬', label: 'Raw Clip', desc: 'Trimmed podcast clip (download karo ↑)' },
-                        { n: 3, icon: '📱', label: 'Discussion', desc: 'Phone Studio animation (Export tab se download karo)' },
-                      ].map(s => (
-                        <div key={s.n} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: s.n < 3 ? 5 : 0 }}>
-                          <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(239,68,68,0.2)', color: '#fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>{s.n}</div>
-                          <div>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{s.icon} {s.label}: </span>
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{s.desc}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Source video clip trim/letterbox/replace now lives in
+                    Settings → Footage (see activeSettingsSection === 'footage'). */}
 
                 {/* ── YouTube Chapters ── */}
                 <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 12 }}>
@@ -5102,6 +4979,146 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
               </div>
             )}
+            </>
+            )}
+
+            {/* ── Intro settings section ── */}
+            {activeSettingsSection === 'intro' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                  🎬 Intro video — real footage se ek frame freeze hoke, uspar "In this clip [host] [talks about] [topic]…" caption/voiceover ban ta hai.
+                </div>
+                <IntroFlow
+                  segments={podcastSegments}
+                  podcastTitle={podcastTitle}
+                  podcastHost={podcastHost}
+                  podcastGuests={podcastGuests}
+                  videoFile={uploadedVideoForClip}
+                  selectedRanges={sourceClips.length > 0 ? sourceClips.map(c => ({ startSec: c.startSec, endSec: c.endSec })) : undefined}
+                  selectionLabel={sourceClips.length > 0 ? sourceClips[0].title : undefined}
+                  onBlobReady={blob => setIntroVideoBlob(blob)}
+                  buttonOnly
+                />
+              </div>
+            )}
+
+            {/* ── Footage settings section ── */}
+            {activeSettingsSection === 'footage' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {!uploadedVideoForClip ? (
+                  <div style={{ padding: '12px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                    Koi video upload nahi hai — Podcast Pro generate karte waqt video upload karo, tabhi footage trim ho sakti hai.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 10, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      🎞️ {uploadedVideoForClip.name}
+                    </div>
+
+                    {/* Start / End trim */}
+                    <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px' }}>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                        Trim
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Start se trim</span>
+                            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#fff' }}>{fmtTime((sourceClips[0]?.startSec ?? 0) * 1000)}</span>
+                          </div>
+                          <input
+                            type="range" min={0} max={Math.max(1, (sourceClips[0]?.endSec ?? 60) - 1)} step={0.5}
+                            value={sourceClips[0]?.startSec ?? 0}
+                            onChange={e => {
+                              const v = +e.target.value;
+                              setSourceClips(prev => prev.map((c, i) => i === 0 ? { ...c, startSec: Math.min(v, c.endSec - 1) } : c));
+                            }}
+                            style={{ width: '100%', accentColor: '#ef4444' }}
+                          />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>End se trim</span>
+                            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#fff' }}>{fmtTime((sourceClips[0]?.endSec ?? 0) * 1000)}</span>
+                          </div>
+                          <input
+                            type="range" min={(sourceClips[0]?.startSec ?? 0) + 1} max={rawClipDurationSec || (sourceClips[0]?.endSec ?? 60)} step={0.5}
+                            value={sourceClips[0]?.endSec ?? 0}
+                            onChange={e => {
+                              const v = +e.target.value;
+                              setSourceClips(prev => prev.map((c, i) => i === 0 ? { ...c, endSec: Math.max(v, c.startSec + 1) } : c));
+                            }}
+                            style={{ width: '100%', accentColor: '#ef4444' }}
+                          />
+                        </div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+                          Kept: {fmtTime(0)} – {fmtTime(((sourceClips[0]?.endSec ?? 0) - (sourceClips[0]?.startSec ?? 0)) * 1000)} ({fmtTime(((sourceClips[0]?.endSec ?? 0) - (sourceClips[0]?.startSec ?? 0)) * 1000)} total)
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Letterbox toggle — moved here from Export tab */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', cursor: 'pointer' }}>
+                      <div
+                        onClick={() => setAddLetterbox(p => !p)}
+                        style={{
+                          width: 36, height: 20, borderRadius: 50, position: 'relative', cursor: 'pointer',
+                          background: addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s', flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.4)', left: addLetterbox ? 18 : 2 }} />
+                      </div>
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>⬛ Black border (letterbox) dono side</span>
+                    </label>
+
+                    {/* Replace video */}
+                    <input
+                      ref={replaceVideoInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/*"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          if (uploadedVideoUrlForClip) { try { URL.revokeObjectURL(uploadedVideoUrlForClip); } catch {} }
+                          setUploadedVideoForClip(f);
+                          setUploadedVideoUrlForClip(URL.createObjectURL(f));
+                          setRawClipPreviewUrl(null);
+                          toast.success('✓ Video replace ho gaya');
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => replaceVideoInputRef.current?.click()}
+                      style={{ padding: '10px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
+                      🔄 Video Replace Karo
+                    </button>
+
+                    {/* Playable preview of the trimmed clip, if generated */}
+                    {rawClipPreviewUrl && (
+                      <video controls src={rawClipPreviewUrl} style={{ width: '100%', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: '#000' }} />
+                    )}
+                    <button
+                      onClick={handleTrimClip}
+                      disabled={clipping || !sourceClips.length}
+                      style={{
+                        padding: '13px', borderRadius: 12, border: 'none',
+                        background: clipping ? 'rgba(239,68,68,0.35)' : '#ef4444',
+                        color: '#fff', fontSize: 13, fontWeight: 800,
+                        cursor: clipping ? 'default' : 'pointer', fontFamily: 'inherit',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      }}
+                    >
+                      {clipping
+                        ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Trim ho rahi hai… {clipProgress}%</>
+                        : <><Download size={13} /> Trim & Preview Karo</>}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -5132,13 +5149,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               <div style={{ fontSize: 10, color: 'rgba(252,165,165,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                 ② Raw Clip {uploadedVideoForClip && sourceClips.length > 0 ? `· ${sourceClips[0].title} (${fmtTime((sourceClips[0].endSec - sourceClips[0].startSec) * 1000)})` : ''}
               </div>
-              {/* Letterbox toggle — only when video ready */}
+              {/* Trim range + letterbox + replace video now live in Settings → Footage */}
               {uploadedVideoForClip && sourceClips.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div onClick={() => setAddLetterbox(p => !p)} style={{ width: 32, height: 18, borderRadius: 50, position: 'relative', cursor: 'pointer', flexShrink: 0, background: addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
-                    <div style={{ position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', left: addLetterbox ? 16 : 2, transition: 'left 0.2s' }} />
-                  </div>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', cursor: 'pointer' }} onClick={() => setAddLetterbox(p => !p)}>Black border (letterbox)</span>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+                  Trim / letterbox / replace video → <b style={{ color: 'rgba(255,255,255,0.5)' }}>Settings → Footage</b>
                 </div>
               )}
               {/* Progress bar while clipping */}
