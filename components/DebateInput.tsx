@@ -76,7 +76,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate'>('situational');
   const [leDuration, setLeDuration] = useState<number>(5);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
-  const [leNarrator, setLeNarrator] = useState(false);
+  const [leIntro, setLeIntro] = useState(false); // whether a short cinematic Narrator intro hook gets generated
   const [leGenerateQuestions, setLeGenerateQuestions] = useState(true);
   const [leLanguage, setLeLanguage] = useState<'hinglish' | 'english'>('hinglish');
 
@@ -177,7 +177,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
         topic: leTopic.trim(),
         specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}\nLEARN_ENGLISH_LANGUAGE:${leLanguage}${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}`,
         duration: leDuration,
-        includeNarrator: leNarrator,
+        includeNarrator: leIntro,
         model,
         language: 'English',
         style: 'learn_english',
@@ -502,21 +502,22 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Narrator</label>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Intro</label>
                 <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
                   <button
-                    onClick={() => setLeNarrator(true)}
+                    onClick={() => setLeIntro(true)}
                     className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
-                      leNarrator ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                      leIntro ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
                     }`}
                   >On</button>
                   <button
-                    onClick={() => setLeNarrator(false)}
+                    onClick={() => setLeIntro(false)}
                     className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
-                      !leNarrator ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                      !leIntro ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
                     }`}
                   >Off</button>
                 </div>
+                <p className="text-[10px] text-gray-600 mt-1.5">On = shuru mein ek chhota Narrator cinematic hook line banega. Off = seedha dialogue se shuru hoga.</p>
               </div>
             </div>
 
