@@ -93,6 +93,8 @@ const App: React.FC = () => {
           ...stored.thumbnailState,
         });
       }
+      if (stored.phoneSourceClips?.length) setPhoneSourceClips(stored.phoneSourceClips);
+      if (stored.phoneVideoFile) setPhoneVideoFile(stored.phoneVideoFile);
     } else if (stored.youtubeData) {
       // Had transcript but no script — go to INPUT step
       const restoredState = isImportState(stored.appState) ? AppState.INPUT : stored.appState;
@@ -114,9 +116,9 @@ const App: React.FC = () => {
   // Save state on change
   useEffect(() => {
     if (isInitialized) {
-      saveState(appState, script, thumbnailState, youtubeData);
+      saveState(appState, script, thumbnailState, youtubeData, phoneSourceClips, phoneVideoFile);
     }
-  }, [appState, script, thumbnailState, youtubeData, isInitialized]);
+  }, [appState, script, thumbnailState, youtubeData, phoneSourceClips, phoneVideoFile, isInitialized]);
 
   const handleGenerateScript = async (config: DebateConfig) => {
     setIsLoading(true);

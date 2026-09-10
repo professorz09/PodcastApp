@@ -1,5 +1,5 @@
 import { get, set, del } from 'idb-keyval';
-import { AppState, DebateSegment, StoryboardScene, ThumbnailState, YoutubeImportData } from '../types';
+import { AppState, DebateSegment, PhoneStudioSourceClip, StoryboardScene, ThumbnailState, YoutubeImportData } from '../types';
 
 const STORE_KEY = 'autovid_state';
 const SCENES_KEY = 'autovid_scenes';
@@ -14,6 +14,11 @@ interface StoredState {
   script: StoredSegment[];
   thumbnailState?: ThumbnailState;
   youtubeData?: YoutubeImportData | null;
+  // Phone Studio's uploaded source video + selected clip ranges — File objects
+  // are structured-cloneable, so IndexedDB stores them directly (no separate
+  // blob/name juggling needed like the audio/image blobs above).
+  phoneSourceClips?: PhoneStudioSourceClip[];
+  phoneVideoFile?: File | null;
 }
 
 // Local cache stores the actual image bytes (Blob), never the imageUrl string
@@ -34,6 +39,8 @@ interface LoadedState {
   script: DebateSegment[];
   thumbnailState?: ThumbnailState;
   youtubeData?: YoutubeImportData | null;
+  phoneSourceClips?: PhoneStudioSourceClip[];
+  phoneVideoFile?: File | null;
 }
 
 interface LoadedScenes {
@@ -141,6 +148,8 @@ export const saveState = async (
   script: DebateSegment[],
   thumbnailState?: ThumbnailState,
   youtubeData?: YoutubeImportData | null,
+  phoneSourceClips?: PhoneStudioSourceClip[],
+  phoneVideoFile?: File | null,
 ) => {
   try {
     const scriptToStore = await Promise.all(script.map(async (seg) => {
@@ -160,7 +169,10 @@ export const saveState = async (
       ? { ...thumbnailState, referenceImage: null }
       : thumbnailState;
 
-    await set(STORE_KEY, { appState, script: scriptToStore, thumbnailState: thumbnailStateToStore, youtubeData: youtubeData ?? null });
+    await set(STORE_KEY, {
+      appState, script: scriptToStore, thumbnailState: thumbnailStateToStore, youtubeData: youtubeData ?? null,
+      phoneSourceClips: phoneSourceClips ?? [], phoneVideoFile: phoneVideoFile ?? null,
+    });
   } catch (error) {
     console.error("Failed to save state to IndexedDB", error);
   }
@@ -189,6 +201,8 @@ export const loadState = async (): Promise<LoadedState | null> => {
       script: loadedScript,
       thumbnailState: stored.thumbnailState,
       youtubeData: stored.youtubeData ?? null,
+      phoneSourceClips: stored.phoneSourceClips ?? [],
+      phoneVideoFile: stored.phoneVideoFile ?? null,
     };
   } catch (error) {
     console.error("Failed to load state from IndexedDB", error);
