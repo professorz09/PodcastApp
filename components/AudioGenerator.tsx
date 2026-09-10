@@ -356,7 +356,10 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
             const newScript = [...prev];
             const oldUrl = newScript[index]?.audioUrl;
             if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-            newScript[index] = { ...newScript[index], audioUrl, duration: audio.duration };
+            // New audio means a different duration/timing — old word/phrase
+            // sync no longer matches it, so clear it instead of leaving the
+            // "Synced" badge green for stale timings from the previous take.
+            newScript[index] = { ...newScript[index], audioUrl, duration: audio.duration, wordTimings: undefined, phraseTimings: undefined };
             return newScript;
           });
           resolve();
@@ -462,7 +465,10 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
             const newScript = [...prev];
             const oldUrl = newScript[idx]?.audioUrl;
             if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-            newScript[idx] = { ...newScript[idx], audioUrl, duration: audio.duration || 0 };
+            // Same as the single-segment path — new audio invalidates any
+            // previous word/phrase sync, so clear it rather than leaving a
+            // stale "Synced" badge.
+            newScript[idx] = { ...newScript[idx], audioUrl, duration: audio.duration || 0, wordTimings: undefined, phraseTimings: undefined };
             return newScript;
           });
           setSegmentStatus(prev => ({ ...prev, [seg.id]: 'success' }));
