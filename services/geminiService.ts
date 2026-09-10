@@ -1,6 +1,6 @@
 import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
-import { fetchStylePoolMeta, fetchStyleImageByPath, fetchRandomStyleReference, matchStylesVector } from "./styleRefClient";
+import { fetchRandomStyleReference } from "./styleRefClient";
 
 // Nano Banana 2 — Gemini image model, used for all image generation
 // (thumbnails, avatars, storyboard illustrations, etc). A global switch (not
@@ -4428,67 +4428,11 @@ ${scriptText.slice(0, 2000)}`;
   }
 };
 
-// Fallback path: LLM-reasoning ranking of the sister project's LIVE style
-// pool by topic/mood fit (their own vector-search RPC is locked to their
-// service role — see styleRefClient.ts), then a Fisher-Yates shuffle across
-// the top matches. Only used if our own copied pool's real vector search
-// (matchStylesVector, tried first in pickBestStyleReference below) comes up
-// empty — e.g. before the pool has been seeded, or if it's unreachable.
-const pickBestStyleReferenceByLLMRanking = async (topicQuery: string): Promise<{ data: string; mimeType: string } | null> => {
-  try {
-    const pool = await fetchStylePoolMeta();
-    if (!pool.length) return await fetchRandomStyleReference();
-
-    const listing = pool
-      .map((r, i) => `${i}: ${JSON.stringify(r.meta || {}).slice(0, 350)}`)
-      .join('\n')
-      .slice(0, 14000);
-
-    const ai = getAi();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: [{
-        role: 'user',
-        parts: [{
-          text: `You are picking the best-matching thumbnail STYLE reference for a YouTube video, based only on mood/niche/composition fit — not content.
-
-VIDEO CONTEXT:
-${topicQuery.slice(0, 1500)}
-
-STYLE POOL (index: metadata for each candidate image):
-${listing}
-
-Return ONLY a JSON array of up to 8 candidate indices, best match first, e.g. [12,4,88]. No commentary.`
-        }]
-      }],
-      config: { responseMimeType: 'application/json' },
-    });
-    const raw = response.text?.trim() || '[]';
-    const idx: number[] = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] || '[]');
-    const candidates = idx.map(i => pool[i]).filter(Boolean);
-    const shortlist = (candidates.length ? candidates : pool).slice(0, 8);
-    for (let i = shortlist.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shortlist[i], shortlist[j]] = [shortlist[j], shortlist[i]];
-    }
-    const chosen = shortlist[0] || pool[Math.floor(Math.random() * pool.length)];
-    const img = await fetchStyleImageByPath(chosen.path);
-    return img ?? (await fetchRandomStyleReference());
-  } catch (e) {
-    console.warn('Style match ranking failed, falling back to random reference', e);
-    return await fetchRandomStyleReference();
-  }
-};
-
-// Topic-matched style pick — tries real cosine-similarity vector search
-// against our own copied+embedded style pool first (matchStylesVector), and
-// only falls back to LLM-reasoning ranking against the live sister project
-// (then a purely random pick) if that comes up empty.
-const pickBestStyleReference = async (topicQuery: string): Promise<{ data: string; mimeType: string } | null> => {
-  const vectorMatch = await matchStylesVector(topicQuery);
-  if (vectorMatch) return vectorMatch;
-  return await pickBestStyleReferenceByLLMRanking(topicQuery);
-};
+// Style reference pick — a random curated thumbnail from the local bundled
+// set (see styleRefClient.ts). topicQuery is unused now that matching is
+// purely local, kept so callers don't need to change.
+const pickBestStyleReference = async (_topicQuery: string): Promise<{ data: string; mimeType: string } | null> =>
+  await fetchRandomStyleReference();
 
 export const generateThumbnail = async (
   title: string,
