@@ -5,6 +5,7 @@ import { toast } from '../components/Toast';
 const STORE_KEY = 'autovid_state';
 const SCENES_KEY = 'autovid_scenes';
 const SHORTS_SCENES_KEY = 'autovid_shorts_scenes';
+const ENGLISH_VIDEO_VISUALS_KEY = 'autovid_english_video_visuals';
 
 interface StoredSegment extends DebateSegment {
   audioBlob?: Blob | null;
@@ -138,6 +139,99 @@ export const loadShortsScenes = async (script: DebateSegment[]): Promise<LoadedS
 
 export const clearShortsScenes = async (): Promise<void> => {
   try { await del(SHORTS_SCENES_KEY); } catch { /* ignore */ }
+};
+
+// ── English Video visuals (speaker avatars, per-speaker backgrounds, Narrator
+// avatar, global background) ─────────────────────────────────────────────────
+// These live purely as HTMLImageElement React state inside EnglishVideoMaker —
+// nothing wrote them to IndexedDB, so a refresh silently lost every uploaded/
+// AI-generated image even though the script/audio itself survived. Stored
+// keyed by script signature (same pattern as Storyboard/Shorts scenes above).
+
+export interface EnglishVideoVisualsData {
+  speakerImages: (HTMLImageElement | null)[];
+  speakerBackgroundImages: (HTMLImageElement | null)[];
+  narratorImage: HTMLImageElement | null;
+  background: HTMLImageElement | null;
+  backgroundColor?: string;
+}
+
+interface StoredEnglishVideoVisuals {
+  scriptSignature: string;
+  speakerImageBlobs: (Blob | null)[];
+  speakerBackgroundBlobs: (Blob | null)[];
+  narratorImageBlob: Blob | null;
+  backgroundBlob: Blob | null;
+  backgroundColor?: string;
+}
+
+let _englishVideoVisualsBlobUrls: string[] = [];
+
+const imageToBlob = async (img: HTMLImageElement | null): Promise<Blob | null> => {
+  if (!img?.src) return null;
+  try {
+    const res = await fetch(img.src);
+    return await res.blob();
+  } catch (e) {
+    console.error('Failed to convert image to blob for storage', e);
+    return null;
+  }
+};
+
+const blobToImage = (blob: Blob | null, blobUrls: string[]): Promise<HTMLImageElement | null> => {
+  if (!blob) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    blobUrls.push(url);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+};
+
+export const saveEnglishVideoVisuals = async (
+  script: DebateSegment[],
+  data: EnglishVideoVisualsData,
+): Promise<void> => {
+  try {
+    const [speakerImageBlobs, speakerBackgroundBlobs, narratorImageBlob, backgroundBlob] = await Promise.all([
+      Promise.all(data.speakerImages.map(imageToBlob)),
+      Promise.all(data.speakerBackgroundImages.map(imageToBlob)),
+      imageToBlob(data.narratorImage),
+      imageToBlob(data.background),
+    ]);
+    await set(ENGLISH_VIDEO_VISUALS_KEY, {
+      scriptSignature: getScriptSignature(script),
+      speakerImageBlobs, speakerBackgroundBlobs, narratorImageBlob, backgroundBlob,
+      backgroundColor: data.backgroundColor,
+    } as StoredEnglishVideoVisuals);
+  } catch (e) {
+    console.error('Failed to save English Video visuals', e);
+  }
+};
+
+export const loadEnglishVideoVisuals = async (script: DebateSegment[]): Promise<EnglishVideoVisualsData | null> => {
+  try {
+    const stored = await get<StoredEnglishVideoVisuals>(ENGLISH_VIDEO_VISUALS_KEY);
+    if (!stored) return null;
+    if (stored.scriptSignature !== getScriptSignature(script)) return null;
+
+    _englishVideoVisualsBlobUrls.forEach(u => URL.revokeObjectURL(u));
+    _englishVideoVisualsBlobUrls = [];
+
+    const [speakerImages, speakerBackgroundImages, narratorImage, background] = await Promise.all([
+      Promise.all(stored.speakerImageBlobs.map(b => blobToImage(b, _englishVideoVisualsBlobUrls))),
+      Promise.all(stored.speakerBackgroundBlobs.map(b => blobToImage(b, _englishVideoVisualsBlobUrls))),
+      blobToImage(stored.narratorImageBlob, _englishVideoVisualsBlobUrls),
+      blobToImage(stored.backgroundBlob, _englishVideoVisualsBlobUrls),
+    ]);
+
+    return { speakerImages, speakerBackgroundImages, narratorImage, background, backgroundColor: stored.backgroundColor };
+  } catch (e) {
+    console.error('Failed to load English Video visuals', e);
+    return null;
+  }
 };
 
 // ── Main state persistence ─────────────────────────────────────────────────────

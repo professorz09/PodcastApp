@@ -9,6 +9,7 @@ import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/t
 import { generateSegmentImage, generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
+import { saveEnglishVideoVisuals, loadEnglishVideoVisuals } from '../services/storageService';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface EnglishVideoMakerProps {
@@ -161,6 +162,37 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [showScores, setShowScores] = useState(false);
   const [backgroundDim, setBackgroundDim] = useState(0);
   const [globalBackgroundColor, setGlobalBackgroundColor] = useState<string | undefined>('#ffffff');
+
+  // Persist speaker/narrator/background images to IndexedDB — these are
+  // plain React state (HTMLImageElement) with nothing writing them to
+  // storage otherwise, so a refresh silently lost every uploaded/AI-
+  // generated image even though the script/audio itself survived.
+  const hasLoadedVisualsRef = useRef(false);
+
+  useEffect(() => {
+      let cancelled = false;
+      (async () => {
+          const loaded = await loadEnglishVideoVisuals(initialScript);
+          if (cancelled) return;
+          if (loaded) {
+              if (loaded.speakerImages.some(Boolean)) setSpeakerImages(loaded.speakerImages);
+              if (loaded.speakerBackgroundImages.some(Boolean)) setSpeakerBackgroundImages(loaded.speakerBackgroundImages);
+              if (loaded.narratorImage) setNarratorImage(loaded.narratorImage);
+              if (loaded.background) setBackground(loaded.background);
+              if (loaded.backgroundColor) setGlobalBackgroundColor(loaded.backgroundColor);
+          }
+          hasLoadedVisualsRef.current = true;
+      })();
+      return () => { cancelled = true; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialScript]);
+
+  useEffect(() => {
+      if (!hasLoadedVisualsRef.current) return; // don't overwrite storage with the pre-load empty state
+      saveEnglishVideoVisuals(script, {
+          speakerImages, speakerBackgroundImages, narratorImage, background, backgroundColor: globalBackgroundColor,
+      });
+  }, [speakerImages, speakerBackgroundImages, narratorImage, background, globalBackgroundColor]); // eslint-disable-line react-hooks/exhaustive-deps
   const [narratorTextColor, setNarratorTextColor] = useState<string>('#ef4444');
   const [showMinimalSpeakerName, setShowMinimalSpeakerName] = useState<boolean>(true);
   const [showMinimalSideVU, setShowMinimalSideVU] = useState<boolean>(true);
