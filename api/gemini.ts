@@ -10,7 +10,7 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'Missing model or contents in request body.' });
   }
   try {
-    const { callGemini } = await import('../services/vertexProxy');
+    const { callGemini } = await import('../services/vertexProxy.js');
     const response = await callGemini(model, contents, genConfig);
     res.json(response);
   } catch (error: any) {

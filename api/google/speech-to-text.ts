@@ -116,7 +116,7 @@ export default async function handler(req: any, res: any) {
   };
 
   try {
-    const { getGCPAccessToken } = await import('../../services/vertexProxy');
+    const { getGCPAccessToken } = await import('../../services/vertexProxy.js');
     const token = await getGCPAccessToken();
     const projectId = process.env.GCP_PROJECT_ID;
     const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
