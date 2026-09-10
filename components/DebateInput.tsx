@@ -76,8 +76,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate'>('situational');
   const [leDuration, setLeDuration] = useState<number>(5);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
-  const [leIntro, setLeIntro] = useState(false); // whether a short cinematic Narrator intro hook gets generated
-  const [leNarrator, setLeNarrator] = useState(true); // whether mid-dialogue Narrator teaching asides get generated
+  const [leIntro, setLeIntro] = useState(true); // whether a short cinematic Narrator intro hook gets generated
+  const [leNarrator, setLeNarrator] = useState(false); // whether mid-dialogue Narrator teaching asides get generated
   const [leGenerateQuestions, setLeGenerateQuestions] = useState(true);
   const [leLanguage, setLeLanguage] = useState<'hinglish' | 'english'>('hinglish');
 
