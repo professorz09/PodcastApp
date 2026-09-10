@@ -852,20 +852,27 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
     try {
       const duration = seg.duration && seg.duration > 0 ? seg.duration : Math.max(6, seg.text.split(/\s+/).length / 2.3);
-      const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 45000, 'Scene breakdown');
+      // 90s — a thinking-heavy reasoning call on a now-longer, richer intro
+      // genuinely takes a while; 45s was cutting it off mid-thought on
+      // every single attempt, not just real stalls.
+      const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 90000, 'Scene breakdown');
       setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: breakdown.length } }));
 
-      const scenesWithImages: NonNullable<DebateSegment['learnEnglish']>['introScenes'] = [];
-      for (const scene of breakdown) {
+      // Images generate in parallel (not one-by-one) — sequential generation
+      // of several scene images compounded into a very long wait for a
+      // multi-beat intro; each image is independent, so there's no reason
+      // to wait for one before starting the next.
+      const scenesWithImages = await Promise.all(breakdown.map(async (scene) => {
         try {
           const imageUrl = await withRetry(() => generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 2, 60000, 'Scene image');
-          scenesWithImages!.push({ ...scene, imageUrl });
+          setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: breakdown.length } }));
+          return { ...scene, imageUrl };
         } catch (e) {
           console.error('Intro scene image failed', e);
-          scenesWithImages!.push({ ...scene });
+          setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: breakdown.length } }));
+          return { ...scene, imageUrl: undefined };
         }
-        setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: breakdown.length } }));
-      }
+      }));
 
       setScript(prev => prev.map(s => s.id === segId
         ? {

@@ -4974,7 +4974,7 @@ Narration: "${introText}"
 Total spoken duration: ${dur.toFixed(1)} seconds — it starts at 0s and ends at ${dur.toFixed(1)}s. Your scenes together must cover this whole range with no gaps or overlaps.${timingSection}
 
 TASK:
-Decide how many distinct visual beats this narration naturally breaks into — usually 2 to 5, based on how many genuinely different moments/images the line actually describes. A short punchy line might only need 1-2 beats; a longer scene-setting narration might need 4-5. Don't force more beats than the content actually has, and don't cram unrelated moments into one beat.
+Decide how many distinct visual beats this narration naturally breaks into — usually 3 to 8 for a full trailer-style intro, based on how many genuinely different moments/images the line actually describes (a short punchy line might only need 1-2; a longer scene-setting narration with several beats/teased moments should get one beat per moment). Don't force more beats than the content actually has, and don't cram unrelated moments into one beat.
 For each beat, give a time range (startOffset/endOffset in seconds${phraseTimings?.length ? ' — snapped exactly to the real phrase timestamps above' : ', roughly proportional to how long that part of the line takes to say'}) and a cinematic image prompt describing that exact visual moment, matching precisely what those specific words describe — realistic movie-still style, specific enough to generate a real image from (setting, who/what is visible, mood), not vague or generic.
 
 Return JSON only (no markdown), an array of {"startOffset": number, "endOffset": number, "prompt": string} in time order.`;
@@ -5370,7 +5370,11 @@ export const generateLearnEnglishScript = async (
       : '"You" (the English learner) plus TWO other characters that fit the situation. Pick natural, consistent role names for the topic.';
 
   const introLine = includeNarrator
-    ? 'Segment 1 MUST be spoken by "Narrator", tag "intro", just 1-2 sentences (10-15 seconds spoken) — a cinematic story hook that sets the scene and creates curiosity about what\'s coming (e.g. "It was just another Monday morning... until my boss called me into his office."). Don\'t give away how it ends. After that, hand off entirely to the characters — Narrator should not interrupt the scene again except for the "narrator" teaching asides described below.'
+    ? `Segment 1 MUST be spoken by "Narrator", tag "intro" — a proper cinematic movie-trailer-style opening, NOT just a one-line hook. Give it real substance: 4-8 sentences (roughly 20-40 seconds spoken). It should:
+- Set the scene (who, where, what's at stake) with enough texture to feel like a real story is starting.
+- Preview/tease 2-3 of the specific moments, turns, or emotional beats that are actually coming up in the dialogue below — like a trailer giving flashes of what's ahead — without spelling out exactly how it resolves. The viewer should come away knowing roughly what kind of ride they're in for.
+- Build genuine curiosity/tension so someone would want to keep watching.
+After this intro, hand off entirely to the characters — Narrator should not interrupt the scene again except for the "narrator" teaching asides described below.`
     : 'Do NOT include an intro segment — start directly with the first line of dialogue (tag "dialogue"), in media res, as if the scene is already underway.';
 
   const languageLine = leLanguage === 'hinglish'
