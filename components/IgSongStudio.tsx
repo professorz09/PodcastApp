@@ -84,7 +84,7 @@ const IgSongStudio: React.FC = () => {
 
   // ── Language + model ──
   const [language, setLanguage] = useState<LangKey>('Hindi');
-  const [lyricsModel, setLyricsModel] = useState('gemini-3.6-flash');
+  const [lyricsModel, setLyricsModel] = useState('gemini-3.8-flash');
 
   // ── Lyrics ──
   const [lyrics, setLyrics] = useState('');
@@ -602,7 +602,7 @@ const IgSongStudio: React.FC = () => {
                 <Label>AI Model</Label>
                 <div className="flex flex-col gap-1.5">
                   {[
-                    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', badge: 'Fast' },
+                    { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', badge: 'Fast' },
                     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', badge: 'Best' },
                   ].map(m => (
                     <button

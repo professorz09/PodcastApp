@@ -14,12 +14,14 @@ Single-user app, no login gate: the one active project is persisted entirely loc
 ## Architecture
 - **Frontend**: React 19 + TypeScript + Vite, styled with Tailwind CSS
 - **Local dev backend**: Express server (TypeScript, run via `tsx`) serves both API routes and the Vite dev middleware, sharing port 5000. Its `/api/*` routes call Vertex/Gemini, ElevenLabs, Google Cloud directly (via `services/vertexProxy.ts` etc.) and proxy the Flask routes to `localhost:8000`.
-- **Production**: the `[deployment]` target in `.replit` runs the same Express server (`start.sh` → `npm start` → `tsx server.ts`) on the Replit VM, so production uses the exact same `/api/*` routes as local dev — no separate serverless backend needed. `vercel.json` is kept only for an optional static-frontend Vercel deploy and now only proxies the Flask/Render routes (`/api/youtube|video|files|instagram|cookies|reddit|shorts|health`); it does not serve `/api/gemini`, `/api/google/*`, or `/api/elevenlabs/*` — those need the Express server, so a Vercel-only deploy isn't a fully working target.
+- **Production (Replit)**: the `[deployment]` target in `.replit` runs the same Express server (`start.sh` → `npm start` → `tsx server.ts`) on the Replit VM, so production uses the exact same `/api/*` routes as local dev.
+- **Production (Vercel, optional)**: `vercel.json` builds the static frontend and rewrites the Flask/Render routes (`/api/youtube|video|files|instagram|cookies|reddit|shorts|health`); everything else under `/api/gemini`, `/api/gemini/key-check`, `/api/google/*`, `/api/elevenlabs/*` is served by the matching file under `api/` (Vercel Node.js Serverless Functions, file-based routing — one file per route, no framework). Each one re-imports the same `services/vertexProxy.ts` logic the Express routes use, so behavior is identical between the two deploy targets. Configure the same env vars as `.env.example` as Vercel project secrets (Project Settings → Environment Variables) — paste `GCP_SA_KEY`'s service-account JSON as a single-line secret value, same as locally.
 - **Persistence**: The single active project (script, storyboard/shorts scenes+images, audio, thumbnail) is stored entirely in the browser's IndexedDB via `services/storageService.ts` — no server-side database, no cross-device sync.
 - **Auth**: none. The app loads straight into the project on open.
 
 ## Key Files
-- `server.ts` — Express server with API proxy routes (Gemini/Vertex, ElevenLabs, Google Cloud, Flask), used for both local dev and production
+- `server.ts` — Express server with API proxy routes (Gemini/Vertex, ElevenLabs, Google Cloud, Flask), used for local dev and Replit VM production
+- `api/` — Vercel Serverless Functions mirroring the same proxy routes (`gemini.ts`, `gemini/key-check.ts`, `google/speech-to-text.ts`, `google/text-to-speech.ts`, `google/operations.ts`, `elevenlabs/tts.ts`, `elevenlabs/voices.ts`), used only when deployed on Vercel
 - `App.tsx` — Main React component managing app state flow
 - `vite.config.ts` — Vite config (port 5000, host 0.0.0.0, allowedHosts: all)
 - `components/` — React UI components (DebateInput, ScriptEditor, AudioGenerator, ThumbnailGenerator, DebateVisualizer, YoutubeImporter, Layout, Storyboard, Shorts, ShortsStudio)

@@ -43,8 +43,7 @@ const DEFAULT_SUBTITLE: SubtitleConfig = {
 };
 
 const MODEL_OPTIONS = [
-  { value: 'gemini-3.6-flash', label: '⚡ Flash' },
-  { value: 'gemini-3.1-flash-lite', label: '✦ Lite' },
+  { value: 'gemini-3.8-flash', label: '⚡ Flash' },
   { value: 'gemini-3.1-pro-preview', label: '✦ Pro' },
 ];
 
@@ -999,7 +998,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
   };
 
   const [sceneCount, setSceneCount] = useState(10);
-  const [model, setModel] = useState('gemini-3.1-flash-lite');
+  const [model, setModel] = useState('gemini-3.8-flash');
   const [showSettings, setShowSettings] = useState(false);
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
 
