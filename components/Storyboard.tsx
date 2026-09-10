@@ -61,7 +61,7 @@ const DEFAULT_SUBTITLE: SubtitleConfig = {
 };
 
 const MODEL_OPTIONS = [
-  { value: 'gemini-3.6-flash', label: '⚡ Flash' },
+  { value: 'gemini-3.8-flash', label: '⚡ Flash' },
   { value: 'gemini-3.1-pro-preview', label: '✦ Pro' },
 ];
 
@@ -802,7 +802,7 @@ const TimelineRow: React.FC<{
 // ── Main ──────────────────────────────────────────────────────────────────────
 const Storyboard: React.FC<StoryboardProps> = ({ script, onBack }) => {
   const [sceneCount, setSceneCount] = useState(10);
-  const [model, setModel] = useState('gemini-3.6-flash');
+  const [model, setModel] = useState('gemini-3.8-flash');
   const [showSettings, setShowSettings] = useState(false);
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
 

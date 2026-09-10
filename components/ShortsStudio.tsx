@@ -241,7 +241,7 @@ async function fetchHashtags(title: string, text: string): Promise<string[]> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-3.8-flash',
         contents: [{ role: 'user', parts: [{ text: `Generate 8 viral hashtags for this YouTube Shorts clip.
 Title: ${title}
 Clip: ${text.slice(0, 300)}
