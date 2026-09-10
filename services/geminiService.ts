@@ -5209,8 +5209,8 @@ export const generateContextBridgeConclusion = async (
 export const generateLearnEnglishScript = async (
   topic: string,
   speakerCount: number,        // 1 = solo monologue practice, 2 = You + 1 other, 3 = You + 2 others
-  includeNarrator: boolean,    // adds a short cinematic-hook Narrator line at the start
-  generateQuestions: boolean,  // appends a Narrator "useful expressions + quiz" segment at the end
+  includeNarrator: boolean,    // adds a short cinematic-hook Narrator "intro" line at the start
+  generateQuestions: boolean,  // appends "quiz" segments at the end, spoken by Narrator
   duration: number = 5,        // minutes — rough length guide
   model: string = 'gemini-3.8-flash',
   leStyle: string = 'situational',
@@ -5221,32 +5221,38 @@ export const generateLearnEnglishScript = async (
   const rolesLine = speakerCount <= 1
     ? 'Just ONE speaker: "You" — a monologue / self-practice speech about the situation.'
     : speakerCount === 2
-      ? 'TWO speakers: "You" (the English learner, practicing) and ONE other character. Pick a role that fits the situation (e.g. "Police Officer", "Waiter", "Interviewer") and keep that exact name consistent throughout.'
+      ? 'TWO speakers: "You" (the English learner) and ONE other character who drives the situation (e.g. "Boss", "Police Officer", "Waiter", "Date", "Interviewer", "Stranger"). Pick a role that fits the topic and keep that exact name consistent throughout. The scene is a DIRECT exchange between "You" and this character — do not add a third person or narrator bridging the conversation, it breaks immersion.'
       : '"You" (the English learner) plus TWO other characters that fit the situation. Pick natural, consistent role names for the topic.';
 
-  const narratorLine = includeNarrator
-    ? 'Start with a short "Narrator" line (1-2 sentences) that sets up the situation like a cinematic story hook (e.g. "Yesterday, I was walking down the street when...").'
-    : 'Do NOT include a Narrator line — start directly with the first line of dialogue.';
+  const introLine = includeNarrator
+    ? 'Segment 1 MUST be spoken by "Narrator", tag "intro", just 1-2 sentences (10-15 seconds spoken) — a cinematic story hook that sets the scene (e.g. "It was just another Monday morning... until my boss called me into his office."). After that, hand off entirely to the characters — Narrator should not interrupt the scene again except for the "narrator" teaching asides described below.'
+    : 'Do NOT include an intro segment — start directly with the first line of dialogue (tag "dialogue").';
+
+  const teachingLine = `Roughly every 3-5 lines of dialogue, when a genuinely useful idiom/phrase/expression just got used, insert ONE short "Narrator" aside, tag "narrator" — like a teacher briefly popping in. Its "text" should be a one-line spoken remark (e.g. "Notice how she said 'let you go' — that's a polite way to say someone is fired."), AND it must carry an "explanation" object: {"phrase": the exact expression, "meaning": short plain-English meaning, "example": one more example sentence using it}. Keep these asides brief and don't overuse them — this whole category should be roughly 10% of all segments. Immediately after each aside, return straight back to the story.`;
 
   const questionsLine = generateQuestions
-    ? `\n\nAfter the dialogue ends, add ONE final segment spoken by "Narrator" (even if no narrator line was used earlier) that reviews 3-5 useful expressions/phrases from the conversation — for each, give the phrase, what it means, and a one-line example of using it. End with 2-3 short comprehension questions a learner could try to answer.`
+    ? `\n\nAfter the dialogue ends, add 2-4 final segments spoken by "Narrator", tag "quiz" (roughly 10% of all segments) — short comprehension/recall questions based on the conversation just shown (e.g. "What did the boss say instead of 'You're fired'?"). Each must carry a "quiz" object: {"question": the question text, "options": 2-4 short possible answers (optional, only if it naturally fits as multiple-choice), "answer": the correct answer}. "text" should just be the spoken question itself.`
     : '';
 
   const styleLine = {
-    situational: 'Everyday situational English — natural, practical phrasing a learner would actually use in real life.',
+    situational: 'Everyday situational English — natural, practical phrasing a learner would actually use in real life. Think of real, slightly dramatic everyday situations: getting fired, missing a flight, being stopped by police, a first date, a robbery, overhearing a secret at work — pick or invent one that fits the topic.',
     roleplay: 'A roleplay-practice scene — slightly more structured, clearly modeling both sides of a common exchange.',
     interview: 'A more formal register — like a job interview or official conversation, polite and professional English.',
     casual: 'Casual, relaxed conversational English between people who know each other.',
   }[leStyle] || 'Everyday situational English.';
 
-  const prompt = `You are writing an ENGLISH-LEARNING practice dialogue for a video, based on this topic/situation: "${topic}".
+  const prompt = `You are writing an ENGLISH-LEARNING practice video script, based on this topic/situation: "${topic}".
 
 ${rolesLine}
-${narratorLine}
+${introLine}
 Style: ${styleLine}
-Roughly ${turnsGuide} lines of dialogue total. Use natural, everyday English — not stiff or textbook-like — full of expressions a learner would genuinely want to practice.${questionsLine}
+Roughly ${turnsGuide} lines of dialogue total (tag "dialogue" for all of these). Use natural, everyday English — not stiff or textbook-like — full of expressions a learner would genuinely want to practice. 80% of all segments should be plain "dialogue" between the characters, driving a real mini-story with a clear beginning, tension, and resolution.
 
-Return JSON only (no markdown), an array of {"speaker": "...", "text": "..."} objects in speaking order. "speaker" must be exactly "Narrator", "You", or the other character's role name (kept spelled identically every time it's used).`;
+${teachingLine}${questionsLine}
+
+Return JSON only (no markdown), an array of objects in speaking order:
+{"speaker": "...", "text": "...", "tag": "intro"|"dialogue"|"narrator"|"quiz", "explanation": {...} (ONLY for tag "narrator"), "quiz": {...} (ONLY for tag "quiz")}
+"speaker" must be exactly "Narrator", "You", or the other character's role name (spelled identically every time it's used).`;
 
   try {
     const response = await ai.models.generateContent({
@@ -5265,13 +5271,32 @@ Return JSON only (no markdown), an array of {"speaker": "...", "text": "..."} ob
       parsed = m ? JSON.parse(m[0]) : [];
     }
 
-    return parsed.map((seg: any, i: number) => ({
-      id: `learn-english-${i}`,
-      speaker: seg.speaker || 'You',
-      text: seg.text || '',
-      scores: [],
-      averageScore: 0,
-    }));
+    return parsed.map((seg: any, i: number) => {
+      const tag = (seg.tag === 'intro' || seg.tag === 'narrator' || seg.tag === 'quiz') ? seg.tag : 'dialogue';
+      const result: DebateSegment = {
+        id: `learn-english-${i}`,
+        speaker: seg.speaker || 'You',
+        text: seg.text || '',
+        scores: [],
+        averageScore: 0,
+        learnEnglish: { segmentType: tag },
+      };
+      if (tag === 'narrator' && seg.explanation?.phrase) {
+        result.learnEnglish!.explanation = {
+          phrase: seg.explanation.phrase,
+          meaning: seg.explanation.meaning || '',
+          example: seg.explanation.example,
+        };
+      }
+      if (tag === 'quiz' && seg.quiz?.question) {
+        result.learnEnglish!.quiz = {
+          question: seg.quiz.question,
+          options: Array.isArray(seg.quiz.options) ? seg.quiz.options : undefined,
+          answer: seg.quiz.answer || '',
+        };
+      }
+      return result;
+    });
   } catch (err: any) {
     console.error('Learn English script generation failed:', err);
     return [];

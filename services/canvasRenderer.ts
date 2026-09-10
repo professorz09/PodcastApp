@@ -1,5 +1,6 @@
 import { DebateSegment } from '../types';
 import { getTheme, getDefaultThemeConfig } from './themes';
+import { drawLearnEnglishOverlay } from './learnEnglishOverlay';
 
 export interface VisualConfig {
   theme: string;
@@ -97,4 +98,8 @@ export const drawDebateFrame = (
       assets,
       themeConfig
   });
+
+  // Additive Learn English overlay (narrator teaching card / quiz panel) — no-ops
+  // for scripts without learnEnglish tags, so this never affects other renders.
+  drawLearnEnglishOverlay(ctx, script, segmentOffsets, currentSegmentIndex, time);
 };

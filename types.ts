@@ -34,6 +34,7 @@ export enum AppState {
   AUDIO = 'AUDIO',
   THUMBNAIL = 'THUMBNAIL',
   VISUALIZER = 'VISUALIZER',
+  ENGLISH_VIDEO = 'ENGLISH_VIDEO',       // Video Maker reused for "Learn English" scripts (intro storyboard, narrator card, quiz overlay)
   STORYBOARD = 'STORYBOARD',
   SHORTS = 'SHORTS',
   SHORTS_STUDIO = 'SHORTS_STUDIO',
@@ -84,6 +85,13 @@ export interface DebateSegment {
   }[];
   averageScore?: number;
   sourceTimestamp?: string; // For context_bridge style: timestamp in source video where this context is relevant
+  /** Tagging used only by the "Learn English" feature — drives which parts of the
+   *  render pipeline (intro storyboard, narrator teaching card, quiz overlay) apply. */
+  learnEnglish?: {
+    segmentType: 'intro' | 'dialogue' | 'narrator' | 'quiz';
+    explanation?: { phrase: string; meaning: string; example?: string };
+    quiz?: { question: string; options?: string[]; answer: string };
+  };
   visualConfig?: {
     backgroundUrl?: string;
     backgroundColor?: string;

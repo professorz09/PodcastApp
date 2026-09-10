@@ -588,6 +588,14 @@ Return JSON only (no markdown):
         />
       )}
 
+      {appState === AppState.ENGLISH_VIDEO && (
+        <DebateVisualizer
+          script={script}
+          onBack={() => setAppState(AppState.AUDIO)}
+          youtubeData={youtubeData}
+        />
+      )}
+
       {appState === AppState.STORYBOARD && (
         <Storyboard
           script={script}
