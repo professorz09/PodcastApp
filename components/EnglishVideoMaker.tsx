@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
@@ -207,10 +207,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [segmentScores, setSegmentScores] = useState<number[]>([]);
   const [showScorecard, setShowScorecard] = useState(false);
   const [scorecardData, setScorecardData] = useState<{ scores: { model: string, score: number }[], average: number } | null>(null);
-  // Auto-expand straight into the Intro tab when the video opens on its
-  // intro segment — otherwise the panel stays collapsed and the user has to
-  // manually expand it just to see the settings that are already relevant.
-  const [showSettings, setShowSettings] = useState(() =>
+  const [showSettings, setShowSettings] = useState(false);
+  // Intro Settings is its own standalone section, separate from
+  // Speakers/Background/Subtitle/Options — auto-expanded when the video
+  // opens on its intro segment, since that's immediately relevant.
+  const [showIntroSection, setShowIntroSection] = useState(() =>
     initialScript[0]?.learnEnglish?.segmentType === 'intro'
   );
   const [questionMode, setQuestionMode] = useState(false);
@@ -242,13 +243,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [showExportSettings, setShowExportSettings] = useState(false);
   // Settings tab state
   // Segment 0 is very commonly the intro segment itself (that's the whole
-  // point of an intro), so currentSegmentIndex defaults to 0 on mount without
-  // the user ever clicking the intro chip — the tab-switch-on-click fix
-  // alone never fires in that case. Default straight to the Intro tab here
-  // instead, whenever the initially-selected segment is intro-tagged.
-  const [settingsTab, setSettingsTab] = useState<'speakers'|'intro'|'background'|'subtitle'|'options'>(() =>
-    initialScript[0]?.learnEnglish?.segmentType === 'intro' ? 'intro' : 'speakers'
-  );
+  // Intro settings live in their own standalone section now (not one of
+  // these tabs) — see the "Intro Settings" card rendered right after the
+  // Timeline Strip, kept fully separate from Speakers/Background/etc.
+  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'>('speakers');
   const [statusMessage, setStatusMessage] = useState("");
   // Rendered video blob kept in memory for merge
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
@@ -3101,9 +3099,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   };
 
   const introSegments = script.filter(s => s.learnEnglish?.segmentType === 'intro');
-  const TABS: readonly string[] = introSegments.length > 0
-    ? (['Speakers', 'Intro', 'Background', 'Subtitle', 'Options'] as const)
-    : (['Speakers', 'Background', 'Subtitle', 'Options'] as const);
+  const TABS = ['Speakers', 'Background', 'Subtitle', 'Options'] as const;
 
   return (
     <div className="w-full h-full bg-black text-white flex flex-col overflow-hidden">
@@ -3200,11 +3196,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                       if (audioRef.current && segmentOffsets[idx] !== undefined) {
                         audioRef.current.currentTime = segmentOffsets[idx] + 0.1;
                         setCurrentSegmentIndex(idx);
-                        // Selecting the intro chip while the Speakers tab (irrelevant to
-                        // it) is open used to just sit there showing You/Chloe cards —
-                        // jump straight to the Intro tab so its settings are what's shown.
+                        // Intro Settings is its own standalone section (not a tab
+                        // shared with Speakers/Background/etc.) — just make sure
+                        // it's expanded so it's immediately visible.
                         if (seg.learnEnglish?.segmentType === 'intro') {
-                          setSettingsTab('intro');
+                          setShowIntroSection(true);
                         }
                       }
                     }}
@@ -3230,6 +3226,152 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               })}
             </div>
           </div>
+
+          {/* ── Intro Settings — standalone, fully separate from Speakers/
+               Background/Subtitle/Options (not one of that tab group). ── */}
+          {introSegments.length > 0 && (
+            <div className="bg-[#0d0d0d] border border-cyan-500/20 rounded-2xl overflow-hidden">
+              <button
+                onClick={() => setShowIntroSection(!showIntroSection)}
+                className="w-full flex items-center justify-between px-4 py-4"
+              >
+                <div className="flex items-center gap-2">
+                  <BookOpen size={15} className="text-cyan-400" />
+                  <span className="font-bold text-white text-sm">Intro Settings</span>
+                </div>
+                {showIntroSection ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
+              </button>
+
+              {showIntroSection && (
+                <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
+                  <p className="text-[10px] text-gray-500">Yeh sirf Narrator ke opening hook line (intro-tagged segment) ke liye hai — cinematic AI image ya apni photo/scene upload karo, jo sirf uss segment ki background bani rahegi.</p>
+
+                  {/* ── Image Generation settings (Storyboard-style) ── */}
+                  <div className="bg-black border border-white/5 rounded-2xl p-4 space-y-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-2">Image Ratio</label>
+                      <div className="flex bg-[#0d0d0d] border border-white/5 rounded-xl p-1 gap-1">
+                        {(['16:9', '9:16', '3:4', '1:1'] as const).map(r => (
+                          <button key={r} onClick={() => setIntroImageAspectRatio(r)}
+                            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${introImageAspectRatio === r ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between bg-[#0d0d0d] border border-white/5 rounded-xl px-3.5 py-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-300">Lite Image Model</p>
+                        <p className="text-[10px] text-gray-600 mt-0.5">Faster/cheaper, different rate limit — applies to Storyboard, Shorts &amp; Thumbnail too</p>
+                      </div>
+                      <button
+                        onClick={toggleLiteImageModel}
+                        className={`relative w-9 h-5 rounded-full shrink-0 transition-all ${useLiteImageModel ? 'bg-cyan-600' : 'bg-white/15'}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${useLiteImageModel ? 'translate-x-4' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {introSegments.map((seg) => (
+                    <div key={seg.id} className="space-y-2">
+                      <p className="text-xs text-gray-400 italic line-clamp-2">"{seg.text}"</p>
+                      <div className="relative aspect-video bg-black rounded-2xl border-2 border-dashed border-white/10 overflow-hidden">
+                        {introImageLoading[seg.id] ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black">
+                            <Loader2 size={20} className="text-cyan-400 animate-spin" />
+                            <span className="text-[10px] text-gray-500">AI…</span>
+                          </div>
+                        ) : seg.visualConfig?.backgroundUrl ? (
+                          <>
+                            <img src={seg.visualConfig.backgroundUrl} alt="Intro" className="w-full h-full object-cover" />
+                            <button
+                              onClick={() => handleClearIntroImage(seg.id)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
+                            >
+                              <X size={10} className="text-white" />
+                            </button>
+                          </>
+                        ) : (
+                          <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer gap-2 hover:bg-white/5 transition-colors">
+                            <Upload size={22} className="text-gray-500" />
+                            <span className="text-xs text-gray-500">Intro image</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleIntroImageUpload(e, seg.id)} />
+                          </label>
+                        )}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => handleGenerateIntroScenes(seg.id)}
+                          disabled={!!introImageLoading[seg.id]}
+                          className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
+                        >
+                          {introImageLoading[seg.id]
+                            ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id] ? `Scene ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating…'}</>
+                            : <><Wand2 size={11} /> Generate Scenes</>
+                          }
+                        </button>
+                        <button
+                          onClick={() => handleGenerateIntroImage(seg.id)}
+                          disabled={!!introImageLoading[seg.id]}
+                          title="Single static image instead of multiple scenes"
+                          className="px-3 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 transition-all disabled:opacity-40"
+                        >
+                          1 Image
+                        </button>
+                        <label className="px-3 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
+                          <Upload size={11} />
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleIntroImageUpload(e, seg.id)} />
+                        </label>
+                      </div>
+                      {!seg.phraseTimings?.length && (
+                        <p className="text-[10px] text-amber-500/70">Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes tab exact bole gaye words ke saath match honge.</p>
+                      )}
+
+                      {/* ── Scenes Timeline (mirrors Storyboard's list) ── */}
+                      {!!seg.learnEnglish?.introScenes?.length && (
+                        <div className="bg-black border border-white/5 rounded-2xl overflow-hidden">
+                          <div className="px-3.5 py-2.5 border-b border-white/5 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Timeline · {seg.learnEnglish.introScenes.length} scenes</span>
+                            <button onClick={() => handleClearIntroScenes(seg.id)} className="text-[10px] text-gray-600 hover:text-red-400 font-bold uppercase">Clear</button>
+                          </div>
+                          <div className="divide-y divide-white/5">
+                            {seg.learnEnglish.introScenes.map((scene, sceneIdx) => {
+                              const sceneKey = `${seg.id}-${sceneIdx}`;
+                              return (
+                                <div key={sceneIdx} className="flex items-center gap-2.5 px-3.5 py-2.5">
+                                  <div className="relative w-14 h-9 shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/10">
+                                    {introImageLoading[sceneKey] ? (
+                                      <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={12} className="text-cyan-400 animate-spin" /></div>
+                                    ) : scene.imageUrl ? (
+                                      <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="absolute inset-0 flex items-center justify-center text-gray-700"><Video size={12} /></div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] text-gray-500 font-mono">#{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s</p>
+                                    <p className="text-[11px] text-gray-400 truncate">{scene.prompt}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRegenerateIntroScene(seg.id, sceneIdx)}
+                                    disabled={!!introImageLoading[sceneKey]}
+                                    className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-cyan-600/15 hover:bg-cyan-600/25 border border-cyan-500/20 text-cyan-300 transition-all disabled:opacity-40"
+                                  >
+                                    <RefreshCw size={11} className={introImageLoading[sceneKey] ? 'animate-spin' : ''} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Visual Settings Panel (inline, collapsible) ── */}
           <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
@@ -3456,135 +3598,6 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
                 {/* ── INTRO TAB — dedicated cinematic hook-shot images for "intro"-tagged
                      segments only, separate from the per-speaker Background tab. ── */}
-                {settingsTab === 'intro' && (
-                  <div className="space-y-4">
-                    <p className="text-[10px] text-gray-500">Yeh sirf Narrator ke opening hook line (intro-tagged segment) ke liye hai — cinematic AI image ya apni photo/scene upload karo, jo sirf uss segment ki background bani rahegi.</p>
-
-                    {/* ── Image Generation settings (Storyboard-style) ── */}
-                    <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl p-4 space-y-4">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-2">Image Ratio</label>
-                        <div className="flex bg-black border border-white/5 rounded-xl p-1 gap-1">
-                          {(['16:9', '9:16', '3:4', '1:1'] as const).map(r => (
-                            <button key={r} onClick={() => setIntroImageAspectRatio(r)}
-                              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${introImageAspectRatio === r ? 'bg-purple-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}>
-                              {r}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between bg-black border border-white/5 rounded-xl px-3.5 py-3">
-                        <div>
-                          <p className="text-xs font-semibold text-gray-300">Lite Image Model</p>
-                          <p className="text-[10px] text-gray-600 mt-0.5">Faster/cheaper, different rate limit — applies to Storyboard, Shorts &amp; Thumbnail too</p>
-                        </div>
-                        <button
-                          onClick={toggleLiteImageModel}
-                          className={`relative w-9 h-5 rounded-full shrink-0 transition-all ${useLiteImageModel ? 'bg-purple-600' : 'bg-white/15'}`}
-                        >
-                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${useLiteImageModel ? 'translate-x-4' : ''}`} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {introSegments.map((seg) => (
-                      <div key={seg.id} className="space-y-2">
-                        <p className="text-xs text-gray-400 italic line-clamp-2">"{seg.text}"</p>
-                        <div className="relative aspect-video bg-[#111] rounded-2xl border-2 border-dashed border-white/10 overflow-hidden">
-                          {introImageLoading[seg.id] ? (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[#111]">
-                              <Loader2 size={20} className="text-purple-400 animate-spin" />
-                              <span className="text-[10px] text-gray-500">AI…</span>
-                            </div>
-                          ) : seg.visualConfig?.backgroundUrl ? (
-                            <>
-                              <img src={seg.visualConfig.backgroundUrl} alt="Intro" className="w-full h-full object-cover" />
-                              <button
-                                onClick={() => handleClearIntroImage(seg.id)}
-                                className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
-                              >
-                                <X size={10} className="text-white" />
-                              </button>
-                            </>
-                          ) : (
-                            <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer gap-2 hover:bg-white/5 transition-colors">
-                              <Upload size={22} className="text-gray-500" />
-                              <span className="text-xs text-gray-500">Intro image</span>
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleIntroImageUpload(e, seg.id)} />
-                            </label>
-                          )}
-                        </div>
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() => handleGenerateIntroScenes(seg.id)}
-                            disabled={!!introImageLoading[seg.id]}
-                            className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-lg text-[11px] font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
-                          >
-                            {introImageLoading[seg.id]
-                              ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id] ? `Scene ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating…'}</>
-                              : <><Wand2 size={11} /> Generate Scenes</>
-                            }
-                          </button>
-                          <button
-                            onClick={() => handleGenerateIntroImage(seg.id)}
-                            disabled={!!introImageLoading[seg.id]}
-                            title="Single static image instead of multiple scenes"
-                            className="px-3 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 transition-all disabled:opacity-40"
-                          >
-                            1 Image
-                          </button>
-                          <label className="px-3 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
-                            <Upload size={11} />
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleIntroImageUpload(e, seg.id)} />
-                          </label>
-                        </div>
-                        {!seg.phraseTimings?.length && (
-                          <p className="text-[10px] text-amber-500/70">Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes tab exact bole gaye words ke saath match honge.</p>
-                        )}
-
-                        {/* ── Scenes Timeline (mirrors Storyboard's list) ── */}
-                        {!!seg.learnEnglish?.introScenes?.length && (
-                          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
-                            <div className="px-3.5 py-2.5 border-b border-white/5 flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Timeline · {seg.learnEnglish.introScenes.length} scenes</span>
-                              <button onClick={() => handleClearIntroScenes(seg.id)} className="text-[10px] text-gray-600 hover:text-red-400 font-bold uppercase">Clear</button>
-                            </div>
-                            <div className="divide-y divide-white/5">
-                              {seg.learnEnglish.introScenes.map((scene, sceneIdx) => {
-                                const sceneKey = `${seg.id}-${sceneIdx}`;
-                                return (
-                                  <div key={sceneIdx} className="flex items-center gap-2.5 px-3.5 py-2.5">
-                                    <div className="relative w-14 h-9 shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/10">
-                                      {introImageLoading[sceneKey] ? (
-                                        <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={12} className="text-purple-400 animate-spin" /></div>
-                                      ) : scene.imageUrl ? (
-                                        <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} className="w-full h-full object-cover" />
-                                      ) : (
-                                        <div className="absolute inset-0 flex items-center justify-center text-gray-700"><Video size={12} /></div>
-                                      )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-[10px] text-gray-500 font-mono">#{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s</p>
-                                      <p className="text-[11px] text-gray-400 truncate">{scene.prompt}</p>
-                                    </div>
-                                    <button
-                                      onClick={() => handleRegenerateIntroScene(seg.id, sceneIdx)}
-                                      disabled={!!introImageLoading[sceneKey]}
-                                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/20 text-purple-300 transition-all disabled:opacity-40"
-                                    >
-                                      <RefreshCw size={11} className={introImageLoading[sceneKey] ? 'animate-spin' : ''} />
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 {/* ── BACKGROUND TAB ── */}
                 {settingsTab === 'background' && (
                   <div className="space-y-4">
