@@ -44,6 +44,7 @@ const AI_MODEL_PRESETS: {
   { id: 'llama',     label: 'Llama',     emoji: '🦙', color: '#f97316', screen: '#130800', style: 'orb'           },
   { id: 'perplexity',label: 'Perplexity',emoji: '🔍', color: '#20b2aa', screen: '#021210', style: 'neon'          },
   { id: 'custom',    label: 'Custom',    emoji: '👤', color: '#a855f7', screen: '#0d0618', style: 'aurora'        },
+  { id: 'nova',      label: 'Nova',      emoji: '🌟', color: '#f5b301', screen: '#171100', style: 'aurora'        },
 ];
 
 const ANIM_STYLES: { value: AnimStyle; label: string; desc: string }[] = [
@@ -84,6 +85,7 @@ const BG_OPTIONS = [
   { value: 'linear:#000510,#0c1e40', label: 'Ocean Deep' },
   { value: '#1a1a2e', label: 'Dark Navy' },
   { value: '#f0f4f8', label: 'Light' },
+  { value: '#fef3c7', label: 'Yellow' },
 ];
 
 // ─── Conversation Styles ──────────────────────────────────────────────────────
