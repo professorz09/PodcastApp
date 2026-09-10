@@ -4938,6 +4938,42 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
   throw new Error('No image generated');
 };
 
+/**
+ * Full-frame (16:9) scene background featuring a given speaker — used by
+ * English Video's per-speaker background feature: when that speaker talks,
+ * this image fills the whole frame instead of a floating avatar box, using
+ * the same SPEAKER_STYLES index as generateSpeakerImage so the character
+ * stays visually consistent between their avatar and their background.
+ */
+export const generateSpeakerBackgroundScene = async (speakerIndex: number, label?: string, sceneHint?: string): Promise<string> => {
+  const ai = getAi();
+
+  const style = SPEAKER_STYLES[speakerIndex % SPEAKER_STYLES.length];
+
+  const prompt = `Cinematic wide 16:9 scene background featuring a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}${sceneHint ? `, in this setting: ${sceneHint}` : `, in a setting that fits: ${style.bg}`}.
+Framing: the character is visible within a full believable environment (not a close-up headshot/portrait) — cinematic depth of field, shot like a movie still, character positioned to one side so there's clean space for subtitles.
+Lighting: cinematic, warm colour grade, natural shadows.
+Style: semi-realistic digital art, sharp detail, professional broadcast-quality look. No text, no watermarks.
+This is a FULL-FRAME VIDEO BACKGROUND, not a portrait. Character: "${label || 'Speaker ' + (speakerIndex + 1)}".`;
+
+  const response = await ai.models.generateContent({
+    model: getImageModel(),
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      responseModalities: [Modality.IMAGE],
+      imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
+      safetySettings: IMAGE_SAFETY_SETTINGS,
+    }
+  });
+
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if (part.inlineData) {
+      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+  throw new Error('No image generated');
+};
+
 export const generateVeo3Prompt = async (comments: string[], transcript?: string): Promise<string> => {
   const ai = getAi();
   const commentSample = comments.slice(0, 20).join('\n');

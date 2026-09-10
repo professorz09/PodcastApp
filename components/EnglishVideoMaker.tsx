@@ -6,7 +6,7 @@ import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
-import { generateSegmentImage, generateSpeakerImage, generateVideoBackground } from '../services/geminiService';
+import { generateSegmentImage, generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { motion, AnimatePresence } from 'motion/react';
@@ -80,6 +80,56 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const narratorBlobUrlRef = React.useRef<string | null>(null);
   const hasNarrator = uniqueSpeakers.includes('Narrator');
 
+  // Per-speaker full-frame background (Background tab) — indexed exactly like
+  // uniqueSpeakers (Narrator included), so when a given speaker talks, their
+  // background fills the whole frame instead of a floating avatar box.
+  const [speakerBackgroundImages, setSpeakerBackgroundImages] = useState<(HTMLImageElement | null)[]>([]);
+  const [speakerBackgroundLoading, setSpeakerBackgroundLoading] = useState<boolean[]>([]);
+  const speakerBgBlobUrls = React.useRef<(string | null)[]>([]);
+
+  useEffect(() => {
+      if (uniqueSpeakers.length > 0) {
+          setSpeakerBackgroundImages(prev => prev.length === uniqueSpeakers.length ? prev : new Array(uniqueSpeakers.length).fill(null));
+          setSpeakerBackgroundLoading(prev => prev.length === uniqueSpeakers.length ? prev : new Array(uniqueSpeakers.length).fill(false));
+      }
+  }, [uniqueSpeakers]);
+
+  const speakerBackgroundsMap = useMemo(() => {
+      const map = new Map<string, HTMLImageElement>();
+      uniqueSpeakers.forEach((name, idx) => {
+          const img = speakerBackgroundImages[idx];
+          if (img) map.set(name, img);
+      });
+      return map;
+  }, [uniqueSpeakers, speakerBackgroundImages]);
+
+  const handleGenerateSpeakerBackground = async (idx: number) => {
+      setSpeakerBackgroundLoading(prev => { const a = [...prev]; a[idx] = true; return a; });
+      const clearLoading = () => setSpeakerBackgroundLoading(prev => { const a = [...prev]; a[idx] = false; return a; });
+      try {
+          const label = uniqueSpeakers[idx];
+          const dataUrl = await generateSpeakerBackgroundScene(idx, label);
+          const img = new Image();
+          img.onload = () => { setSpeakerBackgroundImages(prev => { const a = [...prev]; a[idx] = img; return a; }); clearLoading(); };
+          img.onerror = () => { toast.error('Background image could not be loaded.'); clearLoading(); };
+          img.src = dataUrl;
+      } catch (e: any) {
+          toast.error(`Background generation failed: ${e.message}`);
+          clearLoading();
+      }
+  };
+
+  const handleSpeakerBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
+      if (e.target.files && e.target.files[0]) {
+          if (speakerBgBlobUrls.current[idx]) URL.revokeObjectURL(speakerBgBlobUrls.current[idx]!);
+          const objectUrl = URL.createObjectURL(e.target.files[0]);
+          speakerBgBlobUrls.current[idx] = objectUrl;
+          const img = new Image();
+          img.src = objectUrl;
+          img.onload = () => setSpeakerBackgroundImages(prev => { const a = [...prev]; a[idx] = img; return a; });
+      }
+  };
+
   // Initialize labels, images, and loading state
   useEffect(() => {
       if (activeSpeakers.length > 0) {
@@ -101,7 +151,9 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [showVuMeter, setShowVuMeter] = useState(true);
   const [vuMeterStyle, setVuMeterStyle] = useState<'ring' | 'bar' | 'glow' | 'wave' | 'dots'>('ring');
   const [showSpeakerImages, setShowSpeakerImages] = useState<boolean[]>([]);
-  const [showSpeakers, setShowSpeakers] = useState(true);
+  // Off by default here — English Video shows each character via their own
+  // full-frame background image instead of a floating avatar box.
+  const [showSpeakers, setShowSpeakers] = useState(false);
   const [showNameLabels, setShowNameLabels] = useState(true);
   const [showTimer, setShowTimer] = useState(true);
   const [speakerScale, setSpeakerScale] = useState(1);
@@ -798,6 +850,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         speakerImages,
         segmentBackgrounds: new Map(),
         narratorImage,
+        speakerBackgrounds: speakerBackgroundsMap,
     };
 
     const realTimeSegment = script[realTimeIndex];
@@ -828,7 +881,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       speakerScale, showTimer, showSideStats, showVuMeter, vuMeterStyle, showSpeakerImages, showSpeakers, showScores, backgroundDim, speakerPositions, showNameLabels,
       background, speakerImages, currentSegmentBackground, segmentOffsets, currentSegmentIndex, segmentScores, activeSpeakers, showSettings, globalBackgroundColor, questionMode,
       globalThemeConfig, narratorTextColor, showMinimalSpeakerName, showMinimalSideVU,
-      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB, nameBadgeColorC, narratorImage
+      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB, nameBadgeColorC, narratorImage, speakerBackgroundsMap
   ]);
 
   /* OLD RENDER
@@ -2534,6 +2587,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             speakerImages: speakerImages,
             segmentBackgrounds: new Map(),
             narratorImage,
+            speakerBackgrounds: speakerBackgroundsMap,
         };
 
         // Load all segment backgrounds
@@ -3150,6 +3204,55 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                 {/* ── BACKGROUND TAB ── */}
                 {settingsTab === 'background' && (
                   <div className="space-y-4">
+                    {uniqueSpeakers.length > 0 && (
+                      <div className="space-y-2 pb-3 border-b border-white/5">
+                        <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block">Per-Speaker Background</label>
+                        <p className="text-[10px] text-gray-600">Jo bhi bol raha ho, uski background image poori frame mein aa jayegi — koi alag se segment set karne ki zarurat nahi. "Speakers" tab ki avatar images se alag hai, yeh us character ki poori scene hai.</p>
+                        <div className={`grid gap-3 ${uniqueSpeakers.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                          {uniqueSpeakers.map((speakerName, idx) => (
+                            <div key={speakerName} className="space-y-1.5">
+                              <div className="relative aspect-video bg-[#111] rounded-xl border-2 border-dashed border-white/10 overflow-hidden">
+                                {speakerBackgroundLoading[idx] ? (
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[#111]">
+                                    <Loader2 size={18} className="text-purple-400 animate-spin" />
+                                  </div>
+                                ) : speakerBackgroundImages[idx] ? (
+                                  <>
+                                    <img src={speakerBackgroundImages[idx]!.src} alt={speakerName} className="w-full h-full object-cover" />
+                                    <button
+                                      onClick={() => setSpeakerBackgroundImages(prev => { const n = [...prev]; n[idx] = null; return n; })}
+                                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
+                                    >
+                                      <X size={10} className="text-white" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer gap-1.5 hover:bg-white/5 transition-colors">
+                                    <Upload size={18} className="text-gray-500" />
+                                    <span className="text-[10px] text-gray-500">{speakerName}</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
+                                  </label>
+                                )}
+                              </div>
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleGenerateSpeakerBackground(idx)}
+                                  disabled={!!speakerBackgroundLoading[idx]}
+                                  className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/20 text-purple-300 transition-all disabled:opacity-40 disabled:cursor-wait"
+                                >
+                                  {speakerBackgroundLoading[idx] ? <Loader2 size={9} className="animate-spin" /> : <Wand2 size={9} />}
+                                  AI
+                                </button>
+                                <label className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
+                                  <Upload size={9} /> Upload
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
+                                </label>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold block mb-2">Layout Theme</label>
                       <div className="grid grid-cols-3 gap-2">

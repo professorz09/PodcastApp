@@ -40,6 +40,9 @@ export interface RenderAssets {
   segmentBackgrounds: Map<string, HTMLImageElement>;
   /** Learn English only — Narrator's own avatar, shown in the teaching card. */
   narratorImage?: HTMLImageElement | null;
+  /** Per-speaker full-frame background, keyed by exact speaker name — used
+   *  when a segment has no explicit backgroundUrl override of its own. */
+  speakerBackgrounds?: Map<string, HTMLImageElement>;
 }
 
 export const drawDebateFrame = (

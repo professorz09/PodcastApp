@@ -17,6 +17,11 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
       bgToDraw = null;
       videoToDraw = null;
       colorToDraw = segmentBgColor;
+  } else if (assets.speakerBackgrounds?.has(currentSegment.speaker)) {
+      // No per-segment override set — fall back to that speaker's own background.
+      bgToDraw = assets.speakerBackgrounds.get(currentSegment.speaker) || null;
+      videoToDraw = null;
+      colorToDraw = null;
   }
 
   if (videoToDraw) {
