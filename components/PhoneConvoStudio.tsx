@@ -364,6 +364,24 @@ const randomBattery = () => `${Math.floor(Math.random() * (99 - 28 + 1)) + 28}%`
 // how much of the source transcript feeds into it.
 const PODCAST_PRO_MAX_SPAN_SEC = 300;
 
+// ── Screen Wake Lock — keeps the screen from auto-locking during long
+// renders/exports/combines. Only stops the OS's own inactivity timeout —
+// it can't survive the user manually locking the phone or switching apps
+// (the browser throttles/suspends the tab regardless), that's a hard
+// platform limit no web app can fully work around.
+let _wakeLock: any = null;
+const acquireWakeLock = async () => {
+  try {
+    if ('wakeLock' in navigator) {
+      _wakeLock = await (navigator as any).wakeLock.request('screen');
+    }
+  } catch { /* not supported, no secure context, or denied — rendering still works, screen may just sleep */ }
+};
+const releaseWakeLock = async () => {
+  try { await _wakeLock?.release(); } catch {}
+  _wakeLock = null;
+};
+
 // Default model assignments per speaker index
 const DEFAULT_MODELS = ['chatgpt', 'gemini', 'claude', 'grok', 'deepseek', 'llama'];
 
@@ -557,6 +575,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
       return;
     }
     setRunning(true);
+    await acquireWakeLock();
 
     // Reset this step + all later steps to pending (clear any old failure / done)
     const startIdx = STEP_ORDER.indexOf(fromStep);
@@ -811,6 +830,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
       }
     } finally {
       setRunning(false);
+      await releaseWakeLock();
     }
   };
 
@@ -3356,6 +3376,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const handleTrimClip = async () => {
     if (!uploadedVideoForClip || !sourceClips.length || clipping) return;
     setClipping(true); setClipProgress(0);
+    await acquireWakeLock();
     try {
       const c = sourceClips[0];
       const blob = await trimClipToBlob(c, p => setClipProgress(p));
@@ -3367,7 +3388,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       toast.success('✓ Raw clip download ho gayi!');
     } catch (e: any) {
       toast.error(e.message || 'Clip trim failed');
-    } finally { setClipping(false); setClipProgress(0); }
+    } finally { setClipping(false); setClipProgress(0); await releaseWakeLock(); }
   };
 
   const handleCombineFullVideo = async () => {
@@ -3376,6 +3397,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     setCombining(true);
     setCombineProgress(0);
     setCombineStatus('Shuru ho raha hai…');
+    await acquireWakeLock();
 
     try {
       const blobsToMerge: Blob[] = [];
@@ -3432,6 +3454,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       setCombining(false);
       setCombineProgress(0);
       setCombineStatus('');
+      await releaseWakeLock();
     }
   };
 
@@ -3450,6 +3473,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     const isLongVideo = totalSec > 3 * 60;
 
     setExporting(true); setExportProgress(0); setExportStatus('Audio decode ho raha hai…');
+    await acquireWakeLock();
 
     let fileStream: any = null;
 
@@ -3574,6 +3598,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       toast.error(`Export failed: ${err.message}`);
     } finally {
       setExporting(false); setExportProgress(0); setExportStatus('');
+      await releaseWakeLock();
     }
   }, [buildState, script]);
 
