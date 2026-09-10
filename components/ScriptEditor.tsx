@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ArrowRight, Edit2, Sparkles, Loader2, Save, RefreshCw, Trash2, User, AlignLeft, Clock, Languages, Quote, Copy, Check, RotateCcw, X, Scissors, Play, Download, BookOpen, MapPin } from 'lucide-react';
-import { rewriteScriptSegment, translateScriptToHindi, generateTopicQuote, analyzeTimelineCuts, analyzeContextBridgeTimeline, TimelineCut } from '../services/geminiService';
+import { ChevronLeft, ArrowRight, Edit2, Sparkles, Loader2, Save, RefreshCw, Trash2, User, AlignLeft, Clock, Languages, Quote, Copy, Check, RotateCcw, X, Scissors, Play, Download, BookOpen, MapPin, Tag } from 'lucide-react';
+import { rewriteScriptSegment, translateScriptToHindi, generateTopicQuote, analyzeTimelineCuts, analyzeContextBridgeTimeline, generateTitleTextPair, TimelineCut } from '../services/geminiService';
 
 interface ScriptEditorProps {
   script: DebateSegment[];
@@ -39,6 +39,12 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
   const [timelineCuts, setTimelineCuts] = useState<TimelineCut[] | null>(null);
   const [isAnalyzingTimeline, setIsAnalyzingTimeline] = useState(false);
   const [timelineCutsCopied, setTimelineCutsCopied] = useState(false);
+
+  // Title + Thumbnail Text State
+  const [titleThumbData, setTitleThumbData] = useState<{ title: string; thumbnailText: string; description: string } | null>(null);
+  const [isGeneratingTitleThumb, setIsGeneratingTitleThumb] = useState(false);
+  const [titleCopied, setTitleCopied] = useState(false);
+  const [thumbTextCopied, setThumbTextCopied] = useState(false);
 
   // Source Timeline State (for context_bridge style)
   const [showSourceTimeline, setShowSourceTimeline] = useState(false);
@@ -345,6 +351,40 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     navigator.clipboard.writeText(text).then(() => {
       setTimelineCutsCopied(true);
       setTimeout(() => setTimelineCutsCopied(false), 2500);
+    });
+  };
+
+  // ── Title + Thumbnail Text ─────────────────────────────────────────────
+  const handleGenerateTitleThumb = async () => {
+    setIsGeneratingTitleThumb(true);
+    setTitleThumbData(null);
+    try {
+      const clipText = getTimedTranscript().map(t => t.text).join(' ');
+      const scriptText = script.map(s => s.text).join(' ');
+      const combined = [clipText, scriptText].filter(Boolean).join(' ').slice(0, 6000);
+      const result = await generateTitleTextPair(combined || scriptText);
+      if (!result.length) { toast.error('Koi title/thumbnail nahi aaya — dobara try karo'); return; }
+      setTitleThumbData(result[0]);
+    } catch (e: any) {
+      toast.error(e.message || 'Title/Thumbnail generation failed');
+    } finally {
+      setIsGeneratingTitleThumb(false);
+    }
+  };
+
+  const handleCopyTitle = () => {
+    if (!titleThumbData) return;
+    navigator.clipboard.writeText(titleThumbData.title).then(() => {
+      setTitleCopied(true);
+      setTimeout(() => setTitleCopied(false), 2500);
+    });
+  };
+
+  const handleCopyThumbText = () => {
+    if (!titleThumbData) return;
+    navigator.clipboard.writeText(titleThumbData.thumbnailText).then(() => {
+      setThumbTextCopied(true);
+      setTimeout(() => setThumbTextCopied(false), 2500);
     });
   };
 
@@ -917,6 +957,78 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
           </div>
           )}
 
+          {/* ── Title + Thumbnail Card — analyzes the REAL source clip
+              transcript AND the generated script together (non-context_bridge only) ── */}
+          {scriptStyle !== 'context_bridge' && (
+          <div className="mt-4 mb-4">
+            {!titleThumbData && (
+              <button
+                onClick={handleGenerateTitleThumb}
+                disabled={isGeneratingTitleThumb}
+                className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/20 transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isGeneratingTitleThumb ? (
+                  <>
+                    <Loader2 size={17} className="animate-spin text-fuchsia-400" />
+                    <span className="text-sm text-zinc-400 font-medium">Clip + script analyze ho raha hai…</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-8 h-8 rounded-xl bg-fuchsia-500/10 flex items-center justify-center group-hover:bg-fuchsia-500/20 transition-colors">
+                      <Tag size={15} className="text-fuchsia-400" />
+                    </div>
+                    <span className="text-sm text-zinc-400 font-medium group-hover:text-zinc-200 transition-colors">
+                      Title + Thumbnail Text Generate Karo
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
+            {titleThumbData && (
+              <div className="rounded-2xl overflow-hidden border border-white/8 bg-[#0d0d14]">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+                  <div className="flex items-center gap-2">
+                    <Tag size={14} className="text-fuchsia-400" />
+                    <span className="text-xs font-semibold text-fuchsia-300 uppercase tracking-widest">Title + Thumbnail</span>
+                  </div>
+                  <button onClick={() => setTitleThumbData(null)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="px-4 py-4 flex flex-col gap-4">
+                  <div>
+                    <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1.5">Title</p>
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 text-[15px] font-semibold text-white/90 leading-snug">{titleThumbData.title}</p>
+                      <button onClick={handleCopyTitle} className="shrink-0 flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all">
+                        {titleCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1.5">Thumbnail Text</p>
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 text-lg font-extrabold text-fuchsia-300 tracking-wide uppercase leading-snug">{titleThumbData.thumbnailText}</p>
+                      <button onClick={handleCopyThumbText} className="shrink-0 flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all">
+                        {thumbTextCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-4 py-2.5 border-t border-white/5 flex justify-end">
+                  <button
+                    onClick={handleGenerateTitleThumb}
+                    disabled={isGeneratingTitleThumb}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-500 hover:text-zinc-200 transition-all disabled:opacity-50"
+                  >
+                    {isGeneratingTitleThumb ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                    New Title + Thumbnail
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          )}
 
         {/* ── Split Script Button ── */}
         {uniqueSpeakers.length === 1 && script.some(s => s.text.length > 2000) && (

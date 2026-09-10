@@ -1051,6 +1051,152 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   );
 };
 
+// ─── TitleThumbComboCard — title/thumbnail-text options + thumbnail image ─────
+// Generated from whatever text it's given (post-generation: the actual
+// script + the source clip's transcript, so it reflects what was really
+// made rather than guessing off the raw full-episode transcript upfront).
+interface TitleThumbComboCardProps {
+  srcText: string;
+  topicName: string;
+}
+
+const TitleThumbComboCard: React.FC<TitleThumbComboCardProps> = ({ srcText, topicName }) => {
+  const [comboPairs, setComboPairs] = useState<{ title: string; thumbnailText: string; description: string }[]>([]);
+  const [comboLoading, setComboLoading] = useState(false);
+  const [comboError, setComboError] = useState<string | null>(null);
+  const [selectedCombo, setSelectedCombo] = useState<{ title: string; thumbnailText: string; description: string } | null>(null);
+  const [thumbLoading, setThumbLoading] = useState(false);
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [thumbStep, setThumbStep] = useState<string>('');
+
+  const handleGenerateCombo = async () => {
+    if (!srcText.trim()) { setComboError('Script/transcript empty hai'); return; }
+    setComboLoading(true);
+    setComboError(null);
+    try {
+      const result = await generateTitleTextPair(srcText.slice(0, 3500));
+      if (!result.length) { setComboError('Koi combo nahi aaya — dobara try karo'); return; }
+      setComboPairs(result);
+      setSelectedCombo(result[0]);
+    } catch (e: any) {
+      setComboError(e?.message || 'Combo generation fail hua');
+    } finally {
+      setComboLoading(false);
+    }
+  };
+
+  const handleGenerateThumbnail = async () => {
+    if (!selectedCombo) return;
+    setThumbLoading(true);
+    setThumbUrl(null);
+    setThumbStep('Generating…');
+    try {
+      const url = await generateThumbnail(
+        selectedCombo.title,
+        selectedCombo.description,
+        undefined,
+        step => setThumbStep(step),
+        srcText.slice(0, 3500),
+        topicName || '',
+      );
+      setThumbUrl(url);
+      setThumbStep('');
+    } catch (e: any) {
+      setThumbStep('');
+      setComboError(e?.message || 'Thumbnail generation fail hua');
+    } finally {
+      setThumbLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ borderRadius: 12, border: '1px solid rgba(234,179,8,0.25)', background: 'rgba(234,179,8,0.05)', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#fde68a', letterSpacing: '0.04em', textTransform: 'uppercase' }}>⚡ Title + Thumbnail</div>
+        <button
+          onClick={handleGenerateCombo}
+          disabled={comboLoading || !srcText.trim()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 10px', borderRadius: 8, border: 'none',
+            background: comboLoading ? 'rgba(234,179,8,0.2)' : '#ca8a04',
+            color: '#fff', fontSize: 11, fontWeight: 700,
+            cursor: comboLoading ? 'default' : 'pointer', fontFamily: 'inherit',
+            opacity: !srcText.trim() ? 0.4 : 1,
+          }}
+        >
+          {comboLoading
+            ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+            : comboPairs.length > 0 ? '↺ Regenerate' : '⚡ Generate'}
+        </button>
+      </div>
+
+      {comboError && <div style={{ fontSize: 11, color: '#fca5a5' }}>{comboError}</div>}
+
+      {comboPairs.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {comboPairs.map((pair, idx) => {
+            const isSel = selectedCombo?.title === pair.title;
+            return (
+              <div
+                key={idx}
+                onClick={() => setSelectedCombo(pair)}
+                style={{
+                  padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                  border: `1.5px solid ${isSel ? '#ca8a04' : 'rgba(255,255,255,0.08)'}`,
+                  background: isSel ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.02)',
+                  transition: 'all 0.12s',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{pair.title}</div>
+                <div style={{ fontSize: 10, color: '#fbbf24', fontWeight: 700, letterSpacing: '0.05em' }}>{pair.thumbnailText}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {selectedCombo && (
+        <div style={{ borderTop: '1px solid rgba(234,179,8,0.15)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {thumbUrl ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <img src={thumbUrl} alt="thumbnail" style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <a
+                  href={thumbUrl}
+                  download="thumbnail.jpg"
+                  style={{ flex: 1, textAlign: 'center', padding: '7px', borderRadius: 8, background: '#ca8a04', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}
+                >⬇ Download</a>
+                <button
+                  onClick={handleGenerateThumbnail}
+                  disabled={thumbLoading}
+                  style={{ flex: 1, padding: '7px', borderRadius: 8, border: '1px solid rgba(234,179,8,0.3)', background: 'rgba(234,179,8,0.05)', color: '#fde68a', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                >↺ Regenerate</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={handleGenerateThumbnail}
+              disabled={thumbLoading}
+              style={{
+                padding: '10px', borderRadius: 10, border: 'none',
+                background: thumbLoading ? 'rgba(234,179,8,0.3)' : 'linear-gradient(135deg,#ca8a04,#d97706)',
+                color: '#fff', fontSize: 12, fontWeight: 800,
+                cursor: thumbLoading ? 'default' : 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              {thumbLoading
+                ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {thumbStep || 'Generating Thumbnail…'}</>
+                : <>🖼 Generate Thumbnail</>}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── PodcastAnalysisFlow ─────────────────────────────────────────────────────
 
 type PodcastVariant = 'adaptive' | 'funny' | 'friendly' | 'clip_take' | 'podcast_pro';
@@ -1147,15 +1293,6 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   const [videoTranscribeError, setVideoTranscribeError] = useState('');
   const [companionTranscriptFile, setCompanionTranscriptFile] = useState<File | null>(null);
   const companionTranscriptInputRef = useRef<HTMLInputElement>(null);
-
-  // Combo + Thumbnail state
-  const [comboPairs, setComboPairs] = useState<{ title: string; thumbnailText: string; description: string }[]>([]);
-  const [comboLoading, setComboLoading] = useState(false);
-  const [comboError, setComboError] = useState<string | null>(null);
-  const [selectedCombo, setSelectedCombo] = useState<{ title: string; thumbnailText: string; description: string } | null>(null);
-  const [thumbLoading, setThumbLoading] = useState(false);
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
-  const [thumbStep, setThumbStep] = useState<string>('');
 
   const toggleChapter = (i: number) => {
     setSelectedIdxs(prev => {
@@ -1461,49 +1598,6 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
         // person/verb/topic are auto-detected — left undefined so Gemini extracts
       } : {}),
     });
-  };
-
-  // ── Combo + Thumbnail handlers ─────────────────────────────────────────────
-  const handleGenerateCombo = async () => {
-    if (!segments.length) { setComboError('Transcript load karo pehle'); return; }
-    setComboLoading(true);
-    setComboError(null);
-    try {
-      const srcText = segments.map(s => s.text).join(' ').slice(0, 3500);
-      const result = await generateTitleTextPair(srcText);
-      if (!result.length) { setComboError('Koi combo nahi aaya — dobara try karo'); return; }
-      setComboPairs(result);
-      setSelectedCombo(result[0]);
-    } catch (e: any) {
-      setComboError(e?.message || 'Combo generation fail hua');
-    } finally {
-      setComboLoading(false);
-    }
-  };
-
-  const handleGenerateThumbnail = async () => {
-    if (!selectedCombo) return;
-    setThumbLoading(true);
-    setThumbUrl(null);
-    setThumbStep('Generating…');
-    try {
-      const srcText = segments.map(s => s.text).join(' ').slice(0, 3500);
-      const url = await generateThumbnail(
-        selectedCombo.title,
-        selectedCombo.description,
-        undefined,
-        step => setThumbStep(step),
-        srcText,
-        podcastTitle || '',
-      );
-      setThumbUrl(url);
-      setThumbStep('');
-    } catch (e: any) {
-      setThumbStep('');
-      setComboError(e?.message || 'Thumbnail generation fail hua');
-    } finally {
-      setThumbLoading(false);
-    }
   };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
@@ -2247,90 +2341,10 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
             </div>
           )}
 
-          {/* ── Combo + Thumbnail card ── */}
-          <div style={{ borderRadius: 12, border: '1px solid rgba(234,179,8,0.25)', background: 'rgba(234,179,8,0.05)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#fde68a', letterSpacing: '0.04em' }}>⚡ Title + Thumbnail Combo</div>
-              <button
-                onClick={handleGenerateCombo}
-                disabled={comboLoading || !segments.length}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '5px 10px', borderRadius: 8, border: 'none',
-                  background: comboLoading ? 'rgba(234,179,8,0.2)' : '#ca8a04',
-                  color: '#fff', fontSize: 11, fontWeight: 700,
-                  cursor: comboLoading ? 'default' : 'pointer', fontFamily: 'inherit',
-                  opacity: !segments.length ? 0.4 : 1,
-                }}
-              >
-                {comboLoading
-                  ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
-                  : comboPairs.length > 0 ? '↺ Regenerate' : '⚡ Generate Combo'}
-              </button>
-            </div>
-
-            {comboError && <div style={{ fontSize: 11, color: '#fca5a5' }}>{comboError}</div>}
-
-            {comboPairs.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {comboPairs.map((pair, idx) => {
-                  const isSel = selectedCombo?.title === pair.title;
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => setSelectedCombo(pair)}
-                      style={{
-                        padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                        border: `1.5px solid ${isSel ? '#ca8a04' : 'rgba(255,255,255,0.08)'}`,
-                        background: isSel ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.02)',
-                        transition: 'all 0.12s',
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{pair.title}</div>
-                      <div style={{ fontSize: 10, color: '#fbbf24', fontWeight: 700, letterSpacing: '0.05em' }}>{pair.thumbnailText}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {selectedCombo && (
-              <div style={{ borderTop: '1px solid rgba(234,179,8,0.15)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {thumbUrl ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <img src={thumbUrl} alt="thumbnail" style={{ width: '100%', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }} />
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <a
-                        href={thumbUrl}
-                        download="thumbnail.jpg"
-                        style={{ flex: 1, textAlign: 'center', padding: '7px', borderRadius: 8, background: '#ca8a04', color: '#fff', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}
-                      >⬇ Download</a>
-                      <button
-                        onClick={handleGenerateThumbnail}
-                        disabled={thumbLoading}
-                        style={{ flex: 1, padding: '7px', borderRadius: 8, border: '1px solid rgba(234,179,8,0.3)', background: 'rgba(234,179,8,0.05)', color: '#fde68a', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >↺ Regenerate</button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleGenerateThumbnail}
-                    disabled={thumbLoading}
-                    style={{
-                      padding: '10px', borderRadius: 10, border: 'none',
-                      background: thumbLoading ? 'rgba(234,179,8,0.3)' : 'linear-gradient(135deg,#ca8a04,#d97706)',
-                      color: '#fff', fontSize: 12, fontWeight: 800,
-                      cursor: thumbLoading ? 'default' : 'pointer', fontFamily: 'inherit',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}
-                  >
-                    {thumbLoading
-                      ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {thumbStep || 'Generating Thumbnail…'}</>
-                      : <>🖼 Generate Thumbnail</>}
-                  </button>
-                )}
-              </div>
-            )}
+          {/* Title + Thumbnail now lives in the Export tab, once the actual
+              script exists — see the note below and TitleThumbComboCard. */}
+          <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.2)', fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+            ⚡ Title + Thumbnail Export tab mein milega — Generate ke baad, actual script se banega.
           </div>
 
           {/* Grounding toggle */}
@@ -5153,6 +5167,24 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 }
               </button>
             </div>
+
+            {/* divider */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+
+            {/* ④ Title + Thumbnail — from the actual generated script + the
+                source clip's transcript, not a pre-generation guess */}
+            {script.length > 0 && (
+              <TitleThumbComboCard
+                srcText={[
+                  script.map(t => t.text).join(' '),
+                  podcastSegments.filter(s => {
+                    const mid = s.start + (s.duration || 0) / 2;
+                    return sourceClips.some(c => mid >= c.startSec && mid <= c.endSec);
+                  }).map(s => s.text).join(' '),
+                ].filter(Boolean).join(' ')}
+                topicName={sourceClips[0]?.title || podcastTitle || ''}
+              />
+            )}
 
             {/* divider */}
             <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
