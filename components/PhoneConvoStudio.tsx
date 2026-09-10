@@ -1260,6 +1260,8 @@ const parseTsInput = (txt: string): number | null => {
 
 const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChangeStyle, generating, onGenerate }) => {
   const [phase, setPhase] = useState<'url' | 'cuts' | 'chapters' | 'ready'>('url');
+  // Which tab of the combined Video Source card is showing on the 'url' phase.
+  const [sourceMode, setSourceMode] = useState<'link' | 'video'>('link');
   const [podcastUrl, setPodcastUrl] = useState('');
   const [podcastTitle, setPodcastTitle] = useState('');
   const [supporterName, setSupporterName] = useState('Sam');
@@ -1302,6 +1304,13 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
   const [videoTranscribeError, setVideoTranscribeError] = useState('');
   const [companionTranscriptFile, setCompanionTranscriptFile] = useState<File | null>(null);
   const companionTranscriptInputRef = useRef<HTMLInputElement>(null);
+
+  // Video tab must stay in sync once a video is actually picked (upload in
+  // progress, failed+retryable, or done) — otherwise its status card would be
+  // hidden behind the Link tab.
+  useEffect(() => {
+    if (uploadedVideoFile) setSourceMode('video');
+  }, [uploadedVideoFile]);
 
   const toggleChapter = (i: number) => {
     setSelectedIdxs(prev => {
@@ -1652,18 +1661,197 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
       {/* ── PHASE: URL ── */}
       {phase === 'url' && (
         <>
-          <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Podcast URL (YouTube)</div>
-            <input
-              value={podcastUrl}
-              onChange={e => setPodcastUrl(e.target.value)}
-              placeholder="https://youtube.com/watch?v=..."
-              style={{
-                width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
-              }}
-            />
+          {/* Combined Video Source card — YouTube link OR upload a video, one tabbed card */}
+          <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex' }}>
+              <button
+                onClick={() => setSourceMode('link')}
+                style={{
+                  flex: 1, padding: '10px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 12, fontWeight: 700,
+                  background: sourceMode === 'link' ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.03)',
+                  color: sourceMode === 'link' ? '#fca5a5' : 'rgba(255,255,255,0.4)',
+                  borderBottom: sourceMode === 'link' ? '2px solid #ef4444' : '2px solid transparent',
+                }}
+              >🔗 YouTube Link</button>
+              <button
+                onClick={() => setSourceMode('video')}
+                style={{
+                  flex: 1, padding: '10px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 12, fontWeight: 700,
+                  background: sourceMode === 'video' ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.03)',
+                  color: sourceMode === 'video' ? '#fca5a5' : 'rgba(255,255,255,0.4)',
+                  borderBottom: sourceMode === 'video' ? '2px solid #ef4444' : '2px solid transparent',
+                }}
+              >🎬 Upload Video{uploadedVideoFile ? ' ✓' : ''}</button>
+            </div>
+
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {sourceMode === 'link' ? (
+                <>
+                  <input
+                    value={podcastUrl}
+                    onChange={e => setPodcastUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    style={{
+                      width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                    }}
+                  />
+                  <button
+                    onClick={handleFetch}
+                    disabled={fetching || !podcastUrl.trim()}
+                    style={{
+                      padding: '11px', borderRadius: 12, border: 'none',
+                      background: fetching ? 'rgba(239,68,68,0.3)' : '#ef4444',
+                      color: '#fff', fontSize: 13, fontWeight: 800,
+                      cursor: fetching ? 'default' : 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      opacity: !podcastUrl.trim() ? 0.4 : 1,
+                    }}
+                  >
+                    {fetching
+                      ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Transcript fetch ho raha hai…</>
+                      : <>🚀 Start Analyse</>}
+                  </button>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json,.srt,.txt"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) handleTranscriptFile(f);
+                      e.target.value = '';
+                    }}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      padding: '9px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.15)',
+                      background: 'none', color: 'rgba(255,255,255,0.4)',
+                      fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >📄 Ya transcript file upload karo (.json / .srt / .txt)</button>
+                </>
+              ) : (
+                <>
+                  <input
+                    ref={videoFileInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/*"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) handleVideoUpload(f);
+                      e.target.value = '';
+                    }}
+                  />
+                  <input
+                    ref={companionTranscriptInputRef}
+                    type="file"
+                    accept=".json,.srt,.txt"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) { setCompanionTranscriptFile(f); toast.success(`📄 Transcript attached: ${f.name}`); }
+                      e.target.value = '';
+                    }}
+                  />
+
+                  {videoTranscribing ? (
+                    <div style={{
+                      padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)',
+                      background: 'rgba(239,68,68,0.07)', display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#fca5a5', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>Video Processing…</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{videoTranscribeStep}</div>
+                      </div>
+                    </div>
+                  ) : videoTranscribeFailed && uploadedVideoFile ? (
+                    <div style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.45)', background: 'rgba(239,68,68,0.08)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 14 }}>⚠️</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5' }}>Transcription Failed</div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{videoTranscribeError}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => handleVideoUpload(uploadedVideoFile)}
+                          style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                        >🔄 Retry STT</button>
+                        {!companionTranscriptFile && (
+                          <button
+                            onClick={() => companionTranscriptInputRef.current?.click()}
+                            style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                          >📄 Transcript Attach</button>
+                        )}
+                        <button
+                          onClick={() => { setVideoTranscribeFailed(false); setVideoTranscribeError(''); setUploadedVideoFile(null); setUploadedVideoUrl(null); }}
+                          style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+                        >✕</button>
+                      </div>
+                    </div>
+                  ) : uploadedVideoFile ? (
+                    <div style={{
+                      padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(34,197,94,0.3)',
+                      background: 'rgba(34,197,94,0.06)', display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      <span style={{ fontSize: 16 }}>🎬</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}>Video Uploaded</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadedVideoFile.name}</div>
+                      </div>
+                      <button onClick={() => videoFileInputRef.current?.click()} style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit' }}>Change</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => videoFileInputRef.current?.click()}
+                      style={{
+                        padding: '12px', borderRadius: 12,
+                        border: '2px dashed rgba(239,68,68,0.4)',
+                        background: 'rgba(239,68,68,0.04)', color: '#fca5a5',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 18 }}>🎬</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div>Video Upload karo (.mp4 / .webm / .mov)</div>
+                        <div style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Audio → Google STT → Transcript → Chapters</div>
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Companion transcript — optional, skips STT */}
+                  {!videoTranscribing && (
+                    companionTranscriptFile ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.25)', background: 'rgba(34,197,94,0.05)' }}>
+                        <span style={{ fontSize: 12 }}>📄</span>
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 10, color: '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {companionTranscriptFile.name} <span style={{ color: 'rgba(255,255,255,0.35)' }}>(STT skip hoga)</span>
+                        </div>
+                        <button onClick={() => setCompanionTranscriptFile(null)} style={{ flexShrink: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 14, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>✕</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => companionTranscriptInputRef.current?.click()}
+                        style={{ width: '100%', padding: '7px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.28)', fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        📄 Transcript pehle se hai? Attach karo — STT skip hoga (.json / .srt / .txt)
+                      </button>
+                    )
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           <div>
@@ -1678,6 +1866,38 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
                 color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
               }}
             />
+          </div>
+
+          {/* Host / Guest — feeds the real-footage Intro caption ("in this video [host] talks about…") */}
+          <div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Host / Guest — Intro ke liye</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                value={podcastHost}
+                onChange={e => setPodcastHost(e.target.value)}
+                placeholder="Host name"
+                style={{
+                  flex: 1, minWidth: 0, padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                  background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
+              }}>👤</div>
+              <input
+                value={podcastGuests.join(', ')}
+                onChange={e => setPodcastGuests(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder="Guest name"
+                style={{
+                  flex: 1, minWidth: 0, padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+                  background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                  color: '#fff', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
@@ -1708,171 +1928,6 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
               />
             </div>
           </div>
-
-          <button
-            onClick={handleFetch}
-            disabled={fetching || !podcastUrl.trim()}
-            style={{
-              padding: '11px', borderRadius: 12, border: 'none',
-              background: fetching ? 'rgba(239,68,68,0.3)' : '#ef4444',
-              color: '#fff', fontSize: 13, fontWeight: 800,
-              cursor: fetching ? 'default' : 'pointer', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              opacity: !podcastUrl.trim() ? 0.4 : 1,
-            }}
-          >
-            {fetching
-              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Transcript fetch ho raha hai…</>
-              : <>📥 Fetch Transcript</>}
-          </button>
-
-          {/* Transcript file upload — fallback when YouTube fails */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ya</span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,.srt,.txt"
-            style={{ display: 'none' }}
-            onChange={e => {
-              const f = e.target.files?.[0];
-              if (f) handleTranscriptFile(f);
-              e.target.value = '';
-            }}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              padding: '10px', borderRadius: 12, border: '1px dashed rgba(255,255,255,0.2)',
-              background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.55)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            📄 Transcript File Upload (.json / .srt / .txt)
-          </button>
-
-          {/* ── Video File Upload — Audio → STT → Transcript ── */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ya video</span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-          </div>
-
-          <input
-            ref={videoFileInputRef}
-            type="file"
-            accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/*"
-            style={{ display: 'none' }}
-            onChange={e => {
-              const f = e.target.files?.[0];
-              if (f) handleVideoUpload(f);
-              e.target.value = '';
-            }}
-          />
-          <input
-            ref={companionTranscriptInputRef}
-            type="file"
-            accept=".json,.srt,.txt"
-            style={{ display: 'none' }}
-            onChange={e => {
-              const f = e.target.files?.[0];
-              if (f) { setCompanionTranscriptFile(f); toast.success(`📄 Transcript attached: ${f.name}`); }
-              e.target.value = '';
-            }}
-          />
-
-          {videoTranscribing ? (
-            <div style={{
-              padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)',
-              background: 'rgba(239,68,68,0.07)', display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: '#fca5a5', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fca5a5' }}>Video Processing…</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{videoTranscribeStep}</div>
-              </div>
-            </div>
-          ) : videoTranscribeFailed && uploadedVideoFile ? (
-            <div style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.45)', background: 'rgba(239,68,68,0.08)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 14 }}>⚠️</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5' }}>Transcription Failed</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{videoTranscribeError}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  onClick={() => handleVideoUpload(uploadedVideoFile)}
-                  style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                >🔄 Retry STT</button>
-                {!companionTranscriptFile && (
-                  <button
-                    onClick={() => companionTranscriptInputRef.current?.click()}
-                    style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-                  >📄 Transcript Attach</button>
-                )}
-                <button
-                  onClick={() => { setVideoTranscribeFailed(false); setVideoTranscribeError(''); setUploadedVideoFile(null); setUploadedVideoUrl(null); }}
-                  style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
-                >✕</button>
-              </div>
-            </div>
-          ) : uploadedVideoFile ? (
-            <div style={{
-              padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(34,197,94,0.3)',
-              background: 'rgba(34,197,94,0.06)', display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ fontSize: 16 }}>🎬</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}>Video Uploaded</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadedVideoFile.name}</div>
-              </div>
-              <button onClick={() => videoFileInputRef.current?.click()} style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit' }}>Change</button>
-            </div>
-          ) : (
-            <button
-              onClick={() => videoFileInputRef.current?.click()}
-              style={{
-                padding: '12px', borderRadius: 12,
-                border: '2px dashed rgba(239,68,68,0.4)',
-                background: 'rgba(239,68,68,0.04)', color: '#fca5a5',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>🎬</span>
-              <div style={{ textAlign: 'left' }}>
-                <div>Video Upload karo (.mp4 / .webm / .mov)</div>
-                <div style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Audio → Google STT → Transcript → Chapters</div>
-              </div>
-            </button>
-          )}
-
-          {/* Companion transcript — optional, skips STT */}
-          {!videoTranscribing && (
-            companionTranscriptFile ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.25)', background: 'rgba(34,197,94,0.05)' }}>
-                <span style={{ fontSize: 12 }}>📄</span>
-                <div style={{ flex: 1, minWidth: 0, fontSize: 10, color: '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {companionTranscriptFile.name} <span style={{ color: 'rgba(255,255,255,0.35)' }}>(STT skip hoga)</span>
-                </div>
-                <button onClick={() => setCompanionTranscriptFile(null)} style={{ flexShrink: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 14, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>✕</button>
-              </div>
-            ) : (
-              <button
-                onClick={() => companionTranscriptInputRef.current?.click()}
-                style={{ width: '100%', padding: '7px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.28)', fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                📄 Transcript pehle se hai? Attach karo — STT skip hoga (.json / .srt / .txt)
-              </button>
-            )
-          )}
         </>
       )}
 
