@@ -4159,9 +4159,9 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#050507', color: '#e0e0e0', overflow: 'hidden', fontFamily: 'inherit' }}>
 
-      {/* ── 16:9 Canvas Preview ── */}
+      {/* ── 16:9 Preview — Discussion canvas, or real Intro/Footage video when that chip is selected ── */}
       <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', flexShrink: 0, background: '#050505', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ position: 'absolute', inset: 0 }}>
+        <div style={{ position: 'absolute', inset: 0, display: activeSettingsSection === 'discussion' ? 'block' : 'none' }}>
           <canvas
             ref={canvasRef}
             width={1920}
@@ -4200,10 +4200,53 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             {script.filter(t => t.audioUrl).length}/{script.length} audio
           </div>
         </div>
+
+        {activeSettingsSection === 'footage' && (
+          <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {(rawClipPreviewUrl ?? uploadedVideoUrlForClip) ? (
+              <video
+                key={rawClipPreviewUrl ?? uploadedVideoUrlForClip}
+                controls
+                autoPlay={false}
+                src={rawClipPreviewUrl ?? uploadedVideoUrlForClip ?? undefined}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+                onLoadedMetadata={e => {
+                  if (!rawClipPreviewUrl && sourceClips[0]) {
+                    try { e.currentTarget.currentTime = sourceClips[0].startSec; } catch {}
+                  }
+                }}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: 20 }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🎞️</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Koi video upload nahi hai</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSettingsSection === 'intro' && (
+          <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {introVideoPreviewUrl ? (
+              <video
+                key={introVideoPreviewUrl}
+                controls
+                src={introVideoPreviewUrl}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: 20 }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🎬</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Intro abhi generate nahi hua — neeche Settings mein generate karo</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Playback + Seek ── */}
       <div style={{ flexShrink: 0, padding: '8px 12px 6px', background: '#0a0a0d', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        {activeSettingsSection === 'discussion' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             onClick={togglePlay}
@@ -4235,6 +4278,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             </div>
           </div>
         </div>
+        )}
 
         {/* Timeline chips — Intro + Footage (virtual, not part of the phone-call
             canvas timeline) prepended before the Discussion turn chips. Clicking
