@@ -1,21 +1,43 @@
-// Utility to merge multiple audio URLs into a single WAV Blob
-export const mergeAudioUrls = async (audioUrls: string[]): Promise<{ blob: Blob, durations: number[] }> => {
+// Utility to merge multiple audio URLs into a single WAV Blob.
+// Per-segment fetch/decode failures don't abort the whole merge — one bad
+// clip (revoked blob: URL, corrupt data, decode quirk) used to take down
+// preview/export for every segment. A failed segment is replaced with a
+// short silence instead, and its index is reported back so the caller can
+// tell the user which segment to check/regenerate.
+export const mergeAudioUrls = async (audioUrls: string[]): Promise<{ blob: Blob, durations: number[], failedIndices: number[] }> => {
   const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
   const ctx = new AudioContext();
-  
+
   try {
     // 1. Fetch and Decode all buffers
     const audioBuffers: AudioBuffer[] = [];
     const durations: number[] = [];
-    
-    for (const url of audioUrls) {
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
-        ctx.decodeAudioData(arrayBuffer, resolve, reject);
-      });
-      audioBuffers.push(audioBuffer);
-      durations.push(audioBuffer.duration);
+    const failedIndices: number[] = [];
+    const FALLBACK_SILENCE_SEC = 1.5;
+
+    for (let i = 0; i < audioUrls.length; i++) {
+      try {
+        const response = await fetch(audioUrls[i]);
+        if (!response.ok) throw new Error(`fetch failed with status ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer.byteLength === 0) throw new Error('empty audio data');
+        const audioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
+          ctx.decodeAudioData(arrayBuffer, resolve, reject);
+        });
+        audioBuffers.push(audioBuffer);
+        durations.push(audioBuffer.duration);
+      } catch (segErr) {
+        console.error(`mergeAudioUrls: segment ${i} failed, substituting silence`, segErr);
+        failedIndices.push(i);
+        const fallbackRate = audioBuffers[0]?.sampleRate || ctx.sampleRate;
+        const silent = ctx.createBuffer(1, Math.round(fallbackRate * FALLBACK_SILENCE_SEC), fallbackRate);
+        audioBuffers.push(silent);
+        durations.push(FALLBACK_SILENCE_SEC);
+      }
+    }
+
+    if (failedIndices.length === audioUrls.length) {
+      throw new Error('No audio segments could be decoded');
     }
 
     // 2. Calculate total length
@@ -47,7 +69,8 @@ export const mergeAudioUrls = async (audioUrls: string[]): Promise<{ blob: Blob,
     // 5. Convert AudioBuffer to WAV Blob
     return {
         blob: bufferToWav(outputBuffer),
-        durations
+        durations,
+        failedIndices
     };
   } finally {
     if (ctx.state !== 'closed') {

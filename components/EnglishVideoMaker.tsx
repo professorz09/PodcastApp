@@ -319,47 +319,51 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       }
   }, []);
 
-  // Merge Audio on Mount
-  useEffect(() => {
-      const mergeAudio = async () => {
-          if (!script || script.length === 0) return;
-          
-          // Check if all segments have audio
-          const audioUrls = script.map(s => s.audioUrl).filter(Boolean) as string[];
-          if (audioUrls.length !== script.length) {
-              setMergeError("Some segments are missing audio.");
-              return;
+  const runMergeAudio = useCallback(async () => {
+      if (!initialScript || initialScript.length === 0) return;
+
+      // Check if all segments have audio
+      const audioUrls = initialScript.map(s => s.audioUrl).filter(Boolean) as string[];
+      if (audioUrls.length !== initialScript.length) {
+          const missing = initialScript.filter(s => !s.audioUrl).length;
+          setMergeError(`${missing} segment(s) mein audio nahi hai — Voice Gen mein jaake generate karo, phir yahan wapas aao.`);
+          return;
+      }
+
+      setMergeError(null);
+      setIsMerging(true);
+      try {
+          const { blob, durations, failedIndices } = await mergeAudioUrls(audioUrls);
+          const url = URL.createObjectURL(blob);
+          mergedAudioUrlRef.current = url;
+          setMergedAudioUrl(url);
+
+          // Calculate offsets
+          let offset = 0;
+          const offsets = [0];
+          for (let i = 0; i < durations.length - 1; i++) {
+              offset += durations[i];
+              offsets.push(offset);
+          }
+          setSegmentOffsets(offsets);
+
+          if (failedIndices.length > 0) {
+              const names = failedIndices.map(i => initialScript[i]?.speaker || `#${i + 1}`).join(', ');
+              toast.warning(`${failedIndices.length} segment ka audio load nahi hua (${names}) — waha silence chala diya. Us segment ka audio Voice Gen mein regenerate karo.`);
           }
 
-          setIsMerging(true);
-          try {
-              const { blob, durations } = await mergeAudioUrls(audioUrls);
-              const url = URL.createObjectURL(blob);
-              mergedAudioUrlRef.current = url;
-              setMergedAudioUrl(url);
-              
-              // Calculate offsets
-              let offset = 0;
-              const offsets = [0];
-              for (let i = 0; i < durations.length - 1; i++) {
-                  offset += durations[i];
-                  offsets.push(offset);
-              }
-              setSegmentOffsets(offsets);
-              
-              // Update script with accurate durations if needed
-              // setScript(prev => prev.map((s, i) => ({ ...s, duration: durations[i] })));
-              
-          } catch (e) {
-              console.error("Failed to merge audio", e);
-              setMergeError("Failed to prepare audio playback.");
-          } finally {
-              setIsMerging(false);
-          }
-      };
-      
-      mergeAudio();
-      
+      } catch (e: any) {
+          console.error("Failed to merge audio", e);
+          setMergeError(`Audio prepare nahi ho paaya${e?.message ? ` (${e.message})` : ''}. Retry kar ke dekho — agar dobara ho to kisi ek segment ka audio Voice Gen mein regenerate karo.`);
+      } finally {
+          setIsMerging(false);
+      }
+  }, [initialScript]);
+
+  // Merge Audio on Mount
+  useEffect(() => {
+      runMergeAudio();
+
       return () => {
           if (mergedAudioUrlRef.current) {
               URL.revokeObjectURL(mergedAudioUrlRef.current);
@@ -2283,13 +2287,23 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                   <Activity size={32} />
               </div>
               <h2 className="text-xl font-bold text-white mb-2">Audio Error</h2>
-              <p className="text-red-400 mb-6">{mergeError}</p>
-              <button 
-                onClick={onBack}
-                className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
-              >
-                Go Back
-              </button>
+              <p className="text-red-400 mb-6 max-w-md">{mergeError}</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={runMergeAudio}
+                  disabled={isMerging}
+                  className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isMerging ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                  Retry
+                </button>
+                <button
+                  onClick={onBack}
+                  className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
+                >
+                  Go Back
+                </button>
+              </div>
           </div>
       );
   }

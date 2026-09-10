@@ -1,5 +1,6 @@
 import { get, set, del } from 'idb-keyval';
 import { AppState, DebateSegment, PhoneStudioSourceClip, StoryboardScene, ThumbnailState, YoutubeImportData } from '../types';
+import { toast } from '../components/Toast';
 
 const STORE_KEY = 'autovid_state';
 const SCENES_KEY = 'autovid_scenes';
@@ -151,6 +152,17 @@ let _activeStateBlobUrls: string[] = [];
 // after a refresh. Only the most recently started call is allowed to persist.
 let _saveSeq = 0;
 
+// Re-fetching + re-converting every segment's full audio Blob on EVERY save
+// (saveState fires on every script change) adds up to a lot of redundant
+// IndexedDB write volume for a multi-segment script — on space-constrained
+// browsers (iOS Safari's IndexedDB quota especially) that made the whole
+// set() call silently fail, so a save from BEFORE audio/sync finished stuck
+// around and looked like "audio/sync disappeared after refresh". Caching
+// already-converted blobs by their (stable, per-segment) audioUrl means only
+// genuinely new/changed audio gets re-fetched each save.
+let _audioBlobCache = new Map<string, Blob>();
+let _quotaWarned = false;
+
 export const saveState = async (
   appState: AppState,
   script: DebateSegment[],
@@ -161,15 +173,22 @@ export const saveState = async (
 ) => {
   const mySeq = ++_saveSeq;
   try {
+    const nextCache = new Map<string, Blob>();
     const scriptToStore = await Promise.all(script.map(async (seg) => {
-      let audioBlob = null;
+      let audioBlob: Blob | null = null;
       if (seg.audioUrl) {
-        try {
-          const res = await fetch(seg.audioUrl);
-          audioBlob = await res.blob();
-        } catch (e) {
-          console.error("Failed to fetch blob for storage", e);
+        const cached = _audioBlobCache.get(seg.audioUrl);
+        if (cached) {
+          audioBlob = cached;
+        } else {
+          try {
+            const res = await fetch(seg.audioUrl);
+            audioBlob = await res.blob();
+          } catch (e) {
+            console.error("Failed to fetch blob for storage", e);
+          }
         }
+        if (audioBlob) nextCache.set(seg.audioUrl, audioBlob);
       }
       return { ...seg, audioBlob, audioUrl: undefined };
     }));
@@ -186,8 +205,20 @@ export const saveState = async (
       appState, script: scriptToStore, thumbnailState: thumbnailStateToStore, youtubeData: youtubeData ?? null,
       phoneSourceClips: phoneSourceClips ?? [], phoneVideoFile: phoneVideoFile ?? null,
     });
+    _audioBlobCache = nextCache; // prune to only what's still in the current script
+    _quotaWarned = false;
   } catch (error) {
     console.error("Failed to save state to IndexedDB", error);
+    // This used to fail silently — the browser had already discarded a save
+    // (commonly a storage-quota limit) and the user had no way to know their
+    // audio/sync progress wasn't actually persisted until a refresh "lost" it.
+    if (!_quotaWarned) {
+      _quotaWarned = true;
+      const isQuota = (error as any)?.name === 'QuotaExceededError';
+      toast.error(isQuota
+        ? 'Storage full ho gaya — naya progress save nahi ho raha. Kuch purane projects clear karo ya video jaldi render/export kar lo.'
+        : 'Progress save fail ho gaya. Refresh se pehle video render/export kar lo taki kaam na khoye.');
+    }
   }
 };
 
