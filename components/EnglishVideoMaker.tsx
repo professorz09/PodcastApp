@@ -12,6 +12,18 @@ import { registerActivePlayback, clearActivePlayback } from '../services/audioMa
 import { saveEnglishVideoVisuals, loadEnglishVideoVisuals } from '../services/storageService';
 import { motion, AnimatePresence } from 'motion/react';
 
+// The Gemini SDK call has no built-in timeout — if a request genuinely
+// stalls (network hiccup, provider-side hang), the caller awaits forever
+// with no way to recover except reloading the page. "Generate Scenes" hung
+// on a stuck "Generating…" spinner for exactly this reason. Race it against
+// a timeout so a stall surfaces as a clear, retryable error instead.
+const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s — try again`)), ms)),
+  ]);
+};
+
 interface EnglishVideoMakerProps {
   script: DebateSegment[];
   onBack: () => void;
@@ -823,13 +835,13 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
     try {
       const duration = seg.duration && seg.duration > 0 ? seg.duration : Math.max(6, seg.text.split(/\s+/).length / 2.3);
-      const breakdown = await generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings);
+      const breakdown = await withTimeout(generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 45000, 'Scene breakdown');
       setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: breakdown.length } }));
 
       const scenesWithImages: NonNullable<DebateSegment['learnEnglish']>['introScenes'] = [];
       for (const scene of breakdown) {
         try {
-          const imageUrl = await generateCinematicSceneImage(scene.prompt, introImageAspectRatio);
+          const imageUrl = await withTimeout(generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 60000, 'Scene image');
           scenesWithImages!.push({ ...scene, imageUrl });
         } catch (e) {
           console.error('Intro scene image failed', e);
@@ -859,7 +871,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     const key = `${segId}-${sceneIdx}`;
     setIntroImageLoading(prev => ({ ...prev, [key]: true }));
     try {
-      const imageUrl = await generateCinematicSceneImage(scene.prompt, introImageAspectRatio);
+      const imageUrl = await withTimeout(generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 60000, 'Scene image');
       setScript(prev => prev.map(s => {
         if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
         const newScenes = [...s.learnEnglish.introScenes];
