@@ -130,7 +130,7 @@ const App: React.FC = () => {
         const leStyleMatch = details.match(/LEARN_ENGLISH_STYLE:(\w+)/);
         const leStyle = leStyleMatch?.[1] || 'situational';
         const leLanguageMatch = details.match(/LEARN_ENGLISH_LANGUAGE:(\w+)/);
-        const leLanguage = (leLanguageMatch?.[1] === 'english' ? 'english' : 'hinglish') as 'hinglish' | 'english';
+        const leLanguage = (leLanguageMatch?.[1] === 'hinglish' ? 'hinglish' : 'english') as 'hinglish' | 'english';
         const generateQuestions = /LEARN_ENGLISH_QUESTIONS:true/.test(details);
         const includeTeachingAsides = !/LEARN_ENGLISH_NARRATOR:false/.test(details);
 

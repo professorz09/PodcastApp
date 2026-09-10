@@ -79,7 +79,6 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [leIntro, setLeIntro] = useState(true); // whether a short cinematic Narrator intro hook gets generated
   const [leNarrator, setLeNarrator] = useState(false); // whether mid-dialogue Narrator teaching asides get generated
   const [leGenerateQuestions, setLeGenerateQuestions] = useState(true);
-  const [leLanguage, setLeLanguage] = useState<'hinglish' | 'english'>('hinglish');
 
   const languages = [
     'English',
@@ -176,7 +175,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       }
       onGenerate({
         topic: leTopic.trim(),
-        specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}\nLEARN_ENGLISH_LANGUAGE:${leLanguage}${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}${!leNarrator ? '\nLEARN_ENGLISH_NARRATOR:false' : ''}`,
+        specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}\nLEARN_ENGLISH_LANGUAGE:english${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}${!leNarrator ? '\nLEARN_ENGLISH_NARRATOR:false' : ''}`,
         duration: leDuration,
         includeNarrator: leIntro,
         model,
@@ -576,25 +575,6 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   }`}
                 >3.8 Flash</button>
               </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Explanation Language</label>
-              <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
-                <button
-                  onClick={() => setLeLanguage('hinglish')}
-                  className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
-                    leLanguage === 'hinglish' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`}
-                >Hindi + English</button>
-                <button
-                  onClick={() => setLeLanguage('english')}
-                  className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
-                    leLanguage === 'english' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`}
-                >English Only</button>
-              </div>
-              <p className="text-[10px] text-gray-600 mt-1.5">Dialogue hamesha English mein hi rahega — yeh sirf Narrator ki phrase-explanations/quiz ki language control karta hai.</p>
             </div>
 
             <button
