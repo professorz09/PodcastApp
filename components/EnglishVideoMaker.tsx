@@ -856,10 +856,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
     try {
       const duration = seg.duration && seg.duration > 0 ? seg.duration : Math.max(6, seg.text.split(/\s+/).length / 2.3);
-      // 90s — a thinking-heavy reasoning call on a now-longer, richer intro
-      // genuinely takes a while; 45s was cutting it off mid-thought on
-      // every single attempt, not just real stalls.
-      const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 90000, 'Scene breakdown');
+      // generateIntroSceneBreakdown now uses the same fast JSON-mode config
+      // as Storyboard's own scene generator (no thinkingConfig) instead of
+      // ThinkingLevel.HIGH, so this should return in a few seconds, not
+      // the 45-90s it was timing out at before — 30s is just a safety net.
+      const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 30000, 'Scene breakdown');
       setScript(prev => prev.map(s => s.id === segId
         ? { ...s, learnEnglish: { ...s.learnEnglish!, introScenes: breakdown } }
         : s));

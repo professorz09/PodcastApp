@@ -4977,12 +4977,21 @@ TASK:
 Decide how many distinct visual beats this narration naturally breaks into — usually 3 to 8 for a full trailer-style intro, based on how many genuinely different moments/images the line actually describes (a short punchy line might only need 1-2; a longer scene-setting narration with several beats/teased moments should get one beat per moment). Don't force more beats than the content actually has, and don't cram unrelated moments into one beat.
 For each beat, give a time range (startOffset/endOffset in seconds${phraseTimings?.length ? ' — snapped exactly to the real phrase timestamps above' : ', roughly proportional to how long that part of the line takes to say'}) and a cinematic image prompt describing that exact visual moment, matching precisely what those specific words describe — realistic movie-still style, specific enough to generate a real image from (setting, who/what is visible, mood), not vague or generic.
 
-Return JSON only (no markdown), an array of {"startOffset": number, "endOffset": number, "prompt": string} in time order.`;
+Respond ONLY with valid JSON: an array of {"startOffset": number, "endOffset": number, "prompt": string} in time order. No explanation outside the JSON.`;
 
+  // Storyboard's own scene generator (generateStoryboardScenes) uses this
+  // same responseMimeType + no thinkingConfig combo and returns near-
+  // instantly. This call previously used thinkingConfig: HIGH, which is a
+  // much slower reasoning mode meant for creative writing, not a
+  // structured-JSON breakdown task — that mismatch was the actual cause of
+  // "Storyboard is instant but this hangs/times out", not a network issue.
   const response = await ai.models.generateContent({
     model: 'gemini-3.8-flash',
-    contents: { parts: [{ text: prompt }] },
-    config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } },
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      responseMimeType: 'application/json',
+      temperature: 0.7,
+    },
   });
 
   let raw = response.text || '[]';
