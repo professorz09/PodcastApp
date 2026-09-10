@@ -4939,20 +4939,21 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
 };
 
 /**
- * Cinematic 16:9 hook-shot for a Learn English "intro" segment — a dedicated
- * generator (separate from the per-speaker avatar/background and from the
- * flat-cartoon Storyboard style) so the opening hook gets its own realistic,
- * movie-still look based on what the Narrator's intro line actually
- * describes, matching English Video's established cinematic aesthetic.
+ * Cinematic 16:9 movie-still for a Learn English scene line — used for the
+ * Intro tab's hook shot AND (unlike the flat-cartoon MS-Paint-style
+ * generateSegmentImage) for English Video's general per-segment/bulk image
+ * generation, so every generated image in English Video shares one
+ * realistic cinematic look instead of mixing crude cartoon illustrations
+ * with the realistic speaker avatars/backgrounds.
  */
-export const generateIntroCinematicImage = async (introText: string): Promise<string> => {
+export const generateCinematicSceneImage = async (sceneText: string): Promise<string> => {
   const ai = getAi();
 
-  const prompt = `Cinematic 16:9 movie-still hook shot that visually depicts this opening narration line: "${introText}".
+  const prompt = `Cinematic 16:9 movie-still that visually depicts this moment from a scene: "${sceneText}".
 Framing: wide establishing shot or a dramatic close-up — whichever best captures the moment described — with clean space for subtitle text near the bottom third.
 Lighting: cinematic, moody, movie-trailer quality — strong directional light, real shadows, shallow depth of field where appropriate.
 Style: semi-realistic digital cinematography, sharp detail, professional color grade. No text, no watermarks, no logos.
-This is a story-hook frame for a video intro — it should feel like the first frame of a movie trailer for this exact moment.`;
+This should feel like a real frame from a movie or TV drama depicting this exact moment — not an illustration or cartoon.`;
 
   const response = await ai.models.generateContent({
     model: getImageModel(),

@@ -6,7 +6,7 @@ import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
-import { generateSegmentImage, generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateIntroCinematicImage } from '../services/geminiService';
+import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
 import { saveEnglishVideoVisuals, loadEnglishVideoVisuals } from '../services/storageService';
@@ -236,7 +236,14 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [exportQuality, setExportQuality] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [showExportSettings, setShowExportSettings] = useState(false);
   // Settings tab state
-  const [settingsTab, setSettingsTab] = useState<'speakers'|'intro'|'background'|'subtitle'|'options'>('speakers');
+  // Segment 0 is very commonly the intro segment itself (that's the whole
+  // point of an intro), so currentSegmentIndex defaults to 0 on mount without
+  // the user ever clicking the intro chip — the tab-switch-on-click fix
+  // alone never fires in that case. Default straight to the Intro tab here
+  // instead, whenever the initially-selected segment is intro-tagged.
+  const [settingsTab, setSettingsTab] = useState<'speakers'|'intro'|'background'|'subtitle'|'options'>(() =>
+    initialScript[0]?.learnEnglish?.segmentType === 'intro' ? 'intro' : 'speakers'
+  );
   const [statusMessage, setStatusMessage] = useState("");
   // Rendered video blob kept in memory for merge
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
@@ -776,7 +783,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     if (!seg) return;
     setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
     try {
-      const dataUrl = await generateIntroCinematicImage(seg.text);
+      const dataUrl = await generateCinematicSceneImage(seg.text);
       setScript(prev => prev.map(s => s.id === segId
         ? { ...s, visualConfig: { ...s.visualConfig, backgroundUrl: dataUrl, backgroundColor: undefined } }
         : s));
@@ -2947,7 +2954,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               
               const results = await Promise.all(batch.map(async (seg, batchIdx) => {
                   try {
-                      const url = await generateSegmentImage(seg.text);
+                      const url = await generateCinematicSceneImage(seg.text);
                       return { idx: i + batchIdx, url };
                   } catch (e) {
                       console.error(`Failed to generate image for segment ${i + batchIdx}`, e);
@@ -4033,7 +4040,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         onClick={async () => {
                           if (!currentSegment.text) return;
                           try {
-                            const url = await generateSegmentImage(currentSegment.text);
+                            const url = await generateCinematicSceneImage(currentSegment.text);
                             setScript(prev => { const s = [...prev]; s[currentSegmentIndex] = { ...s[currentSegmentIndex], visualConfig: { ...s[currentSegmentIndex].visualConfig, backgroundUrl: url } }; return s; });
                             setStatusSafe("Image generated!", 3000);
                           } catch (e) { setStatusMessage("Generation failed"); }
