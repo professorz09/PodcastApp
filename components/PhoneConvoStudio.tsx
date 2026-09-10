@@ -955,6 +955,15 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             })}
           </div>
         )}
+
+        {/* Playable preview — once the render step is done */}
+        {allDone && videoRef.current && (
+          <video
+            controls
+            src={videoRef.current.url}
+            style={{ width: '100%', borderRadius: 10, border: '1px solid rgba(168,85,247,0.25)', background: '#000' }}
+          />
+        )}
       </div>
     );
   }
@@ -2831,6 +2840,20 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [clipping, setClipping] = useState(false);
   const [clipProgress, setClipProgress] = useState(0);
   const [addLetterbox, setAddLetterbox] = useState(false);
+  // Playable previews — Raw Clip and the final combined video, so the
+  // Export tab shows what was actually produced, not just a download link.
+  // Refs mirror the latest URL so the unmount cleanup (empty-deps effect)
+  // can revoke whatever is current instead of the stale value it closed over.
+  const [rawClipPreviewUrl, setRawClipPreviewUrl] = useState<string | null>(null);
+  const [combinedVideoPreviewUrl, setCombinedVideoPreviewUrl] = useState<string | null>(null);
+  const rawClipPreviewUrlRef = useRef<string | null>(null);
+  const combinedVideoPreviewUrlRef = useRef<string | null>(null);
+  useEffect(() => { rawClipPreviewUrlRef.current = rawClipPreviewUrl; }, [rawClipPreviewUrl]);
+  useEffect(() => { combinedVideoPreviewUrlRef.current = combinedVideoPreviewUrl; }, [combinedVideoPreviewUrl]);
+  useEffect(() => () => {
+    if (rawClipPreviewUrlRef.current) { try { URL.revokeObjectURL(rawClipPreviewUrlRef.current); } catch {} }
+    if (combinedVideoPreviewUrlRef.current) { try { URL.revokeObjectURL(combinedVideoPreviewUrlRef.current); } catch {} }
+  }, []);
 
   // Podcast metadata — stored when podcast generate is called so IntroFlow
   // stays accessible in the Export tab even after the generator steps are gone.
@@ -2845,6 +2868,13 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [combineStatus, setCombineStatus] = useState('');
   // Intro blob — set by IntroFlow via onBlobReady callback
   const [introVideoBlob, setIntroVideoBlob] = useState<Blob | null>(null);
+  const [introVideoPreviewUrl, setIntroVideoPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!introVideoBlob) { setIntroVideoPreviewUrl(null); return; }
+    const url = URL.createObjectURL(introVideoBlob);
+    setIntroVideoPreviewUrl(url);
+    return () => { try { URL.revokeObjectURL(url); } catch {} };
+  }, [introVideoBlob]);
 
   const totalDuration = script.reduce((a, b) => a + b.durationMs, 0);
 
@@ -3395,8 +3425,10 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       const c = sourceClips[0];
       const blob = await trimClipToBlob(c, p => setClipProgress(p));
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      const url = URL.createObjectURL(blob);
+      setRawClipPreviewUrl(prev => { if (prev) { try { URL.revokeObjectURL(prev); } catch {} } return url; });
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `clip-${c.title.replace(/[^a-z0-9]/gi, '-').slice(0, 40)}.${ext}`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       toast.success('✓ Raw clip download ho gayi!');
@@ -3454,14 +3486,14 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       );
 
       const url = URL.createObjectURL(finalBlob);
+      setCombinedVideoPreviewUrl(prev => { if (prev) { try { URL.revokeObjectURL(prev); } catch {} } return url; });
       const a = document.createElement('a');
       a.href = url;
       a.download = `full-video-${Date.now()}.webm`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      toast.success('✓ Full video download ho gayi!');
+      toast.success('✓ Full video download ho gayi! Neeche preview bhi ready hai.');
     } catch (e: any) {
       toast.error(e.message || 'Full video combine failed');
     } finally {
@@ -5133,6 +5165,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   : <><Download size={13} /> {uploadedVideoForClip && sourceClips.length > 0 ? 'Trim & Download Raw Clip' : 'Trim & Download Raw Clip (Settings se video upload karo)'}</>
                 }
               </button>
+              {/* Playable preview of the trimmed clip */}
+              {rawClipPreviewUrl && (
+                <video
+                  controls
+                  src={rawClipPreviewUrl}
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: '#000' }}
+                />
+              )}
             </div>
 
             {/* ③ Discussion */}
@@ -5233,6 +5273,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   : <>🎥 Generate &amp; Download Full Video</>
                 }
               </button>
+              {/* Playable preview of the final combined video */}
+              {combinedVideoPreviewUrl && (
+                <video
+                  controls
+                  src={combinedVideoPreviewUrl}
+                  style={{ width: '100%', borderRadius: 10, border: '1px solid rgba(251,191,36,0.3)', background: '#000' }}
+                />
+              )}
             </div>
 
           </div>
