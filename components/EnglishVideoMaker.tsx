@@ -72,6 +72,14 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [speakerImageLoading, setSpeakerImageLoading] = useState<boolean[]>([]);
   const speakerBlobUrls = React.useRef<(string | null)[]>([]);
 
+  // Narrator's own avatar — kept separate from speakerImages/activeSpeakers (which
+  // only cover actual dialogue participants) so the Learn English teaching card
+  // can show its own photo, set independently of "You"/the situational character.
+  const [narratorImage, setNarratorImage] = useState<HTMLImageElement | null>(null);
+  const [narratorImageLoading, setNarratorImageLoading] = useState(false);
+  const narratorBlobUrlRef = React.useRef<string | null>(null);
+  const hasNarrator = uniqueSpeakers.includes('Narrator');
+
   // Initialize labels, images, and loading state
   useEffect(() => {
       if (activeSpeakers.length > 0) {
@@ -604,6 +612,39 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     }
   };
 
+  const handleGenerateNarratorImage = async () => {
+    setNarratorImageLoading(true);
+    try {
+      const dataUrl = await generateSpeakerImage(activeSpeakers.length + 3, 'Narrator', theme === 'transparent-avatars');
+      const img = new Image();
+      img.onload = () => {
+        setNarratorImage(img);
+        setNarratorImageLoading(false);
+      };
+      img.onerror = () => {
+        toast.error('Narrator image could not be loaded.');
+        setNarratorImageLoading(false);
+      };
+      img.src = dataUrl;
+    } catch (e: any) {
+      toast.error(`Image generation failed: ${e.message}`);
+      setNarratorImageLoading(false);
+    }
+  };
+
+  const handleNarratorImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      if (narratorBlobUrlRef.current) {
+        URL.revokeObjectURL(narratorBlobUrlRef.current);
+      }
+      const objectUrl = URL.createObjectURL(e.target.files[0]);
+      narratorBlobUrlRef.current = objectUrl;
+      const img = new Image();
+      img.src = objectUrl;
+      img.onload = () => setNarratorImage(img);
+    }
+  };
+
   const handleLabelChange = (index: number, value: string) => {
       setSpeakerLabels(prev => {
           const newLabels = [...prev];
@@ -755,9 +796,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         backgroundVideo,
         backgroundColor: globalBackgroundColor,
         speakerImages,
-        segmentBackgrounds: new Map()
+        segmentBackgrounds: new Map(),
+        narratorImage,
     };
-    
+
     const realTimeSegment = script[realTimeIndex];
     if (realTimeSegment && realTimeSegment.visualConfig?.backgroundUrl && currentSegmentBackground) {
         // Only use the loaded background if it matches the current segment (via index check or URL check)
@@ -786,7 +828,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       speakerScale, showTimer, showSideStats, showVuMeter, vuMeterStyle, showSpeakerImages, showSpeakers, showScores, backgroundDim, speakerPositions, showNameLabels,
       background, speakerImages, currentSegmentBackground, segmentOffsets, currentSegmentIndex, segmentScores, activeSpeakers, showSettings, globalBackgroundColor, questionMode,
       globalThemeConfig, narratorTextColor, showMinimalSpeakerName, showMinimalSideVU,
-      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB, nameBadgeColorC
+      showNameBadge, nameBadgeStyle, nameBadgeColorA, nameBadgeColorB, nameBadgeColorC, narratorImage
   ]);
 
   /* OLD RENDER
@@ -2490,7 +2532,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             backgroundVideo: null, // Will be overridden by offline video during render
             backgroundColor: globalBackgroundColor,
             speakerImages: speakerImages,
-            segmentBackgrounds: new Map()
+            segmentBackgrounds: new Map(),
+            narratorImage,
         };
 
         // Load all segment backgrounds
@@ -3017,6 +3060,52 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         </div>
                       ))}
                     </div>
+
+                    {hasNarrator && (
+                      <div className="pt-2 border-t border-white/5 space-y-2">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Narrator (Learn English teaching card)</p>
+                        <div className="flex gap-3 items-center">
+                          <div className="relative w-16 h-16 shrink-0 bg-[#111] rounded-full border-2 border-dashed border-white/10 overflow-hidden">
+                            {narratorImageLoading ? (
+                              <div className="absolute inset-0 flex items-center justify-center bg-[#111]">
+                                <Loader2 size={16} className="text-cyan-400 animate-spin" />
+                              </div>
+                            ) : narratorImage ? (
+                              <>
+                                <img src={narratorImage.src} alt="Narrator" className="w-full h-full object-cover" />
+                                <button
+                                  onClick={() => setNarratorImage(null)}
+                                  className="absolute top-0 right-0 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
+                                >
+                                  <X size={9} className="text-white" />
+                                </button>
+                              </>
+                            ) : (
+                              <label className="absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-white/5 transition-colors">
+                                <Upload size={16} className="text-gray-500" />
+                                <input type="file" accept="image/*" className="hidden" onChange={handleNarratorImageUpload} />
+                              </label>
+                            )}
+                          </div>
+                          <div className="flex-1 flex gap-1.5">
+                            <button
+                              onClick={handleGenerateNarratorImage}
+                              disabled={narratorImageLoading}
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold bg-cyan-600/15 hover:bg-cyan-600/25 border border-cyan-500/20 text-cyan-300 transition-all disabled:opacity-40 disabled:cursor-wait"
+                            >
+                              {narratorImageLoading ? <Loader2 size={9} className="animate-spin" /> : <Wand2 size={9} />}
+                              AI Photo
+                            </button>
+                            <label className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
+                              <Upload size={9} /> Upload
+                              <input type="file" accept="image/*" className="hidden" onChange={handleNarratorImageUpload} />
+                            </label>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-gray-600">Yeh image sirf Narrator ke teaching-card (phrase/meaning) mein dikhegi — "You" aur situational character ke images upar alag se set hote hai.</p>
+                      </div>
+                    )}
+
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <label className="text-xs text-gray-500">Speaker Size</label>

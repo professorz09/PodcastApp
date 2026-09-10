@@ -12,6 +12,7 @@ export const drawLearnEnglishOverlay = (
   segmentOffsets: number[],
   currentSegmentIndex: number,
   time: number,
+  narratorImage: HTMLImageElement | null = null,
 ) => {
   const seg = script[currentSegmentIndex];
   const tag = seg?.learnEnglish;
@@ -30,7 +31,7 @@ export const drawLearnEnglishOverlay = (
   const ease = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
   if (tag.segmentType === 'narrator' && tag.explanation) {
-    drawNarratorCard(ctx, W, H, tag.explanation, progress, ease);
+    drawNarratorCard(ctx, W, H, tag.explanation, progress, ease, narratorImage);
   } else if (tag.segmentType === 'quiz' && tag.quiz) {
     drawQuizOverlay(ctx, W, H, tag.quiz, progress, ease);
   }
@@ -64,6 +65,7 @@ const drawNarratorCard = (
   explanation: { phrase: string; meaning: string; example?: string },
   progress: number,
   ease: (t: number) => number,
+  narratorImage: HTMLImageElement | null,
 ) => {
   const cardW = Math.min(460, W * 0.4);
   const cardX = W - cardW - 32;
@@ -87,40 +89,64 @@ const drawNarratorCard = (
   ctx.fill();
   ctx.stroke();
 
-  // "teacher" badge
-  ctx.fillStyle = '#22d3ee';
-  ctx.beginPath();
-  ctx.roundRect(cardX + 18, cardY + 16, 96, 28, 14);
-  ctx.fill();
-  ctx.fillStyle = '#04141a';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('LEARN', cardX + 18 + 48, cardY + 16 + 15);
+  // Narrator avatar — round portrait on the left, text column starts after it.
+  const avatarSize = 64;
+  const avatarX = cardX + 18;
+  const avatarY = cardY + 18;
+  let textX = cardX + 18;
+  let textW = cardW - 36;
+  if (narratorImage) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(narratorImage, avatarX, avatarY, avatarSize, avatarSize);
+    ctx.restore();
+    ctx.strokeStyle = '#22d3ee';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+    ctx.stroke();
+    textX = avatarX + avatarSize + 16;
+    textW = cardW - (textX - cardX) - 18;
+  } else {
+    // "teacher" badge — only shown when there's no avatar to anchor the card
+    ctx.fillStyle = '#22d3ee';
+    ctx.beginPath();
+    ctx.roundRect(cardX + 18, cardY + 16, 96, 28, 14);
+    ctx.fill();
+    ctx.fillStyle = '#04141a';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('LEARN', cardX + 18 + 48, cardY + 16 + 15);
+  }
 
   ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 22px sans-serif';
-  const phraseLines = wrapText(ctx, `"${explanation.phrase}"`, cardW - 36);
-  let ty = cardY + 66;
+  ctx.font = 'bold 20px sans-serif';
+  const phraseLines = wrapText(ctx, `"${explanation.phrase}"`, textW);
+  let ty = narratorImage ? cardY + 34 : cardY + 66;
   phraseLines.slice(0, 2).forEach((l) => {
-    ctx.fillText(l, cardX + 18, ty);
-    ty += 26;
+    ctx.fillText(l, textX, ty);
+    ty += 24;
   });
 
   ctx.fillStyle = '#a5f3fc';
-  ctx.font = '16px sans-serif';
-  const meaningLines = wrapText(ctx, explanation.meaning, cardW - 36);
+  ctx.font = '15px sans-serif';
+  const meaningLines = wrapText(ctx, explanation.meaning, textW);
   meaningLines.slice(0, 2).forEach((l) => {
-    ctx.fillText(l, cardX + 18, ty);
-    ty += 20;
+    ctx.fillText(l, textX, ty);
+    ty += 19;
   });
 
   if (explanation.example) {
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = 'italic 14px sans-serif';
-    const exampleLines = wrapText(ctx, explanation.example, cardW - 36);
-    if (exampleLines[0]) ctx.fillText(exampleLines[0], cardX + 18, ty);
+    ctx.font = 'italic 13px sans-serif';
+    const exampleLines = wrapText(ctx, explanation.example, textW);
+    if (exampleLines[0]) ctx.fillText(exampleLines[0], textX, ty);
   }
 
   ctx.restore();

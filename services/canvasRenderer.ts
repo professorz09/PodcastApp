@@ -38,6 +38,8 @@ export interface RenderAssets {
   backgroundColor?: string;
   speakerImages: (HTMLImageElement | null)[];
   segmentBackgrounds: Map<string, HTMLImageElement>;
+  /** Learn English only — Narrator's own avatar, shown in the teaching card. */
+  narratorImage?: HTMLImageElement | null;
 }
 
 export const drawDebateFrame = (
@@ -101,5 +103,5 @@ export const drawDebateFrame = (
 
   // Additive Learn English overlay (narrator teaching card / quiz panel) — no-ops
   // for scripts without learnEnglish tags, so this never affects other renders.
-  drawLearnEnglishOverlay(ctx, script, segmentOffsets, currentSegmentIndex, time);
+  drawLearnEnglishOverlay(ctx, script, segmentOffsets, currentSegmentIndex, time, assets.narratorImage ?? null);
 };
