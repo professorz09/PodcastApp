@@ -24,6 +24,23 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promis
   ]);
 };
 
+// Mobile Safari's fetch() throws a bare "Load failed" for all sorts of
+// transient network blips — usually gone on the very next attempt. Retry a
+// couple of times (each still timeout-guarded) before actually giving up.
+const withRetry = async <T,>(fn: () => Promise<T>, attempts: number, timeoutMs: number, label: string): Promise<T> => {
+  let lastErr: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await withTimeout(fn(), timeoutMs, label);
+    } catch (e) {
+      lastErr = e;
+      console.error(`${label} attempt ${i + 1}/${attempts} failed`, e);
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+    }
+  }
+  throw lastErr;
+};
+
 interface EnglishVideoMakerProps {
   script: DebateSegment[];
   onBack: () => void;
@@ -835,13 +852,13 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
     try {
       const duration = seg.duration && seg.duration > 0 ? seg.duration : Math.max(6, seg.text.split(/\s+/).length / 2.3);
-      const breakdown = await withTimeout(generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 45000, 'Scene breakdown');
+      const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 45000, 'Scene breakdown');
       setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: breakdown.length } }));
 
       const scenesWithImages: NonNullable<DebateSegment['learnEnglish']>['introScenes'] = [];
       for (const scene of breakdown) {
         try {
-          const imageUrl = await withTimeout(generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 60000, 'Scene image');
+          const imageUrl = await withRetry(() => generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 2, 60000, 'Scene image');
           scenesWithImages!.push({ ...scene, imageUrl });
         } catch (e) {
           console.error('Intro scene image failed', e);
@@ -871,7 +888,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     const key = `${segId}-${sceneIdx}`;
     setIntroImageLoading(prev => ({ ...prev, [key]: true }));
     try {
-      const imageUrl = await withTimeout(generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 60000, 'Scene image');
+      const imageUrl = await withRetry(() => generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 2, 60000, 'Scene image');
       setScript(prev => prev.map(s => {
         if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
         const newScenes = [...s.learnEnglish.introScenes];
