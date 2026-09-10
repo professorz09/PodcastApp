@@ -16,7 +16,7 @@ interface DebateInputProps {
   initialCommentsContent?: string;
   initialCommentsFileName?: string;
   /** Fired by the "New Phone Studio" tab once its embedded generator commits a script. Caller routes to PHONE_STUDIO. */
-  onPhoneStudioReady?: (script: DebateSegment[], meta?: { sourceClips?: PhoneStudioSourceClip[] }) => void;
+  onPhoneStudioReady?: (script: DebateSegment[], meta?: { sourceClips?: PhoneStudioSourceClip[]; videoFile?: File }) => void;
 }
 
 const DebateInput: React.FC<DebateInputProps> = ({

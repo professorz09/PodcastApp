@@ -39,6 +39,9 @@ const App: React.FC = () => {
   // Source clips picked in the New Phone Studio "select chapters" step — carried
   // to the standalone Phone Studio so YouTube Chapters can prepend the original clip.
   const [phoneSourceClips, setPhoneSourceClips] = useState<PhoneStudioSourceClip[]>([]);
+  // The video uploaded in the embedded generator — carried the same way, so
+  // Settings → Footage in the standalone Phone Studio has something to trim.
+  const [phoneVideoFile, setPhoneVideoFile] = useState<File | null>(null);
   const [thumbnailState, setThumbnailState] = useState<ThumbnailState>({
     titles: [],
     selectedTitle: '',
@@ -492,7 +495,7 @@ Return JSON only (no markdown):
       )}
 
       {appState === AppState.PHONE_STUDIO && (
-        <PhoneConvoStudio mainScript={script} sourceClips={phoneSourceClips} />
+        <PhoneConvoStudio mainScript={script} sourceClips={phoneSourceClips} videoFile={phoneVideoFile} />
       )}
 
       {appState === AppState.IG_SONG_STUDIO && (
@@ -510,6 +513,7 @@ Return JSON only (no markdown):
           onPhoneStudioReady={(segments, meta) => {
             setScript(segments);
             setPhoneSourceClips(meta?.sourceClips ?? []);
+            setPhoneVideoFile(meta?.videoFile ?? null);
             setScriptStyle('phone_studio');
             setAppState(AppState.SCRIPT);
             toast.success('✓ Script ready — Script Editor me review karo, fir Phone Studio open karo');

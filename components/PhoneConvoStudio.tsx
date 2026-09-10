@@ -2752,19 +2752,23 @@ interface Props {
   /** Source clips the user picked in the New Phone Studio "select chapters" step.
    *  Prepended as "Original Clip" rows in the YouTube Chapters output. */
   sourceClips?: PhoneStudioSourceClip[];
+  /** The uploaded video the script/sourceClips were generated from (if any) —
+   *  carried over from the embedded generator so Settings → Footage has
+   *  something to trim, even in the standalone (non-embedded) studio. */
+  videoFile?: File | null;
   /** Embedded mode: render ONLY the script-generator UI (used inside DebateInput's "New Phone Studio" tab). */
   embedded?: boolean;
   /** Fired when the embedded generator finishes — caller commits the script (and routes to PHONE_STUDIO). */
   onGeneratorComplete?: (
     turns: ScriptTurn[],
     phones: PhoneConfig[],
-    meta?: { sourceClips?: PhoneStudioSourceClip[] },
+    meta?: { sourceClips?: PhoneStudioSourceClip[]; videoFile?: File },
   ) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClipsProp, embedded = false, onGeneratorComplete }) => {
+const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClipsProp, videoFile: videoFileProp, embedded = false, onGeneratorComplete }) => {
   const [phones, setPhones]   = useState<PhoneConfig[]>([]);
   const [script, setScript]   = useState<ScriptTurn[]>([]);
   // Source clips → seeded from the prop (standalone studio), or set directly by
@@ -2837,6 +2841,16 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   // Uploaded video file (from New Phone Studio video-upload path)
   const [uploadedVideoForClip, setUploadedVideoForClip] = useState<File | null>(null);
   const [uploadedVideoUrlForClip, setUploadedVideoUrlForClip] = useState<string | null>(null);
+  // Seed from the videoFile prop — the standalone studio (App.tsx's PHONE_STUDIO
+  // route) gets the video this way, since it was uploaded back in the embedded
+  // generator (a different mounted instance) and can't otherwise survive the
+  // App.tsx state hop between them.
+  useEffect(() => {
+    if (!videoFileProp) return;
+    setUploadedVideoForClip(prev => (prev === videoFileProp ? prev : videoFileProp));
+    setUploadedVideoUrlForClip(prev => { if (prev) { try { URL.revokeObjectURL(prev); } catch {} } return URL.createObjectURL(videoFileProp); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoFileProp]);
   const [clipping, setClipping] = useState(false);
   const [clipProgress, setClipProgress] = useState(0);
   const [addLetterbox, setAddLetterbox] = useState(false);
@@ -3918,7 +3932,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         });
 
         if (embedded && onGeneratorComplete) {
-          onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips });
+          onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips, videoFile: args.videoFile });
           toast.success(`✓ ${newScript.length} turns clip-reaction ready!`);
         } else {
           setSourceClips(args.sourceClips);
@@ -3996,7 +4010,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         }));
 
         if (embedded && onGeneratorComplete) {
-          onGeneratorComplete(newScript, newPhones, { sourceClips: clipSourceClips });
+          onGeneratorComplete(newScript, newPhones, { sourceClips: clipSourceClips, videoFile: args.videoFile });
           toast.success(`✓ ${newScript.length} turns ka Podcast Pro script ready hai!`);
         } else {
           setSourceClips(clipSourceClips);
@@ -4064,7 +4078,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
       });
 
       if (embedded && onGeneratorComplete) {
-        onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips });
+        onGeneratorComplete(newScript, newPhones, { sourceClips: args.sourceClips, videoFile: args.videoFile });
         toast.success(`✓ ${newScript.length} turns deep-analysis ready! Script Editor me jaa raha hai…`);
       } else {
         setSourceClips(args.sourceClips);
