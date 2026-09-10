@@ -5205,6 +5205,79 @@ export const generateContextBridgeConclusion = async (
   }
 };
 
+// ── Learn English — situational practice-dialogue script generator ──────────
+export const generateLearnEnglishScript = async (
+  topic: string,
+  speakerCount: number,        // 1 = solo monologue practice, 2 = You + 1 other, 3 = You + 2 others
+  includeNarrator: boolean,    // adds a short cinematic-hook Narrator line at the start
+  generateQuestions: boolean,  // appends a Narrator "useful expressions + quiz" segment at the end
+  duration: number = 5,        // minutes — rough length guide
+  model: string = 'gemini-3.8-flash',
+  leStyle: string = 'situational',
+): Promise<DebateSegment[]> => {
+  const ai = getAi();
+
+  const turnsGuide = Math.max(6, Math.round(duration * 3));
+  const rolesLine = speakerCount <= 1
+    ? 'Just ONE speaker: "You" — a monologue / self-practice speech about the situation.'
+    : speakerCount === 2
+      ? 'TWO speakers: "You" (the English learner, practicing) and ONE other character. Pick a role that fits the situation (e.g. "Police Officer", "Waiter", "Interviewer") and keep that exact name consistent throughout.'
+      : '"You" (the English learner) plus TWO other characters that fit the situation. Pick natural, consistent role names for the topic.';
+
+  const narratorLine = includeNarrator
+    ? 'Start with a short "Narrator" line (1-2 sentences) that sets up the situation like a cinematic story hook (e.g. "Yesterday, I was walking down the street when...").'
+    : 'Do NOT include a Narrator line — start directly with the first line of dialogue.';
+
+  const questionsLine = generateQuestions
+    ? `\n\nAfter the dialogue ends, add ONE final segment spoken by "Narrator" (even if no narrator line was used earlier) that reviews 3-5 useful expressions/phrases from the conversation — for each, give the phrase, what it means, and a one-line example of using it. End with 2-3 short comprehension questions a learner could try to answer.`
+    : '';
+
+  const styleLine = {
+    situational: 'Everyday situational English — natural, practical phrasing a learner would actually use in real life.',
+    roleplay: 'A roleplay-practice scene — slightly more structured, clearly modeling both sides of a common exchange.',
+    interview: 'A more formal register — like a job interview or official conversation, polite and professional English.',
+    casual: 'Casual, relaxed conversational English between people who know each other.',
+  }[leStyle] || 'Everyday situational English.';
+
+  const prompt = `You are writing an ENGLISH-LEARNING practice dialogue for a video, based on this topic/situation: "${topic}".
+
+${rolesLine}
+${narratorLine}
+Style: ${styleLine}
+Roughly ${turnsGuide} lines of dialogue total. Use natural, everyday English — not stiff or textbook-like — full of expressions a learner would genuinely want to practice.${questionsLine}
+
+Return JSON only (no markdown), an array of {"speaker": "...", "text": "..."} objects in speaking order. "speaker" must be exactly "Narrator", "You", or the other character's role name (kept spelled identically every time it's used).`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: { parts: [{ text: prompt }] },
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } },
+    });
+
+    let raw = response.text || '[]';
+    raw = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed: any[];
+    try { parsed = JSON.parse(raw); }
+    catch {
+      const m = raw.match(/\[[\s\S]*\]/);
+      parsed = m ? JSON.parse(m[0]) : [];
+    }
+
+    return parsed.map((seg: any, i: number) => ({
+      id: `learn-english-${i}`,
+      speaker: seg.speaker || 'You',
+      text: seg.text || '',
+      scores: [],
+      averageScore: 0,
+    }));
+  } catch (err: any) {
+    console.error('Learn English script generation failed:', err);
+    return [];
+  }
+};
+
 // ── Topic-based Transcript Splitter ──────────────────────────────────────────
 export interface TranscriptChunk {
   title: string;

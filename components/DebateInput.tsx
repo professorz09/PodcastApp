@@ -29,7 +29,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   onPhoneStudioReady,
 }) => {
   const [showIntroMaker, setShowIntroMaker] = useState(false);
-  const [mode, setMode] = useState<'topic' | 'script' | 'youtube' | 'phone' | 'phone_new'>('topic');
+  const [mode, setMode] = useState<'topic' | 'script' | 'youtube' | 'phone' | 'phone_new' | 'learn_english'>('topic');
   const [topic, setTopic] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [specificDetails, setSpecificDetails] = useState('');
@@ -70,6 +70,14 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [phoneFileName, setPhoneFileName] = useState<string | undefined>();
   const [phoneFileContent, setPhoneFileContent] = useState<string | undefined>();
   const [isReadingPhoneFile, setIsReadingPhoneFile] = useState(false);
+
+  // ── Learn English state — kept fully separate from the other tabs' state ────
+  const [leTopic, setLeTopic] = useState('');
+  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual'>('situational');
+  const [leDuration, setLeDuration] = useState<number>(5);
+  const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
+  const [leNarrator, setLeNarrator] = useState(false);
+  const [leGenerateQuestions, setLeGenerateQuestions] = useState(true);
 
   const languages = [
     'English',
@@ -158,6 +166,25 @@ const DebateInput: React.FC<DebateInputProps> = ({
   };
 
   const handleSubmit = async () => {
+    // ── Learn English mode ──────────────────────────────────────────────────
+    if (mode === 'learn_english') {
+      if (!leTopic.trim()) {
+        toast.warning('Topic/situation daalo pehle');
+        return;
+      }
+      onGenerate({
+        topic: leTopic.trim(),
+        specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}`,
+        duration: leDuration,
+        includeNarrator: leNarrator,
+        model,
+        language: 'English',
+        style: 'learn_english',
+        speakerCount: leSpeakerCount,
+      });
+      return;
+    }
+
     // ── Phone Studio mode ──────────────────────────────────────────────────
     if (mode === 'phone') {
       const phoneCtx = [
@@ -341,6 +368,17 @@ const DebateInput: React.FC<DebateInputProps> = ({
             YouTube Link
           </button>
           <button
+            onClick={() => setMode('learn_english')}
+            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
+              mode === 'learn_english'
+                ? 'bg-gradient-to-r from-cyan-600/30 to-emerald-600/30 text-white shadow-md ring-1 ring-cyan-500/30'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+            }`}
+          >
+            <BookOpen size={16} className={mode === 'learn_english' ? 'text-cyan-400' : ''} />
+            Learn English
+          </button>
+          <button
             onClick={() => { setMode('phone'); setSpeakerCount(2); }}
             className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
               mode === 'phone'
@@ -401,8 +439,137 @@ const DebateInput: React.FC<DebateInputProps> = ({
         </div>
       )}
 
+      {/* ── "Learn English" tab: fully self-contained, doesn't share state/UI with the other tabs. ── */}
+      {mode === 'learn_english' && (
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-emerald-600 rounded-[18px] opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
+          <div className="relative bg-[#0a0a0a] rounded-[16px] border border-white/5 p-5 space-y-5">
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Topic / Situation</label>
+              <textarea
+                value={leTopic}
+                onChange={e => setLeTopic(e.target.value)}
+                placeholder="e.g. Someone stole my phone and I'm reporting it to a police officer"
+                rows={3}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Style</label>
+                <select
+                  value={leStyle}
+                  onChange={e => setLeStyle(e.target.value as typeof leStyle)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
+                >
+                  <option value="situational">Situational</option>
+                  <option value="roleplay">Roleplay Practice</option>
+                  <option value="interview">Formal / Interview</option>
+                  <option value="casual">Casual Chat</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Duration</label>
+                <select
+                  value={leDuration}
+                  onChange={e => setLeDuration(Number(e.target.value))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
+                >
+                  <option value={3}>3 Min</option>
+                  <option value={5}>5 Min</option>
+                  <option value={8}>8 Min</option>
+                  <option value={12}>12 Min</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Speakers</label>
+                <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
+                  {[1, 2, 3].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setLeSpeakerCount(n)}
+                      className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                        leSpeakerCount === n ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                      }`}
+                    >{n}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Narrator</label>
+                <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
+                  <button
+                    onClick={() => setLeNarrator(true)}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      leNarrator ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >On</button>
+                  <button
+                    onClick={() => setLeNarrator(false)}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      !leNarrator ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >Off</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Generate Questions</label>
+                <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
+                  <button
+                    onClick={() => setLeGenerateQuestions(true)}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      leGenerateQuestions ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >On</button>
+                  <button
+                    onClick={() => setLeGenerateQuestions(false)}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      !leGenerateQuestions ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >Off</button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Model</label>
+                <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
+                  <button
+                    onClick={() => setModel('gemini-3.1-pro-preview')}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      model === 'gemini-3.1-pro-preview' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >3.1 Pro</button>
+                  <button
+                    onClick={() => setModel('gemini-3.8-flash')}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      model === 'gemini-3.8-flash' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >3.8 Flash</button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              disabled={isLoading || !leTopic.trim()}
+              className="w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-cyan-600 to-emerald-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
+            >
+              {isLoading
+                ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
+                : <>Generate Script <ArrowRight size={16} /></>}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* All other modes share the standard input layout below. */}
-      {mode !== 'phone_new' && (
+      {mode !== 'phone_new' && mode !== 'learn_english' && (
       <div className="space-y-5">
         {/* Main Input Area */}
         <div className="relative group">

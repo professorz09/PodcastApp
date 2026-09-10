@@ -15,7 +15,7 @@ const LyricsGenerator  = lazy(() => import('./components/LyricsGenerator'));
 const PhoneConvoStudio = lazy(() => import('./components/PhoneConvoStudio'));
 const IgSongStudio     = lazy(() => import('./components/IgSongStudio'));
 const ShortsStudio     = lazy(() => import('./components/ShortsStudio'));
-import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript } from './services/geminiService';
+import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript, generateLearnEnglishScript } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, PhoneStudioSourceClip, ThumbnailState, YoutubeImportData } from './types';
 import { saveState, loadState, clearState } from './services/storageService';
@@ -123,6 +123,29 @@ const App: React.FC = () => {
   const handleGenerateScript = async (config: DebateConfig) => {
     setIsLoading(true);
     try {
+      // ── Learn English path ─────────────────────────────────────────────────
+      if (config.style === 'learn_english') {
+        const details = config.specificDetails ?? '';
+        const leStyleMatch = details.match(/LEARN_ENGLISH_STYLE:(\w+)/);
+        const leStyle = leStyleMatch?.[1] || 'situational';
+        const generateQuestions = /LEARN_ENGLISH_QUESTIONS:true/.test(details);
+
+        const generatedScript = await generateLearnEnglishScript(
+          config.topic || 'A day at a coffee shop',
+          config.speakerCount,
+          config.includeNarrator,
+          generateQuestions,
+          config.duration,
+          config.model,
+          leStyle,
+        );
+        if (!generatedScript.length) throw new Error('Learn English: Script generate nahi hua — dobara try karo.');
+        setScript(generatedScript);
+        setScriptStyle('learn_english');
+        setAppState(AppState.SCRIPT);
+        return;
+      }
+
       // ── Phone Studio path ─────────────────────────────────────────────────
       if (config.style === 'phone_studio') {
         const details = config.specificDetails ?? '';
