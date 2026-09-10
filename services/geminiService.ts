@@ -5260,44 +5260,63 @@ export const generateLearnEnglishScript = async (
     : speakerCount === 2
       ? leStyle === 'debate'
         ? 'TWO speakers: "You" (the English learner) and ONE "Opponent" who argues the other side of the topic. Keep the opponent\'s name consistent throughout. This is a direct back-and-forth debate, not a moderated one — no third person bridging it.'
-        : 'TWO speakers: "You" (the English learner) and ONE other character who drives the situation (e.g. "Boss", "Police Officer", "Waiter", "Date", "Interviewer", "Stranger"). Pick a role that fits the topic and keep that exact name consistent throughout. The scene is a DIRECT exchange between "You" and this character — do not add a third person or narrator bridging the conversation, it breaks immersion.'
+        : 'TWO speakers: "You" (the English learner) and ONE other character who drives the situation. Give them a real first name plus their role fits the topic (e.g. "Boss", "Officer Reyes", "Maya (your date)", "Interviewer") and keep that EXACT string spelled identically every time it\'s used as "speaker" — this string is also used to pick their voice and on-screen name, so never vary it mid-script. The scene is a DIRECT exchange between "You" and this character — do not add a third person or narrator bridging the conversation, it breaks immersion.'
       : '"You" (the English learner) plus TWO other characters that fit the situation. Pick natural, consistent role names for the topic.';
 
   const introLine = includeNarrator
-    ? 'Segment 1 MUST be spoken by "Narrator", tag "intro", just 1-2 sentences (10-15 seconds spoken) — a cinematic story hook that sets the scene (e.g. "It was just another Monday morning... until my boss called me into his office."). After that, hand off entirely to the characters — Narrator should not interrupt the scene again except for the "narrator" teaching asides described below.'
-    : 'Do NOT include an intro segment — start directly with the first line of dialogue (tag "dialogue").';
+    ? 'Segment 1 MUST be spoken by "Narrator", tag "intro", just 1-2 sentences (10-15 seconds spoken) — a cinematic story hook that sets the scene and creates curiosity about what\'s coming (e.g. "It was just another Monday morning... until my boss called me into his office."). Don\'t give away how it ends. After that, hand off entirely to the characters — Narrator should not interrupt the scene again except for the "narrator" teaching asides described below.'
+    : 'Do NOT include an intro segment — start directly with the first line of dialogue (tag "dialogue"), in media res, as if the scene is already underway.';
 
   const languageLine = leLanguage === 'hinglish'
-    ? 'IMPORTANT: All "dialogue"/"intro" segments (the actual scene) must be in English — that never changes, it\'s what the learner is practicing. BUT every "narrator" aside\'s spoken "text" and its explanation.meaning must be written in Hindi (Devanagari script, natural Hinglish tone) — Hindi speakers learning English understand meanings best explained in Hindi. explanation.phrase and explanation.example stay in English (they ARE the English being taught). Same for "quiz" segments: the question text should be in Hindi, options/answer can stay in English where they quote the English phrase being tested.'
+    ? 'IMPORTANT: All "dialogue"/"intro" segments (the actual scene) must be in English — that never changes, it\'s what the learner is practicing. BUT every "narrator" aside\'s spoken "text" and its explanation.meaning must be written in Hindi (Devanagari script, natural Hinglish tone, like a friendly teacher talking to the learner directly — not a formal textbook translation). explanation.phrase and explanation.example stay in English (they ARE the English being taught). Same for "quiz" segments: the question text should be in Hindi, options/answer can stay in English where they quote the English phrase being tested.'
     : 'Everything — dialogue, narrator asides, and quiz — should be in English.';
 
-  const teachingLine = `Roughly every 3-5 lines of dialogue, when a genuinely useful idiom/phrase/expression just got used, insert ONE short "Narrator" aside, tag "narrator" — like a teacher briefly popping in. Its "text" should be a one-line spoken remark (e.g. "Notice how she said 'let you go' — that's a polite way to say someone is fired."), AND it must carry an "explanation" object: {"phrase": the exact expression, "meaning": short plain meaning, "example": one more example sentence using it}. Keep these asides brief and don't overuse them — this whole category should be roughly 10% of all segments. Immediately after each aside, return straight back to the story.`;
+  const teachingLine = `TEACHING ASIDES ("narrator" tag, roughly 10% of all segments, spread out — not clustered together):
+Roughly every 3-5 lines of dialogue, when a line just used a genuinely common, USEFUL idiom, phrasal verb, or natural expression (not something rare or textbook-obscure), insert ONE short "Narrator" aside — like a teacher briefly pausing the scene, not lecturing. Rules for a good aside:
+- Pick expressions a learner would actually want to reuse in daily life — prioritize phrasal verbs, common idioms, and natural connector phrases over vocabulary that's just a "big word".
+- "text" (what's spoken) is ONE casual, encouraging sentence, e.g. "Notice how she said 'let you go' — that's a polite way to say someone is fired." Never just repeat the dialogue line verbatim.
+- "explanation.phrase" is the exact expression as used.
+- "explanation.meaning" is a short, plain-language meaning — no jargon, no dictionary-speak.
+- "explanation.example" is a FRESH example sentence in a completely different context from the dialogue, so the learner sees the phrase used a second, different way (not a copy of the dialogue line with names swapped).
+- Never explain something already obvious or something a beginner already knows (e.g. don't explain "hello" or "thank you").
+Immediately after each aside, cut straight back to the story — no lingering.`;
 
   const questionsLine = generateQuestions
-    ? `\n\nAfter the dialogue ends, add 2-4 final segments spoken by "Narrator", tag "quiz" (roughly 10% of all segments) — short comprehension/recall questions based on the conversation just shown (e.g. "What did the boss say instead of 'You're fired'?"). Each must carry a "quiz" object: {"question": the question text, "options": 2-4 short possible answers (optional, only if it naturally fits as multiple-choice), "answer": the correct answer}. "text" should just be the spoken question itself.`
+    ? `\n\nQUIZ ("quiz" tag, spoken by "Narrator", roughly 10% of all segments, placed as 2-4 segments after the dialogue ends):
+Short, punchy comprehension/recall questions based ONLY on what was just shown — a viewer who watched the scene should be able to answer every one without outside knowledge. Mix the question types instead of repeating the same pattern:
+- A couple of plot-recall questions (e.g. "What did the boss say instead of 'You're fired'?").
+- At least one usage/application question testing the taught phrases themselves (e.g. "Which of these means the same as 'let you go'?" with the real phrase as one option and 2-3 plausible-but-wrong alternatives).
+Keep questions unambiguous — exactly one correct answer, no trick wording. Each segment must carry a "quiz" object: {"question": the question text, "options": 2-4 short possible answers (optional, only include when it naturally fits multiple-choice), "answer": the correct answer, matched exactly to one of the options when options are given}. "text" is just the spoken question itself.`
     : '';
 
   const styleLine = {
-    situational: 'Everyday situational English — natural, practical phrasing a learner would actually use in real life. Think of real, slightly dramatic everyday situations: getting fired, missing a flight, being stopped by police, a first date, a robbery, overhearing a secret at work — pick or invent one that fits the topic.',
-    roleplay: 'A roleplay-practice scene — slightly more structured, clearly modeling both sides of a common exchange.',
-    interview: 'A more formal register — like a job interview or official conversation, polite and professional English.',
-    casual: 'Casual, relaxed conversational English between people who know each other.',
+    situational: 'Everyday situational English — natural, practical phrasing a learner would actually use in real life. Invent a real, slightly dramatic everyday situation that specifically fits the given topic (getting fired, missing a flight, being stopped by police, a first date, a robbery, overhearing a secret at work, etc. are just examples of the GENRE — don\'t default to reusing them verbatim unless the topic itself is exactly that; tailor the specifics — names, setting, stakes — to the topic given).',
+    roleplay: 'A roleplay-practice scene — slightly more structured, clearly modeling both sides of a common exchange, useful as a template the learner could mimic in real life.',
+    interview: 'A more formal register — like a job interview or official conversation, polite and professional English, but still natural (not stiff/robotic).',
+    casual: 'Casual, relaxed conversational English between people who know each other — contractions, filler words like "honestly"/"I mean", interruptions, natural back-and-forth.',
     debate: 'A friendly but spirited debate between "You" and an "Opponent" arguing opposite sides of the topic — teaches persuasive/argumentative English: agreeing, disagreeing, making a point, conceding a point, rebutting.',
   }[leStyle] || 'Everyday situational English.';
 
-  const prompt = `You are writing an ENGLISH-LEARNING practice video script, based on this topic/situation: "${topic}".
+  const prompt = `You are a scriptwriter creating an ENGLISH-LEARNING practice video, based on this topic/situation: "${topic}".
 
 ${rolesLine}
 ${introLine}
 Style: ${styleLine}
 ${languageLine}
-Roughly ${turnsGuide} lines of dialogue total (tag "dialogue" for all of these). Use natural, everyday English — not stiff or textbook-like — full of expressions a learner would genuinely want to practice. 80% of all segments should be plain "dialogue" between the characters, driving a real mini-story with a clear beginning, tension, and resolution.
+
+SCENE CRAFT — this must read as a real mini-story, not a generic back-and-forth. Give it a clear arc across the ~${turnsGuide} "dialogue" lines: a quick SETUP (where/who/what's at stake), rising TENSION or complication (something goes wrong, is revealed, or is at risk), a TURNING POINT, and a RESOLUTION or a clear final beat — even in ${turnsGuide} lines this should feel like it's going somewhere, not just chatting. 80% of all segments should be plain "dialogue" between the characters.
+
+DIALOGUE QUALITY:
+- Natural, everyday spoken English — contractions (I'm, don't, that's), realistic reactions, interruptions where it fits. Not stiff, not textbook-perfect grammar showcases.
+- Vary sentence length — short reactive lines mixed with longer ones, the way real conversation actually sounds.
+- Every character should sound distinct — don't make both sides speak in the same rhythm/vocabulary.
+- Genuinely useful, reusable expressions a learner would want to practice should come up naturally — don't force vocabulary in awkwardly.
 
 ${teachingLine}${questionsLine}
 
-Return JSON only (no markdown), an array of objects in speaking order:
+Return JSON only (no markdown, no commentary before or after), an array of objects in speaking order:
 {"speaker": "...", "text": "...", "tag": "intro"|"dialogue"|"narrator"|"quiz", "explanation": {...} (ONLY for tag "narrator"), "quiz": {...} (ONLY for tag "quiz")}
-"speaker" must be exactly "Narrator", "You", or the other character's role name (spelled identically every time it's used).`;
+"speaker" must be exactly "Narrator", "You", or the other character's exact name/role string (spelled identically every single time it's used).`;
 
   try {
     const response = await ai.models.generateContent({
