@@ -77,6 +77,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [leDuration, setLeDuration] = useState<number>(5);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
   const [leIntro, setLeIntro] = useState(false); // whether a short cinematic Narrator intro hook gets generated
+  const [leNarrator, setLeNarrator] = useState(true); // whether mid-dialogue Narrator teaching asides get generated
   const [leGenerateQuestions, setLeGenerateQuestions] = useState(true);
   const [leLanguage, setLeLanguage] = useState<'hinglish' | 'english'>('hinglish');
 
@@ -175,7 +176,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       }
       onGenerate({
         topic: leTopic.trim(),
-        specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}\nLEARN_ENGLISH_LANGUAGE:${leLanguage}${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}`,
+        specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}\nLEARN_ENGLISH_LANGUAGE:${leLanguage}${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}${!leNarrator ? '\nLEARN_ENGLISH_NARRATOR:false' : ''}`,
         duration: leDuration,
         includeNarrator: leIntro,
         model,
@@ -523,6 +524,24 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Narrator</label>
+                <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
+                  <button
+                    onClick={() => setLeNarrator(true)}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      leNarrator ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >On</button>
+                  <button
+                    onClick={() => setLeNarrator(false)}
+                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                      !leNarrator ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >Off</button>
+                </div>
+                <p className="text-[10px] text-gray-600 mt-1.5">On = beech-beech mein Narrator phrase/grammar explain karega. Off = koi teaching aside nahi, sirf dialogue.</p>
+              </div>
+              <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Generate Questions</label>
                 <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
                   <button
@@ -539,22 +558,23 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   >Off</button>
                 </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Model</label>
-                <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
-                  <button
-                    onClick={() => setModel('gemini-3.1-pro-preview')}
-                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
-                      model === 'gemini-3.1-pro-preview' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`}
-                  >3.1 Pro</button>
-                  <button
-                    onClick={() => setModel('gemini-3.8-flash')}
-                    className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
-                      model === 'gemini-3.8-flash' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`}
-                  >3.8 Flash</button>
-                </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Model</label>
+              <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/10">
+                <button
+                  onClick={() => setModel('gemini-3.1-pro-preview')}
+                  className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                    model === 'gemini-3.1-pro-preview' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >3.1 Pro</button>
+                <button
+                  onClick={() => setModel('gemini-3.8-flash')}
+                  className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${
+                    model === 'gemini-3.8-flash' ? 'bg-cyan-600/40 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >3.8 Flash</button>
               </div>
             </div>
 

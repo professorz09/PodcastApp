@@ -5251,6 +5251,7 @@ export const generateLearnEnglishScript = async (
   model: string = 'gemini-3.8-flash',
   leStyle: string = 'situational',
   leLanguage: 'hinglish' | 'english' = 'hinglish', // language of Narrator's teaching asides/quiz — dialogue is ALWAYS English
+  includeTeachingAsides: boolean = true, // mid-dialogue Narrator phrase/grammar explanations — independent of includeNarrator (intro)
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -5271,7 +5272,8 @@ export const generateLearnEnglishScript = async (
     ? 'IMPORTANT: All "dialogue"/"intro" segments (the actual scene) must be in English — that never changes, it\'s what the learner is practicing. BUT every "narrator" aside\'s spoken "text" and its explanation.meaning must be written in Hindi (Devanagari script, natural Hinglish tone, like a friendly teacher talking to the learner directly — not a formal textbook translation). explanation.phrase and explanation.example stay in English (they ARE the English being taught). Same for "quiz" segments: the question text should be in Hindi, options/answer can stay in English where they quote the English phrase being tested.'
     : 'Everything — dialogue, narrator asides, and quiz — should be in English.';
 
-  const teachingLine = `TEACHING ASIDES ("narrator" tag, roughly 10% of all segments, spread out — not clustered together):
+  const teachingLine = includeTeachingAsides
+    ? `TEACHING ASIDES ("narrator" tag, roughly 10% of all segments, spread out — not clustered together):
 Roughly every 3-5 lines of dialogue, when a line just used a genuinely common, USEFUL idiom, phrasal verb, or natural expression (not something rare or textbook-obscure), insert ONE short "Narrator" aside — like a teacher briefly pausing the scene, not lecturing. Rules for a good aside:
 - Pick expressions a learner would actually want to reuse in daily life — prioritize phrasal verbs, common idioms, and natural connector phrases over vocabulary that's just a "big word".
 - "text" (what's spoken) is ONE casual, encouraging sentence, e.g. "Notice how she said 'let you go' — that's a polite way to say someone is fired." Never just repeat the dialogue line verbatim.
@@ -5279,7 +5281,8 @@ Roughly every 3-5 lines of dialogue, when a line just used a genuinely common, U
 - "explanation.meaning" is a short, plain-language meaning — no jargon, no dictionary-speak.
 - "explanation.example" is a FRESH example sentence in a completely different context from the dialogue, so the learner sees the phrase used a second, different way (not a copy of the dialogue line with names swapped).
 - Never explain something already obvious or something a beginner already knows (e.g. don't explain "hello" or "thank you").
-Immediately after each aside, cut straight back to the story — no lingering.`;
+Immediately after each aside, cut straight back to the story — no lingering.`
+    : 'Do NOT insert any "narrator" teaching-aside segments — this is a pure dialogue-only scene, no interruptions to explain vocabulary.';
 
   const questionsLine = generateQuestions
     ? `\n\nQUIZ ("quiz" tag, spoken by "Narrator", roughly 10% of all segments, placed as 2-4 segments after the dialogue ends):

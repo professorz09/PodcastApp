@@ -132,6 +132,7 @@ const App: React.FC = () => {
         const leLanguageMatch = details.match(/LEARN_ENGLISH_LANGUAGE:(\w+)/);
         const leLanguage = (leLanguageMatch?.[1] === 'english' ? 'english' : 'hinglish') as 'hinglish' | 'english';
         const generateQuestions = /LEARN_ENGLISH_QUESTIONS:true/.test(details);
+        const includeTeachingAsides = !/LEARN_ENGLISH_NARRATOR:false/.test(details);
 
         const generatedScript = await generateLearnEnglishScript(
           config.topic || 'A day at a coffee shop',
@@ -142,6 +143,7 @@ const App: React.FC = () => {
           config.model,
           leStyle,
           leLanguage,
+          includeTeachingAsides,
         );
         if (!generatedScript.length) throw new Error('Learn English: Script generate nahi hua — dobara try karo.');
         setScript(generatedScript);
