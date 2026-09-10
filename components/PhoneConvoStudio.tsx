@@ -344,7 +344,9 @@ GLOBAL TONE RULES:
 const speakerToPhoneId = (speaker: string) =>
   `p_${speaker.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}`;
 
-const DEFAULT_BATTERIES = ['87%', '73%', '91%', '65%', '82%', '58%'];
+// Random battery % (28-99) — each phone gets its own on creation/shuffle so
+// the call mockup doesn't look identical across renders.
+const randomBattery = () => `${Math.floor(Math.random() * (99 - 28 + 1)) + 28}%`;
 
 // Default model assignments per speaker index
 const DEFAULT_MODELS = ['chatgpt', 'gemini', 'claude', 'grok', 'deepseek', 'llama'];
@@ -367,7 +369,7 @@ const buildPhonesFromSpeakers = (
       screenColor: preset.screen,
       rotation: [-4, 5, -3, 4][i % 4],
       showControls: true,
-      battery: DEFAULT_BATTERIES[i % DEFAULT_BATTERIES.length],
+      battery: randomBattery(),
     };
   });
 };
@@ -574,7 +576,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             screenColor: '#0d0618',
             rotation: 0,
             showControls: true,
-            battery: '87%',
+            battery: randomBattery(),
           };
           const turn: ScriptTurn = {
             id: 'intro_turn',
@@ -3584,8 +3586,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         const p1 = AI_MODEL_PRESETS.find(m => m.label === speaker1) ?? AI_MODEL_PRESETS[0];
         const p2 = AI_MODEL_PRESETS.find(m => m.label === speaker2) ?? AI_MODEL_PRESETS[1];
         return [
-          { id: 'p_ChatGPT', name: p1.label, style: p1.style, color: p1.color, screenColor: p1.screen, rotation: -4, showControls: true, battery: '87%' },
-          { id: 'p_Gemini', name: p2.label, style: p2.style, color: p2.color, screenColor: p2.screen, rotation: 5, showControls: true, battery: '73%' },
+          { id: 'p_ChatGPT', name: p1.label, style: p1.style, color: p1.color, screenColor: p1.screen, rotation: -4, showControls: true, battery: randomBattery() },
+          { id: 'p_Gemini', name: p2.label, style: p2.style, color: p2.color, screenColor: p2.screen, rotation: 5, showControls: true, battery: randomBattery() },
         ];
       })();
 
@@ -3675,7 +3677,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         const newPhones: PhoneConfig[] = [{
           id: phoneId, name: analyst,
           style: 'aurora', color: purplePreset.color, screenColor: purplePreset.screen,
-          rotation: 0, showControls: true, battery: '87%',
+          rotation: 0, showControls: true, battery: randomBattery(),
         }];
         const newScript: ScriptTurn[] = turns.map((t, i) => {
           const estDur = Math.max(3000, t.text.length * 72);
@@ -3735,12 +3737,12 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         {
           id: supporterPhoneId, name: args.supporterName,
           style: 'aurora', color: greenPreset.color, screenColor: greenPreset.screen,
-          rotation: -4, showControls: true, battery: '87%',
+          rotation: -4, showControls: true, battery: randomBattery(),
         },
         {
           id: criticPhoneId, name: args.criticName,
           style: 'ripple', color: redPreset.color, screenColor: redPreset.screen,
-          rotation: 5, showControls: true, battery: '73%',
+          rotation: 5, showControls: true, battery: randomBattery(),
         },
       ];
       const newScript: ScriptTurn[] = turns.map((t, i) => {
@@ -4288,12 +4290,19 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Battery</span>
-                          <input
-                            value={phone.battery ?? '87%'}
-                            onChange={e => updatePhone(phone.id, { battery: e.target.value })}
-                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', fontSize: 12, fontFamily: 'monospace', outline: 'none', width: 72, textAlign: 'center', padding: '6px 8px' }}
-                            placeholder="87%"
-                          />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              onClick={() => updatePhone(phone.id, { battery: randomBattery() })}
+                              title="Randomize battery"
+                              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', fontSize: 13, cursor: 'pointer', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                            >🎲</button>
+                            <input
+                              value={phone.battery ?? '87%'}
+                              onChange={e => updatePhone(phone.id, { battery: e.target.value })}
+                              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', fontSize: 12, fontFamily: 'monospace', outline: 'none', width: 72, textAlign: 'center', padding: '6px 8px' }}
+                              placeholder="87%"
+                            />
+                          </div>
                         </div>
                       </div>
 
