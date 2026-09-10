@@ -309,6 +309,28 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // drag on the Y axis (X still worked since there's nothing to scroll
   // sideways). This ref lets a real addEventListener call preventDefault().
   const isInteractingRef = useRef(false);
+
+  // Native (non-passive) touchmove listener: React's onTouchMove prop is
+  // registered as a passive listener, so preventDefault() called from inside
+  // it is silently ignored — on iOS Safari that lets the page's own
+  // vertical-scroll gesture win over a subtitle-box drag whenever the touch
+  // moves mostly up/down, even with `touch-action: none` in CSS on some
+  // WebKit versions. Only preventDefault while actually dragging/resizing,
+  // so normal page scrolling elsewhere is unaffected.
+  // NOTE: kept up here, before the `if (mergeError) return (...)` early
+  // return further down — a hook placed after that return would be called
+  // on some renders and skipped on others, violating the Rules of Hooks
+  // (React error #300, "rendered fewer hooks than expected").
+  useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const onTouchMoveNative = (e: TouchEvent) => {
+          if (isInteractingRef.current) e.preventDefault();
+      };
+      canvas.addEventListener('touchmove', onTouchMoveNative, { passive: false });
+      return () => canvas.removeEventListener('touchmove', onTouchMoveNative);
+  }, []);
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -2565,23 +2587,6 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       setDraggingSubtitle(false);
       setResizingSubtitle(null);
   };
-
-  // Native (non-passive) touchmove listener: React's onTouchMove prop is
-  // registered as a passive listener, so preventDefault() called from inside
-  // it is silently ignored — on iOS Safari that lets the page's own
-  // vertical-scroll gesture win over a subtitle-box drag whenever the touch
-  // moves mostly up/down, even with `touch-action: none` in CSS on some
-  // WebKit versions. Only preventDefault while actually dragging/resizing,
-  // so normal page scrolling elsewhere is unaffected.
-  useEffect(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const onTouchMoveNative = (e: TouchEvent) => {
-          if (isInteractingRef.current) e.preventDefault();
-      };
-      canvas.addEventListener('touchmove', onTouchMoveNative, { passive: false });
-      return () => canvas.removeEventListener('touchmove', onTouchMoveNative);
-  }, []);
 
   const getSupportedMimeType = () => {
     const types = [
