@@ -55,35 +55,52 @@ export const transcribeAudioGoogleCloud = async (
     console.log(`Resampled to ${TARGET_RATE}Hz mono: duration=${resampled.duration.toFixed(2)}s`);
 
     // ── Chunk into 55 s pieces (safe margin under 60 s sync limit) ──────────
-    // Google STT v1 inline audio: hard limit is 60 s / 10 MB per sync request.
-    // For anything longer, the service switches to longrunningrecognize automatically.
-    // We stay well under with 55 s chunks to avoid the edge case.
+    // Google STT v1 inline audio: hard limit is 60 s / 10 MB per sync request —
+    // that cap is why chunking exists at all, it's not optional. What IS
+    // optional is doing them one at a time: chunks are independent requests,
+    // so we fire several in parallel (bounded pool) instead of awaiting each
+    // one before starting the next — same number of API calls, much less
+    // wall-clock time.
     const CHUNK_DURATION = 55;
+    const CONCURRENCY = 6;
     let allTimings: { word: string; start: number; end: number }[] = [];
 
     if (resampled.duration > CHUNK_DURATION) {
       const totalChunks = Math.ceil(resampled.duration / CHUNK_DURATION);
-      console.log(`Splitting into ${totalChunks} chunks of ≤${CHUNK_DURATION}s`);
+      console.log(`Splitting into ${totalChunks} chunks of ≤${CHUNK_DURATION}s — transcribing up to ${CONCURRENCY} in parallel`);
 
-      for (let i = 0; i < totalChunks; i++) {
-        const startTime = i * CHUNK_DURATION;
-        const endTime = Math.min((i + 1) * CHUNK_DURATION, resampled.duration);
-        const m = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
-        console.log(`Chunk ${i + 1}/${totalChunks}: ${startTime.toFixed(1)}-${endTime.toFixed(1)}s`);
-        onProgress?.(`Google STT — chunk ${i + 1}/${totalChunks} (${m(startTime)}–${m(endTime)}) transcribe ho raha hai…`);
+      const ranges = Array.from({ length: totalChunks }, (_, i) => ({
+        i,
+        startTime: i * CHUNK_DURATION,
+        endTime: Math.min((i + 1) * CHUNK_DURATION, resampled.duration),
+      }));
+      const chunkResults: { word: string; start: number; end: number }[][] = new Array(totalChunks);
+      let completed = 0;
 
+      const runChunk = async ({ i, startTime, endTime }: (typeof ranges)[number]) => {
         const chunkBuffer = extractChunk(resampled, startTime, endTime);
         const chunkBlob = audioBufferToWav(chunkBuffer);
-
         const chunkTimings = await withChunkRetry(
           () => transcribeChunk(chunkBlob, TARGET_RATE, languageCode),
           `Chunk ${i + 1}/${totalChunks}`,
           onProgress,
         );
-        chunkTimings.forEach(t => {
-          allTimings.push({ word: t.word, start: t.start + startTime, end: t.end + startTime });
-        });
-      }
+        chunkResults[i] = chunkTimings.map(t => ({ word: t.word, start: t.start + startTime, end: t.end + startTime }));
+        completed++;
+        onProgress?.(`Google STT — ${completed}/${totalChunks} chunks transcribe ho gaye…`);
+      };
+
+      // Bounded worker pool — each worker pulls the next range until none are left.
+      let nextIdx = 0;
+      const workers = Array.from({ length: Math.min(CONCURRENCY, ranges.length) }, async () => {
+        while (nextIdx < ranges.length) {
+          const range = ranges[nextIdx++];
+          await runChunk(range);
+        }
+      });
+      await Promise.all(workers);
+
+      allTimings = chunkResults.flat();
     } else {
       onProgress?.('Google STT — transcribing…');
       const blob = audioBufferToWav(resampled);
