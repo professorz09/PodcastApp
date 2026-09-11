@@ -6,9 +6,27 @@ const STORE_KEY = 'autovid_state';
 const SCENES_KEY = 'autovid_scenes';
 const SHORTS_SCENES_KEY = 'autovid_shorts_scenes';
 const ENGLISH_VIDEO_VISUALS_KEY = 'autovid_english_video_visuals';
+const ENGLISH_INTRO_SCENES_KEY = 'autovid_english_intro_scenes';
 
-interface StoredSegment extends DebateSegment {
+interface StoredIntroSceneBeat {
+  prompt: string;
+  startOffset: number;
+  endOffset: number;
+  imageBlob?: Blob | null;
+  imageUrl?: string;
+}
+
+interface StoredSegment extends Omit<DebateSegment, 'learnEnglish' | 'visualConfig'> {
   audioBlob?: Blob | null;
+  learnEnglish?: {
+    segmentType: 'intro' | 'dialogue' | 'narrator' | 'quiz';
+    introScenes?: StoredIntroSceneBeat[];
+    explanation?: any;
+    quiz?: any;
+  };
+  visualConfig?: any & {
+    backgroundBlob?: Blob | null;
+  };
 }
 
 interface StoredState {
@@ -234,6 +252,95 @@ export const loadEnglishVideoVisuals = async (script: DebateSegment[]): Promise<
   }
 };
 
+// ── English Intro Scenes Persistence (dedicated key for instant save on generation) ─
+
+export interface StoredIntroScene {
+  prompt: string;
+  startOffset: number;
+  endOffset: number;
+  imageBlob?: Blob | null;
+}
+
+export interface StoredIntroScenesMap {
+  scriptSignature: string;
+  scenesBySegmentId: Record<string, StoredIntroScene[]>;
+}
+
+let _activeEnglishIntroBlobUrls: string[] = [];
+
+export const saveEnglishIntroScenes = async (
+  script: DebateSegment[],
+): Promise<void> => {
+  try {
+    const scenesBySegmentId: Record<string, StoredIntroScene[]> = {};
+    for (const seg of script) {
+      if (seg.learnEnglish?.introScenes?.length) {
+        const storedScenes: StoredIntroScene[] = await Promise.all(
+          seg.learnEnglish.introScenes.map(async (sc) => {
+            let imageBlob: Blob | null = null;
+            if (sc.imageUrl) {
+              try {
+                const res = await fetch(sc.imageUrl);
+                imageBlob = await res.blob();
+              } catch (e) {
+                console.error('Failed to convert intro scene image to blob', e);
+              }
+            }
+            return {
+              prompt: sc.prompt,
+              startOffset: sc.startOffset,
+              endOffset: sc.endOffset,
+              imageBlob,
+            };
+          })
+        );
+        scenesBySegmentId[seg.id] = storedScenes;
+      }
+    }
+
+    await set(ENGLISH_INTRO_SCENES_KEY, {
+      scriptSignature: getScriptSignature(script),
+      scenesBySegmentId,
+    } as StoredIntroScenesMap);
+  } catch (e) {
+    console.error('Failed to save English intro scenes', e);
+  }
+};
+
+export const loadEnglishIntroScenes = async (
+  script: DebateSegment[],
+): Promise<Record<string, { prompt: string; startOffset: number; endOffset: number; imageUrl?: string }[]> | null> => {
+  try {
+    const stored = await get<StoredIntroScenesMap>(ENGLISH_INTRO_SCENES_KEY);
+    if (!stored) return null;
+    if (stored.scriptSignature !== getScriptSignature(script)) return null;
+
+    _activeEnglishIntroBlobUrls.forEach(u => URL.revokeObjectURL(u));
+    _activeEnglishIntroBlobUrls = [];
+
+    const result: Record<string, { prompt: string; startOffset: number; endOffset: number; imageUrl?: string }[]> = {};
+    for (const [segId, storedScenes] of Object.entries(stored.scenesBySegmentId || {})) {
+      result[segId] = storedScenes.map(sc => {
+        let imageUrl: string | undefined;
+        if (sc.imageBlob) {
+          imageUrl = URL.createObjectURL(sc.imageBlob);
+          _activeEnglishIntroBlobUrls.push(imageUrl);
+        }
+        return {
+          prompt: sc.prompt,
+          startOffset: sc.startOffset,
+          endOffset: sc.endOffset,
+          imageUrl,
+        };
+      });
+    }
+    return result;
+  } catch (e) {
+    console.error('Failed to load English intro scenes', e);
+    return null;
+  }
+};
+
 // ── Main state persistence ─────────────────────────────────────────────────────
 
 let _activeStateBlobUrls: string[] = [];
@@ -284,7 +391,40 @@ export const saveState = async (
         }
         if (audioBlob) nextCache.set(seg.audioUrl, audioBlob);
       }
-      return { ...seg, audioBlob, audioUrl: undefined };
+
+      // Convert intro scenes images to Blobs for safe storage
+      let learnEnglish = seg.learnEnglish;
+      if (learnEnglish?.introScenes && Array.isArray(learnEnglish.introScenes)) {
+        const scenesWithBlobs = await Promise.all(learnEnglish.introScenes.map(async (sc) => {
+          let imageBlob: Blob | null = null;
+          if (sc.imageUrl) {
+            try {
+              const res = await fetch(sc.imageUrl);
+              imageBlob = await res.blob();
+            } catch (e) {
+              console.error("Failed to fetch intro scene image for storage", e);
+            }
+          }
+          const { imageUrl, ...rest } = sc;
+          return { ...rest, imageBlob };
+        }));
+        learnEnglish = { ...learnEnglish, introScenes: scenesWithBlobs };
+      }
+
+      // Also preserve segment backgroundUrl as blob if present
+      let visualConfig: any = seg.visualConfig;
+      if (visualConfig?.backgroundUrl) {
+        let backgroundBlob: Blob | null = null;
+        try {
+          const res = await fetch(visualConfig.backgroundUrl);
+          backgroundBlob = await res.blob();
+        } catch (e) {
+          // ignore
+        }
+        visualConfig = { ...visualConfig, backgroundBlob };
+      }
+
+      return { ...seg, audioBlob, audioUrl: undefined, learnEnglish, visualConfig };
     }));
 
     // A newer saveState() call started while this one was still fetching
@@ -303,9 +443,6 @@ export const saveState = async (
     _quotaWarned = false;
   } catch (error) {
     console.error("Failed to save state to IndexedDB", error);
-    // This used to fail silently — the browser had already discarded a save
-    // (commonly a storage-quota limit) and the user had no way to know their
-    // audio/sync progress wasn't actually persisted until a refresh "lost" it.
     if (!_quotaWarned) {
       _quotaWarned = true;
       const isQuota = (error as any)?.name === 'QuotaExceededError';
@@ -330,8 +467,31 @@ export const loadState = async (): Promise<LoadedState | null> => {
         audioUrl = URL.createObjectURL(seg.audioBlob);
         _activeStateBlobUrls.push(audioUrl);
       }
+
+      let learnEnglish = seg.learnEnglish;
+      if (learnEnglish?.introScenes && Array.isArray(learnEnglish.introScenes)) {
+        const restoredScenes = (learnEnglish.introScenes as any[]).map(sc => {
+          let imageUrl = sc.imageUrl;
+          if (sc.imageBlob) {
+            imageUrl = URL.createObjectURL(sc.imageBlob);
+            _activeStateBlobUrls.push(imageUrl);
+          }
+          const { imageBlob, ...rest } = sc;
+          return { ...rest, imageUrl };
+        });
+        learnEnglish = { ...learnEnglish, introScenes: restoredScenes };
+      }
+
+      let visualConfig = seg.visualConfig;
+      if (visualConfig && (visualConfig as any).backgroundBlob) {
+        const bgUrl = URL.createObjectURL((visualConfig as any).backgroundBlob);
+        _activeStateBlobUrls.push(bgUrl);
+        const { backgroundBlob, ...vcRest } = visualConfig as any;
+        visualConfig = { ...vcRest, backgroundUrl: bgUrl };
+      }
+
       const { audioBlob, ...rest } = seg;
-      return { ...rest, audioUrl } as DebateSegment;
+      return { ...rest, audioUrl, learnEnglish, visualConfig } as DebateSegment;
     });
 
     return {
@@ -353,12 +513,15 @@ export const clearState = async () => {
     await del(STORE_KEY);
     await del(SCENES_KEY);
     await del(SHORTS_SCENES_KEY);
+    await del(ENGLISH_INTRO_SCENES_KEY);
     _activeStateBlobUrls.forEach(u => URL.revokeObjectURL(u));
     _activeStateBlobUrls = [];
     _activeStoryboardBlobUrls.forEach(u => URL.revokeObjectURL(u));
     _activeStoryboardBlobUrls = [];
     _activeShortsBlobUrls.forEach(u => URL.revokeObjectURL(u));
     _activeShortsBlobUrls = [];
+    _activeEnglishIntroBlobUrls.forEach(u => URL.revokeObjectURL(u));
+    _activeEnglishIntroBlobUrls = [];
   } catch (error) {
     console.error("Failed to clear state", error);
   }

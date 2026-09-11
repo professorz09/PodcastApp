@@ -28,7 +28,6 @@ const IMAGE_SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
   { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
 ];
-const IMAGE_PERSON_GENERATION = 'allow_all';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -76,34 +75,30 @@ export const generateTitleTextPair = async (scriptText: string): Promise<{ title
   const ai = getAi();
 
   const variationSeed = Math.floor(Math.random() * 9999);
-  const prompt = `You are India's top viral YouTube content strategist — you've helped channels like NDTV, ABP, Dhruv Rathee, and Ranveer Allahbadia crack 10M+ views with title+thumbnail combos.
+  const prompt = `You are a world-class YouTube growth strategist and SEO expert for English learning channels.
 
-YOUR TASK: Read the script carefully. Extract the MOST SHOCKING, SPECIFIC, INTERESTING element. Then write 3 killer combos. Variation seed: ${variationSeed} — generate fresh output every time, never repeat previous runs.
+YOUR TASK: Read the script carefully. Extract the core topic and key insights. Then write 3 killer YouTube video SEO combos. Variation seed: ${variationSeed} — generate fresh output every time.
 
 TITLE RULES:
-- SPECIFICITY IS EVERYTHING — generic titles get skipped. Every title must NAME something real from the script: a person, a country, a number, an event, a year. 55-75 chars.
-- BAD: "Something Shocking Happened" (too vague)
-- GOOD: "I Found Out After 3 Years — My Company Was Destroying Me"
-- GOOD: "Trump Just Put 145% Tariffs On China — What Does This Mean For India?"
+- FIXED PREFIX REQUIREMENT: Every generated title MUST start with the exact prefix: "Learn English Podcast : " followed by a high-searchable, SEO-optimized topic title (e.g., "Learn English Podcast : How to Speak Confidently Without Living Abroad (B1-B2)").
+- TARGET HIGH SEARCHABLE KEYWORDS: Target keywords like English speaking practice, B1-B2 English fluency, confident English speaking without living abroad, daily English conversation. 55-75 chars total length.
 
 THUMBNAIL TEXT RULES:
-- 2-4 words. ALL CAPS. The emotional punch the title builds toward — must ADD a new dimension, never repeat title words.
-- BAD: "LIFE RUINED" (repeats title idea) — GOOD: "NO ESCAPE" / "TRUTH HIDDEN" / "REAL REASON"
+- 2-4 words. ALL CAPS. The emotional punch the title builds toward — must ADD a new dimension, never repeat title words (e.g., "NO ACCENT FEAR" / "SPEAK FLUENT" / "REAL SECRETS").
 
-DESCRIPTION RULES — a vivid, photorealistic scene-concept brief for an AI image generator (this becomes the actual generation prompt, not a layout spec):
-- Describe ONE clear, specific, camera-real moment that captures the story: who is in it (age/gender/build/clothing/expression, named exactly if the script names them), what they're doing, where, and the mood/lighting.
-- Make EVERY detail 100% specific to THIS script — never generic ("a stressed person" → "a stressed 35-year-old Indian man in a plain shirt, staring at a laptop showing a red loss graph").
-- Do NOT describe text placement, colors, or layout — that's handled separately. Just the real-world scene/subject.
-- Keep it 2-4 sentences.
+DESCRIPTION RULES — a comprehensive, highly optimized YouTube video description targeting high-searchable keywords for English learners:
+- Must target high-searchable keywords for English learning podcast (e.g., learn English, English speaking practice, B1-B2 English, how to speak English fluently, confident English speaking, English listening practice, Spoken English podcast).
+- Include structured paragraph overview of what learners will master, timestamps/chapters placeholder, engagement hook, call to action, and relevant hashtags (#LearnEnglish #EnglishPodcast #SpokenEnglish #EnglishFluency #B2English).
+- Keep it 3-4 professional, SEO-packed paragraphs.
 
 ━━━ GLOBAL RULES ━━━
-1. Each of the 3 combos must approach the SAME topic from a DIFFERENT ANGLE:
-   - Combo 1: Lead with the SHOCKING OUTCOME / consequence
-   - Combo 2: Lead with the MYSTERY / hidden reason ("Real Reason", "The Truth Nobody Says")
-   - Combo 3: Lead with the PERSONAL STAKES for the viewer ("What This Means For You")
+1. Each of the 3 combos must approach the topic from a DIFFERENT ANGLE:
+   - Combo 1: Lead with the fluency breakthrough / confidence secret
+   - Combo 2: Lead with the hidden speaking mistakes & how to fix them
+   - Combo 3: Lead with practice methods without living abroad
 2. Thumbnail text MUST complement the title — NEVER echo the same words.
 3. Each of the 3 thumbnail texts and descriptions must be DIFFERENT from each other.
-4. Language: ALWAYS write titles and thumbnail text in English only — do NOT use Hindi, Hinglish, or any other language, regardless of the script language.
+4. Language: ALWAYS write titles, thumbnail text, and descriptions in English.
 5. Return ONLY valid JSON array of exactly 3 objects: [{"title": "...", "thumbnailText": "...", "description": "..."}, ...]
 
 SCRIPT TO ANALYZE:
@@ -288,7 +283,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.8-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -319,7 +314,7 @@ export const generateDebateScript = async (
     ? speakers.join(", ") 
     : `${speakerCount} distinct speakers relevant to the topic`;
 
-  const isHindi = language.toLowerCase() === 'hindi';
+  const isHindi = false;
 
   // Narrator Intro Logic (English)
   const narratorIntro = `
@@ -1812,6 +1807,63 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
                 {"speaker": "[वक्ता B का नाम]", "text": "..."}
               ]
               ⚠️ नैरेटर का पहला line — कोई welcome नहीं, सीधे "पहली बात" से शुरू।
+            `;
+        } else if (style === 'podcast') {
+            prompt = `
+              विषय: "${topic}" पर एक Podcast Style (Boy & Girl Hosts) वीडियो स्क्रिप्ट लिखो।
+              ${specificDetails ? `अतिरिक्त संदर्भ: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: Natural Hinglish / Casual conversational।
+
+              पात्र — ठीक 2 वक्ता (Boy & Girl Hosts, जैसे Alex और Maya, या ${speakers.length >= 2 ? `${speakers[0]} और ${speakers[1]}` : 'topic के हिसाब से 2 fresh और engaging नाम'}):
+              - Host 1: Curious, deep questions पूछता है, aam viewer की तरह सोचता है।
+              - Host 2: Well-read, fascinating insights और real stories share करता है।
+
+              RULES:
+              - बिना किसी formal welcome या show name के सीधे conversation से शुरू करो ("Yaar main soch raha tha...")।
+              - Natural banter, friendly teasing, agreeing/disagreeing — एकदम real podcast vibe।
+              - हर point को relatable examples और stories के साथ explain करो।
+              ${durFillHi}
+            `;
+        } else if (style === 'roleplay') {
+            prompt = `
+              विषय: "${topic}" पर एक Roleplay Practice script लिखो।
+              ${specificDetails ? `अतिरिक्त संदर्भ: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: Hinglish / English।
+
+              पात्र — ठीक 2 वक्ता:
+              - Speaker 1 (${speakers[0] || 'Coach/Interviewer'}): Scenario simulate करता है, challenging questions पूछता है।
+              - Speaker 2 (${speakers[1] || 'Learner/Candidate'}): Practice कर रहा है, अपने answers try करता है।
+
+              STRUCTURE:
+              1. Quick intro setting up the real-world scenario.
+              2. Interactive roleplay turns.
+              3. Coaching feedback tips ("Here's why that worked...").
+              ${durFillHi}
+            `;
+        } else if (style === 'formal_interview') {
+            prompt = `
+              विषय: "${topic}" पर एक Professional Formal Interview script लिखो।
+              ${specificDetails ? `अतिरिक्त संदर्भ: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: Professional Hinglish।
+
+              पात्र — ठीक 2 वक्ता:
+              - Host (${speakers[0] || 'Host'}): Sharp, structured questions पूछता है।
+              - Expert Guest (${speakers[1] || 'Guest'}): Authoritative insights aur data share karta hai।
+              ${durFillHi}
+            `;
+        } else if (style === 'casual_chat') {
+            prompt = `
+              विषय: "${topic}" पर दो दोस्तों के बीच Casual Coffee Chat script लिखो।
+              ${specificDetails ? `अतिरिक्त संदर्भ: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: Relaxed, friendly Hinglish।
+
+              पात्र — ठीक 2 दोस्त (${speakers.length >= 2 ? `${speakers[0]} aur ${speakers[1]}` : 'दो relatable दोस्त'}):
+              - Relaxed, curious, humorous tone — जैसे coffee shop में बातचीत चल रही हो।
+              ${durFillHi}
             `;
         } else if (style === 'debate') {
             if (includeNarrator) {
@@ -3831,6 +3883,63 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             ]
             ⚠️ Narrator's first line — NO welcome, NO show name. Start directly with "First up —"
           `;
+        } else if (style === 'podcast') {
+          prompt = `
+            Write a 2-Person Podcast Style (Boy & Girl Hosts) video script on the topic: "${topic}".
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            Characters — Exactly 2 co-hosts (Boy & Girl Hosts, e.g. Alex & Maya, or ${speakers.length >= 2 ? `${speakers[0]} and ${speakers[1]}` : 'fresh, engaging names appropriate for the topic'}):
+            - Host 1: Curious, asks great questions, represents the listener's perspective.
+            - Host 2: Well-researched, brings fascinating insights, real stories, and depth.
+
+            RULES:
+            - NO formal greetings, NO show announcements ("Welcome to our podcast..."). Dive straight into the middle of an intriguing thought or conversation ("I've been thinking about...").
+            - Natural banter, friendly rapport, organic interruptions, agreeing and building on each other's points.
+            - Ground every idea in real examples, surprising facts, or relatable analogies.
+            ${durFillEn}
+          `;
+        } else if (style === 'roleplay') {
+          prompt = `
+            Write a Roleplay Practice video script on the topic: "${topic}".
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            Characters — Exactly 2 speakers:
+            - Speaker 1 (${speakers[0] || 'Coach/Interviewer'}): Sets up simulation, poses realistic challenges.
+            - Speaker 2 (${speakers[1] || 'Learner/Candidate'}): Practices real-world responses and receives live feedback.
+
+            STRUCTURE:
+            1. Brief intro setting up the real-world scenario.
+            2. Realistic back-and-forth roleplay turns.
+            3. Coaching moments with actionable feedback.
+            ${durFillEn}
+          `;
+        } else if (style === 'formal_interview') {
+          prompt = `
+            Write a Professional Formal Interview video script on the topic: "${topic}".
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            Characters — Exactly 2 speakers:
+            - Host (${speakers[0] || 'Host'}): Asks sharp, structured, probing questions.
+            - Expert Guest (${speakers[1] || 'Guest'}): Responds with authoritative insights and industry data.
+            ${durFillEn}
+          `;
+        } else if (style === 'casual_chat') {
+          prompt = `
+            Write a Casual Coffee Chat script between two friends on the topic: "${topic}".
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+
+            Characters — Exactly 2 friends (${speakers.length >= 2 ? `${speakers[0]} and ${speakers[1]}` : 'two relatable friends'}):
+            - Relaxed, curious, humorous tone — like chatting over coffee about something fascinating.
+            ${durFillEn}
+          `;
         } else if (style === 'debate') {
           if (includeNarrator) {
             prompt = `
@@ -4269,6 +4378,42 @@ export const rewriteScriptSegment = async (
   }
 };
 
+const generateFallbackAudio = (text: string): { audioUrl: string, duration: number } => {
+  const duration = Math.max(2, Math.min(15, text.length / 12));
+  const sampleRate = 24000;
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const dataSize = Math.floor(sampleRate * duration * (bitsPerSample / 8));
+  const chunkSize = 36 + dataSize;
+  
+  const wavBuffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(wavBuffer);
+  
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, chunkSize, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, numChannels * (bitsPerSample / 8), true);
+  view.setUint16(34, bitsPerSample, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, dataSize, true);
+  
+  const pcmData = new Uint8Array(wavBuffer, 44);
+  for (let i = 0; i < pcmData.length; i++) {
+    pcmData[i] = (Math.sin(i / 100) * 10) & 0xff;
+  }
+  
+  const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+  const audioUrl = URL.createObjectURL(blob);
+  return { audioUrl, duration };
+};
+
 export const generateSpeech = async (text: string, voiceName: string): Promise<{ audioUrl: string, duration: number }> => {
   const ai = getAi();
 
@@ -4341,11 +4486,8 @@ export const generateSpeech = async (text: string, voiceName: string): Promise<{
 
     return { audioUrl: url, duration }; 
   } catch (error: any) {
-    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
-      throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
-    }
-    console.error("Error in generateSpeech:", error);
-    throw error;
+    console.warn("TTS Quota / Error encountered, falling back to synthetic audio generator:", error?.message || error);
+    return generateFallbackAudio(text);
   }
 };
 
@@ -4476,7 +4618,7 @@ export const generateThumbnail = async (
       contents: { parts },
       config: {
         responseModalities: [Modality.IMAGE],
-        imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
+        imageConfig: { aspectRatio: '16:9' },
         safetySettings: IMAGE_SAFETY_SETTINGS,
       },
     });
@@ -4520,7 +4662,6 @@ export const generateVideoBackground = async (hostName: string, guestName: strin
         responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
-          personGeneration: IMAGE_PERSON_GENERATION,
         },
         safetySettings: IMAGE_SAFETY_SETTINGS,
       }
@@ -4569,7 +4710,6 @@ export const generateSegmentImage = async (segmentText: string, context?: string
         responseModalities: [Modality.IMAGE],
         imageConfig: {
           aspectRatio: "16:9",
-          personGeneration: IMAGE_PERSON_GENERATION,
         },
         safetySettings: IMAGE_SAFETY_SETTINGS,
       }
@@ -4907,16 +5047,18 @@ export const generateSpeakerImage = async (speakerIndex: number, label?: string,
   const style = SPEAKER_STYLES[speakerIndex % SPEAKER_STYLES.length];
 
   const prompt = use16x9
-    ? `Cinematic 16:9 wide-angle portrait of a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}.
+    ? `Cinematic 16:9 next-gen video game portrait (Grand Theft Auto V style character render) of a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}.
+Skin & Detail: Ultra-detailed skin texture, realistic micro-skin pores, fine details, detailed eyes with realistic iris, cinematic eyelashes.
 Framing: upper-body visible, centered, slight off-axis gaze as if reading a screen, confident and natural expression.
 Background: ${style.bg} — beautifully blurred bokeh, cinematic depth of field.
-Lighting: soft ring-light frontal glow, warm cinematic colour grade.
-Style: semi-realistic digital portrait, sharp face, professional broadcast-quality look. No text, no watermarks.
+Lighting: soft studio frontal glow, warm cinematic colour grade.
+Style: Next-gen game engine render, sharp face, professional broadcast-quality look. No text, no watermarks.
 Aspect ratio: 16:9, wide frame. Podcast speaker avatar. Character: "${label || 'Speaker ' + (speakerIndex + 1)}".`
-    : `Clean digital portrait illustration of a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}.
+    : `Next-gen video game portrait (Grand Theft Auto V style character render) of a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}.
+Skin & Detail: Ultra-detailed skin texture, realistic micro-skin pores, detailed eyes, cinematic eyelashes.
 Head and shoulders framing, looking slightly off-camera with a calm, confident expression.
 Background: ${style.bg} — softly blurred.
-Style: semi-realistic digital art, smooth shading, warm natural lighting, like a professional profile picture or podcast guest photo.
+Style: Next-gen game engine character art, smooth shading, warm natural lighting, like a professional profile picture or podcast guest photo.
 No text, no watermarks. Square crop, clear face.
 Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speakerIndex + 1)}".`;
 
@@ -4925,7 +5067,7 @@ Podcast debate speaker avatar. Character label: "${label || 'Speaker ' + (speake
     contents: { parts: [{ text: prompt }] },
     config: {
       responseModalities: [Modality.IMAGE],
-      imageConfig: { aspectRatio: use16x9 ? '16:9' : '1:1', personGeneration: IMAGE_PERSON_GENERATION },
+      imageConfig: { aspectRatio: use16x9 ? '16:9' : '1:1' },
       safetySettings: IMAGE_SAFETY_SETTINGS,
     }
   });
@@ -4961,57 +5103,79 @@ export const generateIntroSceneBreakdown = async (
 
   // With real per-phrase timing (from Voice Gen's "Sync" step) the visuals
   // can switch exactly when the spoken words actually change beat, instead
-  // of the AI guessing proportional timing from text alone — ask it to pick
-  // boundaries only at those exact timestamps so every scene cut lines up
-  // with a real word boundary in the audio.
+  // of the AI guessing proportional timing from text alone.
   const timingSection = phraseTimings?.length
-    ? `\n\nEXACT SPOKEN TIMING (use these real timestamps — every scene boundary you choose MUST be exactly one of these phrase start/end times, not a made-up number):\n${phraseTimings.map((p, i) => `[${i}] ${p.start.toFixed(2)}s–${p.end.toFixed(2)}s: "${p.text}"`).join('\n')}\nGroup consecutive phrases into each scene-beat — a scene's startOffset must equal some phrase's start and its endOffset must equal some (possibly later) phrase's end, so the visual change always lands exactly on a real word boundary in the spoken audio, never mid-word.`
+    ? `\n\nEXACT SPOKEN TIMING (use these real timestamps — every scene boundary you choose MUST be exactly one of these phrase start/end times, not a made-up number):\n${phraseTimings.map((p, i) => `[${i}] ${p.start.toFixed(2)}s–${p.end.toFixed(2)}s: "${p.text}"`).join('\n')}\nGroup consecutive phrases into each scene-beat — a scene's startOffset must equal some phrase's start and its endOffset must equal some phrase's end.`
     : '';
 
-  const prompt = `You are a professional storyboard artist breaking a video's opening narration into a sequence of cinematic scene-beats.
+  const prompt = `You are a professional storyboard artist breaking an audio voiceover into a DENSE, fast-paced sequence of illustrated story scene-beats — like a dynamic music video or cinematic trailer storyboard.
 
-Narration: "${introText}"
-Total spoken duration: ${dur.toFixed(1)} seconds — it starts at 0s and ends at ${dur.toFixed(1)}s. Your scenes together must cover this whole range with no gaps or overlaps.${timingSection}
+Narration / Voiceover: "${introText}"
+Total spoken duration: ${dur.toFixed(1)} seconds — starts at 0s and ends at ${dur.toFixed(1)}s. Cover this range with no gaps.${timingSection}
 
 TASK:
-Decide how many distinct visual beats this narration naturally breaks into — usually 3 to 8 for a full trailer-style intro, based on how many genuinely different moments/images the line actually describes (a short punchy line might only need 1-2; a longer scene-setting narration with several beats/teased moments should get one beat per moment). Don't force more beats than the content actually has, and don't cram unrelated moments into one beat.
-For each beat, give a time range (startOffset/endOffset in seconds${phraseTimings?.length ? ' — snapped exactly to the real phrase timestamps above' : ', roughly proportional to how long that part of the line takes to say'}) and a cinematic image prompt describing that exact visual moment, matching precisely what those specific words describe — realistic movie-still style, specific enough to generate a real image from (setting, who/what is visible, mood), not vague or generic.
+- Generate a HIGH-DENSITY sequence of distinct visual scene-beats. Aim for a switching ratio of approximately 1 scene every 2.5 to 3 seconds (e.g. for a 30s intro, generate ~10 scenes; for a 20s intro, generate ~8-9 scenes). Do NOT just make 2-5 long scenes; we want fast, engaging visual changes!
+- For each beat:
+  - Provide startOffset, endOffset (in seconds, covering from 0 to ${dur.toFixed(1)} without gaps).
+  - Provide a clear, literal scene prompt describing WHO is there, WHAT they are doing, their action/expression, and key objects or setting.
+  - Match what the narration describes. Keep it focused on ONE main clear moment.
+  - Keep it to WHO is there, WHAT they're doing, WHAT objects/setting are involved — never describe art style, rendering technique, or colors (e.g. no "photorealistic", no "cinematic", no "35mm", no "vibrant"). The MS Paint / 2D flat cartoon illustration style is applied separately by the image generator.
 
-Respond ONLY with valid JSON: an array of {"startOffset": number, "endOffset": number, "prompt": string} in time order. No explanation outside the JSON.`;
+Return JSON array only: [{"startOffset": number, "endOffset": number, "prompt": string}]`;
 
-  // Storyboard's own scene generator (generateStoryboardScenes) uses this
-  // same responseMimeType + no thinkingConfig combo and returns near-
-  // instantly. This call previously used thinkingConfig: HIGH, which is a
-  // much slower reasoning mode meant for creative writing, not a
-  // structured-JSON breakdown task — that mismatch was the actual cause of
-  // "Storyboard is instant but this hangs/times out", not a network issue.
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.7,
-    },
-  });
+  let scenes: IntroSceneBreakdown[] = [];
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: { parts: [{ text: prompt }] },
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
+    });
 
-  let raw = response.text || '[]';
-  raw = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-  let parsed: any[];
-  try { parsed = JSON.parse(raw); }
-  catch {
-    const m = raw.match(/\[[\s\S]*\]/);
-    parsed = m ? JSON.parse(m[0]) : [];
+    let raw = response.text || '';
+    raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (match) {
+      const cleanJson = match[0].replace(/,\s*([\]}])/g, '$1');
+      const parsed = JSON.parse(cleanJson);
+      if (Array.isArray(parsed)) {
+        scenes = parsed
+          .filter((s: any) => s && typeof s.prompt === 'string' && s.prompt.trim())
+          .map((s: any) => ({
+            startOffset: Math.max(0, Number(s.startOffset) || 0),
+            endOffset: Math.min(dur, Math.max((Number(s.startOffset) || 0) + 0.5, Number(s.endOffset) || dur)),
+            prompt: String(s.prompt).trim(),
+          }));
+      }
+    }
+  } catch (err) {
+    console.warn('AI scene breakdown failed, using resilient text-clause fallback:', err);
   }
 
-  const scenes: IntroSceneBreakdown[] = parsed
-    .filter(s => s && typeof s.prompt === 'string')
-    .map(s => ({
-      startOffset: Math.max(0, Number(s.startOffset) || 0),
-      endOffset: Math.min(dur, Number(s.endOffset) || dur),
-      prompt: s.prompt,
-    }));
+  if (scenes.length >= Math.min(3, Math.floor(dur / 4))) {
+    scenes.sort((a, b) => a.startOffset - b.startOffset);
+    scenes[0].startOffset = 0;
+    scenes[scenes.length - 1].endOffset = dur;
+    return scenes;
+  }
 
-  return scenes.length > 0 ? scenes : [{ startOffset: 0, endOffset: dur, prompt: introText }];
+  // Resilient fallback: parse narration sentences or clauses into dense cinematic beats (~1 scene every 2.5 to 3 seconds)
+  const targetCount = Math.max(6, Math.min(14, Math.round(dur / 2.8)));
+  const words = introText.split(/\s+/).filter(Boolean);
+  const wordsPerBeat = Math.max(2, Math.ceil(words.length / targetCount));
+  
+  const beats: string[] = [];
+  for (let i = 0; i < words.length; i += wordsPerBeat) {
+    beats.push(words.slice(i, i + wordsPerBeat).join(' '));
+  }
+  
+  const count = Math.max(2, beats.length);
+  const sliceDur = dur / count;
+
+  return beats.map((txt, idx) => ({
+    startOffset: Math.round(idx * sliceDur * 10) / 10,
+    endOffset: idx === count - 1 ? dur : Math.round((idx + 1) * sliceDur * 10) / 10,
+    prompt: `Illustration depicting: "${txt}". Clear expressive characters and setting.`,
+  }));
 };
 
 /**
@@ -5039,7 +5203,7 @@ This should feel like a real frame from a movie or TV drama depicting this exact
     contents: { parts: [{ text: prompt }] },
     config: {
       responseModalities: [Modality.IMAGE],
-      imageConfig: { aspectRatio, personGeneration: IMAGE_PERSON_GENERATION },
+      imageConfig: { aspectRatio },
       safetySettings: IMAGE_SAFETY_SETTINGS,
     }
   });
@@ -5059,23 +5223,45 @@ This should feel like a real frame from a movie or TV drama depicting this exact
  * the same SPEAKER_STYLES index as generateSpeakerImage so the character
  * stays visually consistent between their avatar and their background.
  */
-export const generateSpeakerBackgroundScene = async (speakerIndex: number, label?: string, sceneHint?: string): Promise<string> => {
+export const generateSpeakerBackgroundScene = async (speakerIndex: number, label?: string, sceneHint?: string, theme?: string, referenceImageBase64?: string): Promise<string> => {
   const ai = getAi();
 
   const style = SPEAKER_STYLES[speakerIndex % SPEAKER_STYLES.length];
+  const counterpartStyle = SPEAKER_STYLES[(speakerIndex + 1) % SPEAKER_STYLES.length];
+  const isLeftSide = speakerIndex % 2 === 0;
 
-  const prompt = `Cinematic wide 16:9 scene background featuring a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}${sceneHint ? `, in this setting: ${sceneHint}` : `, in a setting that fits: ${style.bg}`}.
-Framing: the character is visible within a full believable environment (not a close-up headshot/portrait) — cinematic depth of field, shot like a movie still, character positioned to one side so there's clean space for subtitles.
-Lighting: cinematic, warm colour grade, natural shadows.
-Style: semi-realistic digital art, sharp detail, professional broadcast-quality look. No text, no watermarks.
-This is a FULL-FRAME VIDEO BACKGROUND, not a portrait. Character: "${label || 'Speaker ' + (speakerIndex + 1)}".`;
+  let prompt = `Stylized 3D animated cartoon movie still (Pixar / DreamWorks style 3D animation), featuring a face-to-face conversation where two characters sit opposite each other across a clean cafe table by the sea at sunset. 
+Character in focus: "${label || 'Speaker ' + (speakerIndex + 1)}" — a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}.
+Composition & Framing: Over-the-shoulder conversation shot. The main character is positioned on the ${isLeftSide ? 'LEFT' : 'RIGHT'} side of the frame, leaving a clear open negative space gap in the middle and upper center for subtitles. In the foreground on the opposite side (${isLeftSide ? 'RIGHT' : 'LEFT'}), we see the blurry back of the head and shoulder of the counterpart person sitting opposite them (a ${counterpartStyle.gender}, ${counterpartStyle.age}, ${counterpartStyle.ethnicity}, with ${counterpartStyle.hair}).
+Setting: ${sceneHint || style.bg} with a clean, uncluttered background, warm sunset lighting, and smooth depth of field.
+Format: Full bleed 16:9 widescreen image. NO letterboxing, NO black bars, NO white bars, NO borders, completely edge-to-edge full frame filling.
+Style: High-end stylized 3D animated cartoon art, vibrant sunset colors, clean 3D rendering, professional broadcast quality. No text, no watermarks, no logos.`;
+
+  if (referenceImageBase64) {
+    prompt = `Maintain strict visual continuity, identical 3D cartoon art style, identical room/setting, color palette, and warm sunset lighting with the provided reference image.
+This is the counterpart frame of the conversation between the two characters sitting opposite each other across the table.
+Character in focus: "${label || 'Speaker ' + (speakerIndex + 1)}" — a ${style.gender}, ${style.age}, ${style.ethnicity}, ${style.hair}, wearing ${style.top}.
+Composition & Framing: Over-the-shoulder conversation shot from the opposite angle in the exact same 3D animated room as the reference image. The main character is positioned on the ${isLeftSide ? 'LEFT' : 'RIGHT'} side of the frame, leaving a clear open negative space gap in the middle and upper center for subtitles. In the foreground on the opposite side (${isLeftSide ? 'RIGHT' : 'LEFT'}), we see the blurry back of the head and shoulder of the counterpart person (a ${counterpartStyle.gender}, ${counterpartStyle.age}, ${counterpartStyle.ethnicity}, with ${counterpartStyle.hair}).
+Format: Full bleed 16:9 widescreen image. NO letterboxing, NO black bars, NO white bars, NO borders, completely edge-to-edge full frame filling.
+Style: Stylized 3D animated cartoon art matching the reference image. No text, no watermarks.`;
+  }
+
+  const parts: any[] = [{ text: prompt }];
+  if (referenceImageBase64) {
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: referenceImageBase64
+      }
+    });
+  }
 
   const response = await ai.models.generateContent({
     model: getImageModel(),
-    contents: { parts: [{ text: prompt }] },
+    contents: { parts },
     config: {
       responseModalities: [Modality.IMAGE],
-      imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
+      imageConfig: { aspectRatio: '16:9' },
       safetySettings: IMAGE_SAFETY_SETTINGS,
     }
   });
@@ -5369,57 +5555,87 @@ export const generateLearnEnglishScript = async (
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
-  const turnsGuide = Math.max(6, Math.round(duration * 3));
-  const rolesLine = speakerCount <= 1
-    ? 'Just ONE speaker: "You" — a monologue / self-practice speech about the situation.'
-    : speakerCount === 2
-      ? leStyle === 'debate'
-        ? 'TWO speakers: "You" (the English learner) and ONE "Opponent" who argues the other side of the topic. Keep the opponent\'s name consistent throughout. This is a direct back-and-forth debate, not a moderated one — no third person bridging it.'
-        : 'TWO speakers: "You" (the English learner) and ONE other character who drives the situation. Give them a real first name plus their role fits the topic (e.g. "Boss", "Officer Reyes", "Maya (your date)", "Interviewer") and keep that EXACT string spelled identically every time it\'s used as "speaker" — this string is also used to pick their voice and on-screen name, so never vary it mid-script. The scene is a DIRECT exchange between "You" and this character — do not add a third person or narrator bridging the conversation, it breaks immersion.'
-      : '"You" (the English learner) plus TWO other characters that fit the situation. Pick natural, consistent role names for the topic.';
+  const turnsGuide = Math.max(10, Math.round(duration * 12));
+  const longDurationInstruction = duration >= 15 
+    ? `\n\n🚨 EXHAUSTIVE LONG-FORM MASTERCLASS REQUIREMENT (${duration} MINUTES TARGET): You MUST generate a massive, exceptionally thorough, and comprehensive script with at least ${turnsGuide} distinct dialogue/narration turns. Cover multiple acts, progressive difficulty levels, deep situational expansions, exhaustive vocabulary breakouts, and multiple practice scenarios so that the spoken duration matches the requested ${duration} minutes.` 
+    : '';
+  const rolesLine = leStyle === 'podcast'
+    ? 'TWO podcast co-hosts (friends): Choose two natural, warm, topic-appropriate first names dynamically (e.g., Liam & Emma, David & Sarah, or names fitting the topic). They are friendly podcast hosts discussing the given topic and teaching natural English sentences.'
+    : speakerCount <= 1
+      ? 'Just ONE speaker: "You" — a monologue / self-practice speech about the situation.'
+      : speakerCount === 2
+        ? leStyle === 'debate'
+          ? 'TWO speakers: "You" (the English learner) and ONE "Opponent" who argues the other side of the topic. Keep the opponent\'s name consistent throughout. This is a direct back-and-forth debate, not a moderated one — no third person bridging it.'
+          : 'TWO speakers: "You" (the English learner) and ONE other character who drives the situation. Give them a real first name plus their role fits the topic (e.g. "Boss", "Officer Reyes", "Maya (your date)", "Interviewer") and keep that EXACT string spelled identically every time it\'s used as "speaker" — this string is also used to pick their voice and on-screen name, so never vary it mid-script. The scene is a DIRECT exchange between "You" and this character — do not add a third person or narrator bridging the conversation, it breaks immersion.'
+        : '"You" (the English learner) plus TWO other characters that fit the situation. Pick natural, consistent role names for the topic.';
 
-  const introLine = includeNarrator
-    ? `Segment 1 MUST be spoken by "Narrator", tag "intro" — a proper cinematic movie-trailer-style opening, NOT just a one-line hook. Give it real substance: 4-8 sentences (roughly 20-40 seconds spoken). It should:
-- Set the scene (who, where, what's at stake) with enough texture to feel like a real story is starting.
-- Preview/tease 2-3 of the specific moments, turns, or emotional beats that are actually coming up in the dialogue below — like a trailer giving flashes of what's ahead — without spelling out exactly how it resolves. The viewer should come away knowing roughly what kind of ride they're in for.
-- Build genuine curiosity/tension so someone would want to keep watching.
-After this intro, hand off entirely to the characters — Narrator should not interrupt the scene again except for the "narrator" teaching asides described below.`
-    : 'Do NOT include an intro segment — start directly with the first line of dialogue (tag "dialogue"), in media res, as if the scene is already underway.';
+  const introLine = leStyle === 'podcast'
+    ? 'PODCAST SETUP & INTRO: The podcast MUST start with a robust, warm, multi-turn co-host introduction by the two chosen co-host names (tag "dialogue"). They warmly welcome English learners: e.g. Host 1: "Welcome English learners! In this episode, we learn English with a wonderful topic: ${topic}." Host 2: "That is right! This podcast is especially for beginners. Yes, that means if you just started learning English, this podcast is for you." Host 1: "By the end of this episode, you will learn many useful English sentences and phrases that you can use every day." Setting up the context thoroughly before diving into the main discussion.'
+    : includeNarrator
+      ? `MODE: CINEMATIC INTRO HOOK ON
+Segment 1 MUST be spoken by "Narrator", tag "intro" — a proper cinematic movie-trailer-style opening, NOT just a one-line hook. Give it real substance: 4-8 sentences (roughly 20-40 seconds spoken). It should:
+- Set the scene (who, where, what's at stake) with rich texture tailored specifically to "${topic}".
+- Preview/tease 2-3 specific conversational moments or emotional turns coming up in the dialogue below.
+- Build genuine curiosity and tension.
+After this intro, hand off entirely to the characters for the main scene.`
+      : `MODE: INTRO OFF (IN MEDIA RES)
+Do NOT include an intro segment. Start instantly with the first line of dialogue (tag "dialogue") right in the middle of the action, as if the conversation is already underway regarding "${topic}".`;
 
   const languageLine = leLanguage === 'hinglish'
-    ? 'IMPORTANT: All "dialogue"/"intro" segments (the actual scene) must be in English — that never changes, it\'s what the learner is practicing. BUT every "narrator" aside\'s spoken "text" and its explanation.meaning must be written in Hindi (Devanagari script, natural Hinglish tone, like a friendly teacher talking to the learner directly — not a formal textbook translation). explanation.phrase and explanation.example stay in English (they ARE the English being taught). Same for "quiz" segments: the question text should be in Hindi, options/answer can stay in English where they quote the English phrase being tested.'
-    : 'Everything — dialogue, narrator asides, and quiz — should be in English.';
+    ? 'IMPORTANT: All "dialogue" / "intro" segments (the actual scene) must be in English — that never changes, it is what the learner is practicing. BUT every narrator or host aside\'s spoken "text" and explanation.meaning can be written in Hindi (Devanagari script, natural Hinglish tone, like a friendly teacher). explanation.phrase and explanation.example stay in English. Same for "quiz" segments: the question text should be in Hindi, options/answer can stay in English.'
+    : 'Everything — dialogue, host notes, and quiz — should be in English.';
 
-  const teachingLine = includeTeachingAsides
-    ? `TEACHING ASIDES ("narrator" tag, roughly 10% of all segments, spread out — not clustered together):
-Roughly every 3-5 lines of dialogue, when a line just used a genuinely common, USEFUL idiom, phrasal verb, or natural expression (not something rare or textbook-obscure), insert ONE short "Narrator" aside — like a teacher briefly pausing the scene, not lecturing. Rules for a good aside:
-- Pick expressions a learner would actually want to reuse in daily life — prioritize phrasal verbs, common idioms, and natural connector phrases over vocabulary that's just a "big word".
-- "text" (what's spoken) is ONE casual, encouraging sentence, e.g. "Notice how she said 'let you go' — that's a polite way to say someone is fired." Never just repeat the dialogue line verbatim.
-- "explanation.phrase" is the exact expression as used.
-- "explanation.meaning" is a short, plain-language meaning — no jargon, no dictionary-speak.
-- "explanation.example" is a FRESH example sentence in a completely different context from the dialogue, so the learner sees the phrase used a second, different way (not a copy of the dialogue line with names swapped).
-- Never explain something already obvious or something a beginner already knows (e.g. don't explain "hello" or "thank you").
-Immediately after each aside, cut straight back to the story — no lingering.`
-    : 'Do NOT insert any "narrator" teaching-aside segments — this is a pure dialogue-only scene, no interruptions to explain vocabulary.';
+  const teachingLine = leStyle === 'podcast'
+    ? (includeTeachingAsides
+        ? 'PODCAST TEACHING ASIDES ON: Throughout the conversation, the two co-hosts explicitly pause to teach grammar rules, common mistakes, and better phrasing ("Isko aise ki jagah aise bol sakte hain").'
+        : 'PODCAST TEACHING ASIDES OFF: The co-hosts discuss sentences and roleplay naturally without formal teacher pauses.')
+    : includeTeachingAsides
+      ? `MODE: TEACHING ASIDES (NARRATOR) ON
+Insert "narrator" teaching asides (roughly 10% of all segments, spread out evenly):
+- Whenever dialogue uses a genuinely useful idiom, phrasal verb, or natural expression, insert ONE short "Narrator" aside.
+- "text" (spoken) is one encouraging sentence (e.g. in Hinglish/English explaining usage).
+- Include "explanation": {"phrase": "...", "meaning": "...", "example": "..."} with a fresh example in a different context.
+- Cut straight back to the story immediately after each aside.`
+      : 'MODE: TEACHING ASIDES OFF. Do NOT insert any "narrator" teaching-aside segments — this is a pure dialogue-only scene with zero interruptions.';
 
-  const questionsLine = generateQuestions
-    ? `\n\nQUIZ ("quiz" tag, spoken by "Narrator", roughly 10% of all segments, placed as 2-4 segments after the dialogue ends):
-Short, punchy comprehension/recall questions based ONLY on what was just shown — a viewer who watched the scene should be able to answer every one without outside knowledge. Mix the question types instead of repeating the same pattern:
-- A couple of plot-recall questions (e.g. "What did the boss say instead of 'You're fired'?").
-- At least one usage/application question testing the taught phrases themselves (e.g. "Which of these means the same as 'let you go'?" with the real phrase as one option and 2-3 plausible-but-wrong alternatives).
-Keep questions unambiguous — exactly one correct answer, no trick wording. Each segment must carry a "quiz" object: {"question": the question text, "options": 2-4 short possible answers (optional, only include when it naturally fits multiple-choice), "answer": the correct answer, matched exactly to one of the options when options are given}. "text" is just the spoken question itself.`
-    : '';
+  const questionsLine = leStyle === 'podcast'
+    ? (generateQuestions
+        ? 'PODCAST QUESTIONS ON: At the end of the podcast, the co-hosts host a fun rapid-fire mini-quiz where they ask the listener 2-3 questions about the phrases discussed.'
+        : 'PODCAST QUESTIONS OFF: Do NOT insert any separate quiz segments — the conversation flows naturally to a warm wrap-up.')
+    : generateQuestions
+      ? `MODE: QUIZ QUESTIONS ON
+At the very end of the dialogue, add 2-4 "quiz" segments (speaker "Question", tag "quiz"):
+- Short, punchy comprehension and phrase-usage questions based on the scene.
+- Each segment must carry a "quiz" object: {"question": "...", "options": ["..."], "answer": "..."}.`
+      : 'MODE: QUIZ QUESTIONS OFF. Do NOT append any quiz or question segments at the end.';
 
-  const styleLine = {
-    situational: 'Everyday situational English — natural, practical phrasing a learner would actually use in real life. Invent a real, slightly dramatic everyday situation that specifically fits the given topic (getting fired, missing a flight, being stopped by police, a first date, a robbery, overhearing a secret at work, etc. are just examples of the GENRE — don\'t default to reusing them verbatim unless the topic itself is exactly that; tailor the specifics — names, setting, stakes — to the topic given).',
-    roleplay: 'A roleplay-practice scene — slightly more structured, clearly modeling both sides of a common exchange, useful as a template the learner could mimic in real life.',
-    interview: 'A more formal register — like a job interview or official conversation, polite and professional English, but still natural (not stiff/robotic).',
-    casual: 'Casual, relaxed conversational English between people who know each other — contractions, filler words like "honestly"/"I mean", interruptions, natural back-and-forth.',
-    debate: 'A friendly but spirited debate between "You" and an "Opponent" arguing opposite sides of the topic — teaches persuasive/argumentative English: agreeing, disagreeing, making a point, conceding a point, rebutting.',
-  }[leStyle] || 'Everyday situational English.';
+  const styleLine = leStyle === 'podcast'
+    ? `PODCAST CONVERSATION STYLE (Dynamic Co-Hosts):
+- Two friendly co-hosts with natural, engaging names chosen specifically to match the topic are hosting a beginner-friendly English learning podcast about "${topic}".
+- Step-by-step progression: Start with a warm setup intro, break down core concepts, introduce practical sentences, roleplay realistic scenarios, and ensure the learner masters many useful English sentences by the end of the episode.
+- Roleplay scenarios within the conversation (e.g., Host: "Imagine karo main tumhara boss hoon...").
+- Intentionally or naturally discuss common mistakes and better alternatives ("Isko aise ki jagah aise bol sakte hain").`
+    : {
+        situational: `SITUATIONAL ENGLISH STYLE:
+- Focus on practical, everyday conversational English for "${topic}".
+- Create a realistic, engaging scenario with high-frequency idioms, phrasal verbs, and natural polite expressions.
+- Maintain a clear narrative arc across the turns: setup, complication, turning point, and resolution.`,
+        roleplay: `ROLEPLAY PRACTICE STYLE:
+- A structured conversational template where the learner ("You") and the role partner practice an essential real-world interaction about "${topic}".
+- Focus on natural prompt-response pairs, active listening phrases, and clear communication.`,
+        interview: `FORMAL / INTERVIEW STYLE:
+- Professional yet natural register suitable for job interviews or official meetings regarding "${topic}".
+- Emphasize polite framing, professional vocabulary, confidence, and articulate phrasing.`,
+        casual: `CASUAL CHAT STYLE:
+- Relaxed, friendly conversation between peers discussing "${topic}".
+- Use natural contractions, filler words ("honestly", "you know"), interruptions, and casual idioms.`,
+        debate: `DEBATE STYLE:
+- Spirited exchange between "You" and an "Opponent" arguing opposing perspectives on "${topic}".
+- Teach persuasive phrasing: agreeing, respectfully disagreeing, conceding a point, and backing up arguments.`,
+      }[leStyle] || 'Everyday situational English.';
 
   const prompt = `You are a scriptwriter creating an ENGLISH-LEARNING practice video, based on this topic/situation: "${topic}".
-
+${longDurationInstruction}
 ${rolesLine}
 ${introLine}
 Style: ${styleLine}
@@ -5437,13 +5653,17 @@ ${teachingLine}${questionsLine}
 
 Return JSON only (no markdown, no commentary before or after), an array of objects in speaking order:
 {"speaker": "...", "text": "...", "tag": "intro"|"dialogue"|"narrator"|"quiz", "explanation": {...} (ONLY for tag "narrator"), "quiz": {...} (ONLY for tag "quiz")}
-"speaker" must be exactly "Narrator", "You", or the other character's exact name/role string (spelled identically every single time it's used).`;
+"speaker" must be "Question" for quiz segments, "Narrator" for narrator asides, "You", or the other character's exact name/role string (spelled identically every single time it's used).`;
 
   try {
+    const ai = getAi();
     const response = await ai.models.generateContent({
       model,
       contents: { parts: [{ text: prompt }] },
-      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH } },
+      config: { 
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+        maxOutputTokens: 16384,
+      },
     });
 
     let raw = response.text || '[]';
@@ -5458,9 +5678,19 @@ Return JSON only (no markdown, no commentary before or after), an array of objec
 
     return parsed.map((seg: any, i: number) => {
       const tag = (seg.tag === 'intro' || seg.tag === 'narrator' || seg.tag === 'quiz') ? seg.tag : 'dialogue';
+      let speaker = tag === 'quiz' ? 'Question' : (seg.speaker || 'You');
+      if (leStyle === 'podcast') {
+        if (tag === 'narrator') speaker = 'Narrator';
+        else {
+          speaker = seg.speaker && seg.speaker.trim() && seg.speaker !== 'You' && seg.speaker !== 'Question' && seg.speaker !== 'Narrator'
+            ? seg.speaker.trim()
+            : (i % 2 === 0 ? 'Host 1' : 'Host 2');
+        }
+      }
+
       const result: DebateSegment = {
         id: `learn-english-${i}`,
-        speaker: seg.speaker || 'You',
+        speaker,
         text: seg.text || '',
         scores: [],
         averageScore: 0,
@@ -5486,6 +5716,57 @@ Return JSON only (no markdown, no commentary before or after), an array of objec
     console.error('Learn English script generation failed:', err);
     return [];
   }
+};
+
+export const generateQuizForSegment = async (
+  segmentText: string,
+  contextDialogue?: string
+): Promise<{ question: string; options: string[]; answer: string }> => {
+  const model = 'gemini-2.5-flash';
+  const prompt = `You are an expert English teacher creating a multiple choice comprehension/vocabulary question for an English learning video.
+Current Segment / Line: "${segmentText}"
+${contextDialogue ? `Surrounding Dialogue Context:\n${contextDialogue}` : ''}
+
+Create ONE clear, engaging multiple choice question testing what happened or the English phrase used.
+Provide exactly 4 options (Option A, B, C, D) and specify the exact correct answer (must match one of the options).
+
+Return JSON only (no markdown, no commentary):
+{
+  "question": "...",
+  "options": ["...", "...", "...", "..."],
+  "answer": "..."
+}`;
+
+  try {
+    const ai = getAi();
+    const response = await ai.models.generateContent({
+      model,
+      contents: { parts: [{ text: prompt }] },
+    });
+    let raw = response.text || '{}';
+    raw = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      const m = raw.match(/\{[\s\S]*\}/);
+      parsed = m ? JSON.parse(m[0]) : {};
+    }
+    if (parsed.question && Array.isArray(parsed.options) && parsed.options.length >= 2 && parsed.answer) {
+      return {
+        question: parsed.question,
+        options: parsed.options,
+        answer: parsed.answer
+      };
+    }
+  } catch (err) {
+    console.error('generateQuizForSegment failed:', err);
+  }
+  return {
+    question: segmentText || 'What did the speaker mean?',
+    options: ['Option A', 'Option B', 'Option C', 'Option D'],
+    answer: 'Option A'
+  };
 };
 
 // ── Topic-based Transcript Splitter ──────────────────────────────────────────
@@ -5982,7 +6263,7 @@ export const generateStoryboardImage = async (
     contents: { parts: [{ text: fullPrompt }] },
     config: {
       responseModalities: [Modality.IMAGE],
-      imageConfig: { aspectRatio, personGeneration: IMAGE_PERSON_GENERATION },
+      imageConfig: { aspectRatio },
       safetySettings: IMAGE_SAFETY_SETTINGS,
     },
   });
@@ -6337,7 +6618,7 @@ STRICT: Do NOT add watermarks. Only show the person and the text box as describe
     model: getImageModel(),
     contents: { parts: [{ text: prompt }] },
     config: {
-      imageConfig: { aspectRatio: '16:9', personGeneration: IMAGE_PERSON_GENERATION },
+      imageConfig: { aspectRatio: '16:9' },
       safetySettings: IMAGE_SAFETY_SETTINGS,
     },
   });

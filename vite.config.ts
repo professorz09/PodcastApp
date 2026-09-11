@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     return {
       server: {
-        port: 5000,
+        port: 3000,
         host: '0.0.0.0',
         allowedHosts: true,
         hmr: false,
@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => {
         'process.env.NODE_ENV': JSON.stringify(mode),
       },
       resolve: {
+        dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
         alias: {
           '@': path.resolve(__dirname, '.'),
         }

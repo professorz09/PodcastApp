@@ -38,7 +38,10 @@ export const modernTheme: Theme = {
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
 
     // Timer
-    if (config.showTimer) {
+    const isIntroSeg = currentSegment.learnEnglish?.segmentType === 'intro' || 
+                       (currentSegmentIndex === 0 && (currentSegment.speaker === 'Narrator' || currentSegment.speaker?.toLowerCase() === 'narrator'));
+
+    if (config.showTimer && !isIntroSeg) {
         ctx.fillStyle = 'rgba(0,0,0,0.55)';
         ctx.beginPath();
         ctx.roundRect(canvasWidth / 2 - 80, 16, 160, 52, 26);

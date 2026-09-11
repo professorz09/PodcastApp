@@ -328,5 +328,6 @@ export const renderVideoOffline = async (
     return;
   }
   const { buffer } = (muxer.target as ArrayBufferTarget);
-  return new Blob([buffer], { type: 'video/mp4' });
+  const mimeType = picked.family === 'avc' ? 'video/mp4' : 'video/webm';
+  return new Blob([buffer], { type: mimeType });
 };

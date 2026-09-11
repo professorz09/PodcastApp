@@ -39,7 +39,10 @@ export const transparentAvatarsTheme: Theme = {
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
 
     // Timer
-    if (config.showTimer) {
+    const isIntroSeg = currentSegment.learnEnglish?.segmentType === 'intro' || 
+                       (currentSegmentIndex === 0 && (currentSegment.speaker === 'Narrator' || currentSegment.speaker?.toLowerCase() === 'narrator'));
+
+    if (config.showTimer && !isIntroSeg) {
         const topY = 50;
         const timerW = 100;
         const timerH = 40;
@@ -224,18 +227,21 @@ export const transparentAvatarsTheme: Theme = {
           const meterY = y - meterH / 2;
 
           if (config.vuMeterStyle === 'dots') {
-              // --- Dots VU Meter ---
-              const DOTS = 14;
-              const dotR = Math.max(3, Math.min(6, meterH / (DOTS * 3)));
-              const totalDotsH = DOTS * dotR * 2;
-              const spacing = (meterH - totalDotsH) / (DOTS - 1);
-              const dotX = meterX + dotR + 2;
+              // --- Dots VU Meter (Max 6 dots per column, wrapping) ---
+              const DOTS = 12;
+              const PER_COL = 6;
+              const dotR = Math.max(3, Math.min(6, meterH / (PER_COL * 3)));
+              const totalColH = PER_COL * dotR * 2;
+              const spacing = (meterH - totalColH) / Math.max(1, PER_COL - 1);
               const activeDots = isActive
                   ? Math.round(Math.max(0.18, audioLevel) * DOTS)
                   : 0;
 
               for (let d = 0; d < DOTS; d++) {
-                  const dotY = meterY + meterH - d * (dotR * 2 + spacing) - dotR;
+                  const col = Math.floor(d / PER_COL);
+                  const row = d % PER_COL;
+                  const dotX = meterX + col * (dotR * 2 + 5) + dotR + 2;
+                  const dotY = meterY + meterH - row * (dotR * 2 + spacing) - dotR;
                   const isLit = d < activeDots;
                   // Color gradient: bottom=green, mid=yellow, top=red
                   const pct = d / (DOTS - 1);
@@ -318,7 +324,7 @@ export const transparentAvatarsTheme: Theme = {
 
     // Draw Speaker Names (Top Left)
     const drawSpeakerNames = () => {
-        if (speakerIds.length < 2) return;
+        if (speakerIds.length < 2 || isIntroSeg) return;
         
         const startX = 30;
         let startY = 30;

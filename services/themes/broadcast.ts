@@ -30,7 +30,8 @@ export const broadcastTheme: Theme = {
     const showSpeakers = config.showSpeakers;
     const showWaveforms = themeConfig?.showWaveforms !== undefined ? themeConfig.showWaveforms : true;
 
-    const isNarrator = currentSegment.speaker === 'Narrator';
+    const isQuiz = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz) || currentSegment.speaker?.toLowerCase() === 'question' || currentSegment.speaker?.toLowerCase() === 'quiz';
+    const isNarrator = !isQuiz && currentSegment.speaker === 'Narrator';
 
     // Background
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
@@ -101,7 +102,10 @@ export const broadcastTheme: Theme = {
     }
 
     // Draw Top Boxes
-    if (speakerIds.length === 2) {
+    const isIntroSeg = currentSegment.learnEnglish?.segmentType === 'intro' || 
+                       (currentSegmentIndex === 0 && (currentSegment.speaker === 'Narrator' || currentSegment.speaker?.toLowerCase() === 'narrator'));
+
+    if (speakerIds.length === 2 && !isIntroSeg) {
         // Standard 2-Speaker Layout
         const speakerA = speakerIds[0];
         const speakerB = speakerIds[1];
@@ -173,7 +177,7 @@ export const broadcastTheme: Theme = {
     } else {
         // Multi-Speaker Layout (or 1 speaker)
         // Just show a center timer box if timer is on
-        if (showTimer && !isNarrator) {
+        if (showTimer && !isNarrator && !isIntroSeg) {
              const timerWidth = 140;
              const timerX = (canvasWidth - timerWidth) / 2;
              drawGlowBox(timerX, topY, timerWidth, boxHeight, '#fff', 'center');
@@ -190,7 +194,9 @@ export const broadcastTheme: Theme = {
     const centerX = canvasWidth / 2;
     const nameY = topY + boxHeight / 2;
     
-    if (isNarrator) {
+    if (isQuiz || isIntroSeg) {
+        // Quiz or Intro segment: Top bar stays clean; question overlay handles title
+    } else if (isNarrator) {
         if (!(config.showSubtitles && config.subtitleBackground)) {
             ctx.font = 'bold 28px sans-serif';
             ctx.textAlign = 'center';

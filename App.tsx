@@ -2,20 +2,53 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import Layout from './components/Layout';
 import VideoClipImporter from './components/VideoClipImporter';
 
+// Resilient lazy loader that retries on dynamic import failures (e.g. during server reloads or network hiccups)
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  retries = 3,
+  delayMs = 800
+): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    new Promise<{ default: T }>((resolve, reject) => {
+      let attemptsLeft = retries;
+      const attempt = () => {
+        factory()
+          .then(resolve)
+          .catch((err) => {
+            attemptsLeft--;
+            if (attemptsLeft > 0) {
+              setTimeout(attempt, delayMs);
+            } else {
+              // Attempt a one-time soft page reload if a chunk fails completely
+              const reloadKey = 'chunk_retry_' + window.location.pathname;
+              if (!sessionStorage.getItem(reloadKey)) {
+                sessionStorage.setItem(reloadKey, '1');
+                window.location.reload();
+                return;
+              }
+              reject(err);
+            }
+          });
+      };
+      attempt();
+    })
+  );
+}
+
 // Lazy-load heavy components so initial bundle stays small
-const ContentImporter  = lazy(() => import('./components/ContentImporter'));
-const DebateInput      = lazy(() => import('./components/DebateInput'));
-const ScriptEditor     = lazy(() => import('./components/ScriptEditor'));
-const ThumbnailGenerator = lazy(() => import('./components/ThumbnailGenerator'));
-const AudioGenerator   = lazy(() => import('./components/AudioGenerator'));
-const DebateVisualizer = lazy(() => import('./components/DebateVisualizer'));
-const EnglishVideoMaker = lazy(() => import('./components/EnglishVideoMaker'));
-const Storyboard       = lazy(() => import('./components/Storyboard'));
-const Shorts           = lazy(() => import('./components/Shorts'));
-const LyricsGenerator  = lazy(() => import('./components/LyricsGenerator'));
-const PhoneConvoStudio = lazy(() => import('./components/PhoneConvoStudio'));
-const IgSongStudio     = lazy(() => import('./components/IgSongStudio'));
-const ShortsStudio     = lazy(() => import('./components/ShortsStudio'));
+const ContentImporter  = lazyWithRetry(() => import('./components/ContentImporter'));
+const DebateInput      = lazyWithRetry(() => import('./components/DebateInput'));
+const ScriptEditor     = lazyWithRetry(() => import('./components/ScriptEditor'));
+const ThumbnailGenerator = lazyWithRetry(() => import('./components/ThumbnailGenerator'));
+const AudioGenerator   = lazyWithRetry(() => import('./components/AudioGenerator'));
+const DebateVisualizer = lazyWithRetry(() => import('./components/DebateVisualizer'));
+const EnglishVideoMaker = lazyWithRetry(() => import('./components/EnglishVideoMaker'));
+const Storyboard       = lazyWithRetry(() => import('./components/Storyboard'));
+const Shorts           = lazyWithRetry(() => import('./components/Shorts'));
+const LyricsGenerator  = lazyWithRetry(() => import('./components/LyricsGenerator'));
+const PhoneConvoStudio = lazyWithRetry(() => import('./components/PhoneConvoStudio'));
+const IgSongStudio     = lazyWithRetry(() => import('./components/IgSongStudio'));
+const ShortsStudio     = lazyWithRetry(() => import('./components/ShortsStudio'));
 import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript, generateLearnEnglishScript } from './services/geminiService';
 import type { TranscriptChunk, ShortsSegment, PhoneConvoStyle } from './services/geminiService';
 import { AppState, DebateConfig, DebateSegment, PhoneStudioSourceClip, ThumbnailState, YoutubeImportData } from './types';
@@ -561,6 +594,8 @@ Return JSON only (no markdown):
           youtubeData={youtubeData}
           speakerVoices={audioVoices}
           scriptStyle={scriptStyle}
+          thumbnailState={thumbnailState}
+          onUpdateThumbnailState={setThumbnailState}
         />
       )}
 
@@ -597,6 +632,7 @@ Return JSON only (no markdown):
       {appState === AppState.ENGLISH_VIDEO && (
         <EnglishVideoMaker
           script={script}
+          onUpdateScript={setScript}
           onBack={() => setAppState(AppState.AUDIO)}
           youtubeData={youtubeData}
         />

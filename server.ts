@@ -1,13 +1,14 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { callGemini, getGCPAccessToken, isValidPrivateKey } from './services/vertexProxy';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 5000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Increase payload limit for large audio files (e.g., 50mb)
   app.use(express.json({ limit: '50mb' }));
@@ -199,7 +200,6 @@ async function startServer() {
 
     // Try Vertex SA auth first
     try {
-      const { getGCPAccessToken } = await import('./services/vertexProxy.js');
       const token = await getGCPAccessToken();
       const projectId = process.env.GCP_PROJECT_ID;
       const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
@@ -250,7 +250,6 @@ async function startServer() {
 
     // Try Vertex SA auth first
     try {
-      const { getGCPAccessToken } = await import('./services/vertexProxy.js');
       const token = await getGCPAccessToken();
       const projectId = process.env.GCP_PROJECT_ID;
       const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
@@ -302,7 +301,6 @@ async function startServer() {
     };
 
     try {
-      const { getGCPAccessToken } = await import('./services/vertexProxy.js');
       const token = await getGCPAccessToken();
       const projectId = process.env.GCP_PROJECT_ID;
       const saHeaders: Record<string, string> = {
@@ -348,7 +346,6 @@ async function startServer() {
       return res.status(400).json({ error: 'Missing model or contents in request body.' });
     }
     try {
-      const { callGemini } = await import('./services/vertexProxy.js');
       const response = await callGemini(model, contents, genConfig);
       res.json(response);
     } catch (error: any) {
@@ -361,7 +358,16 @@ async function startServer() {
 
   // ── Gemini key/backend check endpoint ────────────────────────────────────
   app.get('/api/gemini/key-check', (_req, res) => {
-    const hasVertex = !!(process.env.GCP_SA_KEY && process.env.GCP_PROJECT_ID);
+    let hasVertex = false;
+    if (process.env.GCP_SA_KEY) {
+      try {
+        const creds = JSON.parse(process.env.GCP_SA_KEY);
+        const pid = process.env.GCP_PROJECT_ID || creds.project_id;
+        hasVertex = !!(pid && creds.private_key && isValidPrivateKey(creds.private_key));
+      } catch {
+        hasVertex = false;
+      }
+    }
     const hasApiKey = !!process.env.GEMINI_API_KEY;
     res.json({
       hasKey: hasVertex || hasApiKey,
@@ -369,9 +375,26 @@ async function startServer() {
     });
   });
 
-  // Flask proxy routes — forward YouTube/video/files API calls to Flask on port 8000
-  const FLASK_URL = 'http://localhost:8000';
-  const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/health', '/api/instagram', '/api/cookies', '/api/reddit', '/api/shorts'];
+  // Flask proxy routes — forward YouTube/video/files API calls to Flask
+  const FLASK_URL = process.env.FLASK_URL || (process.env.LOCAL_FLASK === 'true' ? 'http://localhost:8000' : 'https://autovid-flask.onrender.com');
+
+  // Health endpoint: return health status and check if cookies exist
+  app.get('/api/health', async (_req, res) => {
+    try {
+      const resp = await fetch(`${FLASK_URL}/api/health`, { signal: AbortSignal.timeout(2000) });
+      if (resp.ok) {
+        const data = await resp.json();
+        return res.json(data);
+      }
+    } catch {
+      // Fall through to node status
+    }
+    const fs = await import('fs');
+    const cookiesExist = fs.existsSync(path.join(process.cwd(), 'yt_cookies.txt'));
+    res.json({ status: 'ok', cookies: cookiesExist, fallback: true });
+  });
+
+  const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/instagram', '/api/cookies', '/api/reddit', '/api/shorts'];
 
   app.use(flaskRoutes, async (req: any, res: any) => {
     const controller = new AbortController();
@@ -429,10 +452,42 @@ async function startServer() {
       res.send(Buffer.from(buffer));
     } catch (err: any) {
       clearTimeout(timeoutId);
+
+      // If YouTube transcript failed, try native Node fallback with youtube-transcript
+      if (req.originalUrl?.includes('/api/youtube/transcript')) {
+        try {
+          const url = req.body?.url;
+          if (url) {
+            const { YoutubeTranscript } = await import('youtube-transcript');
+            const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+            const videoId = match ? match[1] : (url.length === 11 ? url : '');
+            if (videoId) {
+              const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
+              const segments = transcriptItems.map(item => ({
+                text: item.text,
+                start: item.offset / 1000,
+                duration: item.duration / 1000,
+              }));
+              const fullText = segments.map(s => s.text).join(' ');
+              return res.json({
+                segments,
+                full_text: fullText,
+                video_id: videoId,
+                language: 'auto',
+                title: '',
+                description: '',
+              });
+            }
+          }
+        } catch (fallbackError: any) {
+          console.warn('Node YouTube transcript fallback also failed:', fallbackError?.message);
+        }
+      }
+
       if (err.name === 'AbortError') {
-        res.status(504).json({ error: 'Flask server ne response dene mein bahut waqt liya (timeout).' });
+        res.status(504).json({ error: 'Server ne response dene mein bahut waqt liya (timeout).' });
       } else if (err.code === 'ECONNREFUSED' || err.cause?.code === 'ECONNREFUSED') {
-        res.status(503).json({ error: 'Flask server chal nahi raha. "Flask Server" workflow start karo.' });
+        res.status(503).json({ error: 'Backend server chal nahi raha hai.' });
       } else {
         res.status(500).json({ error: err.message });
       }

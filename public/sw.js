@@ -1,9 +1,11 @@
-const CACHE_NAME = 'autovid-ai-v1';
+const CACHE_NAME = 'autovid-ai-v2';
 
 const PRECACHE = [
   '/',
   '/index.html',
   '/index.css',
+  '/icons/icon.svg',
+  '/manifest.json',
 ];
 
 self.addEventListener('install', (event) => {
@@ -25,10 +27,24 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
 
+  // NEVER cache API requests, Vite internal modules, or source files
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/@') ||
+    url.pathname.endsWith('.tsx') ||
+    url.pathname.endsWith('.ts') ||
+    url.search.includes('v=') ||
+    url.search.includes('t=')
+  ) {
+    return;
+  }
+
+  // Network-first strategy for everything else
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response.ok) {
+        if (response.ok && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
@@ -37,3 +53,4 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+

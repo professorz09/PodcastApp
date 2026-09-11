@@ -61,8 +61,10 @@ export const neonTheme: Theme = {
     // ── Background ─────────────────────────────────────────────────
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
 
+    const isQuizSegment = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz) || currentSegment.speaker?.toLowerCase() === 'question' || currentSegment.speaker?.toLowerCase() === 'quiz';
+
     // ── Top Bar ────────────────────────────────────────────────────
-    if (showBar) {
+    if (showBar && !isQuizSegment) {
         ctx.fillStyle = themeConfig?.barColor || 'rgba(0,0,0,0.88)';
         ctx.fillRect(0, 0, canvasWidth, BAR_H);
 
@@ -120,7 +122,10 @@ export const neonTheme: Theme = {
     }
 
     // ── Timer outside bar (when bar is off) ────────────────────────
-    if (!showBar && config.showTimer) {
+    const isIntro = currentSegment.learnEnglish?.segmentType === 'intro' || 
+                    (currentSegmentIndex === 0 && (currentSegment.speaker === 'Narrator' || currentSegment.speaker?.toLowerCase() === 'narrator'));
+
+    if (!showBar && config.showTimer && !isQuizSegment && !isIntro) {
         const isNarrator = currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator';
         const segEnd   = context.segmentOffsets[currentSegmentIndex + 1] || context.totalDuration;
         const segStart = context.segmentOffsets[currentSegmentIndex] || 0;
@@ -285,7 +290,7 @@ export const neonTheme: Theme = {
     }
 
     // ── Speaker names beside/below timer ──────────────────────────
-    if (showTimerNames && config.showTimer && speakerIds.length >= 2) {
+    if (showTimerNames && config.showTimer && speakerIds.length >= 2 && !isQuizSegment && !isIntro) {
         const timerCY = showBar ? BAR_H / 2 : 38;
 
         if (speakerIds.length === 2) {
@@ -856,7 +861,10 @@ export const neonTheme: Theme = {
     }
 
     // Side Stats
-    drawSideStats(ctx, context);
+    const isQuiz = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz) || currentSegment.speaker?.toLowerCase() === 'question' || currentSegment.speaker?.toLowerCase() === 'quiz';
+    if (!isQuiz) {
+        drawSideStats(ctx, context);
+    }
 
     // ── Neon Score Display ─────────────────────────────────────────
     if (config.showScores && context.scores && speakerIds.length >= 2) {

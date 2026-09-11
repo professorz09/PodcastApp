@@ -30,6 +30,7 @@ export interface VisualConfig {
   nameBadgeColorA?: string;
   nameBadgeColorB?: string;
   nameBadgeColorC?: string;
+  introSubtitleColor?: string;
 }
 
 export interface RenderAssets {
@@ -97,6 +98,11 @@ export const drawDebateFrame = (
       ...(currentSegment.visualConfig?.overrides || {})
   };
 
+  const isQuizSeg = currentSegment.learnEnglish?.segmentType === 'quiz' || currentSegment.speaker === 'Question' || Boolean(currentSegment.learnEnglish?.quiz);
+  if (isQuizSeg && currentSegment.learnEnglish?.quiz?.hideSubtitles !== false) {
+      mergedConfig.showSubtitles = false;
+  }
+
   // Merge subtitle config if present in segment visual config
   if (currentSegment.visualConfig?.subtitleConfig) {
       themeConfig.subtitleConfig = {
@@ -129,5 +135,13 @@ export const drawDebateFrame = (
 
   // Additive Learn English overlay (narrator teaching card / quiz panel) — no-ops
   // for scripts without learnEnglish tags, so this never affects other renders.
-  drawLearnEnglishOverlay(ctx, effectiveScript, segmentOffsets, currentSegmentIndex, time, assets.narratorImage ?? null);
+  const isQuizOverlay = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz);
+  drawLearnEnglishOverlay(
+    ctx, 
+    effectiveScript, 
+    segmentOffsets, 
+    currentSegmentIndex, 
+    time, 
+    isQuizOverlay ? null : (assets.narratorImage ?? null)
+  );
 };

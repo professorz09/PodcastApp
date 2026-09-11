@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
-import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage, generateIntroSceneBreakdown, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
+import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage, generateIntroSceneBreakdown, generateStoryboardImage, generateQuizForSegment, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
-import { saveEnglishVideoVisuals, loadEnglishVideoVisuals } from '../services/storageService';
+import { saveEnglishVideoVisuals, loadEnglishVideoVisuals, saveEnglishIntroScenes, loadEnglishIntroScenes } from '../services/storageService';
 import { motion, AnimatePresence } from 'motion/react';
 
 // The Gemini SDK call has no built-in timeout — if a request genuinely
@@ -32,10 +32,14 @@ const withRetry = async <T,>(fn: () => Promise<T>, attempts: number, timeoutMs: 
   for (let i = 0; i < attempts; i++) {
     try {
       return await withTimeout(fn(), timeoutMs, label);
-    } catch (e) {
+    } catch (e: any) {
       lastErr = e;
+      const isQuota = /RESOURCE_EXHAUSTED|429|quota/i.test(e?.message || '');
       console.error(`${label} attempt ${i + 1}/${attempts} failed`, e);
-      if (i < attempts - 1) await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+      if (i < attempts - 1) {
+        const waitMs = isQuota ? 3500 * (i + 1) : 1200 * (i + 1);
+        await new Promise(r => setTimeout(r, waitMs));
+      }
     }
   }
   throw lastErr;
@@ -45,9 +49,10 @@ interface EnglishVideoMakerProps {
   script: DebateSegment[];
   onBack: () => void;
   youtubeData?: YoutubeImportData | null;
+  onUpdateScript?: React.Dispatch<React.SetStateAction<DebateSegment[]>>;
 }
 
-const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialScript, onBack, youtubeData }) => {
+const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialScript, onBack, youtubeData, onUpdateScript }) => {
   // Initialize script with default visual config if missing
   const [script, setScript] = useState<DebateSegment[]>(() => {
       return initialScript.map(seg => ({
@@ -59,7 +64,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                   y: 550,
                   w: 896,
                   h: 150,
-                  fontSize: 1,
+                  fontSize: 1.4,
                   backgroundColor: 'rgba(0,0,0,0.85)',
                   textColor: '#ffffff',
                   borderColor: '#ffffff',
@@ -71,14 +76,25 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   });
 
   const uniqueSpeakers = useMemo(() => {
-    const speakers = Array.from(new Set<string>(script.map(s => s.speaker)));
+    let speakers = Array.from(new Set<string>(script.map(s => s.speaker)));
+    // Filter out question/quiz speakers so they don't appear in backgrounds/avatars
+    speakers = speakers.filter(s => {
+      const lower = s?.toLowerCase() || '';
+      return lower !== 'question' && lower !== 'quiz';
+    });
+
     if (speakers.includes('Narrator')) {
         return ['Narrator', ...speakers.filter(s => s !== 'Narrator')];
     }
     return speakers;
   }, [script]);
   
-  const activeSpeakers = useMemo(() => uniqueSpeakers.filter(s => s !== 'Narrator'), [uniqueSpeakers]);
+  const activeSpeakers = useMemo(() => {
+    return uniqueSpeakers.filter(s => {
+      const lower = s.toLowerCase();
+      return lower !== 'narrator' && lower !== 'question' && lower !== 'quiz';
+    });
+  }, [uniqueSpeakers]);
 
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -92,10 +108,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [dragging, setDragging] = useState<number | null>(null); // Index of speaker being dragged
   
   // Customization State
-  const [theme, setTheme] = useState<string>('transparent-avatars');
+  const [theme, setTheme] = useState<string>('cinematic');
   const [globalThemeConfig, setGlobalThemeConfig] = useState<Record<string, any>>({});
   const [showSubtitles, setShowSubtitles] = useState(true);
-  const [subtitleBackground, setSubtitleBackground] = useState(true);
+  const [subtitleBackground, setSubtitleBackground] = useState(false);
   
   const [speakerLabels, setSpeakerLabels] = useState<string[]>([]);
   const [speakerImages, setSpeakerImages] = useState<(HTMLImageElement | null)[]>([]);
@@ -105,7 +121,71 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // Narrator's own avatar — kept separate from speakerImages/activeSpeakers (which
   // only cover actual dialogue participants) so the Learn English teaching card
   // can show its own photo, set independently of "You"/the situational character.
-  const [narratorImage, setNarratorImage] = useState<HTMLImageElement | null>(null);
+  const [narratorImage, setNarratorImage] = useState<HTMLImageElement | null>(() => {
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const grad = ctx.createRadialGradient(256, 256, 50, 256, 256, 300);
+      grad.addColorStop(0, '#334155');
+      grad.addColorStop(1, '#0f172a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Tailcoat (dark navy coat)
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.moveTo(90, 512);
+      ctx.lineTo(140, 310);
+      ctx.lineTo(210, 270);
+      ctx.lineTo(302, 310);
+      ctx.lineTo(422, 512);
+      ctx.closePath();
+      ctx.fill();
+
+      // Lapels & Inner vest (gold/buff)
+      ctx.fillStyle = '#b45309';
+      ctx.beginPath();
+      ctx.moveTo(180, 340);
+      ctx.lineTo(256, 290);
+      ctx.lineTo(332, 340);
+      ctx.lineTo(300, 512);
+      ctx.lineTo(212, 512);
+      ctx.closePath();
+      ctx.fill();
+
+      // White ruffled cravat / collar
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.roundRect(220, 255, 72, 55, 14);
+      ctx.fill();
+
+      // Face / Skin tone
+      ctx.fillStyle = '#e2b08d';
+      ctx.beginPath();
+      ctx.arc(256, 225, 46, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Powdered wig (grey/white rolled curls)
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.arc(256, 180, 54, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(202, 205, 22, 0, Math.PI * 2);
+      ctx.arc(310, 205, 22, 0, Math.PI * 2);
+      ctx.arc(190, 230, 18, 0, Math.PI * 2);
+      ctx.arc(322, 230, 18, 0, Math.PI * 2);
+      ctx.fill();
+
+      img.src = canvas.toDataURL('image/png');
+    } else {
+      img.src = '/professor_jiang.png';
+    }
+    return img;
+  });
   const [narratorImageLoading, setNarratorImageLoading] = useState(false);
   const narratorBlobUrlRef = React.useRef<string | null>(null);
   const hasNarrator = uniqueSpeakers.includes('Narrator');
@@ -134,11 +214,35 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   }, [uniqueSpeakers, speakerBackgroundImages]);
 
   const handleGenerateSpeakerBackground = async (idx: number) => {
+      if (speakerBackgroundLoading[idx]) return;
+
       setSpeakerBackgroundLoading(prev => { const a = [...prev]; a[idx] = true; return a; });
       const clearLoading = () => setSpeakerBackgroundLoading(prev => { const a = [...prev]; a[idx] = false; return a; });
       try {
           const label = uniqueSpeakers[idx];
-          const dataUrl = await generateSpeakerBackgroundScene(idx, label);
+          let refBase64: string | undefined = undefined;
+
+          // Use any already generated speaker background image as reference (if available)
+          const existingImageIdx = speakerBackgroundImages.findIndex((img, i) => i !== idx && img !== null);
+          if (existingImageIdx !== -1 && speakerBackgroundImages[existingImageIdx]) {
+              try {
+                  const imgEl = speakerBackgroundImages[existingImageIdx]!;
+                  const canvas = document.createElement('canvas');
+                  canvas.width = imgEl.naturalWidth || 1280;
+                  canvas.height = imgEl.naturalHeight || 720;
+                  const ctx = canvas.getContext('2d');
+                  if (ctx) {
+                      ctx.drawImage(imgEl, 0, 0);
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                      const commaIdx = dataUrl.indexOf(',');
+                      if (commaIdx !== -1) refBase64 = dataUrl.slice(commaIdx + 1);
+                  }
+              } catch (err) {
+                  console.error('Could not extract reference image base64', err);
+              }
+          }
+
+          const dataUrl = await generateSpeakerBackgroundScene(idx, label, undefined, theme, refBase64);
           const img = new Image();
           img.onload = () => { setSpeakerBackgroundImages(prev => { const a = [...prev]; a[idx] = img; return a; }); clearLoading(); };
           img.onerror = () => { toast.error('Background image could not be loaded.'); clearLoading(); };
@@ -191,6 +295,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [showScores, setShowScores] = useState(false);
   const [backgroundDim, setBackgroundDim] = useState(0);
   const [globalBackgroundColor, setGlobalBackgroundColor] = useState<string | undefined>('#ffffff');
+  const [introSubtitleColor, setIntroSubtitleColor] = useState<string>('#ffffff');
 
   // Persist speaker/narrator/background images to IndexedDB — these are
   // plain React state (HTMLImageElement) with nothing writing them to
@@ -222,10 +327,78 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           speakerImages, speakerBackgroundImages, narratorImage, background, backgroundColor: globalBackgroundColor,
       });
   }, [speakerImages, speakerBackgroundImages, narratorImage, background, globalBackgroundColor]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [narratorTextColor, setNarratorTextColor] = useState<string>('#ef4444');
+
+  const hasLoadedIntroScenesRef = useRef(false);
+
+  // Load intro scenes from storage if not already in initialScript
+  useEffect(() => {
+      let cancelled = false;
+      (async () => {
+          const hasScenesInInitial = initialScript.some(s => s.learnEnglish?.introScenes?.length);
+          if (hasScenesInInitial) {
+              hasLoadedIntroScenesRef.current = true;
+              return;
+          }
+          const loadedScenesMap = await loadEnglishIntroScenes(initialScript);
+          if (cancelled) return;
+          if (loadedScenesMap && Object.keys(loadedScenesMap).length > 0) {
+              setScript(prev => {
+                  const updated = prev.map(s => {
+                      const scenes = loadedScenesMap[s.id];
+                      if (scenes && scenes.length > 0) {
+                          const bgUrl = scenes[0]?.imageUrl;
+                          return {
+                              ...s,
+                              learnEnglish: { ...s.learnEnglish!, introScenes: scenes },
+                              visualConfig: bgUrl
+                                  ? { ...s.visualConfig, backgroundUrl: bgUrl, backgroundColor: undefined }
+                                  : s.visualConfig,
+                          };
+                      }
+                      return s;
+                  });
+                  onUpdateScript?.(updated);
+                  return updated;
+              });
+          }
+          hasLoadedIntroScenesRef.current = true;
+      })();
+      return () => { cancelled = true; };
+  }, [initialScript, onUpdateScript]);
+
+  // Sync script changes back to parent App state, and auto-persist intro scenes to IndexedDB
+  const prevIntroScenesSigRef = useRef('');
+  useEffect(() => {
+      onUpdateScript?.(script);
+
+      if (!hasLoadedIntroScenesRef.current) return;
+      const introSig = script.map(s => {
+          const scenes = s.learnEnglish?.introScenes;
+          if (!scenes?.length) return '';
+          return `${s.id}:${scenes.map(sc => `${sc.prompt}-${sc.imageUrl || ''}`).join(';')}`;
+      }).join('|');
+
+      if (introSig !== prevIntroScenesSigRef.current) {
+          prevIntroScenesSigRef.current = introSig;
+          saveEnglishIntroScenes(script);
+      }
+  }, [script, onUpdateScript]);
+  const [narratorTextColor, setNarratorTextColor] = useState<string>('#eab308');
   const [showMinimalSpeakerName, setShowMinimalSpeakerName] = useState<boolean>(true);
   const [showMinimalSideVU, setShowMinimalSideVU] = useState<boolean>(true);
-  const [syncSubtitlePosition, setSyncSubtitlePosition] = useState(true);
+  const [syncSubtitlePosition, setSyncSubtitlePosition] = useState(false);
+  const [syncSpeakerPosition, setSyncSpeakerPosition] = useState<Record<string, boolean>>({});
+  const currentSpeaker = script[currentSegmentIndex]?.speaker;
+  const shouldSync = (seg: DebateSegment, idx: number) => {
+    if (syncSubtitlePosition) return true;
+    if (currentSpeaker && seg.speaker === currentSpeaker) {
+      if (syncSpeakerPosition[currentSpeaker] ?? true) {
+        return true;
+      }
+    }
+    if (idx === currentSegmentIndex) return true;
+    return false;
+  };
   const [subtitleBgHex, setSubtitleBgHex] = useState('#000000');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(80);
   const [showNameBadge, setShowNameBadge] = useState(false);
@@ -243,6 +416,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [showIntroSection, setShowIntroSection] = useState(() =>
     initialScript[0]?.learnEnglish?.segmentType === 'intro'
   );
+  const [showQuizSection, setShowQuizSection] = useState(() =>
+    initialScript[0]?.learnEnglish?.segmentType === 'quiz' || initialScript[0]?.speaker === 'Question' || Boolean(initialScript[0]?.learnEnglish?.quiz)
+  );
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [quizImageLoading, setQuizImageLoading] = useState(false);
   const [questionMode, setQuestionMode] = useState(false);
 
   // When Neon theme is selected, default speakers & subtitle background to OFF
@@ -275,7 +453,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // Intro settings live in their own standalone section now (not one of
   // these tabs) — see the "Intro Settings" card rendered right after the
   // Timeline Strip, kept fully separate from Speakers/Background/etc.
-  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'>('speakers');
+  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'|'intro'>('background');
   const [statusMessage, setStatusMessage] = useState("");
   // Rendered video blob kept in memory for merge
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
@@ -383,8 +561,18 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentSegment = script?.[currentSegmentIndex];
+  const isQuiz = currentSegment?.learnEnglish?.segmentType === 'quiz' || currentSegment?.speaker === 'Question' || Boolean(currentSegment?.learnEnglish?.quiz);
+  const isYoutube = (currentSegment?.learnEnglish?.segmentType as string) === 'youtube' || currentSegment?.speaker?.toLowerCase() === 'youtube';
+  const isNarrator = currentSegment?.learnEnglish?.segmentType === 'intro' || currentSegment?.learnEnglish?.segmentType === 'narrator' || currentSegment?.speaker?.toLowerCase() === 'narrator' || currentSegment?.speaker?.toLowerCase() === 'intro' || currentSegment?.speaker?.toLowerCase() === 'i' || (currentSegmentIndex === 0 && (!currentSegment?.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(currentSegment?.speaker?.toLowerCase()?.trim())));
+  const isCharacter = currentSegment?.speaker && !isNarrator && !isYoutube && !isQuiz;
+
+  const defaultX = isYoutube ? 185 : isNarrator ? 542 : isCharacter ? 395 : 192;
+  const defaultY = isYoutube ? 119 : isNarrator ? 61 : isCharacter ? 148 : 550;
+
   const currentSubtitleConfig = currentSegment?.visualConfig?.subtitleConfig || { 
-      x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
+      x: defaultX, 
+      y: defaultY, 
+      w: 896, h: 150, fontSize: 1.4, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
   };
 
   const applySubtitleBg = (hex: string, opacity: number) => {
@@ -392,7 +580,12 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     const g = parseInt(hex.slice(3,5), 16);
     const b = parseInt(hex.slice(5,7), 16);
     const rgba = `rgba(${r},${g},${b},${(opacity/100).toFixed(2)})`;
-    setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: rgba } } })));
+    setScript(prev => prev.map((seg, i) => {
+      if (shouldSync(seg, i)) {
+        return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: rgba } } };
+      }
+      return seg;
+    }));
   };
 
   // ── Component lifetime tracking (prevents setState after unmount) ──
@@ -419,13 +612,19 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       }
   }, []);
 
+  const latestScriptRef = useRef(initialScript);
+  latestScriptRef.current = initialScript;
+
+  const audioUrlsStr = useMemo(() => initialScript.map(s => s.audioUrl || '').join('|'), [initialScript]);
+
   const runMergeAudio = useCallback(async () => {
-      if (!initialScript || initialScript.length === 0) return;
+      const scriptToMerge = latestScriptRef.current;
+      if (!scriptToMerge || scriptToMerge.length === 0) return;
 
       // Check if all segments have audio
-      const audioUrls = initialScript.map(s => s.audioUrl).filter(Boolean) as string[];
-      if (audioUrls.length !== initialScript.length) {
-          const missing = initialScript.filter(s => !s.audioUrl).length;
+      const audioUrls = scriptToMerge.map(s => s.audioUrl).filter(Boolean) as string[];
+      if (audioUrls.length !== scriptToMerge.length) {
+          const missing = scriptToMerge.filter(s => !s.audioUrl).length;
           setMergeError(`${missing} segment(s) mein audio nahi hai — Voice Gen mein jaake generate karo, phir yahan wapas aao.`);
           return;
       }
@@ -448,7 +647,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           setSegmentOffsets(offsets);
 
           if (failedIndices.length > 0) {
-              const names = failedIndices.map(i => initialScript[i]?.speaker || `#${i + 1}`).join(', ');
+              const names = failedIndices.map(i => scriptToMerge[i]?.speaker || `#${i + 1}`).join(', ');
               toast.warning(`${failedIndices.length} segment ka audio load nahi hua (${names}) — waha silence chala diya. Us segment ka audio Voice Gen mein regenerate karo.`);
           }
 
@@ -458,9 +657,9 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       } finally {
           setIsMerging(false);
       }
-  }, [initialScript]);
+  }, []);
 
-  // Merge Audio on Mount
+  // Merge Audio on Mount or when audio URLs change
   useEffect(() => {
       runMergeAudio();
 
@@ -469,12 +668,18 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               URL.revokeObjectURL(mergedAudioUrlRef.current);
               mergedAudioUrlRef.current = null;
           }
+      };
+  }, [audioUrlsStr, runMergeAudio]); // Only re-run when audio URLs change!
+
+  // Cleanup bgBlobUrl on unmount
+  useEffect(() => {
+      return () => {
           if (bgBlobUrlRef.current) {
               URL.revokeObjectURL(bgBlobUrlRef.current);
               bgBlobUrlRef.current = null;
           }
       };
-  }, [initialScript]); // Only run once on mount/initialScript change
+  }, []);
 
   // Load Segment Background
   useEffect(() => {
@@ -506,7 +711,9 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       Promise.all(scenes.map(sc => new Promise<void>((resolve) => {
           if (!sc.imageUrl) { resolve(); return; }
           const img = new Image();
-          img.crossOrigin = "anonymous";
+          if (!sc.imageUrl.startsWith('data:') && !sc.imageUrl.startsWith('blob:')) {
+            img.crossOrigin = "anonymous";
+          }
           img.onload = () => { map.set(sc.imageUrl!, img); resolve(); };
           img.onerror = () => resolve();
           img.src = sc.imageUrl;
@@ -846,65 +1053,105 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // during that segment's own playback instead of one static image.
   const [introScenesProgress, setIntroScenesProgress] = useState<Record<string, { done: number; total: number }>>({});
 
-  // Step 1: just the breakdown — prompts + time ranges, no images yet. The
-  // Timeline list appears right after this (fast) step so the user sees the
-  // scene plan immediately, instead of staring at one spinner until both the
-  // breakdown AND every image are done.
+  // Internal helper to sequentially generate images for intro scene beats.
+  // Sequential with small pause prevents 429 quota exhaustion and updates
+  // progress live on screen after each image finishes.
+  const generateIntroImagesInternal = async (
+    segId: string,
+    scenesToGenerate: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string }[]
+  ) => {
+    if (!scenesToGenerate?.length) return;
+    setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
+    setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: scenesToGenerate.length } }));
+
+    let successCount = 0;
+    for (let i = 0; i < scenesToGenerate.length; i++) {
+      const scene = scenesToGenerate[i];
+      const sceneKey = `${segId}-${i}`;
+      setIntroImageLoading(prev => ({ ...prev, [sceneKey]: true }));
+      try {
+        const imageUrl = await withRetry(
+          () => generateStoryboardImage(scene.prompt, undefined, introImageAspectRatio),
+          3,
+          50000,
+          `Scene #${i + 1} image`
+        );
+        successCount++;
+        setScript(prev => prev.map(s => {
+          if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
+          const newScenes = [...s.learnEnglish.introScenes];
+          if (newScenes[i]) {
+            newScenes[i] = { ...newScenes[i], imageUrl };
+          }
+          return {
+            ...s,
+            learnEnglish: { ...s.learnEnglish, introScenes: newScenes },
+            visualConfig: i === 0 ? { ...s.visualConfig, backgroundUrl: imageUrl, backgroundColor: undefined } : s.visualConfig,
+          };
+        }));
+      } catch (err: any) {
+        console.error(`Intro scene #${i + 1} image failed:`, err);
+        toast.error(`Scene #${i + 1} image generation failed — tap retry on that card.`);
+      } finally {
+        setIntroImageLoading(prev => ({ ...prev, [sceneKey]: false }));
+        setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: i + 1, total: scenesToGenerate.length } }));
+      }
+      // Pause between calls to avoid API burst rate limits
+      if (i < scenesToGenerate.length - 1) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    setIntroImageLoading(prev => ({ ...prev, [segId]: false }));
+    if (successCount === scenesToGenerate.length) {
+      toast.success('All intro scenes & visuals generated in MS Paint style!');
+    } else if (successCount > 0) {
+      toast.success(`${successCount}/${scenesToGenerate.length} scenes generated. Tap retry on any missing visual.`);
+    }
+  };
+
+  // Step 1: Breakdown into scene-beats (planning prompts like Storyboard — does NOT auto-generate images)
   const handleGenerateIntroScenes = async (segId: string) => {
     const seg = script.find(s => s.id === segId);
     if (!seg) return;
     setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
+    setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: 0 } }));
     try {
       const duration = seg.duration && seg.duration > 0 ? seg.duration : Math.max(6, seg.text.split(/\s+/).length / 2.3);
-      // generateIntroSceneBreakdown now uses the same fast JSON-mode config
-      // as Storyboard's own scene generator (no thinkingConfig) instead of
-      // ThinkingLevel.HIGH, so this should return in a few seconds, not
-      // the 45-90s it was timing out at before — 30s is just a safety net.
-      const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 30000, 'Scene breakdown');
+      // Fast breakdown with 35s timeout
+      const breakdown = await withRetry(() => generateIntroSceneBreakdown(seg.text, duration, seg.phraseTimings), 2, 35000, 'Scene breakdown');
       setScript(prev => prev.map(s => s.id === segId
         ? { ...s, learnEnglish: { ...s.learnEnglish!, introScenes: breakdown } }
         : s));
+      toast.success(`${breakdown.length} scene prompts created! Tap "Generate Images (MS Paint Style)" to create visuals.`);
     } catch (e: any) {
-      toast.error(`Scene generation failed: ${e.message}`);
+      toast.error(`Scene breakdown failed: ${e.message}`);
     } finally {
       setIntroImageLoading(prev => ({ ...prev, [segId]: false }));
     }
   };
 
-  // Step 2: generate the actual images for scenes that already have their
-  // prompt/timing from step 1 — a separate action, run once the Timeline is
-  // visible, not bundled invisibly into step 1.
+  // Update a single scene prompt manually
+  const handleUpdateIntroScenePrompt = (segId: string, sceneIdx: number, newPrompt: string) => {
+    setScript(prev => prev.map(s => {
+      if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
+      const newScenes = [...s.learnEnglish.introScenes];
+      if (newScenes[sceneIdx]) {
+        newScenes[sceneIdx] = { ...newScenes[sceneIdx], prompt: newPrompt };
+      }
+      return {
+        ...s,
+        learnEnglish: { ...s.learnEnglish, introScenes: newScenes }
+      };
+    }));
+  };
+
+  // Generate / regenerate images for existing scene prompts
   const handleGenerateIntroSceneImages = async (segId: string) => {
     const seg = script.find(s => s.id === segId);
     const scenes = seg?.learnEnglish?.introScenes;
     if (!seg || !scenes?.length) return;
-    setIntroImageLoading(prev => ({ ...prev, [segId]: true }));
-    setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: 0, total: scenes.length } }));
-    try {
-      // Parallel, not one-by-one — each image is independent, sequential
-      // generation just compounds the wait for a multi-beat intro.
-      await Promise.all(scenes.map(async (scene, sceneIdx) => {
-        try {
-          const imageUrl = await withRetry(() => generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 2, 60000, 'Scene image');
-          setScript(prev => prev.map(s => {
-            if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
-            const newScenes = [...s.learnEnglish.introScenes];
-            newScenes[sceneIdx] = { ...newScenes[sceneIdx], imageUrl };
-            return {
-              ...s,
-              learnEnglish: { ...s.learnEnglish, introScenes: newScenes },
-              visualConfig: sceneIdx === 0 ? { ...s.visualConfig, backgroundUrl: imageUrl, backgroundColor: undefined } : s.visualConfig,
-            };
-          }));
-        } catch (e) {
-          console.error('Intro scene image failed', e);
-        } finally {
-          setIntroScenesProgress(prev => ({ ...prev, [segId]: { done: (prev[segId]?.done || 0) + 1, total: scenes.length } }));
-        }
-      }));
-    } finally {
-      setIntroImageLoading(prev => ({ ...prev, [segId]: false }));
-    }
+    await generateIntroImagesInternal(segId, scenes);
   };
 
   const handleRegenerateIntroScene = async (segId: string, sceneIdx: number) => {
@@ -914,13 +1161,18 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     const key = `${segId}-${sceneIdx}`;
     setIntroImageLoading(prev => ({ ...prev, [key]: true }));
     try {
-      const imageUrl = await withRetry(() => generateCinematicSceneImage(scene.prompt, introImageAspectRatio), 2, 60000, 'Scene image');
+      const imageUrl = await withRetry(() => generateStoryboardImage(scene.prompt, undefined, introImageAspectRatio), 3, 50000, 'Scene image');
       setScript(prev => prev.map(s => {
         if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
         const newScenes = [...s.learnEnglish.introScenes];
         newScenes[sceneIdx] = { ...newScenes[sceneIdx], imageUrl };
-        return { ...s, learnEnglish: { ...s.learnEnglish, introScenes: newScenes } };
+        return {
+          ...s,
+          learnEnglish: { ...s.learnEnglish, introScenes: newScenes },
+          visualConfig: sceneIdx === 0 ? { ...s.visualConfig, backgroundUrl: imageUrl, backgroundColor: undefined } : s.visualConfig,
+        };
       }));
+      toast.success(`Scene #${sceneIdx + 1} visual regenerated!`);
     } catch (e: any) {
       toast.error(`Scene image regeneration failed: ${e.message}`);
     } finally {
@@ -989,7 +1241,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             floatDataRef.current = new Float32Array(analyserRef.current.fftSize);
         }
         const floatData = floatDataRef.current;
-        analyserRef.current.getFloatTimeDomainData(floatData);
+        analyserRef.current.getFloatTimeDomainData(floatData as any);
         let sum = 0;
         for (let i = 0; i < floatData.length; i++) sum += floatData[i] * floatData[i];
         const rms = Math.sqrt(sum / floatData.length);
@@ -1078,6 +1330,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         nameBadgeColorA,
         nameBadgeColorB,
         nameBadgeColorC,
+        introSubtitleColor
     };
 
     const assets: RenderAssets = {
@@ -1268,7 +1521,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         drawSidePanel(false, totalB, currentB, isSpeakingB, theme === 'neon' ? '#ff0000' : '#ef4444');
     }
 
-    const isNarrator = currentSegment.speaker === 'Narrator';
+    const isNarrator = currentSegment.speaker === 'Narrator' ||
+                       currentSegment.speaker?.toLowerCase() === 'narrator' ||
+                       currentSegment.speaker?.toLowerCase() === 'explainer' ||
+                       currentSegment.learnEnglish?.segmentType === 'narrator';
 
     // ... (Themes logic)
     if (theme === 'broadcast') {
@@ -2183,76 +2439,84 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
     // --- SUBTITLES (Improved Phrase-wise Sync) ---
     if (showSubtitles && currentSegment.text) {
+        const isIntro = currentSegment?.learnEnglish?.segmentType === 'intro' || 
+                        (currentSegmentIndex === 0 && (!currentSegment.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(currentSegment.speaker.toLowerCase().trim())));
         const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || {
-            x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
+            x: 192, y: 550, w: 896, h: 150, fontSize: 1.4, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
         };
+        
+        // Force mode to 'line' if it's the Intro segment
+        const mode = subtitleConfig.mode || 'phrase';
 
         const text = currentSegment.text;
         const fontSize = 32 * subtitleConfig.fontSize;
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         
-        const maxWidth = subtitleConfig.w - (60 * subtitleConfig.fontSize);
-        
+        const bw = subtitleConfig.w;
+        const maxWidth = (bw - (60 * subtitleConfig.fontSize));
         let visibleLines: string[] = [];
+        
         const globalTime = audioRef.current ? audioRef.current.currentTime : 0;
         const segmentStartTime = segmentOffsets[currentSegmentIndex] || 0;
         const currentTime = globalTime - segmentStartTime;
 
-        if (currentSegment.phraseTimings && currentSegment.phraseTimings.length > 0) {
-            // Find the active phrase based on current time
-            const activePhrase = currentSegment.phraseTimings.find(p => currentTime >= p.start && currentTime <= p.end + 0.5);
-            const pastPhrases = currentSegment.phraseTimings.filter(p => p.start <= currentTime);
-            
-            let currentText = "";
-            if (activePhrase) {
-                currentText = activePhrase.text;
-            } else if (pastPhrases.length > 0) {
-                const lastPhrase = pastPhrases[pastPhrases.length - 1];
-                // Keep showing the last phrase for a short moment after it ends
-                if (currentTime <= lastPhrase.end + 1.0) {
-                    currentText = lastPhrase.text;
-                }
-            }
-
-            // Word wrap the current phrase
-            const words = currentText.split(' ');
-            let line = '';
-            for(let n = 0; n < words.length; n++) {
-                const testLine = line + words[n] + ' ';
-                const metrics = ctx.measureText(testLine);
-                if (metrics.width > maxWidth && n > 0) {
-                    visibleLines.push(line.trim());
-                    line = words[n] + ' ';
-                } else {
-                    line = testLine;
-                }
-            }
-            if (line.trim()) visibleLines.push(line.trim());
-
-        } else {
-            // Fallback to old linear logic if no phrase timings
-            const words = text.split(' ');
-            let line = '';
-            const lines: string[] = [];
-            for(let n = 0; n < words.length; n++) {
-              const testLine = line + words[n] + ' ';
-              const metrics = ctx.measureText(testLine);
-              if (metrics.width > maxWidth && n > 0) {
+        // Base wrapping for the entire text
+        const words = text.split(' ');
+        const lines: string[] = [];
+        let line = '';
+        for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
                 lines.push(line.trim());
                 line = words[n] + ' ';
-              } else {
+            } else {
                 line = testLine;
-              }
             }
-            lines.push(line.trim());
+        }
+        lines.push(line.trim());
 
+        if (mode === 'full-static') {
+            visibleLines = lines;
+        } else if (mode === 'phrase') {
+            if (currentSegment.phraseTimings && currentSegment.phraseTimings.length > 0) {
+                // Phrase timings exist, use them
+                const activePhrase = currentSegment.phraseTimings.find(p => currentTime >= p.start && currentTime <= p.end + 0.5);
+                const pastPhrases = currentSegment.phraseTimings.filter(p => p.start <= currentTime);
+                let currentText = "";
+                if (activePhrase) {
+                    currentText = activePhrase.text;
+                } else if (pastPhrases.length > 0) {
+                    const lastPhrase = pastPhrases[pastPhrases.length - 1];
+                    if (currentTime <= lastPhrase.end + 1.0) currentText = lastPhrase.text;
+                }
+                
+                // Wrap the active phrase
+                const pWords = currentText.split(' ');
+                let pLine = '';
+                for(let n = 0; n < pWords.length; n++) {
+                    const testLine = pLine + pWords[n] + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    if (metrics.width > maxWidth && n > 0) {
+                        visibleLines.push(pLine.trim());
+                        pLine = pWords[n] + ' ';
+                    } else {
+                        pLine = testLine;
+                    }
+                }
+                if (pLine.trim()) visibleLines.push(pLine.trim());
+            } else {
+                // No timings, show entire segment text wrapped (like full-static)
+                visibleLines = lines;
+            }
+        } else {
+            // Line, Word, or Mix modes
             let duration = currentSegment.duration || 1;
             if (!isFinite(duration) || duration <= 0) duration = 1;
-            
             const progress = Math.min(currentTime / duration, 1);
             const visibleWordCount = Math.floor(progress * words.length);
-
+            
             let wordCounter = 0;
             let activeLineIndex = 0;
             for (let i = 0; i < lines.length; i++) {
@@ -2265,20 +2529,27 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             }
             if (visibleWordCount >= words.length) activeLineIndex = lines.length - 1;
 
-            const mode = subtitleConfig.mode || 'full-word';
-            if (mode === 'full-static') {
-                visibleLines = lines;
-            } else if (mode === 'line-static' || mode === 'line-word' || mode === 'full-word') {
+            if (mode === 'word') {
+                const currentWordIndex = Math.min(visibleWordCount, words.length - 1);
+                visibleLines = [words[currentWordIndex] || ''];
+            } else if (mode === 'mix') {
+                let currentLineWords = lines[activeLineIndex].split(' ');
+                let wordsInPreviousLines = 0;
+                for (let i = 0; i < activeLineIndex; i++) wordsInPreviousLines += lines[i].split(' ').length;
+                let visibleWordsInCurrentLine = Math.max(1, visibleWordCount - wordsInPreviousLines);
+                visibleLines = [currentLineWords.slice(0, visibleWordsInCurrentLine).join(' ')];
+            } else {
+                // 'line' mode
                 visibleLines = [lines[activeLineIndex] || ''];
             }
         }
 
         const lineHeight = fontSize * 1.5;
         const totalHeight = visibleLines.length * lineHeight;
+        
         const bx = subtitleConfig.x;
-        const by = subtitleConfig.y;
-        const bw = subtitleConfig.w;
         const bh = Math.max(subtitleConfig.h, totalHeight + (60 * subtitleConfig.fontSize));
+        const by = subtitleConfig.y;
 
         const br = (subtitleConfig.borderRadius ?? 20) * subtitleConfig.fontSize;
 
@@ -2416,15 +2687,37 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             ctx.restore();
         }
 
-        ctx.fillStyle = subtitleConfig.textColor;
+        if (isNarrator) {
+            ctx.fillStyle = narratorTextColor || '#eab308';
+        } else {
+            ctx.fillStyle = subtitleConfig.textColor || '#ffffff';
+        }
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         const textBlockHeight = visibleLines.length * lineHeight;
-        const textStartY = by + (bh - textBlockHeight) / 2 + (fontSize * 0.3);
+        let textStartY = by + (bh - textBlockHeight) / 2 + (fontSize * 0.3);
+
+        if (isIntro) {
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 12;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        }
 
         visibleLines.forEach((l, i) => {
             ctx.fillText(l, bx + bw / 2, textStartY + (i * lineHeight));
         });
+        
+        if (isIntro) {
+            ctx.shadowBlur = 3;
+            visibleLines.forEach((l, i) => {
+                ctx.fillText(l, bx + bw / 2, textStartY + (i * lineHeight));
+            });
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        }
     }
 
     // ... (Scorecard logic remains same)
@@ -2560,6 +2853,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   };
 
   const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+    if (e.cancelable) e.preventDefault();
+    const isIntro = currentSegment?.learnEnglish?.segmentType === 'intro';
     const { x, y } = getCanvasCoords(e);
     
     // Check Subtitle Handles first (if settings visible)
@@ -2606,7 +2901,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     }
 
     // Check Speakers (Only if settings visible)
-    if (showSettings) {
+    if (showSettings && !isIntro) {
         // Iterate over all speakers to find hit
         for (let i = 0; i < speakerPositions.length; i++) {
             const pos = speakerPositions[i];
@@ -2654,6 +2949,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   };
 
   const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isInteractingRef.current && e.cancelable) e.preventDefault();
+    const isIntro = currentSegment?.learnEnglish?.segmentType === 'intro';
     const { x, y } = getCanvasCoords(e);
     const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || { x: 192, y: 550, w: 896, h: 150 };
 
@@ -2695,7 +2992,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         
         setScript(prev => {
             return prev.map((seg, idx) => {
-                if (syncSubtitlePosition || idx === currentSegmentIndex) {
+                if (shouldSync(seg, idx)) {
                     return {
                         ...seg,
                         visualConfig: {
@@ -2719,7 +3016,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         
         setScript(prev => {
             return prev.map((seg, idx) => {
-                if (syncSubtitlePosition || idx === currentSegmentIndex) {
+                if (shouldSync(seg, idx)) {
                     return {
                         ...seg,
                         visualConfig: {
@@ -2780,6 +3077,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // Export Logic
   const handleExport = async () => {
       setStatusMessage("Initializing...");
+      let wakeLock: any = null;
       
       try {
         if (!mergedAudioUrl) {
@@ -2823,6 +3121,14 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         }
         */
 
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await (navigator as any).wakeLock.request('screen');
+            }
+        } catch (e) {
+            console.warn('Wake Lock request failed:', e);
+        }
+
         setIsExporting(true);
         setExportProgress(0);
         setShowExportSettings(false);
@@ -2856,7 +3162,9 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             if (assets.segmentBackgrounds.has(url)) return;
             try {
                 const img = new Image();
-                img.crossOrigin = "anonymous";
+                if (!url.startsWith('data:') && !url.startsWith('blob:')) {
+                    img.crossOrigin = "anonymous";
+                }
                 img.src = url;
                 await new Promise((resolve, reject) => {
                     img.onload = resolve;
@@ -3006,9 +3314,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             setStatusMessage("Download ready! (Merge available in Settings)");
             setRenderedBlob(videoBlob as Blob);
             const url = URL.createObjectURL(videoBlob as Blob);
+            const ext = (videoBlob as Blob).type.includes('webm') ? 'webm' : 'mp4';
             const a = document.createElement('a');
             a.href = url;
-            a.download = `debate_video_${Date.now()}.mp4`;
+            a.download = `debate_video_${Date.now()}.${ext}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -3023,6 +3332,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           setStatusMessage(`Error: ${err.message}`);
           toast.error(`Export failed: ${err.message}`);
       } finally {
+          if (wakeLock) {
+              try {
+                  await wakeLock.release();
+              } catch (e) {}
+          }
           setIsExporting(false);
       }
   };
@@ -3080,7 +3394,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               
               const results = await Promise.all(batch.map(async (seg, batchIdx) => {
                   try {
-                      const url = await generateCinematicSceneImage(seg.text);
+                      const url = await generateStoryboardImage(seg.text);
                       return { idx: i + batchIdx, url };
                   } catch (e) {
                       console.error(`Failed to generate image for segment ${i + batchIdx}`, e);
@@ -3119,7 +3433,110 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   };
 
   const introSegments = script.filter(s => s.learnEnglish?.segmentType === 'intro');
-  const TABS = ['Speakers', 'Background', 'Subtitle', 'Options'] as const;
+  const isCurrentSegmentIntro = Boolean(
+    currentSegment?.learnEnglish?.segmentType === 'intro' ||
+    (introSegments.length > 0 && introSegments.some(s => s.id === currentSegment?.id))
+  );
+
+  const quizSegments = script.filter(s => s.learnEnglish?.segmentType === 'quiz' || s.speaker === 'Question' || Boolean(s.learnEnglish?.quiz));
+  const isCurrentSegmentQuiz = Boolean(
+    currentSegment?.learnEnglish?.segmentType === 'quiz' ||
+    currentSegment?.speaker === 'Question' ||
+    Boolean(currentSegment?.learnEnglish?.quiz) ||
+    (quizSegments.length > 0 && quizSegments.some(s => s.id === currentSegment?.id))
+  );
+
+  const handleUpdateCurrentQuiz = (patch: Partial<NonNullable<NonNullable<DebateSegment['learnEnglish']>['quiz']>>) => {
+    if (!currentSegment) return;
+    const currentQuiz = currentSegment.learnEnglish?.quiz || {
+      question: currentSegment.text || 'Question',
+      options: ['Option A', 'Option B', 'Option C', 'Option D'],
+      answer: 'Option A',
+      theme: 'light',
+      position: 'top',
+      revealTiming: 0.7,
+      accentColor: '#ef4444',
+      hideSubtitles: true,
+    };
+    const updatedQuiz = { ...currentQuiz, ...patch };
+    const updatedScript = script.map(s => s.id === currentSegment.id ? {
+      ...s,
+      speaker: 'Question',
+      learnEnglish: {
+        ...s.learnEnglish,
+        segmentType: 'quiz' as const,
+        quiz: updatedQuiz,
+      }
+    } : s);
+    setScript(updatedScript);
+    if (onUpdateScript) onUpdateScript(updatedScript);
+  };
+
+  const handleUpdateQuizVoiceover = (newText: string) => {
+    if (!currentSegment) return;
+    const updatedScript = script.map(s => s.id === currentSegment.id ? {
+      ...s,
+      text: newText,
+    } : s);
+    setScript(updatedScript);
+    if (onUpdateScript) onUpdateScript(updatedScript);
+  };
+
+  const handleUpdateQuizBackground = (bgUrl: string) => {
+    if (!currentSegment) return;
+    const updatedScript = script.map(s => s.id === currentSegment.id ? {
+      ...s,
+      visualConfig: {
+        ...s.visualConfig,
+        backgroundUrl: bgUrl,
+      }
+    } : s);
+    setScript(updatedScript);
+    if (onUpdateScript) onUpdateScript(updatedScript);
+  };
+
+  const handleAddQuizOption = () => {
+    if (!currentSegment) return;
+    const currentQuiz = currentSegment.learnEnglish?.quiz || {
+      question: currentSegment.text || 'Question',
+      options: ['Option A', 'Option B', 'Option C', 'Option D'],
+      answer: 'Option A',
+    };
+    const opts = currentQuiz.options || ['Option A', 'Option B'];
+    const nextLetter = String.fromCharCode(65 + opts.length);
+    const newOpts = [...opts, `Option ${nextLetter}`];
+    handleUpdateCurrentQuiz({ options: newOpts });
+  };
+
+  const handleEditQuizOption = (idx: number, val: string) => {
+    if (!currentSegment) return;
+    const prevOpts = currentSegment.learnEnglish?.quiz?.options || ['Option A', 'Option B', 'Option C', 'Option D'];
+    const newOpts = [...prevOpts];
+    const oldVal = newOpts[idx];
+    newOpts[idx] = val;
+    const currentAns = currentSegment.learnEnglish?.quiz?.answer || prevOpts[0] || '';
+    const isAnswer = currentAns.trim().toLowerCase() === oldVal?.trim().toLowerCase();
+    handleUpdateCurrentQuiz({
+      options: newOpts,
+      answer: isAnswer ? val : currentAns,
+    });
+  };
+
+  const handleDeleteQuizOption = (idx: number) => {
+    if (!currentSegment) return;
+    const prevOpts = currentSegment.learnEnglish?.quiz?.options || [];
+    if (prevOpts.length <= 2) return;
+    const removedVal = prevOpts[idx];
+    const newOpts = prevOpts.filter((_, i) => i !== idx);
+    const currentAns = currentSegment.learnEnglish?.quiz?.answer || '';
+    const isAnswer = currentAns.trim().toLowerCase() === removedVal?.trim().toLowerCase();
+    handleUpdateCurrentQuiz({
+      options: newOpts,
+      answer: isAnswer ? (newOpts[0] || '') : currentAns,
+    });
+  };
+
+  const TABS = ['Background', 'Subtitle', 'Options', 'Speakers'] as const;
 
   return (
     <div className="w-full h-full bg-black text-white flex flex-col overflow-hidden">
@@ -3156,6 +3573,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         width={1280}
                         height={720}
                         className="w-full h-full object-contain touch-none"
+                        style={{ touchAction: 'none' }}
                         onMouseDown={handlePointerDown}
                         onMouseMove={handlePointerMove}
                         onMouseUp={handlePointerUp}
@@ -3209,19 +3627,21 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                 const spIdx = activeSpeakers.indexOf(seg.speaker);
                 const colors = ['bg-blue-900/30 text-blue-400', 'bg-red-900/30 text-red-400', 'bg-purple-900/30 text-purple-400'];
                 const isIntroSeg = seg.learnEnglish?.segmentType === 'intro';
+                const isQuizSeg = seg.learnEnglish?.segmentType === 'quiz' || seg.speaker === 'Question' || Boolean(seg.learnEnglish?.quiz);
                 return (
                   <button
                     key={seg.id}
                     onClick={() => {
+                      setCurrentSegmentIndex(idx);
+                      // Standalone sections auto-expand when their segment is selected
+                      if (seg.learnEnglish?.segmentType === 'intro') {
+                        setShowIntroSection(true);
+                      }
+                      if (isQuizSeg) {
+                        setShowQuizSection(true);
+                      }
                       if (audioRef.current && segmentOffsets[idx] !== undefined) {
                         audioRef.current.currentTime = segmentOffsets[idx] + 0.1;
-                        setCurrentSegmentIndex(idx);
-                        // Intro Settings is its own standalone section (not a tab
-                        // shared with Speakers/Background/etc.) — just make sure
-                        // it's expanded so it's immediately visible.
-                        if (seg.learnEnglish?.segmentType === 'intro') {
-                          setShowIntroSection(true);
-                        }
                       }
                     }}
                     className={`relative flex flex-col items-center gap-0.5 p-1.5 rounded-lg border transition-all min-w-[52px] ${
@@ -3231,11 +3651,13 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                     }`}
                   >
                     <div className={`w-full h-6 rounded-md flex items-center justify-center text-[9px] font-bold ${
-                      seg.speaker === 'Narrator'
-                        ? (isIntroSeg ? 'bg-cyan-900/30 text-cyan-400' : 'bg-gray-800 text-gray-400')
-                        : (colors[spIdx] || colors[1])
+                      isQuizSeg
+                        ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
+                        : (seg.speaker === 'Narrator'
+                          ? (isIntroSeg ? 'bg-cyan-900/30 text-cyan-400' : 'bg-gray-800 text-gray-400')
+                          : (colors[spIdx] || colors[1]))
                     }`}>
-                      {seg.speaker === 'Narrator' ? (isIntroSeg ? 'I' : 'N') : (speakerLabels[spIdx]?.charAt(0) || seg.speaker.charAt(0))}
+                      {isQuizSeg ? 'Q' : (seg.speaker === 'Narrator' ? (isIntroSeg ? 'I' : 'N') : (speakerLabels[spIdx]?.charAt(0) || seg.speaker.charAt(0)))}
                     </div>
                     <div className="text-[8px] text-gray-600 font-mono">{Math.round(seg.duration || 0)}s</div>
                     {currentSegmentIndex === idx && (
@@ -3251,7 +3673,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                Background/Subtitle/Options (not one of that tab group), and
                only visible while the currently-selected chip is the intro
                segment itself — it disappears entirely on any other chip. ── */}
-          {currentSegment?.learnEnglish?.segmentType === 'intro' && (
+          {isCurrentSegmentIntro && (
             <div className="bg-[#0d0d0d] border border-cyan-500/20 rounded-2xl overflow-hidden">
               <button
                 onClick={() => setShowIntroSection(!showIntroSection)}
@@ -3277,35 +3699,56 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                            soon as scenes exist, before images are generated ── */}
                       {hasScenes && (
                         <div className="bg-black border border-white/5 rounded-2xl overflow-hidden">
-                          <div className="px-3.5 py-2.5 border-b border-white/5 flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Timeline · {seg.learnEnglish.introScenes.length} scenes</span>
-                            <button onClick={() => handleClearIntroScenes(seg.id)} className="text-[10px] text-gray-600 hover:text-red-400 font-bold uppercase">Clear</button>
+                          <div className="px-3.5 py-2.5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                              <Layers size={11} />
+                              Timeline · {seg.learnEnglish.introScenes.length} scenes (MS Paint Style)
+                            </span>
+                            <button onClick={() => handleClearIntroScenes(seg.id)} className="text-[10px] text-gray-500 hover:text-red-400 font-bold uppercase transition-colors">Clear</button>
                           </div>
                           <div className="divide-y divide-white/5">
                             {seg.learnEnglish.introScenes.map((scene, sceneIdx) => {
                               const sceneKey = `${seg.id}-${sceneIdx}`;
                               return (
-                                <div key={sceneIdx} className="flex items-center gap-2.5 px-3.5 py-2.5">
-                                  <div className="relative w-14 h-9 shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/10">
-                                    {introImageLoading[sceneKey] ? (
-                                      <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={12} className="text-cyan-400 animate-spin" /></div>
-                                    ) : scene.imageUrl ? (
-                                      <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <div className="absolute inset-0 flex items-center justify-center text-gray-700"><Video size={12} /></div>
-                                    )}
+                                <div key={sceneIdx} className="p-3 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                                      Scene #{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s
+                                    </span>
+                                    <button
+                                      onClick={() => handleRegenerateIntroScene(seg.id, sceneIdx)}
+                                      disabled={!!introImageLoading[sceneKey]}
+                                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-600/15 hover:bg-cyan-600/25 border border-cyan-500/20 text-cyan-300 text-[10px] font-semibold transition-all disabled:opacity-40"
+                                      title="Generate / Regenerate this scene image in MS Paint style"
+                                    >
+                                      <RefreshCw size={10} className={introImageLoading[sceneKey] ? 'animate-spin' : ''} />
+                                      {scene.imageUrl ? 'Regenerate' : 'Generate Visual'}
+                                    </button>
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] text-gray-500 font-mono">#{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s</p>
-                                    <p className="text-[11px] text-gray-400 truncate">{scene.prompt}</p>
+
+                                  <div className="flex items-start gap-2.5">
+                                    <div className="relative w-20 h-12 shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/10">
+                                      {introImageLoading[sceneKey] ? (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/60"><Loader2 size={13} className="text-cyan-400 animate-spin" /></div>
+                                      ) : scene.imageUrl ? (
+                                        <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-700 gap-0.5">
+                                          <ImagePlus size={14} />
+                                          <span className="text-[8px] text-gray-600">No image</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <textarea
+                                        rows={2}
+                                        value={scene.prompt}
+                                        onChange={(e) => handleUpdateIntroScenePrompt(seg.id, sceneIdx, e.target.value)}
+                                        placeholder="Scene prompt (who is there, what they are doing)..."
+                                        className="w-full bg-[#111] border border-white/8 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-200 placeholder-gray-600 resize-none focus:outline-none focus:border-cyan-500/50 leading-relaxed font-sans"
+                                      />
+                                    </div>
                                   </div>
-                                  <button
-                                    onClick={() => handleRegenerateIntroScene(seg.id, sceneIdx)}
-                                    disabled={!!introImageLoading[sceneKey]}
-                                    className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-cyan-600/15 hover:bg-cyan-600/25 border border-cyan-500/20 text-cyan-300 transition-all disabled:opacity-40"
-                                  >
-                                    <RefreshCw size={11} className={introImageLoading[sceneKey] ? 'animate-spin' : ''} />
-                                  </button>
                                 </div>
                               );
                             })}
@@ -3317,38 +3760,486 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         <button
                           onClick={() => handleGenerateIntroScenes(seg.id)}
                           disabled={!!introImageLoading[seg.id]}
-                          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
+                          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait shadow-sm"
                         >
                           {introImageLoading[seg.id]
-                            ? <><Loader2 size={11} className="animate-spin" /> Generating…</>
-                            : <><Wand2 size={11} /> Generate Scenes</>
+                            ? <><Loader2 size={11} className="animate-spin" /> Planning scenes…</>
+                            : <><Wand2 size={11} /> Plan Scenes (Storyboard Prompts)</>
                           }
                         </button>
-                      ) : !hasAnyImage ? (
-                        <button
-                          onClick={() => handleGenerateIntroSceneImages(seg.id)}
-                          disabled={!!introImageLoading[seg.id]}
-                          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait"
-                        >
-                          {introImageLoading[seg.id]
-                            ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id] ? `Image ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating…'}</>
-                            : <><Wand2 size={11} /> Generate Images</>
-                          }
-                        </button>
-                      ) : null}
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleGenerateIntroSceneImages(seg.id)}
+                            disabled={!!introImageLoading[seg.id]}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait shadow-sm"
+                          >
+                            {introImageLoading[seg.id]
+                              ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id]?.total ? `Images ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating MS Paint images…'}</>
+                              : hasAnyImage
+                                ? <><RefreshCw size={11} /> Regenerate All Images (MS Paint Style)</>
+                                : <><ImagePlus size={11} /> Generate Images (MS Paint Style)</>
+                            }
+                          </button>
+                          <button
+                            onClick={() => handleGenerateIntroScenes(seg.id)}
+                            disabled={!!introImageLoading[seg.id]}
+                            className="px-3 py-2.5 rounded-lg text-[11px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 transition-all disabled:opacity-40"
+                            title="Re-plan scene prompts"
+                          >
+                            Re-plan
+                          </button>
+                        </div>
+                      )}
                       {!seg.phraseTimings?.length && !hasScenes && (
                         <p className="text-[10px] text-amber-500/70">Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes exact bole gaye words ke saath match honge.</p>
                       )}
                     </div>
                     );
                   })}
+
+                  {/* ── Subtitle Manual Positioning (Up, Down, Left, Right) ── */}
+                  <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-2 mt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold flex items-center gap-1.5">
+                        <Type size={11} className="text-cyan-400" /> Subtitle Position (X, Y)
+                      </span>
+                      <span className="text-[10px] font-mono text-gray-400">{Math.round(currentSubtitleConfig.x || 192)}, {Math.round(currentSubtitleConfig.y)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                          onClick={() => { const val = Math.max(0, currentSubtitleConfig.y - 20); setScript(prev => prev.map((s, i) => { if (shouldSync(s, i)) { return { ...s, visualConfig: { ...s.visualConfig, subtitleConfig: { ...(s.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return s; })); }}
+                          className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                      >
+                          <ChevronUp size={13} /> Upar
+                      </button>
+                      <button
+                          onClick={() => { const val = Math.min(1080, currentSubtitleConfig.y + 20); setScript(prev => prev.map((s, i) => { if (shouldSync(s, i)) { return { ...s, visualConfig: { ...s.visualConfig, subtitleConfig: { ...(s.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return s; })); }}
+                          className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                      >
+                          <ChevronDown size={13} /> Niche
+                      </button>
+                      <button
+                          onClick={() => { const val = Math.max(-500, (currentSubtitleConfig.x || 192) - 20); setScript(prev => prev.map((s, i) => { if (shouldSync(s, i)) { return { ...s, visualConfig: { ...s.visualConfig, subtitleConfig: { ...(s.visualConfig?.subtitleConfig || currentSubtitleConfig), x: val } } }; } return s; })); }}
+                          className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                      >
+                          <ChevronLeft size={13} /> Left
+                      </button>
+                      <button
+                          onClick={() => { const val = Math.min(1920, (currentSubtitleConfig.x || 192) + 20); setScript(prev => prev.map((s, i) => { if (shouldSync(s, i)) { return { ...s, visualConfig: { ...s.visualConfig, subtitleConfig: { ...(s.visualConfig?.subtitleConfig || currentSubtitleConfig), x: val } } }; } return s; })); }}
+                          className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                      >
+                          Right <ChevronRight size={13} />
+                      </button>
+                      <button
+                          onClick={() => { setScript(prev => prev.map((s, i) => { if (shouldSync(s, i)) { 
+                              const isYt = (s.learnEnglish?.segmentType as string) === 'youtube' || s.speaker?.toLowerCase() === 'youtube';
+                              const isNar = s.learnEnglish?.segmentType === 'intro' || s.learnEnglish?.segmentType === 'narrator' || s.speaker?.toLowerCase() === 'narrator' || s.speaker?.toLowerCase() === 'intro' || s.speaker?.toLowerCase() === 'i' || (i === 0 && (!s.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(s.speaker.toLowerCase().trim())));
+                              const isChar = s.speaker && !isNar && !isYt;
+                              const defX = isYt ? 185 : isNar ? 542 : isChar ? 395 : 192;
+                              const defY = isYt ? 119 : isNar ? 61 : isChar ? 148 : 550;
+                              return { ...s, visualConfig: { ...s.visualConfig, subtitleConfig: { ...(s.visualConfig?.subtitleConfig || currentSubtitleConfig), x: defX, y: defY } } }; 
+                          } return s; })); }}
+                          className="px-2.5 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors border border-red-900/40"
+                          title="Reset Default"
+                      >
+                          <RefreshCw size={11} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Visual Settings Panel (inline, collapsible) ── */}
-          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
+          {/* ── Question Settings — standalone, fully separate from Speakers/
+               Background/Subtitle/Options, and only visible while the
+               currently-selected chip is a question segment (segmentType 'quiz' or speaker 'Question'). ── */}
+          {isCurrentSegmentQuiz && (
+            <div className="bg-[#0d0d0d] border border-amber-500/30 rounded-2xl overflow-hidden shadow-lg shadow-amber-950/20">
+              <button
+                onClick={() => setShowQuizSection(!showQuizSection)}
+                className="w-full flex items-center justify-between px-4 py-4 hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400">
+                    <HelpCircle size={15} />
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-sm">Question Settings</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        Segment {currentSegmentIndex + 1}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Edit question overlay, answers, card theme & timings</p>
+                  </div>
+                </div>
+                {showQuizSection ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
+              </button>
+
+              {showQuizSection && currentSegment && (
+                <div className="p-4 space-y-5 border-t border-amber-500/15">
+                  {/* Spoken Voiceover Text */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-300 flex items-center justify-between">
+                      <span>Spoken Voiceover (Audio Voice Line)</span>
+                      <span className="text-[10px] text-gray-500 font-mono">Spoken in audio</span>
+                    </label>
+                    <textarea
+                      value={currentSegment.text || ''}
+                      onChange={(e) => handleUpdateQuizVoiceover(e.target.value)}
+                      rows={2}
+                      className="w-full bg-[#141416] border border-white/10 rounded-xl px-3 py-2 text-xs md:text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amber-500/50"
+                      placeholder="What is spoken during this question segment..."
+                    />
+                  </div>
+
+                  {/* Question Display on Card */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                      <HelpCircle size={13} />
+                      <span>Question Card Text (Visual Overlay)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={currentSegment.learnEnglish?.quiz?.question ?? currentSegment.text ?? ''}
+                      onChange={(e) => handleUpdateCurrentQuiz({ question: e.target.value })}
+                      placeholder="Question displayed on screen..."
+                      className="w-full bg-[#141416] border border-amber-500/30 rounded-xl px-3 py-2 text-xs md:text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 font-medium"
+                    />
+                  </div>
+
+                  {/* Options (Multiple Choice) */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-gray-300">
+                        Options & Correct Answer
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={isGeneratingQuiz}
+                          onClick={async () => {
+                            if (!currentSegment) return;
+                            try {
+                              setIsGeneratingQuiz(true);
+                              const ctxSegs = script.slice(Math.max(0, currentSegmentIndex - 5), currentSegmentIndex);
+                              const contextDialogue = ctxSegs.map(s => `${s.speaker}: ${s.text}`).join('\n');
+                              const quiz = await generateQuizForSegment(currentSegment.text || '', contextDialogue);
+                              if (quiz) {
+                                handleUpdateCurrentQuiz({
+                                  question: quiz.question,
+                                  options: quiz.options,
+                                  answer: quiz.answer
+                                });
+                              }
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setIsGeneratingQuiz(false);
+                            }
+                          }}
+                          className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {isGeneratingQuiz ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                          AI Auto-Fill
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddQuizOption}
+                          className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-all active:scale-95"
+                        >
+                          <Plus size={12} /> Add Option
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {(currentSegment.learnEnglish?.quiz?.options || ['Option A', 'Option B', 'Option C', 'Option D']).map((opt, optIdx) => {
+                        const currentAnswer = currentSegment.learnEnglish?.quiz?.answer || '';
+                        const isCorrect = opt.trim().toLowerCase() === currentAnswer.trim().toLowerCase();
+                        return (
+                          <div
+                            key={optIdx}
+                            className={`flex items-center gap-2 p-2 rounded-xl border transition-all ${
+                              isCorrect
+                                ? 'bg-emerald-950/20 border-emerald-500/40'
+                                : 'bg-[#141416] border-white/5 hover:border-white/10'
+                            }`}
+                          >
+                            {/* Radio / Correct Answer Selector */}
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCurrentQuiz({ answer: opt })}
+                              title="Set as correct answer"
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0 border transition-all ${
+                                isCorrect
+                                  ? 'bg-emerald-500 text-black border-emerald-400 shadow-sm shadow-emerald-500/50'
+                                  : 'bg-white/5 text-gray-400 border-white/10 hover:text-white hover:border-white/20'
+                              }`}
+                            >
+                              {isCorrect ? <Check size={11} className="stroke-[3]" /> : null}
+                              {String.fromCharCode(65 + optIdx)}
+                              {isCorrect ? ' (Answer)' : ''}
+                            </button>
+
+                            {/* Option Text Input */}
+                            <input
+                              type="text"
+                              value={opt}
+                              onChange={(e) => handleEditQuizOption(optIdx, e.target.value)}
+                              className="flex-1 bg-transparent border-none text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-0"
+                              placeholder={`Option ${String.fromCharCode(65 + optIdx)}...`}
+                            />
+
+                            {/* Remove Option Button */}
+                            {(currentSegment.learnEnglish?.quiz?.options?.length || 0) > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQuizOption(optIdx)}
+                                className="p-1 text-gray-500 hover:text-red-400 rounded-lg transition-colors"
+                                title="Delete option"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Direct Answer (fallback or summary) */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-300">
+                      Confirmed Correct Answer
+                    </label>
+                    <input
+                      type="text"
+                      value={currentSegment.learnEnglish?.quiz?.answer ?? ''}
+                      onChange={(e) => handleUpdateCurrentQuiz({ answer: e.target.value })}
+                      placeholder="Exact correct answer string..."
+                      className="w-full bg-[#141416] border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-emerald-300 focus:outline-none focus:border-emerald-500 font-medium"
+                    />
+                  </div>
+
+                  {/* Appearance & Layout */}
+                  <div className="pt-2 border-t border-white/5 space-y-3">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      Card Appearance & Animation
+                    </span>
+
+                    {/* Card Theme */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-300">Card Color Theme</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCurrentQuiz({ theme: 'light' })}
+                          className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                            (currentSegment.learnEnglish?.quiz?.theme || 'light') === 'light'
+                              ? 'bg-white text-black border-white shadow-md'
+                              : 'bg-[#141416] text-gray-400 border-white/10 hover:text-white'
+                          }`}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-400" />
+                          Light Clean
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCurrentQuiz({ theme: 'dark' })}
+                          className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                            currentSegment.learnEnglish?.quiz?.theme === 'dark'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md shadow-amber-950/40'
+                              : 'bg-[#141416] text-gray-400 border-white/10 hover:text-white'
+                          }`}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-amber-400" />
+                          Dark Slate
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Card Position */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-300">Card Position</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCurrentQuiz({ position: 'top' })}
+                          className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
+                            (currentSegment.learnEnglish?.quiz?.position || 'top') === 'top'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                              : 'bg-[#141416] text-gray-400 border-white/10 hover:text-white'
+                          }`}
+                        >
+                          Top Banner
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCurrentQuiz({ position: 'center' })}
+                          className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
+                            currentSegment.learnEnglish?.quiz?.position === 'center'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                              : 'bg-[#141416] text-gray-400 border-white/10 hover:text-white'
+                          }`}
+                        >
+                          Center Stage
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Reveal Timing Slider */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-300">Answer Reveal Timing</span>
+                        <span className="text-amber-400 font-mono font-bold">
+                          {Math.round((currentSegment.learnEnglish?.quiz?.revealTiming ?? 0.7) * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={0.9}
+                        step={0.05}
+                        value={currentSegment.learnEnglish?.quiz?.revealTiming ?? 0.7}
+                        onChange={(e) => handleUpdateCurrentQuiz({ revealTiming: parseFloat(e.target.value) })}
+                        className="w-full accent-amber-500"
+                      />
+                      <p className="text-[10px] text-gray-500">The correct answer turns green at this point in the segment duration</p>
+                    </div>
+
+                    {/* Progress Timer Color */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-300">Timer Bar Color</label>
+                      <div className="flex items-center gap-2">
+                        {[
+                          { color: '#ef4444', name: 'Red' },
+                          { color: '#f59e0b', name: 'Amber' },
+                          { color: '#10b981', name: 'Emerald' },
+                          { color: '#06b6d4', name: 'Cyan' },
+                          { color: '#8b5cf6', name: 'Purple' },
+                        ].map((c) => (
+                          <button
+                            key={c.color}
+                            type="button"
+                            onClick={() => handleUpdateCurrentQuiz({ accentColor: c.color })}
+                            className={`w-7 h-7 rounded-full border-2 transition-transform active:scale-90 ${
+                              (currentSegment.learnEnglish?.quiz?.accentColor || '#ef4444') === c.color
+                                ? 'border-white scale-110 shadow-md'
+                                : 'border-transparent hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: c.color }}
+                            title={c.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Subtitles & Preview Toggles */}
+                    <div className="pt-2 space-y-2">
+                      {/* Hide subtitles toggle */}
+                      <label className="flex items-center justify-between p-2.5 rounded-xl bg-[#141416] border border-white/5 cursor-pointer hover:border-white/10 transition-colors">
+                        <div className="text-xs">
+                          <div className="font-semibold text-gray-200">Hide Subtitles During Question</div>
+                          <div className="text-[10px] text-gray-500">Prevents voiceover subtitles from crowding the question card</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={currentSegment.learnEnglish?.quiz?.hideSubtitles !== false}
+                          onChange={(e) => handleUpdateCurrentQuiz({ hideSubtitles: e.target.checked })}
+                          className="w-4 h-4 rounded accent-amber-500"
+                        />
+                      </label>
+
+                      {/* Test Reveal Preview toggle */}
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateCurrentQuiz({ testReveal: !currentSegment.learnEnglish?.quiz?.testReveal })}
+                        className={`w-full py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                          currentSegment.learnEnglish?.quiz?.testReveal
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
+                            : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                        }`}
+                      >
+                        {currentSegment.learnEnglish?.quiz?.testReveal ? <Eye size={14} /> : <EyeOff size={14} />}
+                        {currentSegment.learnEnglish?.quiz?.testReveal
+                          ? 'Test Reveal: ON (Answer highlighted in canvas)'
+                          : 'Test Reveal: OFF (Click to preview green answer in canvas)'}
+                      </button>
+                    </div>
+
+                    {/* Segment Background */}
+                    <div className="pt-2 border-t border-white/5 space-y-2">
+                      <label className="text-xs font-semibold text-gray-300 flex items-center justify-between">
+                        <span>Question Background Image</span>
+                        {currentSegment.visualConfig?.backgroundUrl && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateQuizBackground('')}
+                            className="text-[10px] text-red-400 hover:underline"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={currentSegment.visualConfig?.backgroundUrl || ''}
+                          onChange={(e) => handleUpdateQuizBackground(e.target.value)}
+                          placeholder="Image URL or upload..."
+                          className="flex-1 bg-[#141416] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amber-500/50"
+                        />
+                        <button
+                          type="button"
+                          disabled={quizImageLoading}
+                          title="Generate AI Background"
+                          onClick={async () => {
+                            if (!currentSegment) return;
+                            try {
+                              setQuizImageLoading(true);
+                              const imageUrl = await generateVideoBackground(currentSegment.text || '', theme);
+                              if (imageUrl) {
+                                handleUpdateQuizBackground(imageUrl);
+                              }
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setQuizImageLoading(false);
+                            }
+                          }}
+                          className="px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-xl text-xs font-semibold cursor-pointer text-indigo-400 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                        >
+                          {quizImageLoading ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+                        </button>
+                        <label className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-semibold cursor-pointer text-gray-300 flex items-center gap-1.5 transition-colors">
+                          <Upload size={13} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const url = URL.createObjectURL(file);
+                                handleUpdateQuizBackground(url);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Visual Settings Panel (inline, collapsible) — only visible when NOT on intro or question segments ── */}
+          {!isCurrentSegmentIntro && !isCurrentSegmentQuiz && (
+            <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
             {/* Collapsible header */}
             <button
               onClick={() => setShowSettings(!showSettings)}
@@ -3572,6 +4463,28 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
                 {/* ── INTRO TAB — dedicated cinematic hook-shot images for "intro"-tagged
                      segments only, separate from the per-speaker Background tab. ── */}
+                {settingsTab === 'intro' && (
+                  <div className="space-y-4">
+                    {/* Add Intro settings controls here if needed, besides the timeline list which is rendered elsewhere */}
+                    
+                    <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Intro Settings</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Intro Subtitle Color</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono text-gray-500">{introSubtitleColor}</span>
+                            <input type="color" value={introSubtitleColor}
+                              onChange={(e) => setIntroSubtitleColor(e.target.value)}
+                              className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── BACKGROUND TAB ── */}
                 {settingsTab === 'background' && (
                   <div className="space-y-4">
@@ -3823,6 +4736,22 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           <span className="text-xs text-gray-300">Sync Position (All Segments)</span>
                           <input type="checkbox" checked={syncSubtitlePosition} onChange={(e) => setSyncSubtitlePosition(e.target.checked)} className="accent-red-500" />
                         </label>
+                        {uniqueSpeakers.length > 0 && (
+                          <div className="pt-2 border-t border-white/5 space-y-2">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider block font-semibold">Speaker Position Sync</span>
+                            {uniqueSpeakers.map(speaker => (
+                              <label key={speaker} className="flex items-center justify-between cursor-pointer">
+                                <span className="text-xs text-gray-300">Sync {speaker} Position</span>
+                                <input 
+                                  type="checkbox" 
+                                  checked={syncSpeakerPosition[speaker] ?? true} 
+                                  onChange={(e) => setSyncSpeakerPosition(prev => ({ ...prev, [speaker]: e.target.checked }))} 
+                                  className="accent-red-500" 
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* ─── 1b. BADGE STYLE ─── */}
@@ -3898,7 +4827,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             <span className="text-xs font-mono text-red-400">{currentSubtitleConfig.fontSize.toFixed(1)}x</span>
                           </div>
                           <input type="range" min={0.5} max={2} step={0.1} value={currentSubtitleConfig.fontSize}
-                            onChange={(e) => { const val = parseFloat(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), fontSize: val } } }))); }}
+                            onChange={(e) => { const val = parseFloat(e.target.value); setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), fontSize: val } } }; } return seg; })); }}
                             className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                           />
                         </div>
@@ -3910,7 +4839,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-mono text-gray-500">{currentSubtitleConfig.textColor}</span>
                               <input type="color" value={currentSubtitleConfig.textColor}
-                                onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: val } } }))); }}
+                                onChange={(e) => { const val = e.target.value; setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: val } } }; } return seg; })); }}
                                 className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
                               />
                             </div>
@@ -3930,7 +4859,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                               <button
                                 key={hex}
                                 title={label}
-                                onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: hex } } })))}
+                                onClick={() => setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), textColor: hex } } }; } return seg; }))}
                                 className={`w-6 h-6 rounded-lg border-2 transition-all shrink-0 ${currentSubtitleConfig.textColor === hex ? 'border-white scale-110' : 'border-white/10 hover:border-white/40'}`}
                                 style={{ backgroundColor: hex }}
                               />
@@ -3958,15 +4887,20 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
                         {/* Liquid Glass Preset */}
                         <button
-                          onClick={() => setScript(prev => prev.map(seg => ({
-                            ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: {
-                              ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig),
-                              backgroundColor: 'rgba(255,255,255,0.08)',
-                              borderColor: 'rgba(255,255,255,0.28)',
-                              borderWidth: 1.5,
-                              borderRadius: 22,
-                            }}
-                          })))}
+                          onClick={() => setScript(prev => prev.map((seg, i) => {
+                            if (shouldSync(seg, i)) {
+                              return {
+                                ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: {
+                                  ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig),
+                                  backgroundColor: 'rgba(255,255,255,0.08)',
+                                  borderColor: 'rgba(255,255,255,0.28)',
+                                  borderWidth: 1.5,
+                                  borderRadius: 22,
+                                }}
+                              };
+                            }
+                            return seg;
+                          }))}
                           className="w-full py-2 rounded-xl text-xs font-bold border-2 border-cyan-400/40 text-cyan-300 bg-cyan-400/5 hover:bg-cyan-400/10 transition-all flex items-center justify-center gap-2"
                         >
                           <span className="text-sm">🫧</span> Liquid Glass
@@ -3984,7 +4918,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             { label: 'None', value: 'transparent' },
                           ].map(opt => (
                             <button key={opt.label}
-                              onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: opt.value } } })))}
+                              onClick={() => setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), backgroundColor: opt.value } } }; } return seg; }))}
                               className={`py-1.5 text-xs font-bold rounded-lg border-2 transition-all ${currentSubtitleConfig.backgroundColor === opt.value ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
                             >{opt.label}</button>
                           ))}
@@ -4024,7 +4958,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                               { label: 'Pill', radius: 60 },
                             ].map(opt => (
                               <button key={opt.label}
-                                onClick={() => setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: opt.radius } } })))}
+                                onClick={() => setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: opt.radius } } }; } return seg; }))}
                                 className={`flex-1 py-1.5 text-xs font-bold rounded-lg border-2 transition-all flex flex-col items-center gap-1 ${(currentSubtitleConfig.borderRadius ?? 20) === opt.radius ? 'border-red-500 text-red-300 bg-red-500/10' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'}`}
                               >
                                 <span className={`inline-block w-4 h-3 border border-current ${opt.radius === 0 ? '' : opt.radius <= 6 ? 'rounded-sm' : opt.radius <= 20 ? 'rounded' : 'rounded-full'}`} />
@@ -4035,7 +4969,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           <div className="flex items-center gap-2 mt-1">
                             <input type="range" min={0} max={80} step={2}
                               value={currentSubtitleConfig.borderRadius ?? 20}
-                              onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: val } } }))); }}
+                              onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderRadius: val } } }; } return seg; })); }}
                               className="flex-1 accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                             />
                             <span className="text-xs font-mono text-red-400 w-9 text-right">{currentSubtitleConfig.borderRadius ?? 20}px</span>
@@ -4050,7 +4984,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           </div>
                           <input type="range" min={0} max={8} step={1}
                             value={currentSubtitleConfig.borderWidth ?? 0}
-                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderWidth: val } } }))); }}
+                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderWidth: val } } }; } return seg; })); }}
                             className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                           />
                           {(currentSubtitleConfig.borderWidth ?? 0) > 0 && (
@@ -4060,7 +4994,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                 <span className="text-[10px] font-mono text-gray-500">{currentSubtitleConfig.borderColor || '#ffffff'}</span>
                                 <input type="color"
                                   value={currentSubtitleConfig.borderColor || '#ffffff'}
-                                  onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderColor: val } } }))); }}
+                                  onChange={(e) => { const val = e.target.value; setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), borderColor: val } } }; } return seg; })); }}
                                   className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
                                 />
                               </div>
@@ -4073,24 +5007,74 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                       <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
                         <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Layout & Behavior</p>
 
-                        {/* Vertical Position */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-400">Vertical Position</span>
-                            <span className="text-xs font-mono text-gray-400">{Math.round(currentSubtitleConfig.y)}px</span>
+                        {/* Position (X, Y) */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-400">Position (X, Y)</span>
+                            <span className="text-xs font-mono text-gray-400">{Math.round(currentSubtitleConfig.x || 192)}, {Math.round(currentSubtitleConfig.y)}</span>
                           </div>
-                          <input type="range" min={0} max={720} step={10} value={currentSubtitleConfig.y}
-                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
-                            className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                          />
+                          
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <button
+                                  onClick={() => { const val = Math.max(0, currentSubtitleConfig.y - 20); setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
+                                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                              >
+                                  <ChevronUp size={14} /> Upar
+                              </button>
+                              <button
+                                  onClick={() => { const val = Math.min(1080, currentSubtitleConfig.y + 20); setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
+                                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                              >
+                                  <ChevronDown size={14} /> Niche
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                  onClick={() => { const val = Math.max(-500, (currentSubtitleConfig.x || 192) - 20); setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: val } } }; } return seg; })); }}
+                                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                              >
+                                  <ChevronLeft size={14} /> Left
+                              </button>
+                              <button
+                                  onClick={() => { const val = Math.min(1920, (currentSubtitleConfig.x || 192) + 20); setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: val } } }; } return seg; })); }}
+                                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                              >
+                                  Right <ChevronRight size={14} />
+                              </button>
+                              <button
+                                  onClick={() => { setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: 192, y: 550 } } }; } return seg; })); }}
+                                  className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors border border-red-900/40"
+                              >
+                                  <RefreshCw size={12} /> Default
+                              </button>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Display Mode */}
                         <div className="space-y-1">
-                          <span className="text-xs text-gray-400 block">Display Mode</span>
-                          <select value={currentSubtitleConfig.mode || 'phrase'}
-                            onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), mode: val as any } } }))); }}
-                            className="w-full bg-[#0a0a0a] text-gray-200 text-xs rounded-lg px-3 py-2 border border-white/5 focus:border-red-500 outline-none appearance-none cursor-pointer"
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-400 block">Display Mode</span>
+                          </div>
+                          <select 
+                            value={currentSubtitleConfig.mode || 'phrase'}
+                            onChange={(e) => { 
+                                const val = e.target.value; 
+                                setScript(prev => prev.map((seg, i) => {
+                                    return { 
+                                        ...seg, 
+                                        visualConfig: { 
+                                            ...seg.visualConfig, 
+                                            subtitleConfig: { 
+                                                ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), 
+                                                mode: val as any 
+                                            } 
+                                        } 
+                                    };
+                                })); 
+                            }}
+                            className="w-full bg-[#0a0a0a] text-gray-200 text-xs rounded-lg px-3 py-2 border border-white/5 outline-none appearance-none cursor-pointer focus:border-red-500"
                           >
                             <option value="phrase">Phrase — show whole phrase at once</option>
                             <option value="word">Word — one word at a time</option>
@@ -4099,12 +5083,16 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             <option value="full-static">Full Static — all text always visible</option>
                           </select>
                           <p className="text-[10px] text-gray-600 mt-1">
-                            {currentSubtitleConfig.mode === 'phrase' && 'Shows each phrase/sentence at once. Clean & readable.'}
-                            {currentSubtitleConfig.mode === 'word' && 'One word at a time — very minimal, karaoke style.'}
-                            {currentSubtitleConfig.mode === 'mix' && 'Words appear one-by-one within each phrase, then reset.'}
-                            {currentSubtitleConfig.mode === 'line' && 'Shows one wrapped line at a time.'}
-                            {currentSubtitleConfig.mode === 'full-static' && 'Always shows the full segment text — no animation.'}
-                            {!currentSubtitleConfig.mode && 'Shows each phrase/sentence at once. Clean & readable.'}
+                            {isCurrentSegmentIntro ? 'Intro always shows one wrapped line at a time.' : (
+                                <>
+                                    {currentSubtitleConfig.mode === 'phrase' && 'Shows each phrase/sentence at once. Clean & readable.'}
+                                    {currentSubtitleConfig.mode === 'word' && 'One word at a time — very minimal, karaoke style.'}
+                                    {currentSubtitleConfig.mode === 'mix' && 'Words appear one-by-one within each phrase, then reset.'}
+                                    {currentSubtitleConfig.mode === 'line' && 'Shows one wrapped line at a time.'}
+                                    {currentSubtitleConfig.mode === 'full-static' && 'Always shows the full segment text — no animation.'}
+                                    {!currentSubtitleConfig.mode && 'Shows each phrase/sentence at once. Clean & readable.'}
+                                </>
+                            )}
                           </p>
                         </div>
 
@@ -4116,6 +5104,25 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           </div>
                           <input type="checkbox" checked={questionMode} onChange={(e) => setQuestionMode(e.target.checked)} className="accent-red-500 shrink-0" />
                         </label>
+
+                        {/* Reset All Subtitle Settings */}
+                        <div className="pt-2 border-t border-white/5">
+                          <button
+                              onClick={() => { 
+                                setSubtitleBackground(false);
+                                const defaultSubtitleConfig = { x: 192, y: 550, w: 896, h: 150, fontSize: 1.4, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20, mode: 'phrase' };
+                                setScript(prev => prev.map((seg, i) => { 
+                                  if (shouldSync(seg, i)) { 
+                                      return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: defaultSubtitleConfig } }; 
+                                  } 
+                                  return seg; 
+                                }));
+                              }}
+                              className="w-full bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs py-3 rounded-xl border border-red-900/30 flex items-center justify-center gap-2 transition-colors font-bold uppercase tracking-wider"
+                          >
+                              <RefreshCw size={14} /> Reset All Subtitle Settings
+                          </button>
+                        </div>
                       </div>
 
                     </div>
@@ -4215,7 +5222,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         onClick={async () => {
                           if (!currentSegment.text) return;
                           try {
-                            const url = await generateCinematicSceneImage(currentSegment.text);
+                            const url = await generateStoryboardImage(currentSegment.text);
                             setScript(prev => { const s = [...prev]; s[currentSegmentIndex] = { ...s[currentSegmentIndex], visualConfig: { ...s[currentSegmentIndex].visualConfig, backgroundUrl: url } }; return s; });
                             setStatusSafe("Image generated!", 3000);
                           } catch (e) { setStatusMessage("Generation failed"); }
@@ -4264,7 +5271,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                 </div>{/* end tab content */}
               </>
             )}
-          </div>{/* end Visual Settings panel */}
+          </div>
+          )}{/* end Visual Settings panel */}
 
         </div>{/* end max-w-2xl inner col */}
       </div>{/* end scrollable content */}

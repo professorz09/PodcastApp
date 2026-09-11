@@ -2,6 +2,8 @@
 // in server.ts (Vertex SA auth preferred, falls back to a plain API key;
 // tries STT v2 first, then v1p1beta1/v1, with a long-running fallback for
 // audio that's too long for the sync endpoint).
+import { getGCPAccessToken } from '../../services/vertexProxy';
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -116,7 +118,6 @@ export default async function handler(req: any, res: any) {
   };
 
   try {
-    const { getGCPAccessToken } = await import('../../services/vertexProxy.js');
     const token = await getGCPAccessToken();
     const projectId = process.env.GCP_PROJECT_ID;
     const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };

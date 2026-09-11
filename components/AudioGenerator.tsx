@@ -56,7 +56,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         if (!newVoices[speaker]) {
           if (isNarrator(speaker)) newVoices[speaker] = 'Puck';
           else {
-            const defaults = ['Zephyr', 'Charon', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
+            const defaults = ['Charon', 'Zephyr', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
             const speakerIndex = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(speaker);
             newVoices[speaker] = defaults[speakerIndex % defaults.length];
           }
@@ -191,7 +191,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
 
   useEffect(() => {
     const chirp3HdValidIds = ['Achernar','Achird','Algenib','Algieba','Alnilam','Aoede','Autonoe','Callirrhoe','Charon','Despina','Enceladus','Erinome','Fenrir','Gacrux','Iapetus','Kore','Laomedeia','Leda','Orus','Puck','Pulcherrima','Rasalgethi','Sadachbia','Sadaltager','Schedar','Sulafat','Umbriel','Vindemiatrix','Zephyr','Zubenelgenubi'];
-    const chirp3HdDefaults = ['Zephyr', 'Puck', 'Aoede', 'Charon', 'Kore', 'Fenrir'];
+    const chirp3HdDefaults = ['Charon', 'Puck', 'Aoede', 'Zephyr', 'Kore', 'Fenrir'];
     if (ttsProvider === 'elevenlabs') {
       if (elevenLabsVoices.length > 0) {
         setVoices(prev => {
@@ -602,7 +602,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       const phraseTimings = buildPhrases(wordTimings);
       onUpdateScript(prev => {
         const newScript = [...prev];
-        newScript[index] = { ...newScript[index], wordTimings, phraseTimings };
+        newScript[index] = { ...newScript[index], wordTimings, phraseTimings, isApproximate: usedFallback };
         return newScript;
       });
     } catch (error) {
@@ -644,11 +644,13 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
             const blob = await response.blob();
 
             let wordTimings: { word: string; start: number; end: number }[];
+            let usedFallback = false;
             try {
               wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
             } catch (cloudErr: any) {
               console.warn(`Segment ${i}: Cloud STT unavailable, using offline fallback`, cloudErr);
               fallbackCount++;
+              usedFallback = true;
               const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
               wordTimings = generateProportionalWordTimings(seg.text, duration);
             }
@@ -659,7 +661,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
               const idx = prev.findIndex(s => s.id === seg.id);
               if (idx === -1) return prev;
               const next = [...prev];
-              next[idx] = { ...next[idx], wordTimings, phraseTimings };
+              next[idx] = { ...next[idx], wordTimings, phraseTimings, isApproximate: usedFallback };
               return next;
             });
             okCount++;
@@ -752,8 +754,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     return { card: 'bg-orange-950/30 border-orange-800/30', icon: 'bg-orange-900/40 text-orange-400' };
   };
 
-  const speakerTimelineColor = (role: string, isIntro?: boolean) => {
+  const speakerTimelineColor = (role: string, isIntro?: boolean, isQuiz?: boolean) => {
     if (isIntro) return { dot: 'bg-cyan-900/20 text-cyan-400', card: 'bg-cyan-950/5 border-cyan-900/20 hover:border-cyan-500/30', label: 'text-cyan-400' };
+    if (isQuiz) return { dot: 'bg-amber-500/20 text-amber-300 ring-amber-500/30', card: 'bg-amber-950/10 border-amber-500/20 hover:border-amber-500/40', label: 'text-amber-400' };
     if (isNarrator(role)) return { dot: 'bg-gray-800 text-gray-400', card: 'bg-[#0a0a0a] border-white/5 hover:border-white/10', label: 'text-gray-500' };
     const idx = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(role);
     if (idx === 0) return { dot: 'bg-blue-900/20 text-blue-400', card: 'bg-blue-950/5 border-blue-900/20 hover:border-blue-500/30', label: 'text-blue-400' };
@@ -1132,7 +1135,8 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                   const isExpanded = expandedSegments[seg.id];
                   const isPlaying = playingSegment === seg.id;
                   const isIntroSeg = seg.learnEnglish?.segmentType === 'intro';
-                  const colors = speakerTimelineColor(seg.speaker, isIntroSeg);
+                  const isQuizSeg = seg.learnEnglish?.segmentType === 'quiz' || seg.speaker === 'Question' || Boolean(seg.learnEnglish?.quiz);
+                  const colors = speakerTimelineColor(seg.speaker, isIntroSeg, isQuizSeg);
 
                   return (
                     <div key={seg.id} className="flex gap-3 group">
@@ -1142,7 +1146,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                           <div className="absolute top-10 bottom-[-16px] w-px bg-gray-800/50 z-0 group-hover:bg-gray-700/50 transition-colors" />
                         )}
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold z-10 relative ring-4 ring-[#0c0c0e] transition-transform group-hover:scale-110 ${colors.dot}`}>
-                          {isIntroSeg ? 'I' : isNarrator(seg.speaker) ? 'N' : seg.speaker.charAt(0)}
+                          {isIntroSeg ? 'I' : (isQuizSeg ? 'Q' : (isNarrator(seg.speaker) ? 'N' : seg.speaker.charAt(0)))}
                         </div>
                       </div>
 
@@ -1150,7 +1154,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                       <div className={`flex-1 mb-4 p-3 md:p-4 rounded-xl border transition-all duration-200 ${colors.card}`}>
                         <div className="flex items-center justify-between mb-2">
                           <span className={`text-xs font-bold uppercase tracking-wider ${colors.label}`}>
-                            {isIntroSeg ? 'Intro' : seg.speaker}
+                            {isIntroSeg ? 'Intro' : (isQuizSeg ? 'Question' : seg.speaker)}
                           </span>
                           {hasAudio && (
                             <span className="text-[10px] font-mono text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -1195,12 +1199,14 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                                 disabled={syncingSegments[seg.id]}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors border disabled:opacity-50 ${
                                   seg.phraseTimings && seg.phraseTimings.length > 0
-                                    ? 'text-green-400 border-green-500/30 bg-green-900/10 hover:bg-green-900/30'
+                                    ? seg.isApproximate
+                                      ? 'text-yellow-400 border-yellow-500/30 bg-yellow-900/10 hover:bg-yellow-900/30'
+                                      : 'text-green-400 border-green-500/30 bg-green-900/10 hover:bg-green-900/30'
                                     : 'text-blue-400 border-blue-500/30 bg-blue-900/10 hover:bg-blue-900/30 hover:text-white'
                                 }`}
                               >
-                                {syncingSegments[seg.id] ? <RefreshCw size={14} className="animate-spin" /> : seg.phraseTimings && seg.phraseTimings.length > 0 ? <Check size={14} /> : <RefreshCw size={14} />}
-                                <span className="text-xs font-medium">{seg.phraseTimings && seg.phraseTimings.length > 0 ? 'Synced' : 'Sync'}</span>
+                                {syncingSegments[seg.id] ? <RefreshCw size={14} className="animate-spin" /> : seg.phraseTimings && seg.phraseTimings.length > 0 ? (seg.isApproximate ? <AlertCircle size={14} /> : <Check size={14} />) : <RefreshCw size={14} />}
+                                <span className="text-xs font-medium">{seg.phraseTimings && seg.phraseTimings.length > 0 ? (seg.isApproximate ? 'Approx' : 'Synced') : 'Sync'}</span>
                               </button>
                               <button
                                 onClick={() => handleDownloadSingleTranscript(seg, idx)}

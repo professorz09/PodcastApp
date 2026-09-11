@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { DebateSegment, YoutubeImportData } from '../types';
+import { DebateSegment, YoutubeImportData, ThumbnailState } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ArrowRight, Edit2, Sparkles, Loader2, Save, RefreshCw, Trash2, User, AlignLeft, Clock, Languages, Quote, Copy, Check, RotateCcw, X, Scissors, Play, Download, BookOpen, MapPin, Tag } from 'lucide-react';
+import { ChevronLeft, ArrowRight, Edit2, Sparkles, Loader2, Save, RefreshCw, Trash2, User, AlignLeft, Clock, Languages, Quote, Copy, Check, RotateCcw, X, Scissors, Play, Download, BookOpen, MapPin, Tag, HelpCircle, Plus } from 'lucide-react';
 import { rewriteScriptSegment, translateScriptToHindi, generateTopicQuote, analyzeTimelineCuts, analyzeContextBridgeTimeline, generateTitleTextPair, TimelineCut } from '../services/geminiService';
 
 interface ScriptEditorProps {
@@ -12,9 +12,11 @@ interface ScriptEditorProps {
   onBack: () => void;
   youtubeData?: YoutubeImportData | null;
   scriptStyle?: string;
+  thumbnailState?: ThumbnailState;
+  onUpdateThumbnailState?: (state: ThumbnailState) => void;
 }
 
-const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onNext, onBack, youtubeData, speakerVoices, scriptStyle }) => {
+const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onNext, onBack, youtubeData, speakerVoices, scriptStyle, thumbnailState, onUpdateThumbnailState }) => {
   const [editMode, setEditMode] = useState<boolean>(false);
   
   // Translate State
@@ -31,20 +33,27 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
   const [segmentToDelete, setSegmentToDelete] = useState<string | null>(null);
 
   // Topic Quote State
-  const [quoteData, setQuoteData] = useState<{ quote: string; author: string; title: string } | null>(null);
+  const [quoteData, setQuoteData] = useState<{ quote: string; author: string; title: string } | null>(
+    thumbnailState?.quoteData || null
+  );
   const [isGeneratingQuote, setIsGeneratingQuote] = useState(false);
   const [quoteCopied, setQuoteCopied] = useState(false);
 
   // Timeline Cuts State
-  const [timelineCuts, setTimelineCuts] = useState<TimelineCut[] | null>(null);
+  const [timelineCuts, setTimelineCuts] = useState<TimelineCut[] | null>(
+    thumbnailState?.timelineCuts || null
+  );
   const [isAnalyzingTimeline, setIsAnalyzingTimeline] = useState(false);
   const [timelineCutsCopied, setTimelineCutsCopied] = useState(false);
 
   // Title + Thumbnail Text State
-  const [titleThumbData, setTitleThumbData] = useState<{ title: string; thumbnailText: string; description: string } | null>(null);
+  const [titleThumbData, setTitleThumbData] = useState<{ title: string; thumbnailText: string; description: string } | null>(
+    thumbnailState?.titleThumbData || null
+  );
   const [isGeneratingTitleThumb, setIsGeneratingTitleThumb] = useState(false);
   const [titleCopied, setTitleCopied] = useState(false);
   const [thumbTextCopied, setThumbTextCopied] = useState(false);
+  const [descCopied, setDescCopied] = useState(false);
 
   // Source Timeline State (for context_bridge style)
   const [showSourceTimeline, setShowSourceTimeline] = useState(false);
@@ -79,9 +88,10 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
 
   const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'Voiceover'];
   const isNarrator = (s: string) => NARRATOR_KEYS.includes(s);
+  const isQuizSpeaker = (s: string) => s === 'Question' || s === 'Quiz' || s === 'क्वेश्चन';
 
-  // Extract unique speakers
-  const uniqueSpeakers: string[] = Array.from(new Set(script.map(s => s.speaker).filter(s => !isNarrator(s))));
+  // Extract unique speakers (excluding Narrator and Question)
+  const uniqueSpeakers: string[] = Array.from(new Set(script.map(s => s.speaker).filter(s => !isNarrator(s) && !isQuizSpeaker(s) && s !== 'Intro')));
   if (uniqueSpeakers.length === 0) {
       uniqueSpeakers.push('Speaker 1', 'Speaker 2');
   }
@@ -89,14 +99,80 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
   const handleSpeakerChange = (id: string) => {
     const updatedScript = script.map(seg => {
       if (seg.id === id) {
-        const allOptions = ['Narrator', ...uniqueSpeakers];
+        const isCurrentQuiz = seg.learnEnglish?.segmentType === 'quiz' || isQuizSpeaker(seg.speaker);
+        const allOptions = isCurrentQuiz
+          ? ['Question', 'Narrator', ...uniqueSpeakers]
+          : ['Narrator', ...uniqueSpeakers, 'Question'];
         const currentIndex = allOptions.indexOf(seg.speaker);
         const nextIndex = (currentIndex + 1) % allOptions.length;
-        return { ...seg, speaker: allOptions[nextIndex] };
+        const nextSpeaker = allOptions[nextIndex];
+        return {
+          ...seg,
+          speaker: nextSpeaker,
+          learnEnglish: nextSpeaker === 'Question'
+            ? { ...seg.learnEnglish, segmentType: 'quiz' as const }
+            : (seg.learnEnglish?.segmentType === 'quiz' ? { ...seg.learnEnglish, segmentType: 'narrator' as const } : seg.learnEnglish)
+        };
       }
       return seg;
     });
     onUpdateScript(updatedScript);
+  };
+
+  const handleQuizQuestionChange = (id: string, newQ: string) => {
+    const updated = script.map(s => s.id === id ? {
+      ...s,
+      learnEnglish: {
+        ...s.learnEnglish,
+        segmentType: 'quiz' as const,
+        quiz: {
+          question: newQ,
+          options: s.learnEnglish?.quiz?.options || ['Option A', 'Option B', 'Option C', 'Option D'],
+          answer: s.learnEnglish?.quiz?.answer || s.learnEnglish?.quiz?.options?.[0] || 'Option A',
+        }
+      }
+    } : s);
+    onUpdateScript(updated);
+  };
+
+  const handleQuizOptionChange = (id: string, optIdx: number, val: string) => {
+    const updated = script.map(s => {
+      if (s.id !== id || !s.learnEnglish?.quiz) return s;
+      const prevOpts = s.learnEnglish.quiz.options || [];
+      const newOpts = [...prevOpts];
+      const oldVal = newOpts[optIdx];
+      newOpts[optIdx] = val;
+      const isAns = s.learnEnglish.quiz.answer.trim().toLowerCase() === oldVal?.trim().toLowerCase();
+      return {
+        ...s,
+        learnEnglish: {
+          ...s.learnEnglish,
+          quiz: {
+            ...s.learnEnglish.quiz,
+            options: newOpts,
+            answer: isAns ? val : s.learnEnglish.quiz.answer,
+          }
+        }
+      };
+    });
+    onUpdateScript(updated);
+  };
+
+  const handleQuizAnswerSelect = (id: string, correctOpt: string) => {
+    const updated = script.map(s => {
+      if (s.id !== id || !s.learnEnglish?.quiz) return s;
+      return {
+        ...s,
+        learnEnglish: {
+          ...s.learnEnglish,
+          quiz: {
+            ...s.learnEnglish.quiz,
+            answer: correctOpt,
+          }
+        }
+      };
+    });
+    onUpdateScript(updated);
   };
 
   const handleTextChange = (id: string, newText: string) => {
@@ -217,10 +293,22 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
   const handleGenerateQuote = async () => {
     setIsGeneratingQuote(true);
     setQuoteData(null);
+    const baseState: ThumbnailState = thumbnailState || {
+      titles: [],
+      selectedTitle: '',
+      thumbnailTexts: [],
+      selectedThumbnailText: '',
+      hostName: 'Joe Rogan',
+      guestName: '',
+      thumbnailUrl: null,
+      referenceImage: null,
+    };
+    onUpdateThumbnailState?.({ ...baseState, quoteData: null });
     try {
       const fullText = script.map(s => s.text).join(' ');
       const result = await generateTopicQuote(fullText);
       setQuoteData(result);
+      onUpdateThumbnailState?.({ ...baseState, quoteData: result });
     } catch (e: any) {
       toast.error(e.message || 'Quote generation failed. Please try again.');
     } finally {
@@ -265,6 +353,17 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
   const handleAnalyzeTimeline = async () => {
     setIsAnalyzingTimeline(true);
     setTimelineCuts(null);
+    const baseState: ThumbnailState = thumbnailState || {
+      titles: [],
+      selectedTitle: '',
+      thumbnailTexts: [],
+      selectedThumbnailText: '',
+      hostName: 'Joe Rogan',
+      guestName: '',
+      thumbnailUrl: null,
+      referenceImage: null,
+    };
+    onUpdateThumbnailState?.({ ...baseState, timelineCuts: null });
     try {
       const transcript = getTimedTranscript();
       if (transcript.length === 0) {
@@ -303,6 +402,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       }
       const cuts = await analyzeTimelineCuts(finalPoints, transcript);
       setTimelineCuts(cuts);
+      onUpdateThumbnailState?.({ ...baseState, timelineCuts: cuts });
     } catch (e: any) {
       toast.error(e.message || 'Timeline analysis failed. Please try again.');
     } finally {
@@ -358,6 +458,17 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
   const handleGenerateTitleThumb = async () => {
     setIsGeneratingTitleThumb(true);
     setTitleThumbData(null);
+    const baseState: ThumbnailState = thumbnailState || {
+      titles: [],
+      selectedTitle: '',
+      thumbnailTexts: [],
+      selectedThumbnailText: '',
+      hostName: 'Joe Rogan',
+      guestName: '',
+      thumbnailUrl: null,
+      referenceImage: null,
+    };
+    onUpdateThumbnailState?.({ ...baseState, titleThumbData: null });
     try {
       const clipText = getTimedTranscript().map(t => t.text).join(' ');
       const scriptText = script.map(s => s.text).join(' ');
@@ -365,6 +476,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
       const result = await generateTitleTextPair(combined || scriptText);
       if (!result.length) { toast.error('Koi title/thumbnail nahi aaya — dobara try karo'); return; }
       setTitleThumbData(result[0]);
+      onUpdateThumbnailState?.({ ...baseState, titleThumbData: result[0] });
     } catch (e: any) {
       toast.error(e.message || 'Title/Thumbnail generation failed');
     } finally {
@@ -385,6 +497,14 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     navigator.clipboard.writeText(titleThumbData.thumbnailText).then(() => {
       setThumbTextCopied(true);
       setTimeout(() => setThumbTextCopied(false), 2500);
+    });
+  };
+
+  const handleCopyDesc = () => {
+    if (!titleThumbData) return;
+    navigator.clipboard.writeText(titleThumbData.description).then(() => {
+      setDescCopied(true);
+      setTimeout(() => setDescCopied(false), 2500);
     });
   };
 
@@ -412,8 +532,9 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     return { words, seconds };
   };
 
-  const speakerAccent = (speaker: string, isIntro?: boolean) => {
+  const speakerAccent = (speaker: string, isIntro?: boolean, isQuiz?: boolean) => {
     if (isIntro) return { bar: 'bg-cyan-500', badge: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' };
+    if (isQuiz) return { bar: 'bg-amber-500', badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
     if (isNarrator(speaker)) return { bar: 'bg-zinc-600', badge: 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50' };
     const idx = uniqueSpeakers.indexOf(speaker);
     const palette = [
@@ -501,7 +622,9 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
           {script.map((seg, idx) => {
             const displayText = translateView && translatedTexts?.[idx] != null ? translatedTexts[idx] : seg.text;
             const stats = getStats(seg.text);
-            const accent = speakerAccent(seg.speaker, seg.learnEnglish?.segmentType === 'intro');
+            const isIntroSeg = seg.learnEnglish?.segmentType === 'intro';
+            const isQuiz = seg.learnEnglish?.segmentType === 'quiz' || seg.speaker === 'Question' || Boolean(seg.learnEnglish?.quiz);
+            const accent = speakerAccent(seg.speaker, isIntroSeg, isQuiz);
             const isRewiting = isRewriting && activeRewriteId === seg.id;
 
             return (
@@ -519,8 +642,8 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                       disabled={!editMode || translateView}
                       className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5 border transition-all ${accent.badge} ${editMode && !translateView ? 'cursor-pointer hover:brightness-125 active:scale-95' : 'cursor-default'}`}
                     >
-                      <User size={11} />
-                      {seg.learnEnglish?.segmentType === 'intro' ? 'Intro' : seg.speaker}
+                      {isQuiz ? <HelpCircle size={11} className="text-amber-400" /> : (isIntroSeg ? <Sparkles size={11} className="text-cyan-400" /> : <User size={11} />)}
+                      {isIntroSeg ? 'Intro' : (isQuiz ? 'Question' : seg.speaker)}
                       {editMode && !translateView && <RefreshCw size={9} className="opacity-40" />}
                     </button>
 
@@ -576,6 +699,73 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                         <p className={`text-sm md:text-base font-light leading-relaxed whitespace-pre-wrap font-sans ${translateView ? 'text-orange-100/80' : 'text-zinc-300'}`}>
                           {displayText}
                         </p>
+                      )}
+
+                      {/* ── Quiz Card Inspector & Inline Editor ── */}
+                      {isQuiz && seg.learnEnglish?.quiz && (
+                        <div className="mt-3 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                              <HelpCircle size={11} /> Question Overlay Card
+                            </span>
+                            <span className="text-[10px] text-amber-400/80 font-mono">
+                              Correct: <span className="text-emerald-400 font-bold">{seg.learnEnglish.quiz.answer}</span>
+                            </span>
+                          </div>
+
+                          {editMode && !translateView ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={seg.learnEnglish.quiz.question}
+                                onChange={(e) => handleQuizQuestionChange(seg.id, e.target.value)}
+                                placeholder="Question display text..."
+                                className="w-full bg-black/40 border border-amber-500/30 rounded-lg px-2.5 py-1.5 text-xs text-amber-200 focus:outline-none focus:border-amber-500 font-medium"
+                              />
+                              {seg.learnEnglish.quiz.options && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                  {seg.learnEnglish.quiz.options.map((opt, optI) => {
+                                    const isCorrect = opt.trim().toLowerCase() === seg.learnEnglish?.quiz?.answer.trim().toLowerCase();
+                                    return (
+                                      <div key={optI} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${isCorrect ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-black/30 border-white/10 text-zinc-300'}`}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleQuizAnswerSelect(seg.id, opt)}
+                                          title="Set as correct answer"
+                                          className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[8px] font-bold ${isCorrect ? 'border-emerald-400 bg-emerald-500 text-black' : 'border-zinc-500 hover:border-emerald-400'}`}
+                                        >
+                                          {isCorrect ? '✓' : ''}
+                                        </button>
+                                        <input
+                                          type="text"
+                                          value={opt}
+                                          onChange={(e) => handleQuizOptionChange(seg.id, optI, e.target.value)}
+                                          className="flex-1 bg-transparent border-none p-0 text-xs focus:ring-0 focus:outline-none"
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-semibold text-amber-200">{seg.learnEnglish.quiz.question}</p>
+                              {seg.learnEnglish.quiz.options && (
+                                <div className="flex flex-wrap gap-1.5 mt-1">
+                                  {seg.learnEnglish.quiz.options.map((opt, optI) => {
+                                    const isCorrect = opt.trim().toLowerCase() === seg.learnEnglish?.quiz?.answer.trim().toLowerCase();
+                                    return (
+                                      <span key={optI} className={`text-[11px] px-2 py-0.5 rounded-md border ${isCorrect ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold' : 'bg-white/5 border-white/5 text-zinc-400'}`}>
+                                        {String.fromCharCode(65 + optI)}. {opt} {isCorrect && '✓'}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -897,7 +1087,20 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                         {timelineCutsCopied ? <><Check size={12} className="text-green-400" /> Copied!</> : <><Copy size={12} /> Copy All</>}
                       </button>
                       <button
-                        onClick={() => setTimelineCuts(null)}
+                        onClick={() => {
+                          setTimelineCuts(null);
+                          const baseState: ThumbnailState = thumbnailState || {
+                            titles: [],
+                            selectedTitle: '',
+                            thumbnailTexts: [],
+                            selectedThumbnailText: '',
+                            hostName: 'Joe Rogan',
+                            guestName: '',
+                            thumbnailUrl: null,
+                            referenceImage: null,
+                          };
+                          onUpdateThumbnailState?.({ ...baseState, timelineCuts: null });
+                        }}
                         className="text-zinc-600 hover:text-zinc-300 transition-colors"
                       >
                         <X size={14} />
@@ -992,7 +1195,20 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                     <Tag size={14} className="text-fuchsia-400" />
                     <span className="text-xs font-semibold text-fuchsia-300 uppercase tracking-widest">Title + Thumbnail</span>
                   </div>
-                  <button onClick={() => setTitleThumbData(null)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+                  <button onClick={() => {
+                    setTitleThumbData(null);
+                    const baseState: ThumbnailState = thumbnailState || {
+                      titles: [],
+                      selectedTitle: '',
+                      thumbnailTexts: [],
+                      selectedThumbnailText: '',
+                      hostName: 'Joe Rogan',
+                      guestName: '',
+                      thumbnailUrl: null,
+                      referenceImage: null,
+                    };
+                    onUpdateThumbnailState?.({ ...baseState, titleThumbData: null });
+                  }} className="text-zinc-600 hover:text-zinc-300 transition-colors">
                     <X size={14} />
                   </button>
                 </div>
@@ -1015,6 +1231,17 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
                       </button>
                     </div>
                   </div>
+                  {titleThumbData.description && (
+                    <div>
+                      <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1.5">Description (SEO Keywords)</p>
+                      <div className="flex items-start gap-2">
+                        <p className="flex-1 text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed bg-black/40 p-3 rounded-xl border border-white/5">{titleThumbData.description}</p>
+                        <button onClick={handleCopyDesc} className="shrink-0 flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all">
+                          {descCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="px-4 py-2.5 border-t border-white/5 flex justify-end">
                   <button

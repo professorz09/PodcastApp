@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AutoVid AI</title>
+    <title>PODCAST basiks final</title>
+    <meta property="og:title" content="PODCAST basiks final" />
 
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
@@ -12,10 +13,11 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="AutoVid AI" />
+    <meta name="apple-mobile-web-app-title" content="PODCAST basiks final" />
     <link rel="apple-touch-icon" href="/icons/icon.svg" />
 
-    <meta name="description" content="AI-driven video & storyboard generation studio" />
+    <meta name="description" content="Generate structured debate videos with AI avatars and synchronized audio from a topic or script." />
+    <meta property="og:description" content="Generate structured debate videos with AI avatars and synchronized audio from a topic or script." />
 
   <!-- importmap removed: Vite bundles all deps locally —
        CDN fallback was causing extra network round-trips on every load -->
@@ -26,9 +28,25 @@
     <script type="module" src="/index.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
+        const isDev = location.port === '3000' || location.hostname.includes('run.app') || location.hostname === 'localhost';
+        if (isDev) {
+          navigator.serviceWorker.getRegistrations().then((regs) => {
+            for (const reg of regs) {
+              reg.unregister();
+            }
+          });
+          if ('caches' in window) {
+            caches.keys().then((keys) => {
+              for (const k of keys) {
+                if (k.startsWith('autovid-ai')) caches.delete(k);
+              }
+            });
+          }
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+          });
+        }
       }
     </script>
   </body>

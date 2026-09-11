@@ -194,16 +194,19 @@ export const minimalTheme: Theme = {
             const barX = rectX + w + 10;
 
             if (config.vuMeterStyle === 'dots') {
-                // --- Dots VU Meter ---
+                // --- Dots VU Meter (Max 6 dots per column, wrapping) ---
                 const DOTS = 12;
-                const dotR = Math.max(3, Math.min(6, h / (DOTS * 3)));
-                const totalDotsH = DOTS * dotR * 2;
-                const spacing = (h - totalDotsH) / (DOTS - 1);
-                const dotCX = barX + dotR + 1;
+                const PER_COL = 6;
+                const dotR = Math.max(3, Math.min(6, h / (PER_COL * 3)));
+                const totalColH = PER_COL * dotR * 2;
+                const spacing = (h - totalColH) / Math.max(1, PER_COL - 1);
                 const activeDots = Math.round(Math.max(0.18, audioLevel) * DOTS);
 
                 for (let d = 0; d < DOTS; d++) {
-                    const dotY = rectY + h - d * (dotR * 2 + spacing) - dotR;
+                    const col = Math.floor(d / PER_COL);
+                    const row = d % PER_COL;
+                    const dotCX = barX + col * (dotR * 2 + 5) + dotR + 1;
+                    const dotY = rectY + h - row * (dotR * 2 + spacing) - dotR;
                     const isLit = d < activeDots;
                     const pct = d / (DOTS - 1);
                     let dotColor: string;

@@ -1,6 +1,13 @@
 import { DrawContext } from './types';
 
 export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, assets: any, currentSegment: any, width: number, height: number, dimLevel: number = 0) => {
+  const isQuizSeg = currentSegment?.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment?.learnEnglish?.quiz);
+  if (isQuizSeg) {
+    ctx.fillStyle = '#ffffff'; // Pure white background for quiz
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
+
   const segmentBgUrl = currentSegment.visualConfig?.backgroundUrl;
   const segmentBgColor = currentSegment.visualConfig?.backgroundColor;
   
@@ -26,7 +33,7 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
 
   if (videoToDraw) {
     // Check if video is ready to play
-    if (videoToDraw.readyState >= 2) {
+    if (videoToDraw.readyState >= 1 && videoToDraw.videoWidth > 0) {
         const scale = Math.max(width / videoToDraw.videoWidth, height / videoToDraw.videoHeight);
         const x = (width / 2) - (videoToDraw.videoWidth / 2) * scale;
         const y = (height / 2) - (videoToDraw.videoHeight / 2) * scale;
@@ -38,9 +45,30 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
             ctx.fillRect(0, 0, width, height);
         }
     } else {
-        // Fallback to black if video not ready
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, width, height);
+        // Fallback to speaker background, color, or gradient if video not ready (never draw solid black)
+        if (bgToDraw) {
+            const scale = Math.max(width / bgToDraw.width, height / bgToDraw.height);
+            const x = (width / 2) - (bgToDraw.width / 2) * scale;
+            const y = (height / 2) - (bgToDraw.height / 2) * scale;
+            ctx.drawImage(bgToDraw, x, y, bgToDraw.width * scale, bgToDraw.height * scale);
+            if (dimLevel > 0) {
+                ctx.fillStyle = `rgba(0,0,0,${dimLevel})`;
+                ctx.fillRect(0, 0, width, height);
+            }
+        } else if (colorToDraw) {
+            ctx.fillStyle = colorToDraw;
+            ctx.fillRect(0, 0, width, height);
+            if (dimLevel > 0) {
+                ctx.fillStyle = `rgba(0,0,0,${dimLevel})`;
+                ctx.fillRect(0, 0, width, height);
+            }
+        } else {
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(1, '#f3f4f6');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+        }
     }
   } else if (bgToDraw) {
     const scale = Math.max(width / bgToDraw.width, height / bgToDraw.height);
@@ -89,19 +117,43 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   }
 
   if (!currentSegment || !currentSegment.text) return;
+  
+  // Disable subtitle drawing completely if it's a Quiz segment, 
+  // since the quiz overlay takes over the screen and shows the question text.
+  const isQuizSeg = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz) || currentSegment.speaker?.toLowerCase() === 'question' || currentSegment.speaker?.toLowerCase() === 'quiz';
+  if (isQuizSeg) return;
+
+  if (currentSegment.learnEnglish?.quiz?.hideSubtitles) return;
+
+  const isYoutube = (currentSegment.learnEnglish?.segmentType as string) === 'youtube' || currentSegment.speaker?.toLowerCase() === 'youtube';
+  const isNarrator = currentSegment.learnEnglish?.segmentType === 'intro' || currentSegment.learnEnglish?.segmentType === 'narrator' || currentSegment.speaker?.toLowerCase() === 'narrator' || currentSegment.speaker?.toLowerCase() === 'intro' || currentSegment.speaker?.toLowerCase() === 'i' || (currentSegmentIndex === 0 && (!currentSegment.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(currentSegment.speaker.toLowerCase().trim())));
+  const isIntroSeg = isNarrator;
+  const isCharacter = currentSegment.speaker && !isNarrator && !isYoutube && !isQuizSeg;
+
+  const defaultX = isYoutube ? 185 : isNarrator ? 542 : isCharacter ? 395 : 192;
+  const defaultY = isYoutube ? 119 : isNarrator ? 61 : isCharacter ? 148 : 550;
 
   const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || {
-    x: 192, y: 550, w: 896, h: 150, fontSize: 1,
+    x: defaultX,
+    y: defaultY,
+    w: 896, h: 150, fontSize: 1.4,
     backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff',
     borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
   };
 
+  const isNarratorSeg = !isQuizSeg && (
+    currentSegment.speaker === 'Narrator' ||
+    currentSegment.speaker?.toLowerCase() === 'narrator' ||
+    currentSegment.speaker?.toLowerCase() === 'explainer' ||
+    currentSegment.learnEnglish?.segmentType === 'narrator'
+  );
+
   const text = currentSegment.text;
   const fs = subtitleConfig.fontSize;
-  const fontSize = 32 * fs;
+  const fontSize = isIntroSeg ? 28 : (32 * fs);
   ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
-  const maxWidth = subtitleConfig.w - (60 * fs);
+  const maxWidth = isIntroSeg ? (ctx.canvas.width || 1280) - 100 : subtitleConfig.w - (60 * fs);
   // Normalise legacy mode strings → new mode keys
   const rawMode = (subtitleConfig.mode as string) || 'phrase';
   const modeMap: Record<string, string> = {
@@ -255,10 +307,12 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   // ── Layout ────────────────────────────────────────────────────
   const lineHeight = fontSize * 1.5;
   const totalHeight = visibleLines.length * lineHeight;
-  const bx = subtitleConfig.x;
-  const by = subtitleConfig.y;
   const bw = subtitleConfig.w;
+  const bx = subtitleConfig.x;
+  
   const bh = Math.max(subtitleConfig.h, totalHeight + (60 * fs));
+  const by = subtitleConfig.y;
+  
   const br = (subtitleConfig.borderRadius ?? 20) * fs;
 
   // ── Speaker theme colours ─────────────────────────────────────
@@ -281,8 +335,11 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
     (themeConfig?.subtitleBoxStyle === 'comic' || !themeConfig?.subtitleBoxStyle);
   const badgeStyle = comicBoxActive ? 'comic' : (config.nameBadgeStyle || 'classic');
 
+  // Should we draw the box?
+  const drawBox = config.subtitleBackground;
+
   // ── Draw Box ──────────────────────────────────────────────────
-  if (config.subtitleBackground) {
+  if (drawBox) {
     if (comicBoxActive) {
       // transparent-avatars comic: white box, black border
       ctx.fillStyle = '#ffffff';
@@ -318,17 +375,18 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
     ctx.shadowOffsetY = 2;
   }
 
-  // ── Draw Badge (speaker or narrator) ─────────────────────────
-  if (config.subtitleBackground && config.showNameBadge !== false) {
-    const isNarratorSeg = currentSegment.speaker === 'Narrator';
+  // ── Draw Badge (speaker, narrator or question) ─────────────────────────
+  if (drawBox && config.showNameBadge !== false) {
+    const isQuizSeg = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz) || currentSegment.speaker?.toLowerCase() === 'question' || currentSegment.speaker?.toLowerCase() === 'quiz';
+    const isNarratorSeg = !isQuizSeg && (currentSegment.speaker === 'Narrator' || currentSegment.speaker?.toLowerCase() === 'narrator' || currentSegment.speaker?.toLowerCase() === 'explainer' || currentSegment.learnEnglish?.segmentType === 'narrator');
     const speakerIndex = config.speakerIds.indexOf(currentSegment.speaker);
-    const hasKnownSpeaker = !isNarratorSeg && speakerIndex !== -1;
+    const hasKnownSpeaker = !isNarratorSeg && !isQuizSeg && speakerIndex !== -1;
 
     const badgeFontSize = 22 * fs;
     ctx.save();
     ctx.font = `bold ${badgeFontSize}px sans-serif`;
 
-    const rawName = isNarratorSeg ? 'NARRATOR' : (config.speakerLabels[speakerIndex] || currentSegment.speaker);
+    const rawName = isQuizSeg ? 'QUESTION' : (isNarratorSeg ? 'EXPLAINER' : (config.speakerLabels[speakerIndex] || currentSegment.speaker));
     const badgeText = rawName.toUpperCase();
     const tW = ctx.measureText(badgeText).width;
     const padX = 14 * fs;
@@ -337,9 +395,9 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
     const badgeH = badgeFontSize + padY * 2;
     const badgeRadius = badgeStyle === 'pill' ? badgeH / 2 : 8 * fs;
 
-    // X position: speaker alternates left/right; narrator centered
+    // X position: speaker alternates left/right; narrator/question centered
     let badgeX: number;
-    if (isNarratorSeg || badgeStyle === 'comic') {
+    if (isNarratorSeg || isQuizSeg || badgeStyle === 'comic') {
       badgeX = bx + bw / 2 - badgeW / 2;
     } else {
       badgeX = speakerIndex % 2 === 0 ? bx + 20 : bx + bw - badgeW - 20;
@@ -358,8 +416,9 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
     let textColor = '#ffffff';
     if (badgeStyle === 'comic') {
       bgColor = '#000000';
-    } else if (isNarratorSeg) {
-      bgColor = subtitleConfig.backgroundColor || 'rgba(0,0,0,0.85)';
+    } else if (isQuizSeg || isNarratorSeg) {
+      bgColor = '#f59e0b';
+      textColor = '#000000';
     } else {
       bgColor = badgeCustomColors[speakerIndex % badgeCustomColors.length];
     }
@@ -448,32 +507,39 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
-
-  if (currentSegment.speaker === 'Narrator') {
-    ctx.fillStyle = config.narratorTextColor || '#eab308';
-  } else if (comicBoxActive && config.subtitleBackground) {
-    ctx.fillStyle = '#000000';
+  if (isIntroSeg) {
+    ctx.fillStyle = config.introSubtitleColor || "#ffffff";
+  } else if (isNarratorSeg) {
+    ctx.fillStyle = config.narratorTextColor || "#eab308";
+  } else if (comicBoxActive && drawBox) {
+    ctx.fillStyle = "#000000";
   } else {
-    ctx.fillStyle = subtitleConfig.textColor || '#ffffff';
+    ctx.fillStyle = subtitleConfig.textColor || "#ffffff";
   }
-
-  if (!config.subtitleBackground) {
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 5;
-    ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 1;
+  if (!drawBox) {
+    if (isIntroSeg) {
+        ctx.shadowColor = "rgba(0,0,0,0.9)";
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+    } else {
+        ctx.shadowColor = "rgba(0,0,0,0.9)";
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+    }
   }
 
   ctx.font = `bold ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
 
-  // ── Draw Text ─────────────────────────────────────────────────
   const textBlockHeight = visibleLines.length * lineHeight;
   const textStartY = by + (bh - textBlockHeight) / 2 + (fontSize * 0.3);
-  visibleLines.forEach((l, i) => {
-    ctx.fillText(l, bx + bw / 2, textStartY + i * lineHeight);
-  });
 
+  visibleLines.forEach((l, i) => {
+    const textY = textStartY + i * lineHeight;
+    ctx.fillText(l, bx + bw / 2, textY);
+  });
   // ── Settings Handles ──────────────────────────────────────────
   if (config.showSettings) {
     ctx.fillStyle = '#fff';
@@ -501,6 +567,12 @@ export const drawSideStats = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
     const { speakerIds } = config;
 
     if (!config.showSideStats) return;
+    
+    // Disable side stats entirely if we are currently displaying a Quiz overlay
+    const currentSegment = script[currentSegmentIndex];
+    if (currentSegment?.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment?.learnEnglish?.quiz)) {
+        return;
+    }
     
     // Only support side stats for first 2 speakers for now
     if (speakerIds.length < 2) return;
@@ -535,7 +607,8 @@ export const drawSideStats = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
         
         // Dots Height (Actual)
         const dotsHeight = Math.max(0, total * (boxSize + gap) - gap);
-        const dotsY = canvasHeight / 2 - dotsHeight / 2;
+        // Centered vertically
+        const dotsY = (canvasHeight / 2 - dotsHeight / 2);
         
         let dotsX: number;
         let meterX: number;
@@ -578,13 +651,12 @@ export const drawSideStats = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
 
         // VU Meter (Side Bar)
         if (config.showVuMeter) {
-            // Fixed height to at least 8 dots
-            const minDots = 8;
-            const meterDots = Math.max(total, minDots);
+            // Match dots height up to 6, then fixed at 6
+            const meterDots = Math.min(6, Math.max(1, total)); // Min 1 so it doesn't disappear completely if no arguments
             const meterHeight = Math.max(0, meterDots * (boxSize + gap) - gap);
-            const meterY = canvasHeight / 2 - meterHeight / 2;
+            const meterY = (canvasHeight / 2 - meterHeight / 2);
 
-            if (meterDots > 0) {
+            if (meterHeight > 0) {
                 // Always draw meter background
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
                 ctx.fillRect(meterX, meterY, meterWidth, meterHeight);

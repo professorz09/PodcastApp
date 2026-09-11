@@ -79,6 +79,7 @@ export interface DebateSegment {
   duration?: number; // seconds
   wordTimings?: { word: string; start: number; end: number }[];
   phraseTimings?: { text: string; start: number; end: number }[];
+  isApproximate?: boolean;
   scores?: {
     model: string;
     score: number;
@@ -90,7 +91,17 @@ export interface DebateSegment {
   learnEnglish?: {
     segmentType: 'intro' | 'dialogue' | 'narrator' | 'quiz';
     explanation?: { phrase: string; meaning: string; example?: string };
-    quiz?: { question: string; options?: string[]; answer: string };
+    quiz?: {
+      question: string;
+      options?: string[];
+      answer: string;
+      theme?: 'light' | 'dark' | 'glass';
+      position?: 'top' | 'center';
+      revealTiming?: number;
+      accentColor?: string;
+      hideSubtitles?: boolean;
+      testReveal?: boolean;
+    };
     /** Multiple cinematic images across a single (usually longer) intro
      *  segment's own duration — like a mini-Storyboard scoped to just the
      *  intro line, auto-broken into beats instead of one static image. */
@@ -115,10 +126,10 @@ export interface DebateSegment {
       y: number;
       w: number;
       h: number;
-      fontSize: number;
-      backgroundColor: string;
-      textColor: string;
-      mode?: 'full-static' | 'full-word' | 'line-static' | 'line-word';
+      fontSize?: number;
+      backgroundColor?: string;
+      textColor?: string;
+      mode?: 'full-static' | 'full-word' | 'line-static' | 'line-word' | 'phrase' | 'word' | 'mix' | 'line' | string;
       borderWidth?: number;
       borderColor?: string;
       borderRadius?: number;
@@ -137,6 +148,14 @@ export interface PhoneStudioSourceClip {
   endSec: number;   // end time in the ORIGINAL source video
 }
 
+export interface TimelineCut {
+  index: number;
+  text: string;
+  startSec: number;
+  endSec: number;
+  transcriptPreview: string;
+}
+
 export interface ThumbnailState {
   extraInstructions?: string;
   titles: string[];
@@ -151,6 +170,9 @@ export interface ThumbnailState {
   referenceImage: { data: string, mimeType: string, url: string } | null;
   videoStyle?: 'situational' | 'debate' | 'podcast';
   scriptSignature?: string;
+  titleThumbData?: { title: string; thumbnailText: string; description: string } | null;
+  quoteData?: { quote: string; author: string; title: string } | null;
+  timelineCuts?: TimelineCut[] | null;
 }
 
 export interface StoryboardScene {

@@ -1,5 +1,8 @@
 {
   "name": "PODCAST basiks final",
   "description": "Generate structured debate videos with AI avatars and synchronized audio from a topic or script.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

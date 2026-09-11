@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
@@ -29,7 +29,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                   y: 550,
                   w: 896,
                   h: 150,
-                  fontSize: 1,
+                  fontSize: 1.4,
                   backgroundColor: 'rgba(0,0,0,0.85)',
                   textColor: '#ffffff',
                   borderColor: '#ffffff',
@@ -65,7 +65,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [theme, setTheme] = useState<string>('transparent-avatars');
   const [globalThemeConfig, setGlobalThemeConfig] = useState<Record<string, any>>({});
   const [showSubtitles, setShowSubtitles] = useState(true);
-  const [subtitleBackground, setSubtitleBackground] = useState(true);
+  const [subtitleBackground, setSubtitleBackground] = useState(false);
   
   const [speakerLabels, setSpeakerLabels] = useState<string[]>([]);
   const [speakerImages, setSpeakerImages] = useState<(HTMLImageElement | null)[]>([]);
@@ -104,7 +104,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [narratorTextColor, setNarratorTextColor] = useState<string>('#ef4444');
   const [showMinimalSpeakerName, setShowMinimalSpeakerName] = useState<boolean>(true);
   const [showMinimalSideVU, setShowMinimalSideVU] = useState<boolean>(true);
-  const [syncSubtitlePosition, setSyncSubtitlePosition] = useState(true);
+  const [syncSubtitlePosition, setSyncSubtitlePosition] = useState(false);
   const [subtitleBgHex, setSubtitleBgHex] = useState('#000000');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(80);
   const [showNameBadge, setShowNameBadge] = useState(false);
@@ -144,7 +144,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   const [exportQuality, setExportQuality] = useState<'High' | 'Medium' | 'Low'>('Medium');
   const [showExportSettings, setShowExportSettings] = useState(false);
   // Settings tab state
-  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'>('speakers');
+  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'>('background');
   const [statusMessage, setStatusMessage] = useState("");
   // Rendered video blob kept in memory for merge
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
@@ -224,7 +224,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
   const currentSegment = script?.[currentSegmentIndex];
   const currentSubtitleConfig = currentSegment?.visualConfig?.subtitleConfig || { 
-      x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
+      x: 192, y: 550, w: 896, h: 150, fontSize: 1.4, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
   };
 
   const applySubtitleBg = (hex: string, opacity: number) => {
@@ -659,7 +659,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             floatDataRef.current = new Float32Array(analyserRef.current.fftSize);
         }
         const floatData = floatDataRef.current;
-        analyserRef.current.getFloatTimeDomainData(floatData);
+        (analyserRef.current as any).getFloatTimeDomainData(floatData);
         let sum = 0;
         for (let i = 0; i < floatData.length; i++) sum += floatData[i] * floatData[i];
         const rms = Math.sqrt(sum / floatData.length);
@@ -1851,76 +1851,83 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
 
     // --- SUBTITLES (Improved Phrase-wise Sync) ---
     if (showSubtitles && currentSegment.text) {
+        const isIntro = currentSegmentIndex === 0 && (!currentSegment.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(currentSegment.speaker.toLowerCase().trim()));
         const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || {
-            x: 192, y: 550, w: 896, h: 150, fontSize: 1, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
+            x: 192, y: 550, w: 896, h: 150, fontSize: 1.4, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20
         };
+        
+        // Force mode to 'line' if it's the Intro segment
+        const mode = isIntro ? 'line' : (subtitleConfig.mode || 'phrase');
 
         const text = currentSegment.text;
         const fontSize = 32 * subtitleConfig.fontSize;
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         
-        const maxWidth = subtitleConfig.w - (60 * subtitleConfig.fontSize);
-        
+        const bw = isIntro ? 896 : subtitleConfig.w;
+        const maxWidth = bw - (60 * subtitleConfig.fontSize);
         let visibleLines: string[] = [];
+        
         const globalTime = audioRef.current ? audioRef.current.currentTime : 0;
         const segmentStartTime = segmentOffsets[currentSegmentIndex] || 0;
         const currentTime = globalTime - segmentStartTime;
 
-        if (currentSegment.phraseTimings && currentSegment.phraseTimings.length > 0) {
-            // Find the active phrase based on current time
-            const activePhrase = currentSegment.phraseTimings.find(p => currentTime >= p.start && currentTime <= p.end + 0.5);
-            const pastPhrases = currentSegment.phraseTimings.filter(p => p.start <= currentTime);
-            
-            let currentText = "";
-            if (activePhrase) {
-                currentText = activePhrase.text;
-            } else if (pastPhrases.length > 0) {
-                const lastPhrase = pastPhrases[pastPhrases.length - 1];
-                // Keep showing the last phrase for a short moment after it ends
-                if (currentTime <= lastPhrase.end + 1.0) {
-                    currentText = lastPhrase.text;
-                }
-            }
-
-            // Word wrap the current phrase
-            const words = currentText.split(' ');
-            let line = '';
-            for(let n = 0; n < words.length; n++) {
-                const testLine = line + words[n] + ' ';
-                const metrics = ctx.measureText(testLine);
-                if (metrics.width > maxWidth && n > 0) {
-                    visibleLines.push(line.trim());
-                    line = words[n] + ' ';
-                } else {
-                    line = testLine;
-                }
-            }
-            if (line.trim()) visibleLines.push(line.trim());
-
-        } else {
-            // Fallback to old linear logic if no phrase timings
-            const words = text.split(' ');
-            let line = '';
-            const lines: string[] = [];
-            for(let n = 0; n < words.length; n++) {
-              const testLine = line + words[n] + ' ';
-              const metrics = ctx.measureText(testLine);
-              if (metrics.width > maxWidth && n > 0) {
+        // Base wrapping for the entire text
+        const words = text.split(' ');
+        const lines: string[] = [];
+        let line = '';
+        for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
                 lines.push(line.trim());
                 line = words[n] + ' ';
-              } else {
+            } else {
                 line = testLine;
-              }
             }
-            lines.push(line.trim());
+        }
+        lines.push(line.trim());
 
+        if (mode === 'full-static') {
+            visibleLines = lines;
+        } else if (mode === 'phrase') {
+            if (currentSegment.phraseTimings && currentSegment.phraseTimings.length > 0) {
+                // Phrase timings exist, use them
+                const activePhrase = currentSegment.phraseTimings.find(p => currentTime >= p.start && currentTime <= p.end + 0.5);
+                const pastPhrases = currentSegment.phraseTimings.filter(p => p.start <= currentTime);
+                let currentText = "";
+                if (activePhrase) {
+                    currentText = activePhrase.text;
+                } else if (pastPhrases.length > 0) {
+                    const lastPhrase = pastPhrases[pastPhrases.length - 1];
+                    if (currentTime <= lastPhrase.end + 1.0) currentText = lastPhrase.text;
+                }
+                
+                // Wrap the active phrase
+                const pWords = currentText.split(' ');
+                let pLine = '';
+                for(let n = 0; n < pWords.length; n++) {
+                    const testLine = pLine + pWords[n] + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    if (metrics.width > maxWidth && n > 0) {
+                        visibleLines.push(pLine.trim());
+                        pLine = pWords[n] + ' ';
+                    } else {
+                        pLine = testLine;
+                    }
+                }
+                if (pLine.trim()) visibleLines.push(pLine.trim());
+            } else {
+                // No timings, show entire segment text wrapped (like full-static)
+                visibleLines = lines;
+            }
+        } else {
+            // Line, Word, or Mix modes
             let duration = currentSegment.duration || 1;
             if (!isFinite(duration) || duration <= 0) duration = 1;
-            
             const progress = Math.min(currentTime / duration, 1);
             const visibleWordCount = Math.floor(progress * words.length);
-
+            
             let wordCounter = 0;
             let activeLineIndex = 0;
             for (let i = 0; i < lines.length; i++) {
@@ -1933,10 +1940,17 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             }
             if (visibleWordCount >= words.length) activeLineIndex = lines.length - 1;
 
-            const mode = subtitleConfig.mode || 'full-word';
-            if (mode === 'full-static') {
-                visibleLines = lines;
-            } else if (mode === 'line-static' || mode === 'line-word' || mode === 'full-word') {
+            if (mode === 'word') {
+                const currentWordIndex = Math.min(visibleWordCount, words.length - 1);
+                visibleLines = [words[currentWordIndex] || ''];
+            } else if (mode === 'mix') {
+                let currentLineWords = lines[activeLineIndex].split(' ');
+                let wordsInPreviousLines = 0;
+                for (let i = 0; i < activeLineIndex; i++) wordsInPreviousLines += lines[i].split(' ').length;
+                let visibleWordsInCurrentLine = Math.max(1, visibleWordCount - wordsInPreviousLines);
+                visibleLines = [currentLineWords.slice(0, visibleWordsInCurrentLine).join(' ')];
+            } else {
+                // 'line' mode
                 visibleLines = [lines[activeLineIndex] || ''];
             }
         }
@@ -2200,6 +2214,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   }
 
   // Mouse/Touch Handling
+  const isInteractingRef = useRef<boolean>(false);
   const getCanvasCoords = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -2218,6 +2233,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   };
 
   const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+    if (e.cancelable) e.preventDefault();
     const { x, y } = getCanvasCoords(e);
     
     // Check Subtitle Handles first (if settings visible)
@@ -2306,6 +2322,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
   };
 
   const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isInteractingRef.current && e.cancelable) e.preventDefault();
     const { x, y } = getCanvasCoords(e);
     const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || { x: 192, y: 550, w: 896, h: 150 };
 
@@ -2650,9 +2667,10 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
             setStatusMessage("Download ready! (Merge available in Settings)");
             setRenderedBlob(videoBlob as Blob);
             const url = URL.createObjectURL(videoBlob as Blob);
+            const ext = (videoBlob as Blob).type.includes('webm') ? 'webm' : 'mp4';
             const a = document.createElement('a');
             a.href = url;
-            a.download = `debate_video_${Date.now()}.mp4`;
+            a.download = `debate_video_${Date.now()}.${ext}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2762,7 +2780,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
       }
   };
 
-  const TABS = ['Speakers', 'Background', 'Subtitle', 'Options'] as const;
+  const TABS = ['Background', 'Subtitle', 'Options', 'Speakers'] as const;
 
   return (
     <div className="w-full h-full bg-black text-white flex flex-col overflow-hidden">
@@ -2799,6 +2817,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                         width={1280}
                         height={720}
                         className="w-full h-full object-contain touch-none"
+                        style={{ touchAction: 'none' }}
                         onMouseDown={handlePointerDown}
                         onMouseMove={handlePointerMove}
                         onMouseUp={handlePointerUp}
@@ -3510,24 +3529,81 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                       <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
                         <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Layout & Behavior</p>
 
-                        {/* Vertical Position */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-400">Vertical Position</span>
-                            <span className="text-xs font-mono text-gray-400">{Math.round(currentSubtitleConfig.y)}px</span>
+                        {/* Position (X, Y) */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-400">Position (X, Y)</span>
+                            <span className="text-xs font-mono text-gray-400">{Math.round(currentSubtitleConfig.x || 192)}, {Math.round(currentSubtitleConfig.y)}</span>
                           </div>
-                          <input type="range" min={0} max={720} step={10} value={currentSubtitleConfig.y}
-                            onChange={(e) => { const val = parseInt(e.target.value); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
-                            className="w-full accent-red-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => { const val = Math.max(0, currentSubtitleConfig.y - 20); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                            >
+                                <ChevronUp size={14} /> Upar
+                            </button>
+                            <button
+                                onClick={() => { const val = Math.min(1080, currentSubtitleConfig.y + 20); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), y: val } } }; } return seg; })); }}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                            >
+                                <ChevronDown size={14} /> Niche
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => { const val = Math.max(-500, (currentSubtitleConfig.x || 192) - 20); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: val } } }; } return seg; })); }}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                            >
+                                <ChevronLeft size={14} /> Left
+                            </button>
+                            <button
+                                onClick={() => { const val = Math.min(1920, (currentSubtitleConfig.x || 192) + 20); setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: val } } }; } return seg; })); }}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                            >
+                                Right <ChevronRight size={14} />
+                            </button>
+                            <button
+                                onClick={() => { setScript(prev => prev.map((seg, i) => { if (syncSubtitlePosition || i === currentSegmentIndex) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: 192, y: 550 } } }; } return seg; })); }}
+                                className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors border border-red-900/40"
+                            >
+                                <RefreshCw size={12} /> Default
+                            </button>
+                          </div>
                         </div>
 
                         {/* Display Mode */}
+                        {(() => {
+                            const isCurrentSegmentIntro = currentSegmentIndex === 0 && (!currentSegment.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(currentSegment.speaker.toLowerCase().trim()));
+                            return (
+                                <>
                         <div className="space-y-1">
-                          <span className="text-xs text-gray-400 block">Display Mode</span>
-                          <select value={currentSubtitleConfig.mode || 'phrase'}
-                            onChange={(e) => { const val = e.target.value; setScript(prev => prev.map(seg => ({ ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), mode: val as any } } }))); }}
-                            className="w-full bg-[#0a0a0a] text-gray-200 text-xs rounded-lg px-3 py-2 border border-white/5 focus:border-red-500 outline-none appearance-none cursor-pointer"
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-400 block">Display Mode</span>
+                            {isCurrentSegmentIntro && (
+                              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Fixed in Intro</span>
+                            )}
+                          </div>
+                          <select 
+                            value={isCurrentSegmentIntro ? 'line' : (currentSubtitleConfig.mode || 'phrase')}
+                            disabled={isCurrentSegmentIntro}
+                            onChange={(e) => { 
+                                const val = e.target.value; 
+                                setScript(prev => prev.map((seg, i) => {
+                                    const isSegIntro = i === 0 && (!seg.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(seg.speaker.toLowerCase().trim()));
+                                    if (isSegIntro) return seg;
+                                    return { 
+                                        ...seg, 
+                                        visualConfig: { 
+                                            ...seg.visualConfig, 
+                                            subtitleConfig: { 
+                                                ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), 
+                                                mode: val as any 
+                                            } 
+                                        } 
+                                    };
+                                })); 
+                            }}
+                            className={`w-full bg-[#0a0a0a] text-gray-200 text-xs rounded-lg px-3 py-2 border border-white/5 outline-none appearance-none cursor-pointer ${isCurrentSegmentIntro ? 'opacity-50' : 'focus:border-red-500'}`}
                           >
                             <option value="phrase">Phrase — show whole phrase at once</option>
                             <option value="word">Word — one word at a time</option>
@@ -3536,14 +3612,21 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                             <option value="full-static">Full Static — all text always visible</option>
                           </select>
                           <p className="text-[10px] text-gray-600 mt-1">
-                            {currentSubtitleConfig.mode === 'phrase' && 'Shows each phrase/sentence at once. Clean & readable.'}
-                            {currentSubtitleConfig.mode === 'word' && 'One word at a time — very minimal, karaoke style.'}
-                            {currentSubtitleConfig.mode === 'mix' && 'Words appear one-by-one within each phrase, then reset.'}
-                            {currentSubtitleConfig.mode === 'line' && 'Shows one wrapped line at a time.'}
-                            {currentSubtitleConfig.mode === 'full-static' && 'Always shows the full segment text — no animation.'}
-                            {!currentSubtitleConfig.mode && 'Shows each phrase/sentence at once. Clean & readable.'}
+                            {isCurrentSegmentIntro ? 'Intro always shows one wrapped line at a time.' : (
+                                <>
+                                    {currentSubtitleConfig.mode === 'phrase' && 'Shows each phrase/sentence at once. Clean & readable.'}
+                                    {currentSubtitleConfig.mode === 'word' && 'One word at a time — very minimal, karaoke style.'}
+                                    {currentSubtitleConfig.mode === 'mix' && 'Words appear one-by-one within each phrase, then reset.'}
+                                    {currentSubtitleConfig.mode === 'line' && 'Shows one wrapped line at a time.'}
+                                    {currentSubtitleConfig.mode === 'full-static' && 'Always shows the full segment text — no animation.'}
+                                    {!currentSubtitleConfig.mode && 'Shows each phrase/sentence at once. Clean & readable.'}
+                                </>
+                            )}
                           </p>
                         </div>
+                        </>
+                            );
+                        })()}
 
                         {/* Question Mode */}
                         <label className="flex items-center justify-between cursor-pointer pt-1 border-t border-white/5">
@@ -3553,6 +3636,25 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
                           </div>
                           <input type="checkbox" checked={questionMode} onChange={(e) => setQuestionMode(e.target.checked)} className="accent-red-500 shrink-0" />
                         </label>
+
+                        {/* Reset All Subtitle Settings */}
+                        <div className="pt-2 border-t border-white/5">
+                          <button
+                              onClick={() => { 
+                                setSubtitleBackground(false);
+                                const defaultSubtitleConfig = { x: 192, y: 550, w: 896, h: 150, fontSize: 1.4, backgroundColor: 'rgba(0,0,0,0.85)', textColor: '#ffffff', borderColor: '#ffffff', borderWidth: 0, borderRadius: 20, mode: 'phrase' };
+                                setScript(prev => prev.map((seg, i) => { 
+                                  if (syncSubtitlePosition || i === currentSegmentIndex) { 
+                                      return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: defaultSubtitleConfig } }; 
+                                  } 
+                                  return seg; 
+                                }));
+                              }}
+                              className="w-full bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs py-3 rounded-xl border border-red-900/30 flex items-center justify-center gap-2 transition-colors font-bold uppercase tracking-wider"
+                          >
+                              <RefreshCw size={14} /> Reset All Subtitle Settings
+                          </button>
+                        </div>
                       </div>
 
                     </div>

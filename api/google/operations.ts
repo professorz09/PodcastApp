@@ -1,3 +1,5 @@
+import { getGCPAccessToken } from '../../services/vertexProxy';
+
 // Vercel serverless function — mirrors the /api/google/operations route in
 // server.ts (polls a Google Speech long-running-operation by name).
 export default async function handler(req: any, res: any) {
@@ -24,7 +26,6 @@ export default async function handler(req: any, res: any) {
   };
 
   try {
-    const { getGCPAccessToken } = await import('../../services/vertexProxy.js');
     const token = await getGCPAccessToken();
     const projectId = process.env.GCP_PROJECT_ID;
     const saHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };

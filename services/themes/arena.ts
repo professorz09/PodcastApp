@@ -355,12 +355,16 @@ export const arenaTheme: Theme = {
                 const barX = rx + w + 10;
                 if (config.vuMeterStyle === 'dots') {
                     const DOTS = 12;
-                    const dotR = Math.max(3, Math.min(6, h/(DOTS*3)));
-                    const spacing = (h - DOTS*dotR*2) / (DOTS-1);
-                    const dotCX = barX + dotR + 1;
+                    const PER_COL = 6;
+                    const dotR = Math.max(3, Math.min(6, h/(PER_COL*3)));
+                    const totalColH = PER_COL * dotR * 2;
+                    const spacing = (h - totalColH) / Math.max(1, PER_COL - 1);
                     const activeDots = Math.round(Math.max(0.18, audioLevel) * DOTS);
                     for (let d = 0; d < DOTS; d++) {
-                        const dotY = ry + h - d*(dotR*2+spacing) - dotR;
+                        const col = Math.floor(d / PER_COL);
+                        const row = d % PER_COL;
+                        const dotCX = barX + col * (dotR * 2 + 5) + dotR + 1;
+                        const dotY = ry + h - row * (dotR * 2 + spacing) - dotR;
                         const isLit = d < activeDots;
                         const pct = d / (DOTS-1);
                         const dotColor = !isLit ? 'rgba(255,255,255,0.10)' : pct < 0.5 ? color : pct < 0.8 ? '#facc15' : '#ef4444';
@@ -391,7 +395,8 @@ export const arenaTheme: Theme = {
     // ── Render all speakers ────────────────────────────────────────
     if (showSpeakers) {
         const focusMode = themeConfig?.focusActiveSpeaker === true;
-        const isNarratorTurn = currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator';
+        const isQuizTurn = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz) || currentSegment.speaker?.toLowerCase() === 'question' || currentSegment.speaker?.toLowerCase() === 'quiz';
+        const isNarratorTurn = !isQuizTurn && (currentSegment.speaker === 'Narrator' || currentSegment.speaker === 'narrator');
         const activeIdx = speakerIds.findIndex(id => id === currentSegment.speaker);
         const doFocus = focusMode && !isNarratorTurn && activeIdx !== -1;
 

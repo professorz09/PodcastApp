@@ -29,9 +29,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
   onPhoneStudioReady,
 }) => {
   const [showIntroMaker, setShowIntroMaker] = useState(false);
-  const [mode, setMode] = useState<'topic' | 'script' | 'youtube' | 'phone' | 'phone_new' | 'learn_english'>('topic');
+  const [mode, setMode] = useState<'topic' | 'phone' | 'phone_new' | 'learn_english'>('topic');
   const [topic, setTopic] = useState('');
-  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [specificDetails, setSpecificDetails] = useState('');
   const [customScript, setCustomScript] = useState('');
   const [includeNarrator, setIncludeNarrator] = useState(false);
@@ -73,12 +72,12 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
   // ── Learn English state — kept fully separate from the other tabs' state ────
   const [leTopic, setLeTopic] = useState('');
-  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate'>('situational');
-  const [leDuration, setLeDuration] = useState<number>(5);
+  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate' | 'podcast'>('podcast');
+  const [leDuration, setLeDuration] = useState<number>(12);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
-  const [leIntro, setLeIntro] = useState(true); // whether a short cinematic Narrator intro hook gets generated
+  const [leIntro, setLeIntro] = useState(false); // podcast defaults to false
   const [leNarrator, setLeNarrator] = useState(false); // whether mid-dialogue Narrator teaching asides get generated
-  const [leGenerateQuestions, setLeGenerateQuestions] = useState(true);
+  const [leGenerateQuestions, setLeGenerateQuestions] = useState(false);
 
   const languages = [
     'English',
@@ -242,22 +241,9 @@ const DebateInput: React.FC<DebateInputProps> = ({
     let finalContext = contextFileContent;
     let finalTopic = topic || (contextFileContent ? "the provided document" : "");
 
-    if (mode === 'topic' && !finalTopic.trim()) {
-      toast.warning('Please enter a topic to generate a script');
+    if (mode === 'topic' && !finalTopic.trim() && !customScript.trim()) {
+      toast.warning('Please enter a topic or paste a script to generate');
       return;
-    }
-
-    if (mode === 'script' && !customScript.trim()) {
-      toast.warning('Please paste your script before generating');
-      return;
-    }
-
-    if (mode === 'youtube') {
-      if (!youtubeUrl) {
-        toast.warning('Please enter a YouTube URL');
-        return;
-      }
-      finalTopic = "YouTube Podcast Review";
     }
 
     const isJoeRogan = style === 'joe_rogan';
@@ -265,12 +251,15 @@ const DebateInput: React.FC<DebateInputProps> = ({
       ? ['Joe Rogan', joeRoganGuest]
       : (activeNames.length > 0 ? activeNames : undefined);
 
+    const ytRegex = /(https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[^\s]+)/i;
+    const detectedYtUrl = topic.match(ytRegex)?.[0] || specificDetails.match(ytRegex)?.[0] || customScript.match(ytRegex)?.[0];
+
     onGenerate({
-      topic: finalTopic,
+      topic: finalTopic || (customScript ? "Custom Script" : ""),
       specificDetails,
       duration: duration,
       includeNarrator: isJoeRogan ? false : includeNarrator,
-      customScript: mode === 'script' ? customScript : undefined,
+      customScript: customScript.trim() ? customScript : undefined,
       contextFileContent: finalContext,
       commentsFileContent: initialCommentsContent,
       model,
@@ -278,7 +267,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       style,
       speakerCount: isJoeRogan ? 2 : speakerCount,
       speakerNames: finalSpeakerNames,
-      youtubeUrl: mode === 'youtube' ? youtubeUrl : undefined
+      youtubeUrl: detectedYtUrl
     });
   };
 
@@ -346,28 +335,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
             <Mic size={16} className={mode === 'topic' ? 'text-purple-400' : ''} />
             From Topic
           </button>
-          <button
-            onClick={() => setMode('script')}
-            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
-              mode === 'script' 
-                ? 'bg-white/10 text-white shadow-md ring-1 ring-white/10' 
-                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-            }`}
-          >
-            <FileText size={16} className={mode === 'script' ? 'text-purple-400' : ''} />
-            Paste Script
-          </button>
-          <button
-            onClick={() => { setMode('youtube'); setStyle('podcast_breakdown'); setSpeakerCount(2); }}
-            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
-              mode === 'youtube' 
-                ? 'bg-white/10 text-white shadow-md ring-1 ring-white/10' 
-                : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-            }`}
-          >
-            <Activity size={16} className={mode === 'youtube' ? 'text-purple-400' : ''} />
-            YouTube Link
-          </button>
+
           <button
             onClick={() => setMode('learn_english')}
             className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex-1 sm:flex-none whitespace-nowrap ${
@@ -461,9 +429,18 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Style</label>
                 <select
                   value={leStyle}
-                  onChange={e => setLeStyle(e.target.value as typeof leStyle)}
+                  onChange={e => {
+                    const val = e.target.value as typeof leStyle;
+                    setLeStyle(val);
+                    if (val === 'podcast') {
+                      setLeIntro(false);
+                      setLeNarrator(false);
+                      setLeGenerateQuestions(false);
+                    }
+                  }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
                 >
+                  <option value="podcast">Podcast Style (Boy & Girl Hosts)</option>
                   <option value="situational">Situational</option>
                   <option value="roleplay">Roleplay Practice</option>
                   <option value="interview">Formal / Interview</option>
@@ -478,10 +455,13 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   onChange={e => setLeDuration(Number(e.target.value))}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
                 >
-                  <option value={3}>3 Min</option>
-                  <option value={5}>5 Min</option>
-                  <option value={8}>8 Min</option>
-                  <option value={12}>12 Min</option>
+                  <option value={3} className="bg-[#111]">3 Min</option>
+                  <option value={5} className="bg-[#111]">5 Min</option>
+                  <option value={8} className="bg-[#111]">8 Min</option>
+                  <option value={12} className="bg-[#111]">12 Min</option>
+                  <option value={20} className="bg-[#111]">20 Min</option>
+                  <option value={30} className="bg-[#111]">30 Min</option>
+                  <option value={40} className="bg-[#111]">40 Min</option>
                 </select>
               </div>
             </div>
@@ -642,7 +622,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     </div>
                   </div>
                 )}
-                <div className="px-5 pb-4">
+                <div className="px-5 pb-4 space-y-3">
                   <textarea
                     value={specificDetails}
                     onChange={(e) => setSpecificDetails(e.target.value)}
@@ -658,16 +638,23 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     rows={2}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-3 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-purple-500/50 resize-none"
                   />
+                  
+                  {/* Optional Paste Script Box */}
+                  <div className="pt-2 border-t border-white/5">
+                    <label className="text-xs text-gray-400 font-medium mb-1.5 flex items-center gap-1.5">
+                      <FileText size={13} className="text-purple-400" />
+                      <span>Paste Script (Optional — raw script/text past karke properly tag & format karein)</span>
+                    </label>
+                    <textarea
+                      value={customScript}
+                      onChange={(e) => setCustomScript(e.target.value)}
+                      placeholder="Apna raw script ya content yahan paste karo... AI isko automatically proper speaker tags aur professional dialogue formatting mein convert kar dega."
+                      rows={3}
+                      className="w-full bg-[#111111] border border-white/5 rounded-lg px-3 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-purple-500/50 resize-none font-mono leading-relaxed"
+                    />
+                  </div>
                 </div>
               </div>
-            ) : mode === 'script' ? (
-              <textarea
-                value={customScript}
-                onChange={(e) => setCustomScript(e.target.value)}
-                placeholder="Paste your full debate script here..."
-                rows={6}
-                className="w-full bg-transparent text-white px-5 py-4 text-sm placeholder:text-gray-600 focus:outline-none resize-none custom-scrollbar font-mono leading-relaxed"
-              />
             ) : mode === 'phone' ? (
               <div className="space-y-2">
                 {/* YouTube toggle */}
@@ -850,34 +837,19 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                  placeholder="Paste YouTube Podcast URL here..."
-                  className="w-full bg-transparent text-white px-5 py-4 text-base md:text-lg placeholder:text-gray-600 focus:outline-none font-medium"
-                />
-                <div className="px-5 pb-4">
-                  <p className="text-xs text-gray-400">
-                    We will extract the transcript from this YouTube video and generate a detailed breakdown of its key points and insights.
-                  </p>
-                </div>
-              </div>
-            )}
+            ) : null}
             
             <div className="px-4 py-2 border-t border-white/5 flex justify-between items-center bg-[#050505]/50 backdrop-blur-sm">
                <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1.5">
                  <Sparkles size={10} className="text-purple-500" />
-                 {mode === 'topic' ? `${topic.length} chars` : mode === 'script' ? `${customScript.split(' ').length} words` : mode === 'phone' ? `📱 Phone Studio · ${phoneConvoStyle}` : 'YouTube Mode'}
+                 {mode === 'topic' ? `${topic.length} chars` : mode === 'phone' ? `📱 Phone Studio · ${phoneConvoStyle}` : ''}
                </div>
             </div>
           </div>
         </div>
 
-        {/* Configuration Grid — hidden when pasting a script directly */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${mode === 'script' ? 'hidden' : ''}`}>
+        {/* Configuration Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
           {/* Left Column (Speakers & Context) */}
           <div className="space-y-4">
@@ -892,7 +864,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
                 
                 {/* Speaker Count Selector */}
-                <div className={`flex bg-[#111111] p-0.5 rounded-lg border border-white/5 ${mode === 'youtube' ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex bg-[#111111] p-0.5 rounded-lg border border-white/5">
                   {[1, 2, 3, 4].map((count) => (
                     <button
                       key={count}
@@ -1120,35 +1092,23 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <select
                     value={style === 'context_bridge' ? 'context_bridge' : style}
                     onChange={(e) => {
-                      const newStyle = e.target.value as 'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov';
+                      const newStyle = e.target.value as any;
                       setStyle(newStyle);
-                      if (newStyle === 'podcast_panel') { setSpeakerCount(3); }
-                      if (newStyle === 'situational') { setSpeakerCount(3); }
-                      if (newStyle === 'context_bridge') { setSpeakerCount(1); }
-                      if (newStyle === 'debate') { setSpeakerCount(2); }
-                      if (newStyle === 'debate2') { setSpeakerCount(2); setIncludeNarrator(true); }
-                      if (newStyle === 'explained') { setSpeakerCount(2); }
-                      if (newStyle === 'explained_solo') { setSpeakerCount(1); }
-                      if (newStyle === 'narration') { setSpeakerCount(1); setIncludeNarrator(false); }
-                      if (newStyle === 'monkey_explain') { setSpeakerCount(1); setIncludeNarrator(false); }
-                      if (newStyle === 'viral_recap') { setSpeakerCount(1); setIncludeNarrator(false); }
-                      if (newStyle === 'image') { setSpeakerCount(1); setIncludeNarrator(false); }
-                      if (newStyle === 'podcast_breakdown') { setSpeakerCount(2); }
-                      if (newStyle === 'documentary') { setSpeakerCount(2); }
-                      if (newStyle === 'joe_rogan') { setSpeakerCount(2); }
-                      if (newStyle === 'finance_deep_dive') { setSpeakerCount(3); }
-                      if (newStyle === 'professor_jiang') { setSpeakerCount(1); setIncludeNarrator(false); }
-                      if (newStyle === 'book_summary') { setSpeakerCount(2); setIncludeNarrator(false); }
-                      if (newStyle === 'questioning') { setSpeakerCount(4); setIncludeNarrator(true); }
-                      if (newStyle === 'transcript_review') { setSpeakerCount(1); setIncludeNarrator(false); }
-                      if (newStyle === 'summarizer_pov') { setSpeakerCount(1); setIncludeNarrator(false); }
-                      if (newStyle === 'deep_explainer') { setSpeakerCount(2); }
+                      if (newStyle === 'podcast_panel' || newStyle === 'situational') { setSpeakerCount(3); }
+                      else if (newStyle === 'questioning') { setSpeakerCount(4); setIncludeNarrator(true); }
+                      else if (newStyle === 'debate2') { setSpeakerCount(2); setIncludeNarrator(true); }
+                      else if (['narration', 'monkey_explain', 'viral_recap', 'image', 'professor_jiang', 'transcript_review', 'summarizer_pov', 'context_bridge', 'explained_solo'].includes(newStyle)) { setSpeakerCount(1); setIncludeNarrator(false); }
+                      else { setSpeakerCount(2); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
-                    <option value="debate">Debate</option>
+                    <option value="podcast">🎙️ Podcast Style (Boy & Girl Hosts)</option>
+                    <option value="situational">🌍 Situational</option>
+                    <option value="roleplay">🎭 Roleplay Practice</option>
+                    <option value="formal_interview">👔 Formal / Interview</option>
+                    <option value="casual_chat">☕ Casual Chat</option>
+                    <option value="debate">⚔️ Debate</option>
                     <option value="debate2">⚔️ Debate 2 (Rounds)</option>
-                    <option value="situational">Situational</option>
                     <option value="finance_deep_dive">💰 Finance Deep Dive</option>
                     <option value="explained">Explained</option>
                     <option value="explained_solo">🎙 Explained (Solo)</option>
@@ -1330,9 +1290,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
           onClick={handleSubmit}
           disabled={
             isLoading
-            || (mode === 'topic' && !topic && !contextFileContent)
-            || (mode === 'script' && !customScript)
-            || (mode === 'youtube' && !youtubeUrl)
+            || (mode === 'topic' && !topic && !contextFileContent && !customScript)
             || (mode === 'phone' && !topic.trim() && !phoneDescription.trim() && !phoneFileContent && !useImportTranscript && !(phoneYtMode && phoneYtUrl.trim()))
           }
           className={`w-full mt-2 bg-gradient-to-r ${mode === 'phone' ? 'from-purple-700 to-pink-700 hover:from-purple-600 hover:to-pink-600' : 'from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500'} disabled:from-gray-800 disabled:to-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 rounded-[16px] shadow-lg shadow-purple-900/20 transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-3 text-base group relative overflow-hidden`}
@@ -1346,7 +1304,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
           ) : (
             <>
               {mode === 'phone' && <Smartphone size={18} />}
-              <span>{mode === 'script' ? 'Process Script' : mode === 'phone' ? 'Generate Phone Script' : 'Generate Video'}</span>
+              <span>{mode === 'phone' ? 'Generate Phone Script' : 'Generate Video'}</span>
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </>
           )}

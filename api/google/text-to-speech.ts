@@ -1,3 +1,5 @@
+import { getGCPAccessToken } from '../../services/vertexProxy';
+
 // Vercel serverless function — mirrors the /api/google/text-to-speech route
 // in server.ts (Google Cloud Text-to-Speech, Chirp 3 HD — Vertex SA auth
 // preferred, falls back to a plain API key).
@@ -31,7 +33,6 @@ export default async function handler(req: any, res: any) {
   };
 
   try {
-    const { getGCPAccessToken } = await import('../../services/vertexProxy.js');
     const token = await getGCPAccessToken();
     const projectId = process.env.GCP_PROJECT_ID;
     const saHeaders: Record<string, string> = {

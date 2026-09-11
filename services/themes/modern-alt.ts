@@ -32,7 +32,10 @@ export const modernAltTheme: Theme = {
     drawBackground(ctx, assets, currentSegment, canvasWidth, canvasHeight, config.backgroundDim);
 
     // Timer
-    if (config.showTimer) {
+    const isIntroSeg = currentSegment.learnEnglish?.segmentType === 'intro' || 
+                       (currentSegmentIndex === 0 && (currentSegment.speaker === 'Narrator' || currentSegment.speaker?.toLowerCase() === 'narrator'));
+
+    if (config.showTimer && !isIntroSeg) {
          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
          ctx.beginPath();
          ctx.roundRect(canvasWidth / 2 - 80, 20, 160, 60, 30);

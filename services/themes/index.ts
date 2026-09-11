@@ -7,6 +7,7 @@ import { neonTheme } from './neon';
 import { minimalTheme } from './minimal';
 import { splitTheme } from './split';
 import { arenaTheme } from './arena';
+import { cinematicTheme } from './cinematic';
 
 export const themes: Record<string, Theme> = {
   modern: modernTheme,
@@ -17,6 +18,7 @@ export const themes: Record<string, Theme> = {
   minimal: minimalTheme,
   split: splitTheme,
   arena: arenaTheme,
+  cinematic: cinematicTheme,
 };
 
 export const getTheme = (id: string): Theme => {
