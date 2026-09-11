@@ -1,4 +1,4 @@
-import { getGCPAccessToken } from '../../services/vertexProxy';
+import { getGCPAccessToken } from '../../services/vertexProxy.ts';
 
 // Vercel serverless function — mirrors the /api/google/operations route in
 // server.ts (polls a Google Speech long-running-operation by name).

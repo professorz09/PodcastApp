@@ -1,4 +1,4 @@
-import { getGCPAccessToken } from '../../services/vertexProxy';
+import { getGCPAccessToken } from '../../services/vertexProxy.ts';
 
 // Vercel serverless function — mirrors the /api/google/text-to-speech route
 // in server.ts (Google Cloud Text-to-Speech, Chirp 3 HD — Vertex SA auth

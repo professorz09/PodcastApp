@@ -2,7 +2,7 @@
 // in server.ts (Vertex SA auth preferred, falls back to a plain API key;
 // tries STT v2 first, then v1p1beta1/v1, with a long-running fallback for
 // audio that's too long for the sync endpoint).
-import { getGCPAccessToken } from '../../services/vertexProxy';
+import { getGCPAccessToken } from '../../services/vertexProxy.ts';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
