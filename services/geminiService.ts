@@ -38,13 +38,23 @@ const callGemini = async (model: string, contents: any, config?: any): Promise<a
     body: JSON.stringify({ model, contents, config }),
   });
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    const msg = err.error || `Gemini proxy error: ${response.status}`;
+    let msg = '';
+    try {
+      const err = await response.json();
+      if (typeof err?.error === 'string') msg = err.error;
+      else if (typeof err?.error?.message === 'string') msg = err.error.message;
+      else if (typeof err?.message === 'string') msg = err.message;
+      else if (err?.error) msg = JSON.stringify(err.error);
+    } catch {
+      try {
+        const text = await response.text();
+        if (text && text.length < 300) msg = text.trim();
+      } catch {}
+    }
+    if (!msg) {
+      msg = `Gemini proxy error: ${response.status} ${response.statusText || ''}`.trim();
+    }
     if (response.status === 429 || msg.includes('RESOURCE_EXHAUSTED')) {
-      // Keep the real backend detail (the gemini edge function prefixes it
-      // with [vertex]/[apikey] plus any quota-violation info Google returns)
-      // instead of replacing it with a generic message that hides which
-      // backend actually failed and why.
       throw new Error(`Gemini API Quota Exceeded — ${msg}`);
     }
     throw new Error(msg);

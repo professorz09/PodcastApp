@@ -24,11 +24,26 @@ const DEFAULT_LOCATION = 'global';
 
 let cachedClient: GoogleGenAI | null = null;
 let cachedMode: 'vertex' | 'apikey' | null = null;
+let cachedProjectId: string | undefined = undefined;
+let cachedLocation: string | undefined = undefined;
+let cachedCredentials: any = null;
+
+export interface ParsedGcpCredentials {
+  project_id: string;
+  private_key: string;
+  client_email: string;
+  [key: string]: any;
+}
 
 export function isValidPrivateKey(keyStr: any): boolean {
-  if (!keyStr || typeof keyStr !== 'string' || keyStr.length < 100) return false;
+  if (!keyStr || typeof keyStr !== 'string' || keyStr.length < 50) return false;
   try {
-    const normalized = keyStr.replace(/\\n/g, '\n');
+    const normalized = keyStr
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\\\\n/g, '\n')
+      .replace(/\r\n/g, '\n')
+      .trim();
     createPrivateKey(normalized);
     return true;
   } catch {
@@ -36,33 +51,179 @@ export function isValidPrivateKey(keyStr: any): boolean {
   }
 }
 
-export function getGeminiClient(): { ai: GoogleGenAI; mode: 'vertex' | 'apikey' } {
-  if (cachedClient && cachedMode) return { ai: cachedClient, mode: cachedMode };
+/**
+ * Bulletproof parser for GCP_SA_KEY:
+ * - Handles raw JSON
+ * - Handles JSON wrapped in single/double quotes (common from Vercel UI copy-paste)
+ * - Handles Base64 encoded service account JSON
+ * - Handles unescaped or doubly escaped newlines in the private_key
+ * - Returns structured diagnostics so setup issues can be immediately understood
+ */
+export function parseGcpServiceAccount(rawKey?: string, explicitProjectId?: string): {
+  valid: boolean;
+  credentials?: ParsedGcpCredentials;
+  projectId?: string;
+  error?: string;
+} {
+  if (!rawKey || typeof rawKey !== 'string' || !rawKey.trim()) {
+    return { valid: false, error: 'GCP_SA_KEY environment variable is missing or empty.' };
+  }
+
+  let str = rawKey.trim();
+
+  // Strip wrapping outer quotes if pasted as string in Vercel UI
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    try {
+      const unquoted = JSON.parse(str);
+      if (typeof unquoted === 'string') str = unquoted.trim();
+      else if (typeof unquoted === 'object' && unquoted !== null) {
+        str = JSON.stringify(unquoted);
+      }
+    } catch {
+      str = str.slice(1, -1).trim();
+    }
+  }
+
+  // Handle Base64-encoded service account key (common in secret managers / CI/CD)
+  if (!str.startsWith('{')) {
+    try {
+      const decoded = Buffer.from(str, 'base64').toString('utf-8');
+      if (decoded.trim().startsWith('{')) {
+        str = decoded.trim();
+      }
+    } catch {}
+  }
+
+  let obj: any = null;
+  try {
+    obj = JSON.parse(str);
+  } catch (e: any) {
+    // If standard JSON.parse fails due to unescaped newlines in private key string, try sanitizing
+    try {
+      const sanitized = str.replace(/[\r\n]+/g, '\\n');
+      obj = JSON.parse(sanitized);
+    } catch {
+      return {
+        valid: false,
+        error: `GCP_SA_KEY is not valid JSON (${e?.message || 'parse error'}). Ensure the complete Service Account JSON was pasted.`,
+      };
+    }
+  }
+
+  if (typeof obj === 'string') {
+    try { obj = JSON.parse(obj); } catch {}
+  }
+
+  if (!obj || typeof obj !== 'object') {
+    return { valid: false, error: 'GCP_SA_KEY parsed as non-object. Ensure the entire JSON object was provided.' };
+  }
+
+  // Determine Project ID (from explicit param, process.env.GCP_PROJECT_ID, or JSON field)
+  const projectId = (explicitProjectId || process.env.GCP_PROJECT_ID || obj.project_id || '').trim();
+  if (!projectId) {
+    return {
+      valid: false,
+      error: 'Google Cloud Project ID is missing. Add GCP_PROJECT_ID to Vercel or include "project_id" in GCP_SA_KEY.',
+    };
+  }
+
+  // Extract and normalize Private Key
+  let privateKey = obj.private_key;
+  if (!privateKey && typeof obj === 'string' && (obj as string).includes('BEGIN PRIVATE KEY')) {
+    privateKey = obj;
+  }
+  if (!privateKey || typeof privateKey !== 'string') {
+    return {
+      valid: false,
+      error: 'GCP_SA_KEY is missing the "private_key" field. Check the Service Account JSON.',
+    };
+  }
+
+  // Normalize all forms of escaped or literal newlines in private key
+  privateKey = privateKey
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .trim();
+
+  // Validate format and RSA key
+  if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    return {
+      valid: false,
+      error: 'GCP_SA_KEY private_key must contain "-----BEGIN PRIVATE KEY-----".',
+    };
+  }
+
+  try {
+    createPrivateKey(privateKey);
+  } catch (keyErr: any) {
+    return {
+      valid: false,
+      error: `Invalid RSA private key in GCP_SA_KEY: ${keyErr?.message || 'cannot parse key'}. Ensure newlines were not mangled.`,
+    };
+  }
+
+  const clientEmail = (obj.client_email || process.env.GCP_CLIENT_EMAIL || '').trim();
+
+  return {
+    valid: true,
+    projectId,
+    credentials: {
+      ...obj,
+      project_id: projectId,
+      private_key: privateKey,
+      client_email: clientEmail,
+    },
+  };
+}
+
+export function getGeminiClient(): {
+  ai: GoogleGenAI;
+  mode: 'vertex' | 'apikey';
+  projectId?: string;
+  location?: string;
+  credentials?: any;
+} {
+  if (cachedClient && cachedMode) {
+    return {
+      ai: cachedClient,
+      mode: cachedMode,
+      projectId: cachedProjectId,
+      location: cachedLocation,
+      credentials: cachedCredentials,
+    };
+  }
 
   const saKey = process.env.GCP_SA_KEY;
-  let projectId = process.env.GCP_PROJECT_ID;
+  const explicitPid = process.env.GCP_PROJECT_ID;
   const location = process.env.GCP_REGION || DEFAULT_LOCATION;
 
+  let vertexParseError = '';
+
   if (saKey) {
-    let credentials: any = null;
-    try {
-      credentials = JSON.parse(saKey);
-    } catch {
-      console.warn('GCP_SA_KEY is not valid JSON, skipping Vertex AI mode.');
-    }
-    projectId = projectId || credentials?.project_id;
-    if (projectId && credentials?.private_key && isValidPrivateKey(credentials.private_key)) {
-      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    const parsed = parseGcpServiceAccount(saKey, explicitPid);
+    if (parsed.valid && parsed.credentials && parsed.projectId) {
       cachedClient = new GoogleGenAI({
         vertexai: true,
-        project: projectId,
+        project: parsed.projectId,
         location,
-        googleAuthOptions: { credentials },
+        googleAuthOptions: { credentials: parsed.credentials },
       });
       cachedMode = 'vertex';
-      return { ai: cachedClient, mode: 'vertex' };
-    } else if (saKey) {
-      console.warn('GCP_SA_KEY does not contain a valid RSA private key. Falling back to direct API key.');
+      cachedProjectId = parsed.projectId;
+      cachedLocation = location;
+      cachedCredentials = parsed.credentials;
+      return {
+        ai: cachedClient,
+        mode: 'vertex',
+        projectId: cachedProjectId,
+        location: cachedLocation,
+        credentials: cachedCredentials,
+      };
+    } else {
+      vertexParseError = parsed.error || 'Failed to parse GCP_SA_KEY';
+      console.warn(`[VertexProxy] GCP_SA_KEY parse issue: ${vertexParseError}`);
     }
   }
 
@@ -73,8 +234,12 @@ export function getGeminiClient(): { ai: GoogleGenAI; mode: 'vertex' | 'apikey' 
     return { ai: cachedClient, mode: 'apikey' };
   }
 
+  if (saKey && vertexParseError) {
+    throw new Error(`Vertex AI Configuration Error: ${vertexParseError}`);
+  }
+
   throw new Error(
-    'No valid Gemini backend configured. Set a valid GCP_SA_KEY with RSA private key (preferred) or GEMINI_API_KEY.',
+    'No valid Gemini backend configured. Please ensure GCP_SA_KEY and GCP_PROJECT_ID are set in Vercel environment variables, or provide GEMINI_API_KEY.',
   );
 }
 
@@ -175,22 +340,47 @@ export async function callGemini(model: string, contents: any, genConfig: any) {
     const isQuota = /RESOURCE_EXHAUSTED|429|quota/i.test(msg);
     const isImageModel = /image/i.test(model) || !!finalConfig?.responseModalities?.includes?.('IMAGE');
 
-    // For image models hitting quota limits on Vertex, do NOT fall back to GEMINI_API_KEY
-    // because Developer API free tier has a limit of 0 for image models. Instead, bubble
-    // up the 429 so the client can retry Vertex AI after quota replenishes.
+    // 1. Location fallback: if model is not found in the current location (e.g. global vs us-central1), retry alternate
+    if (clientInfo.mode === 'vertex' && clientInfo.credentials && clientInfo.projectId &&
+        /not found in location|Publisher Model.*not found|RESOURCE_NOT_FOUND|LOCATION_NOT_SUPPORTED/i.test(msg)) {
+      const altLoc = (clientInfo.location || DEFAULT_LOCATION) === 'global' ? 'us-central1' : 'global';
+      console.warn(`Vertex AI call failed in ${clientInfo.location} (${msg}). Retrying in ${altLoc}...`);
+      try {
+        const altClient = new GoogleGenAI({
+          vertexai: true,
+          project: clientInfo.projectId,
+          location: altLoc,
+          googleAuthOptions: { credentials: clientInfo.credentials },
+        });
+        const res = await altClient.models.generateContent({ model, contents: finalContents, config: finalConfig });
+        clientInfo.location = altLoc;
+        return res;
+      } catch (altErr: any) {
+        console.warn(`Vertex AI alternate location ${altLoc} also failed:`, altErr.message);
+      }
+    }
+
+    // 2. Fallback to GEMINI_API_KEY if available
     if (clientInfo.mode === 'vertex' && process.env.GEMINI_API_KEY && !(isImageModel && isQuota)) {
       console.warn(`Vertex AI call failed (${msg}), falling back to GEMINI_API_KEY...`);
       const fallbackAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      // Only permanently demote cached mode on unrecoverable credentials/auth errors,
-      // NOT on temporary 429, 503, or rate limits.
       const isFatalAuth = /unauthenticated|invalid_grant|private.?key|decoder/i.test(msg);
       if (isFatalAuth) {
         cachedClient = fallbackAi;
         cachedMode = 'apikey';
       }
       const safeConfig = sanitizeConfigForApiKey(genConfig);
-      return await fallbackAi.models.generateContent({ model, contents, config: safeConfig });
+      return await fallbackAi.models.generateContent({ model, contents: safeConfig });
     }
+
+    // 3. User-friendly explanations for common GCP Vertex AI setup issues
+    if (/aiplatform.googleapis.com.*disabled|has not been used in project/i.test(msg)) {
+      throw new Error(`Google Cloud Vertex AI API is disabled in project "${clientInfo.projectId}". Please enable "Vertex AI API" (aiplatform.googleapis.com) in GCP Console.`);
+    }
+    if (/Permission 'aiplatform.endpoints.predict' denied/i.test(msg)) {
+      throw new Error(`Permission Denied: Ensure the Service Account has the "Vertex AI User" role in GCP project "${clientInfo.projectId}".`);
+    }
+
     throw error;
   }
 }
@@ -204,16 +394,12 @@ export async function getGCPAccessToken(): Promise<string> {
   if (_tokenCache && _tokenCache.expiresAt > now + 60_000) return _tokenCache.value;
 
   const saKey = process.env.GCP_SA_KEY;
-  if (!saKey) throw new Error('GCP_SA_KEY is not set');
-
-  let creds: any;
-  try { creds = JSON.parse(saKey); } catch { throw new Error('GCP_SA_KEY is not valid JSON'); }
-
-  if (!creds.private_key || !isValidPrivateKey(creds.private_key)) {
-    throw new Error('GCP_SA_KEY contains an invalid or placeholder private key');
+  const parsed = parseGcpServiceAccount(saKey, process.env.GCP_PROJECT_ID);
+  if (!parsed.valid || !parsed.credentials) {
+    throw new Error(parsed.error || 'GCP_SA_KEY is invalid or missing');
   }
 
-  const cleanPrivateKey = creds.private_key.replace(/\\n/g, '\n');
+  const creds = parsed.credentials;
   const nowSec = Math.floor(now / 1000);
   const jwtPayload = {
     iss: creds.client_email,
@@ -228,7 +414,7 @@ export async function getGCPAccessToken(): Promise<string> {
   const pay = Buffer.from(JSON.stringify(jwtPayload)).toString('base64url');
   const signer = createSign('RSA-SHA256');
   signer.update(`${hdr}.${pay}`);
-  const sig = signer.sign(cleanPrivateKey, 'base64url');
+  const sig = signer.sign(creds.private_key, 'base64url');
   const jwt = `${hdr}.${pay}.${sig}`;
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {

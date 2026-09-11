@@ -4,6 +4,11 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     { "source": "/api/youtube/:path*",   "destination": "https://autovid-flask.onrender.com/api/youtube/:path*" },
     { "source": "/api/video/:path*",     "destination": "https://autovid-flask.onrender.com/api/video/:path*" },

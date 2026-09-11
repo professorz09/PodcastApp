@@ -4,7 +4,7 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
-import { callGemini, getGCPAccessToken, isValidPrivateKey } from './services/vertexProxy';
+import { callGemini, getGCPAccessToken, isValidPrivateKey, parseGcpServiceAccount } from './services/vertexProxy';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -350,7 +350,11 @@ async function startServer() {
   // to GEMINI_API_KEY. Same logic the Vercel function uses in production
   // (api/gemini.ts), so dev/prod behave identically.
   app.post('/api/gemini', async (req, res) => {
-    const { model, contents, config: genConfig } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { return res.status(400).json({ error: 'Invalid JSON body' }); }
+    }
+    const { model, contents, config: genConfig } = body ?? {};
     if (!model || !contents) {
       return res.status(400).json({ error: 'Missing model or contents in request body.' });
     }
@@ -359,28 +363,37 @@ async function startServer() {
       res.json(response);
     } catch (error: any) {
       console.error('Gemini proxy error:', error);
-      const msg = error?.message || 'Gemini API call failed';
-      const isQuota = /RESOURCE_EXHAUSTED|429|quota/i.test(msg);
-      res.status(isQuota ? 429 : 500).json({ error: msg });
+      let msg = error?.message || 'Gemini API call failed';
+      try {
+        if (typeof msg === 'string' && msg.trim().startsWith('{')) {
+          const parsed = JSON.parse(msg);
+          if (parsed?.error?.message) msg = parsed.error.message;
+          else if (parsed?.message) msg = parsed.message;
+        }
+      } catch {}
+      const isQuota = /RESOURCE_EXHAUSTED|429|quota/i.test(String(msg));
+      res.status(isQuota ? 429 : 500).json({ error: String(msg) });
     }
   });
 
   // ── Gemini key/backend check endpoint ────────────────────────────────────
   app.get('/api/gemini/key-check', (_req, res) => {
     let hasVertex = false;
+    let vertexError: string | null = null;
+    let detectedProjectId: string | undefined = undefined;
+
     if (process.env.GCP_SA_KEY) {
-      try {
-        const creds = JSON.parse(process.env.GCP_SA_KEY);
-        const pid = process.env.GCP_PROJECT_ID || creds.project_id;
-        hasVertex = !!(pid && creds.private_key && isValidPrivateKey(creds.private_key));
-      } catch {
-        hasVertex = false;
-      }
+      const parsed = parseGcpServiceAccount(process.env.GCP_SA_KEY, process.env.GCP_PROJECT_ID);
+      hasVertex = parsed.valid;
+      detectedProjectId = parsed.projectId;
+      if (!parsed.valid) vertexError = parsed.error || null;
     }
     const hasApiKey = !!process.env.GEMINI_API_KEY;
     res.json({
       hasKey: hasVertex || hasApiKey,
       backend: hasVertex ? 'vertex' : hasApiKey ? 'apikey' : 'none',
+      projectId: detectedProjectId,
+      vertexError: hasVertex ? null : vertexError,
     });
   });
 
