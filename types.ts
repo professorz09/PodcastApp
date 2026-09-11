@@ -202,4 +202,5 @@ export interface DebateConfig {
   speakerNames?: string[]; // Optional, if user provides them. Otherwise auto-detected.
   specificDetails?: string;
   youtubeUrl?: string;
+  useGrounding?: boolean;
 }

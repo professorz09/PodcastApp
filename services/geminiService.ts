@@ -89,31 +89,74 @@ const mockAi = {
 
 const getAi = () => mockAi;
 
-export const generateTitleTextPair = async (scriptText: string): Promise<{ title: string; thumbnailText: string; description: string }[]> => {
+export const generateTitleTextPair = async (scriptText: string, scriptStyle?: string): Promise<{ title: string; thumbnailText: string; description: string }[]> => {
   const ai = getAi();
 
   const variationSeed = Math.floor(Math.random() * 9999);
-  const prompt = `You are a world-class YouTube growth strategist and SEO expert for English learning channels.
+
+  let prefix = 'A high-searchable, SEO-optimized topic title followed by " | Learn English Podcast"';
+  let keywords = 'English speaking practice, B1-B2 English fluency, confident English speaking without living abroad, daily English conversation';
+  let channelType = 'English learning channels';
+  let exampleTitle = '"Speak Confidently with Deep Debates (B2) | Learn English Podcast"';
+
+  if (scriptStyle === 'podcast') {
+    prefix = 'A high-searchable, SEO-optimized topic title followed by " | Learn English Podcast"';
+    keywords = 'English speaking practice, B1-B2 English fluency, English learning podcast, daily English conversation';
+    channelType = 'English learning podcast channels';
+    exampleTitle = '"How to Speak Confidently (B1-B2) | Learn English Podcast"';
+  } else if (scriptStyle === 'debate') {
+    prefix = 'The core argument followed by " | English Debate" or " | Debate in English"';
+    keywords = 'English debate, conversational English, learn English through debate, advanced English speaking';
+    channelType = 'English learning channels focused on debates and deep discussions';
+    exampleTitle = '"Is Social Media Destroying Our Focus? (Advanced) | English Debate"';
+  } else if (scriptStyle === 'interview') {
+    prefix = 'A specific scenario followed by " | English Interview Practice"';
+    keywords = 'English interview practice, professional English, business English conversation, English for job interviews';
+    channelType = 'professional and business English learning channels';
+    exampleTitle = '"How to Answer Tell Me About Yourself | English Interview Practice"';
+  } else if (scriptStyle === 'roleplay') {
+    prefix = 'The situation followed by " | English Roleplay" or " | Interactive English"';
+    keywords = 'English roleplay, interactive English practice, real-life English conversation, daily life English';
+    channelType = 'interactive English learning channels';
+    exampleTitle = '"Ordering Food at a Restaurant Like a Native | English Roleplay"';
+  } else if (scriptStyle === 'situational') {
+    prefix = 'The exact situation followed by " | Real Life English" or " | Daily English"';
+    keywords = 'situational English, real life English conversation, speak English naturally, daily English phrases';
+    channelType = 'practical English learning channels';
+    exampleTitle = '"Essential Phrases for Traveling Abroad | Real Life English"';
+  } else if (scriptStyle === 'casual') {
+    prefix = 'The topic followed by " | Casual English Chat"';
+    keywords = 'casual English conversation, informal English, natural English speaking, learn English with friends';
+    channelType = 'informal and conversational English learning channels';
+    exampleTitle = '"Talking About Weekend Plans with Friends | Casual English Chat"';
+  } else if (scriptStyle) {
+    // If a different style is provided that we don't have a specific rule for
+    prefix = 'A compelling, highly clickable, and searchable title relevant to the topic (No strict prefix required, but make it catchy)';
+    keywords = 'English speaking practice, learn English, English conversation, spoken English';
+    exampleTitle = '"How to Master English Speaking in 30 Days"';
+  }
+
+  const prompt = `You are a world-class YouTube growth strategist and SEO expert for ${channelType}.
 
 YOUR TASK: Read the script carefully. Extract the core topic and key insights. Then write 3 killer YouTube video SEO combos. Variation seed: ${variationSeed} — generate fresh output every time.
 
 TITLE RULES:
-- FIXED PREFIX REQUIREMENT: Every generated title MUST start with the exact prefix: "Learn English Podcast : " followed by a high-searchable, SEO-optimized topic title (e.g., "Learn English Podcast : How to Speak Confidently Without Living Abroad (B1-B2)").
-- TARGET HIGH SEARCHABLE KEYWORDS: Target keywords like English speaking practice, B1-B2 English fluency, confident English speaking without living abroad, daily English conversation. 55-75 chars total length.
+- PREFIX/FORMAT REQUIREMENT: Every generated title MUST follow this format: ${prefix} (e.g., ${exampleTitle}).
+- TARGET HIGH SEARCHABLE KEYWORDS: Target keywords like ${keywords}. 55-75 chars total length.
 
 THUMBNAIL TEXT RULES:
 - 2-4 words. ALL CAPS. The emotional punch the title builds toward — must ADD a new dimension, never repeat title words (e.g., "NO ACCENT FEAR" / "SPEAK FLUENT" / "REAL SECRETS").
 
 DESCRIPTION RULES — a comprehensive, highly optimized YouTube video description targeting high-searchable keywords for English learners:
-- Must target high-searchable keywords for English learning podcast (e.g., learn English, English speaking practice, B1-B2 English, how to speak English fluently, confident English speaking, English listening practice, Spoken English podcast).
-- Include structured paragraph overview of what learners will master, timestamps/chapters placeholder, engagement hook, call to action, and relevant hashtags (#LearnEnglish #EnglishPodcast #SpokenEnglish #EnglishFluency #B2English).
+- Must target high-searchable keywords like: ${keywords}.
+- Include structured paragraph overview of what learners will master, timestamps/chapters placeholder, engagement hook, call to action, and relevant hashtags (#LearnEnglish #SpokenEnglish).
 - Keep it 3-4 professional, SEO-packed paragraphs.
 
 ━━━ GLOBAL RULES ━━━
 1. Each of the 3 combos must approach the topic from a DIFFERENT ANGLE:
-   - Combo 1: Lead with the fluency breakthrough / confidence secret
-   - Combo 2: Lead with the hidden speaking mistakes & how to fix them
-   - Combo 3: Lead with practice methods without living abroad
+   - Combo 1: Lead with the fluency breakthrough / core concept
+   - Combo 2: Lead with the hidden mistakes & how to fix them
+   - Combo 3: Lead with practice methods / situational mastery
 2. Thumbnail text MUST complement the title — NEVER echo the same words.
 3. Each of the 3 thumbnail texts and descriptions must be DIFFERENT from each other.
 4. Language: ALWAYS write titles, thumbnail text, and descriptions in English.
@@ -306,7 +349,8 @@ export const generateDebateScript = async (
   providedSpeakerNames?: string[],
   specificDetails?: string,
   youtubeUrl?: string,
-  commentsFileContent?: string
+  commentsFileContent?: string,
+  useGrounding: boolean = false
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -4225,15 +4269,14 @@ Speaker B (Curious): choose a different name — asks what the audience is think
   // customScript just needs speaker detection — use pro model, no grounding needed
   const effectiveModel = customScript ? 'gemini-3.1-pro-preview' : model;
 
-  const tools: any[] = [{ googleSearch: {} }];
+  const tools: any[] = [];
+  if (useGrounding && !customScript && (model.includes('2.5') || model.includes('1.5') || model.includes('3.'))) {
+    tools.push({ googleSearch: {} });
+  }
   if (youtubeUrl) {
     tools.push({ urlContext: {} });
   }
-
-  // Only use googleSearch grounding for models that support it without breaking text extraction
-  // Disable grounding for customScript — web search is irrelevant when user already has the script
-  const supportsGrounding = !customScript && (model.includes('2.5') || model.includes('1.5') || model.includes('3.'));
-  const finalTools = supportsGrounding ? tools : [];
+  const finalTools = tools;
 
   try {
     const response = await ai.models.generateContent({
@@ -5570,6 +5613,7 @@ export const generateLearnEnglishScript = async (
   leStyle: string = 'situational',
   leLanguage: 'hinglish' | 'english' = 'hinglish', // language of Narrator's teaching asides/quiz — dialogue is ALWAYS English
   includeTeachingAsides: boolean = true, // mid-dialogue Narrator phrase/grammar explanations — independent of includeNarrator (intro)
+  useGrounding: boolean = false,
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -5703,6 +5747,7 @@ Return JSON only (no markdown, no commentary before or after), an array of objec
       config: { 
         thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
         maxOutputTokens: 16384,
+        tools: useGrounding ? [{ googleSearch: {} }] : undefined,
       },
     });
 
@@ -6919,6 +6964,7 @@ export const generatePhoneStudioScript = async (
   language: string = 'English',
   includeNarrator: boolean = false,
   youtubeComments?: string[],
+  useGrounding: boolean = false,
 ): Promise<DebateSegment[]> => {
   const targetWords = duration * 150;
   const isHindi = language.toLowerCase() === 'hindi';
@@ -7097,7 +7143,7 @@ Rules:
 - Generate at least ${Math.max(6, duration * 3)} turns
 `;
 
-  const data = await callGemini(model, [{ role: 'user', parts: [{ text: prompt }] }]);
+  const data = await callGemini(model, [{ role: 'user', parts: [{ text: prompt }] }], { tools: useGrounding ? [{ googleSearch: {} }] : undefined });
   const raw: string = data.text ?? data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   const jsonStr = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 

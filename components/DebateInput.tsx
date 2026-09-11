@@ -1,7 +1,7 @@
 import React, { useState, useRef, lazy, Suspense } from 'react';
 import { toast } from './Toast';
 import { DebateConfig, DebateSegment, PhoneStudioSourceClip } from '../types';
-import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Brain, Activity, Video, BookOpen, Smartphone, Link2, Scissors, Loader2 } from 'lucide-react';
+import { Mic, FileText, Clock, Users, ArrowRight, Upload, X, FileCheck, Sparkles, Brain, Activity, Video, BookOpen, Globe, Smartphone, Link2, Scissors, Loader2 } from 'lucide-react';
 import type { PhoneConvoStyle, TranscriptChunk } from '../services/geminiService';
 import { splitTranscriptByTopics } from '../services/geminiService';
 import IntroVideoMaker from './IntroVideoMaker';
@@ -34,6 +34,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [specificDetails, setSpecificDetails] = useState('');
   const [customScript, setCustomScript] = useState('');
   const [includeNarrator, setIncludeNarrator] = useState(false);
+  const [useGrounding, setUseGrounding] = useState(false);
   const [model, setModel] = useState<'gemini-3.8-flash' | 'gemini-3.1-pro-preview'>('gemini-3.8-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
@@ -181,6 +182,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
         language: 'English',
         style: 'learn_english',
         speakerCount: leSpeakerCount,
+        useGrounding,
       });
       return;
     }
@@ -229,6 +231,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
         style: 'phone_studio',
         speakerCount,
         speakerNames: activePhoneSpeakers.length >= 2 ? activePhoneSpeakers : undefined,
+        useGrounding,
       });
       return;
     }
@@ -265,6 +268,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       model,
       language,
       style,
+      useGrounding,
       speakerCount: isJoeRogan ? 2 : speakerCount,
       speakerNames: finalSpeakerNames,
       youtubeUrl: detectedYtUrl
@@ -1240,6 +1244,40 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   </div>
                 </div>
                 )}
+              </div>
+            </div>
+
+            {/* Google Search Grounding Selection */}
+            <div className="bg-[#0a0a0a] p-4 rounded-[16px] border border-white/5 hover:border-white/10 transition-colors shadow-sm mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-gray-200">
+                  <div className="p-1.5 bg-green-500/10 rounded-lg">
+                    <Globe size={14} className="text-green-400" />
+                  </div>
+                  <span className="font-semibold text-sm">Google Search Grounding</span>
+                </div>
+                <div className="flex bg-[#111111] p-0.5 rounded-lg border border-white/5">
+                  <button
+                    onClick={() => setUseGrounding(true)}
+                    className={`px-4 py-1 rounded-md text-[10px] font-bold transition-all ${
+                      useGrounding
+                        ? 'bg-white/10 text-white shadow-sm'
+                        : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    On
+                  </button>
+                  <button
+                    onClick={() => setUseGrounding(false)}
+                    className={`px-4 py-1 rounded-md text-[10px] font-bold transition-all ${
+                      !useGrounding
+                        ? 'bg-white/10 text-white shadow-sm'
+                        : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Off
+                  </button>
+                </div>
               </div>
             </div>
 

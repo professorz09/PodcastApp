@@ -177,6 +177,7 @@ const App: React.FC = () => {
           leStyle,
           leLanguage,
           includeTeachingAsides,
+          config.useGrounding
         );
         if (!generatedScript.length) throw new Error('Learn English: Script generate nahi hua — dobara try karo.');
         setScript(generatedScript);
