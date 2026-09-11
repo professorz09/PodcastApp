@@ -5620,34 +5620,56 @@ At the very end of the dialogue, add 2-4 "quiz" segments (speaker "Question", ta
 - Focus on practical, everyday conversational English for "${topic}".
 - Create a realistic, engaging scenario with high-frequency idioms, phrasal verbs, and natural polite expressions.
 - Maintain a clear narrative arc across the turns: setup, complication, turning point, and resolution.`,
-        roleplay: `ROLEPLAY PRACTICE STYLE:
-- A structured conversational template where the learner ("You") and the role partner practice an essential real-world interaction about "${topic}".
-- Focus on natural prompt-response pairs, active listening phrases, and clear communication.`,
+        roleplay: `IMMERSIVE ROLEPLAY PRACTICE STYLE:
+- High-engagement immersive roleplay session for "${topic}".
+- Structure: 
+  1. Setup & Scenario Briefing by the Host/Narrator ("Imagine karo aap is situation mein hain...").
+  2. Interactive turns where "You" (the learner) interact with a role-play partner (e.g., customer, interviewer, client, or friend).
+  3. Built-in Teacher / Narrator Coaching Asides: After key conversation exchanges, the narrator pauses to explain *why* a specific phrase was used, point out alternative expressions, and give pronunciation/tone tips.
+- Ensure natural back-and-forth dialogue with rich educational value.`,
         interview: `FORMAL / INTERVIEW STYLE:
 - Professional yet natural register suitable for job interviews or official meetings regarding "${topic}".
 - Emphasize polite framing, professional vocabulary, confidence, and articulate phrasing.`,
         casual: `CASUAL CHAT STYLE:
 - Relaxed, friendly conversation between peers discussing "${topic}".
 - Use natural contractions, filler words ("honestly", "you know"), interruptions, and casual idioms.`,
-        debate: `DEBATE STYLE:
-- Spirited exchange between "You" and an "Opponent" arguing opposing perspectives on "${topic}".
-- Teach persuasive phrasing: agreeing, respectfully disagreeing, conceding a point, and backing up arguments.`,
+        debate: `DEBATE & BREAKDOWN STYLE (Debate + Real-Time Explanation):
+- A spirited, engaging debate between "You" and an "Opponent" arguing opposing perspectives on "${topic}".
+- Crucial Requirement: Along with the debate arguments, include frequent "Host / Teacher Breakdown" interludes between debate rounds. 
+- During these interludes, the host or narrator explains the debate phrases used:
+  1. How to respectfully disagree ("I see your point, but...", "That's debatable because...").
+  2. How to concede a point and pivot ("Granted, however...", "You make a fair point, but...").
+  3. How to back up arguments with evidence and persuasive vocabulary.
+- Keep the dynamic lively, educational, and high-retention with clear argumentation and language coaching.`,
+        top_list: `TOP LIST & GRAMMAR / PHRASE EXPLANATION STYLE (e.g. Top 20 / Top 30):
+- Designed for listicle educational videos (e.g., "Top 20 Daily Use Sentences", "Top 30 Office English Phrases", "Top 50 Grammar Rules").
+- Structure the script as a structured countdown or ordered list presentation.
+- For each sentence/phrase or grammar rule, the host/narrator explains:
+  1. The sentence/phrase clearly in English.
+  2. Detailed grammar breakdown & when/where to use it (Hinglish/English as per language setting).
+  3. Real-world example sentences and pronunciation/tone tips.
+- Keep the energy high, engaging, and educational with clear pacing across all items requested in "${topic}".`,
       }[leStyle] || 'Everyday situational English.';
 
-  const prompt = `You are a scriptwriter creating an ENGLISH-LEARNING practice video, based on this topic/situation: "${topic}".
+   const prompt = `You are a master YouTube scriptwriter and English-learning educator creating a viral, high-retention English-learning video based on: "${topic}".
 ${longDurationInstruction}
 ${rolesLine}
 ${introLine}
 Style: ${styleLine}
 ${languageLine}
 
-SCENE CRAFT — this must read as a real mini-story, not a generic back-and-forth. Give it a clear arc across the ~${turnsGuide} "dialogue" lines: a quick SETUP (where/who/what's at stake), rising TENSION or complication (something goes wrong, is revealed, or is at risk), a TURNING POINT, and a RESOLUTION or a clear final beat — even in ${turnsGuide} lines this should feel like it's going somewhere, not just chatting. 80% of all segments should be plain "dialogue" between the characters.
+CRITICAL RETENTION & HOOK REQUIREMENTS:
+1. **Immediate Hook (First 3 Seconds):** The very first spoken line must grab attention instantly (e.g. a bold statement, a relatable everyday frustration, a surprising common mistake, or a high-stakes challenge). Absolutely no boring or generic intros.
+2. **High-Value Pacing:** Keep the momentum high. Every single turn must add genuine educational value, real-world usefulness, or dramatic tension. 
+3. **Anti-Low-Effort & Anti-Reused Content:** Ensure diverse vocabulary, rich situational context, natural conversational rhythm, dynamic breakdowns, and interactive challenges so viewers stay hooked till the end.
+
+SCENE CRAFT — this must read as a real mini-story or masterclass, not a generic back-and-forth. Give it a clear arc across the ~${turnsGuide} "dialogue" lines: a quick SETUP (where/who/what's at stake), rising TENSION or complication, a TURNING POINT, and a RESOLUTION or clear final takeaway. 80% of all segments should be plain "dialogue" between the characters.
 
 DIALOGUE QUALITY:
 - Natural, everyday spoken English — contractions (I'm, don't, that's), realistic reactions, interruptions where it fits. Not stiff, not textbook-perfect grammar showcases.
 - Vary sentence length — short reactive lines mixed with longer ones, the way real conversation actually sounds.
 - Every character should sound distinct — don't make both sides speak in the same rhythm/vocabulary.
-- Genuinely useful, reusable expressions a learner would want to practice should come up naturally — don't force vocabulary in awkwardly.
+- Genuinely useful, reusable expressions a learner would want to practice should come up naturally.
 
 ${teachingLine}${questionsLine}
 
