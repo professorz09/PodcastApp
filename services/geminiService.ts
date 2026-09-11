@@ -40,19 +40,27 @@ const callGemini = async (model: string, contents: any, config?: any): Promise<a
   if (!response.ok) {
     let msg = '';
     try {
-      const err = await response.json();
-      if (typeof err?.error === 'string') msg = err.error;
-      else if (typeof err?.error?.message === 'string') msg = err.error.message;
-      else if (typeof err?.message === 'string') msg = err.message;
-      else if (err?.error) msg = JSON.stringify(err.error);
-    } catch {
+      const rawText = await response.text();
       try {
-        const text = await response.text();
-        if (text && text.length < 300) msg = text.trim();
-      } catch {}
-    }
+        const err = JSON.parse(rawText);
+        if (typeof err?.error === 'string') msg = err.error;
+        else if (typeof err?.error?.message === 'string') msg = err.error.message;
+        else if (typeof err?.message === 'string') msg = err.message;
+        else if (err?.error) msg = typeof err.error === 'object' ? JSON.stringify(err.error) : String(err.error);
+      } catch {
+        if (rawText && !rawText.trim().startsWith('<!DOCTYPE') && !rawText.trim().startsWith('<html')) {
+          msg = rawText.trim().slice(0, 300);
+        }
+      }
+    } catch {}
     if (!msg) {
-      msg = `Gemini proxy error: ${response.status} ${response.statusText || ''}`.trim();
+      if (response.status === 500) {
+        msg = 'Gemini proxy error (500): Server error processing AI request. Please verify your GCP Service Account or Gemini API key configuration.';
+      } else if (response.status === 504) {
+        msg = 'Gemini proxy error (504): Gateway timeout — AI response took too long.';
+      } else {
+        msg = `Gemini proxy error: ${response.status} ${response.statusText || ''}`.trim();
+      }
     }
     if (response.status === 429 || msg.includes('RESOURCE_EXHAUSTED')) {
       throw new Error(`Gemini API Quota Exceeded — ${msg}`);
@@ -5754,7 +5762,7 @@ export const generateQuizForSegment = async (
   segmentText: string,
   contextDialogue?: string
 ): Promise<{ question: string; options: string[]; answer: string }> => {
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-3.8-flash';
   const prompt = `You are an expert English teacher creating a multiple choice comprehension/vocabulary question for an English learning video.
 Current Segment / Line: "${segmentText}"
 ${contextDialogue ? `Surrounding Dialogue Context:\n${contextDialogue}` : ''}

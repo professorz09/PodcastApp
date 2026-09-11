@@ -370,7 +370,7 @@ export async function callGemini(model: string, contents: any, genConfig: any) {
         cachedMode = 'apikey';
       }
       const safeConfig = sanitizeConfigForApiKey(genConfig);
-      return await fallbackAi.models.generateContent({ model, contents: safeConfig });
+      return await fallbackAi.models.generateContent({ model, contents: finalContents, config: safeConfig });
     }
 
     // 3. User-friendly explanations for common GCP Vertex AI setup issues

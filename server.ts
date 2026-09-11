@@ -364,15 +364,30 @@ async function startServer() {
     } catch (error: any) {
       console.error('Gemini proxy error:', error);
       let msg = error?.message || 'Gemini API call failed';
+      let statusCode = 500;
+
+      if (typeof error?.status === 'number' && error.status >= 400 && error.status < 600) {
+        statusCode = error.status;
+      } else if (typeof error?.code === 'number' && error.code >= 400 && error.code < 600) {
+        statusCode = error.code;
+      }
+
       try {
-        if (typeof msg === 'string' && msg.trim().startsWith('{')) {
+        if (typeof msg === 'string' && (msg.trim().startsWith('{') || msg.trim().startsWith('['))) {
           const parsed = JSON.parse(msg);
-          if (parsed?.error?.message) msg = parsed.error.message;
-          else if (parsed?.message) msg = parsed.message;
+          if (parsed?.error?.message) {
+            msg = parsed.error.message;
+            if (parsed.error.code && typeof parsed.error.code === 'number' && parsed.error.code >= 400 && parsed.error.code < 600) {
+              statusCode = parsed.error.code;
+            }
+          } else if (parsed?.message) {
+            msg = parsed.message;
+          }
         }
       } catch {}
       const isQuota = /RESOURCE_EXHAUSTED|429|quota/i.test(String(msg));
-      res.status(isQuota ? 429 : 500).json({ error: String(msg) });
+      if (isQuota) statusCode = 429;
+      res.status(statusCode).json({ error: String(msg) });
     }
   });
 

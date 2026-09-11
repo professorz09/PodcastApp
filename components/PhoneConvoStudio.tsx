@@ -3708,7 +3708,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         }),
       });
-      if (!genRes.ok) throw new Error(`Gemini error: ${genRes.status}`);
+      if (!genRes.ok) {
+        let errDetail = '';
+        try {
+          const errData = await genRes.json();
+          errDetail = errData?.error || errData?.message || '';
+        } catch {}
+        throw new Error(errDetail || `Gemini error: ${genRes.status}`);
+      }
       const genJson = await genRes.json();
       const rawText2 = genJson.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
       const arrMatch = rawText2.match(/\[[\s\S]*\]/);
