@@ -2778,62 +2778,6 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     return () => cancelAnimationFrame(animationRef.current);
   }, [render]);
 
-  if (!script || script.length === 0) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center text-center p-8">
-        <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4 text-gray-500">
-          <Video size={32} />
-        </div>
-        <h2 className="text-2xl font-bold text-white mb-2">No Script Available</h2>
-        <p className="text-gray-400 mb-6">Please generate a script and audio before visualizing.</p>
-        <button 
-          onClick={onBack}
-          className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"
-        >
-          <ChevronLeft size={20} /> Go Back
-        </button>
-      </div>
-    );
-  }
-
-  if (isMerging) {
-      return (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-black/90 z-50">
-              <Loader2 className="w-12 h-12 text-purple-500 animate-spin mb-4" />
-              <h2 className="text-xl font-bold text-white">Preparing Audio...</h2>
-              <p className="text-gray-400 text-sm mt-2">Merging audio segments for seamless playback</p>
-          </div>
-      );
-  }
-
-  if (mergeError) {
-      return (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-black/90 z-50 p-8 text-center">
-              <div className="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center mb-4 text-red-500">
-                  <Activity size={32} />
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">Audio Error</h2>
-              <p className="text-red-400 mb-6 max-w-md">{mergeError}</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={runMergeAudio}
-                  disabled={isMerging}
-                  className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isMerging ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                  Retry
-                </button>
-                <button
-                  onClick={onBack}
-                  className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
-                >
-                  Go Back
-                </button>
-              </div>
-          </div>
-      );
-  }
-
   // Mouse/Touch Handling
   const getCanvasCoords = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
@@ -3540,6 +3484,52 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
   return (
     <div className="w-full h-full bg-black text-white flex flex-col overflow-hidden">
+      {!script || script.length === 0 ? (
+        <div className="w-full h-full flex flex-col items-center justify-center text-center p-8">
+          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4 text-gray-500">
+            <Video size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">No Script Available</h2>
+          <p className="text-gray-400 mb-6">Please generate a script and audio before visualizing.</p>
+          <button 
+            onClick={onBack}
+            className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-colors flex items-center gap-2"
+          >
+            <ChevronLeft size={20} /> Go Back
+          </button>
+        </div>
+      ) : isMerging ? (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-black/90 z-50">
+            <Loader2 className="w-12 h-12 text-purple-500 animate-spin mb-4" />
+            <h2 className="text-xl font-bold text-white">Preparing Audio...</h2>
+            <p className="text-gray-400 text-sm mt-2">Merging audio segments for seamless playback</p>
+        </div>
+      ) : mergeError ? (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-black/90 z-50 p-8 text-center">
+            <div className="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center mb-4 text-red-500">
+                <Activity size={32} />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Audio Error</h2>
+            <p className="text-red-400 mb-6 max-w-md">{mergeError}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={runMergeAudio}
+                disabled={isMerging}
+                className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isMerging ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Retry
+              </button>
+              <button
+                onClick={onBack}
+                className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
+        </div>
+      ) : (
+        <>
       {/* Header */}
       <header className="shrink-0 sticky top-0 z-30 bg-[#050505]/95 backdrop-blur-md border-b border-white/5 px-4 py-3 flex items-center justify-between">
         <button
@@ -5306,6 +5296,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         crossOrigin="anonymous"
         className="hidden"
       />
+        </>
+      )}
     </div>
   );
 };
