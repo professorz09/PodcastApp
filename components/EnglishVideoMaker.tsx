@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check, Sparkles, CheckCircle2 } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
@@ -118,9 +118,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [speakerImageLoading, setSpeakerImageLoading] = useState<boolean[]>([]);
   const speakerBlobUrls = React.useRef<(string | null)[]>([]);
 
-  // Narrator's own avatar — kept separate from speakerImages/activeSpeakers (which
-  // only cover actual dialogue participants) so the Learn English teaching card
-  // can show its own photo, set independently of "You"/the situational character.
+  // Narrator's own avatar for Learn English teaching card (kept separate from dialogue participants)
   const [narratorImage, setNarratorImage] = useState<HTMLImageElement | null>(() => {
     const img = new Image();
     const canvas = document.createElement('canvas');
@@ -181,8 +179,6 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       ctx.fill();
 
       img.src = canvas.toDataURL('image/png');
-    } else {
-      img.src = '/professor_jiang.png';
     }
     return img;
   });
@@ -190,28 +186,61 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const narratorBlobUrlRef = React.useRef<string | null>(null);
   const hasNarrator = uniqueSpeakers.includes('Narrator');
 
+  // Helper to load fresh Narrator default background (/Narrator.png)
+  const createDefaultNarratorBg = useCallback(() => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = '/Narrator.png';
+    return img;
+  }, []);
+
   // Per-speaker full-frame background (Background tab) — indexed exactly like
   // uniqueSpeakers (Narrator included), so when a given speaker talks, their
   // background fills the whole frame instead of a floating avatar box.
+  // By default, Narrator's background is /Narrator.png (can be replaced anytime).
   const [speakerBackgroundImages, setSpeakerBackgroundImages] = useState<(HTMLImageElement | null)[]>([]);
   const [speakerBackgroundLoading, setSpeakerBackgroundLoading] = useState<boolean[]>([]);
   const speakerBgBlobUrls = React.useRef<(string | null)[]>([]);
 
   useEffect(() => {
       if (uniqueSpeakers.length > 0) {
-          setSpeakerBackgroundImages(prev => prev.length === uniqueSpeakers.length ? prev : new Array(uniqueSpeakers.length).fill(null));
+          setSpeakerBackgroundImages(prev => {
+              const narrIdx = uniqueSpeakers.findIndex(s => s.toLowerCase() === 'narrator');
+              const newArr = prev.length === uniqueSpeakers.length ? [...prev] : new Array(uniqueSpeakers.length).fill(null);
+              // Default Narrator's background to /Narrator.png if not yet set
+              if (narrIdx !== -1 && !newArr[narrIdx]) {
+                  newArr[narrIdx] = createDefaultNarratorBg();
+              }
+              return newArr;
+          });
           setSpeakerBackgroundLoading(prev => prev.length === uniqueSpeakers.length ? prev : new Array(uniqueSpeakers.length).fill(false));
       }
-  }, [uniqueSpeakers]);
+  }, [uniqueSpeakers, createDefaultNarratorBg]);
 
   const speakerBackgroundsMap = useMemo(() => {
       const map = new Map<string, HTMLImageElement>();
+      let customNarratorBg: HTMLImageElement | null = null;
       uniqueSpeakers.forEach((name, idx) => {
           const img = speakerBackgroundImages[idx];
-          if (img) map.set(name, img);
+          if (img) {
+              map.set(name, img);
+              if (name.toLowerCase() === 'narrator') {
+                  customNarratorBg = img;
+                  map.set('Narrator', img);
+                  map.set('narrator', img);
+                  map.set('Intro', img);
+                  map.set('intro', img);
+              }
+          }
       });
+      // Default: If Narrator background not explicitly replaced, use /Narrator.png
+      const defaultNarrator = customNarratorBg || createDefaultNarratorBg();
+      map.set('Narrator', defaultNarrator);
+      map.set('narrator', defaultNarrator);
+      map.set('Intro', defaultNarrator);
+      map.set('intro', defaultNarrator);
       return map;
-  }, [uniqueSpeakers, speakerBackgroundImages]);
+  }, [uniqueSpeakers, speakerBackgroundImages, createDefaultNarratorBg]);
 
   const handleGenerateSpeakerBackground = async (idx: number) => {
       if (speakerBackgroundLoading[idx]) return;
@@ -310,7 +339,18 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           if (cancelled) return;
           if (loaded) {
               if (loaded.speakerImages.some(Boolean)) setSpeakerImages(loaded.speakerImages);
-              if (loaded.speakerBackgroundImages.some(Boolean)) setSpeakerBackgroundImages(loaded.speakerBackgroundImages);
+              if (loaded.speakerBackgroundImages.some(Boolean)) {
+                  setSpeakerBackgroundImages(loaded.speakerBackgroundImages);
+              } else {
+                  const narrIdx = uniqueSpeakers.findIndex(s => s.toLowerCase() === 'narrator');
+                  if (narrIdx !== -1) {
+                      setSpeakerBackgroundImages(prev => {
+                          const a = prev.length === uniqueSpeakers.length ? [...prev] : new Array(uniqueSpeakers.length).fill(null);
+                          if (!a[narrIdx]) a[narrIdx] = createDefaultNarratorBg();
+                          return a;
+                      });
+                  }
+              }
               if (loaded.narratorImage) setNarratorImage(loaded.narratorImage);
               if (loaded.background) setBackground(loaded.background);
               if (loaded.backgroundColor) setGlobalBackgroundColor(loaded.backgroundColor);
@@ -3121,6 +3161,18 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         });
         await Promise.all(bgPromises);
 
+        // Preload speaker backgrounds (including Narrator default/custom background)
+        if (assets.speakerBackgrounds) {
+            for (const [, img] of assets.speakerBackgrounds) {
+                if (img && !img.complete) {
+                    await new Promise(r => {
+                        img.onload = r;
+                        img.onerror = r;
+                    });
+                }
+            }
+        }
+
         // 2. Get Audio Blob and Decode
         setStatusMessage("Decoding audio...");
         const audioRes = await fetch(mergedAudioUrl);
@@ -3253,21 +3305,57 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             }
         });
 
-        // 4. Download + keep blob for merge
+        // 4. Attach Channel Intro and Download
         if (videoBlob) {
-            setStatusMessage("Download ready! (Merge available in Settings)");
             setRenderedBlob(videoBlob as Blob);
-            const url = URL.createObjectURL(videoBlob as Blob);
-            const ext = (videoBlob as Blob).type.includes('webm') ? 'webm' : 'mp4';
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `debate_video_${Date.now()}.${ext}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            
+            let mergedSuccessfully = false;
+            try {
+                setStatusMessage("Channel Intro video jod rahe hain (Attaching intro.mp4)...");
+                const formData = new FormData();
+                formData.append('rendered_video', videoBlob as Blob, 'rendered_podcast.mp4');
+                formData.append('resolution', exportResolution);
 
-            setStatusSafe("", 6000);
+                const mergeRes = await fetch('/api/video/merge-intro', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (mergeRes.ok) {
+                    const mergedBlob = await mergeRes.blob();
+                    if (mergedBlob && mergedBlob.size > 10000) {
+                        const url = URL.createObjectURL(mergedBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `english_podcast_show_${Date.now()}.mp4`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        mergedSuccessfully = true;
+                        setStatusMessage("Complete! Channel Intro ke saath video download ho gaya!");
+                        toast.success("Channel Intro ke saath podcast video successfully download ho gaya!");
+                        setStatusSafe("", 6000);
+                    }
+                }
+            } catch (mergeErr) {
+                console.warn("Auto merge intro failed, falling back to direct download:", mergeErr);
+            }
+
+            // Fallback: If merge failed or intro was unavailable, download rendered video directly
+            if (!mergedSuccessfully) {
+                setStatusMessage("Download ready!");
+                const url = URL.createObjectURL(videoBlob as Blob);
+                const ext = (videoBlob as Blob).type.includes('webm') ? 'webm' : 'mp4';
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `podcast_video_${Date.now()}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                setStatusSafe("", 6000);
+            }
         }
         
 
@@ -3290,30 +3378,30 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           toast.warning('Please export the video first before merging.');
           return;
       }
-      const introFilename = youtubeData?.editedFilename || youtubeData?.downloadedFilename;
-      if (!introFilename) {
-          toast.error('YouTube video filename not found. Please download the video in the YouTube Import step.');
-          return;
-      }
+      
       setIsMergingVideos(true);
       setMergeVideoError('');
       setMergeVideoResult(null);
       try {
           const formData = new FormData();
-          formData.append('intro_filename', introFilename);
           formData.append('rendered_video', renderedBlob, 'rendered_debate.mp4');
-          formData.append('output_name', `final_merged_${Date.now()}.mp4`);
+          formData.append('resolution', exportResolution);
 
-          const res = await fetch(`${mergeFlaskUrl}/api/video/merge`, {
+          const res = await fetch('/api/video/merge-intro', {
               method: 'POST',
               body: formData,
           });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Merge failed');
+          if (!res.ok) {
+              const errData = await res.json().catch(() => ({ error: 'Merge failed' }));
+              throw new Error(errData.error || 'Merge failed');
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
           setMergeVideoResult({
-              filename: data.filename,
-              downloadUrl: `${mergeFlaskUrl}${data.download_url}`,
+              filename: 'english_podcast_merged.mp4',
+              downloadUrl: url,
           });
+          toast.success('Channel intro successfully merged!');
       } catch (e: any) {
           setMergeVideoError(e.message || 'Merge failed');
       } finally {
@@ -4496,16 +4584,39 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                     <button
                                       onClick={() => setSpeakerBackgroundImages(prev => { const n = [...prev]; n[idx] = null; return n; })}
                                       className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
+                                      title="Remove background"
                                     >
                                       <X size={10} className="text-white" />
                                     </button>
+                                    {speakerName.toLowerCase() === 'narrator' && (
+                                      <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-amber-300 backdrop-blur-xs font-mono">
+                                        {speakerBackgroundImages[idx]?.src.includes('Narrator.png') ? 'Default Narrator Scene' : 'Custom Scene'}
+                                      </div>
+                                    )}
                                   </>
                                 ) : (
-                                  <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer gap-1.5 hover:bg-white/5 transition-colors">
-                                    <Upload size={18} className="text-gray-500" />
-                                    <span className="text-[10px] text-gray-500">{speakerName}</span>
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
-                                  </label>
+                                  <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+                                    <label className="flex flex-col items-center justify-center cursor-pointer gap-1 hover:text-white transition-colors">
+                                      <Upload size={16} className="text-gray-500" />
+                                      <span className="text-[10px] text-gray-400 font-medium">{speakerName} Background</span>
+                                      <span className="text-[9px] text-gray-600">Click to upload</span>
+                                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
+                                    </label>
+                                    {speakerName.toLowerCase() === 'narrator' && (
+                                      <button
+                                        onClick={() => {
+                                          setSpeakerBackgroundImages(prev => {
+                                            const n = [...prev];
+                                            n[idx] = createDefaultNarratorBg();
+                                            return n;
+                                          });
+                                        }}
+                                        className="mt-1 text-[9px] text-amber-400 underline hover:text-amber-300"
+                                      >
+                                        Reset to Narrator.png
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                               <div className="flex gap-1.5">
@@ -4515,10 +4626,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                   className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/20 text-purple-300 transition-all disabled:opacity-40 disabled:cursor-wait"
                                 >
                                   {speakerBackgroundLoading[idx] ? <Loader2 size={9} className="animate-spin" /> : <Wand2 size={9} />}
-                                  AI
+                                  AI Scene
                                 </button>
-                                <label className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
-                                  <Upload size={9} /> Upload
+                                <label className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-400 hover:text-gray-200 cursor-pointer transition-all">
+                                  <Upload size={9} /> Replace
                                   <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
                                 </label>
                               </div>
@@ -5224,35 +5335,29 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                       </button>
                     </div>
                     <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
-                      <label className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold flex items-center gap-1.5"><Merge size={11} /> Merge with YT Video</label>
-                      {!youtubeData?.downloadedFilename && !youtubeData?.editedFilename ? (
-                        <p className="text-xs text-gray-600 italic">YouTube Import step mein video download karein.</p>
-                      ) : (
-                        <>
-                          <div className="text-xs text-gray-500 space-y-1">
-                            <p>YT: <code className="text-orange-400">{youtubeData.editedFilename || youtubeData.downloadedFilename}</code></p>
-                            <p>Rendered: <span className={renderedBlob ? 'text-green-400' : 'text-gray-600'}>{renderedBlob ? 'Ready' : 'Export first'}</span></p>
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-gray-600 uppercase tracking-wider">Flask Server URL</label>
-                            <input type="text" value={mergeFlaskUrl} onChange={(e) => setMergeFlaskUrl(e.target.value)}
-                              className="w-full bg-black/50 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500/50"
-                            />
-                          </div>
-                          <button onClick={handleMergeVideos} disabled={isMergingVideos || !renderedBlob}
-                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-300 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
-                          >
-                            {isMergingVideos ? <><Loader2 size={13} className="animate-spin" /> Merging...</> : <><Merge size={13} /> Merge Videos</>}
-                          </button>
-                          {mergeVideoError && <p className="text-xs text-red-400">{mergeVideoError}</p>}
-                          {mergeVideoResult && (
-                            <a href={mergeVideoResult.downloadUrl} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center justify-center gap-2 py-2 bg-green-600/20 border border-green-500/30 text-green-300 rounded-xl text-xs font-semibold"
-                            >
-                              <Download size={13} /> Download Merged Video
-                            </a>
-                          )}
-                        </>
+                      <label className="text-[10px] text-amber-400 uppercase tracking-widest font-semibold flex items-center gap-1.5"><Sparkles size={11} /> Channel Intro Video</label>
+                      <div className="text-xs text-gray-400 space-y-1 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-amber-300 flex items-center gap-1"><CheckCircle2 size={12} className="text-green-400" /> intro.mp4 (Public)</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 font-mono">Active</span>
+                        </div>
+                        <p className="text-[11px] text-gray-400">Har English video render hote hi yeh intro video shuru mein automatically jud jayega.</p>
+                      </div>
+                      <div className="space-y-1 text-xs">
+                        <p className="text-gray-500">Rendered Video: <span className={renderedBlob ? 'text-green-400 font-medium' : 'text-gray-600'}>{renderedBlob ? 'Ready in memory' : 'Click Render Podcast Video'}</span></p>
+                      </div>
+                      <button onClick={handleMergeVideos} disabled={isMergingVideos || !renderedBlob}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-300 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
+                      >
+                        {isMergingVideos ? <><Loader2 size={13} className="animate-spin" /> Merging Intro...</> : <><Merge size={13} /> Re-merge Intro & Download</>}
+                      </button>
+                      {mergeVideoError && <p className="text-xs text-red-400">{mergeVideoError}</p>}
+                      {mergeVideoResult && (
+                        <a href={mergeVideoResult.downloadUrl} download="english_podcast_with_intro.mp4"
+                          className="flex items-center justify-center gap-2 py-2 bg-green-600/20 border border-green-500/30 text-green-300 rounded-xl text-xs font-semibold"
+                        >
+                          <Download size={13} /> Download Merged Video
+                        </a>
                       )}
                     </div>
                   </div>

@@ -989,8 +989,15 @@ def merge_videos():
     # Validate intro file
     safe_intro = os.path.basename(intro_filename)
     intro_path = os.path.join(DOWNLOAD_DIR, safe_intro)
+    
+    # Check if the intro video is present in the public directory (as default fallback)
+    public_intro_path = os.path.join(os.path.dirname(__file__), "public", safe_intro)
+    
     if not os.path.exists(intro_path):
-        return jsonify({'error': f'Intro file not found: {safe_intro}'}), 404
+        if os.path.exists(public_intro_path):
+            intro_path = public_intro_path
+        else:
+            return jsonify({'error': f'Intro file not found in downloads or public: {safe_intro}'}), 404
 
     # Save uploaded rendered video
     rendered_file = request.files['rendered_video']

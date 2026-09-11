@@ -15,6 +15,12 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
   let videoToDraw = assets.backgroundVideo;
   let colorToDraw = assets.backgroundColor;
 
+  const isNarrator = currentSegment?.learnEnglish?.segmentType === 'intro' || 
+                     currentSegment?.learnEnglish?.segmentType === 'narrator' || 
+                     currentSegment?.speaker?.toLowerCase() === 'narrator' || 
+                     currentSegment?.speaker?.toLowerCase() === 'intro' ||
+                     currentSegment?.speaker?.toLowerCase() === 'i';
+
   // Segment overrides
   if (segmentBgUrl && assets.segmentBackgrounds.has(segmentBgUrl)) {
       bgToDraw = assets.segmentBackgrounds.get(segmentBgUrl) || null;
@@ -29,6 +35,16 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
       bgToDraw = assets.speakerBackgrounds.get(currentSegment.speaker) || null;
       videoToDraw = null;
       colorToDraw = null;
+  } else if (isNarrator) {
+      // Narrator segment: use Narrator's background from speakerBackgrounds (defaults to Narrator.png)
+      const narrBg = assets.speakerBackgrounds?.get('Narrator') ||
+                     assets.speakerBackgrounds?.get('narrator') ||
+                     assets.speakerBackgrounds?.get('Intro');
+      if (narrBg) {
+          bgToDraw = narrBg;
+          videoToDraw = null;
+          colorToDraw = null;
+      }
   }
 
   if (videoToDraw) {

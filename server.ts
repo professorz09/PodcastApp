@@ -1,10 +1,19 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
+import { spawn } from 'child_process';
+import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { callGemini, getGCPAccessToken, isValidPrivateKey } from './services/vertexProxy';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const uploadDir = path.join(process.cwd(), 'temp_uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+const upload = multer({ dest: uploadDir, limits: { fileSize: 1024 * 1024 * 1024 } });
 
 async function startServer() {
   const app = express();
@@ -393,6 +402,93 @@ async function startServer() {
     const cookiesExist = fs.existsSync(path.join(process.cwd(), 'yt_cookies.txt'));
     res.json({ status: 'ok', cookies: cookiesExist, fallback: true });
   });
+
+  // Channel Intro Video Check
+  app.get('/api/video/has-intro', (_req, res) => {
+    const introPath = path.join(process.cwd(), 'public', 'intro.mp4');
+    const exists = fs.existsSync(introPath);
+    res.json({
+      hasIntro: exists,
+      filename: 'intro.mp4',
+      size: exists ? fs.statSync(introPath).size : 0
+    });
+  });
+
+  // Local FFmpeg Merge Intro Endpoint (prepends public/intro.mp4)
+  const handleMergeIntro = async (req: any, res: any) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Missing rendered_video file' });
+    }
+
+    const renderedPath = req.file.path;
+    const introPath = path.join(process.cwd(), 'public', 'intro.mp4');
+
+    if (!fs.existsSync(introPath)) {
+      console.warn('Intro file public/intro.mp4 not found, returning rendered video');
+      return res.download(renderedPath, 'rendered_video.mp4', () => {
+        try { fs.unlinkSync(renderedPath); } catch {}
+      });
+    }
+
+    const resolution = req.body?.resolution === '1080p' ? '1080p' : '720p';
+    const targetW = resolution === '1080p' ? 1920 : 1280;
+    const targetH = resolution === '1080p' ? 1080 : 720;
+    const outputPath = path.join(uploadDir, `merged_${Date.now()}.mp4`);
+
+    console.log(`[FFmpeg] Merging intro (${introPath}) + rendered (${renderedPath}) at ${resolution}...`);
+
+    const filterComplex = `[0:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0];[1:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v1];[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0];[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a1];[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]`;
+
+    const ffmpegArgs = [
+      '-y',
+      '-i', introPath,
+      '-i', renderedPath,
+      '-filter_complex', filterComplex,
+      '-map', '[v]',
+      '-map', '[a]',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '22',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-movflags', '+faststart',
+      outputPath
+    ];
+
+    const child = spawn('ffmpeg', ffmpegArgs);
+    let stderr = '';
+
+    child.stderr.on('data', (d) => {
+      stderr += d.toString();
+    });
+
+    child.on('close', (code) => {
+      try { fs.unlinkSync(renderedPath); } catch {}
+
+      if (code !== 0) {
+        console.error('[FFmpeg] Merge failed with code:', code, stderr.slice(-400));
+        try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
+        return res.status(500).json({ error: 'FFmpeg merge failed', details: stderr.slice(-300) });
+      }
+
+      console.log(`[FFmpeg] Merge successful: ${outputPath}`);
+      res.download(outputPath, `english_podcast_${Date.now()}.mp4`, (err: any) => {
+        try {
+          if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+        } catch {}
+      });
+    });
+
+    child.on('error', (err) => {
+      console.error('[FFmpeg] Spawn error:', err);
+      try { fs.unlinkSync(renderedPath); } catch {}
+      try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
+      res.status(500).json({ error: err.message });
+    });
+  };
+
+  app.post('/api/video/merge-intro', upload.single('rendered_video'), handleMergeIntro);
+  app.post('/api/video/merge', upload.single('rendered_video'), handleMergeIntro);
 
   const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/instagram', '/api/cookies', '/api/reddit', '/api/shorts'];
 
