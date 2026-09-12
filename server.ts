@@ -17,7 +17,7 @@ const upload = multer({ dest: uploadDir, limits: { fileSize: 1024 * 1024 * 1024 
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = 3000;
 
   // Increase payload limit for large audio files (e.g., 50mb)
   app.use(express.json({ limit: '50mb' }));

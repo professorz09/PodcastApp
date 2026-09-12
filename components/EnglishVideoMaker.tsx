@@ -725,7 +725,23 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
   // Load Segment Background
   useEffect(() => {
-      const bgUrl = currentSegment?.visualConfig?.backgroundUrl;
+      let bgUrl = currentSegment?.visualConfig?.backgroundUrl;
+      if (!bgUrl) {
+          for (let i = currentSegmentIndex - 1; i >= 0; i--) {
+              const prevScenes = script[i]?.learnEnglish?.introScenes;
+              if (prevScenes && prevScenes.length > 0) {
+                  const lastScene = prevScenes[prevScenes.length - 1];
+                  if (lastScene?.imageUrl) {
+                      bgUrl = lastScene.imageUrl;
+                      break;
+                  }
+              }
+              if (script[i]?.visualConfig?.backgroundUrl) {
+                  bgUrl = script[i].visualConfig!.backgroundUrl;
+                  break;
+              }
+          }
+      }
       if (bgUrl) {
           const img = new Image();
           img.crossOrigin = "anonymous"; // Enable CORS to prevent canvas tainting
@@ -1404,11 +1420,26 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     };
 
     const realTimeSegment = script[realTimeIndex];
-    if (realTimeSegment && realTimeSegment.visualConfig?.backgroundUrl && currentSegmentBackground) {
-        // Only use the loaded background if it matches the current segment (via index check or URL check)
-        // Since currentSegmentBackground is loaded based on currentSegmentIndex, we check if indices match
+    let activeBgUrl = realTimeSegment?.visualConfig?.backgroundUrl;
+    if (!activeBgUrl && realTimeSegment) {
+        for (let i = realTimeIndex - 1; i >= 0; i--) {
+            const prevScenes = script[i]?.learnEnglish?.introScenes;
+            if (prevScenes && prevScenes.length > 0) {
+                const lastScene = prevScenes[prevScenes.length - 1];
+                if (lastScene?.imageUrl) {
+                    activeBgUrl = lastScene.imageUrl;
+                    break;
+                }
+            }
+            if (script[i]?.visualConfig?.backgroundUrl) {
+                activeBgUrl = script[i].visualConfig!.backgroundUrl;
+                break;
+            }
+        }
+    }
+    if (activeBgUrl && currentSegmentBackground) {
         if (realTimeIndex === currentSegmentIndex) {
-            assets.segmentBackgrounds.set(realTimeSegment.visualConfig.backgroundUrl, currentSegmentBackground);
+            assets.segmentBackgrounds.set(activeBgUrl, currentSegmentBackground);
         }
     }
 

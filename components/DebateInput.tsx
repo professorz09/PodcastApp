@@ -74,7 +74,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
   // ── Learn English state — kept fully separate from the other tabs' state ────
   const [leTopic, setLeTopic] = useState('');
-  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate' | 'podcast'>('podcast');
+  const [leSituations, setLeSituations] = useState<{topic: string, duration: number}[]>([{topic: '', duration: 3}]);
+  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate' | 'podcast' | 'multi_situation'>('podcast');
   const [leDuration, setLeDuration] = useState<number>(12);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
   const [leIntro, setLeIntro] = useState(false); // podcast defaults to false
@@ -170,14 +171,28 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const handleSubmit = async () => {
     // ── Learn English mode ──────────────────────────────────────────────────
     if (mode === 'learn_english') {
-      if (!leTopic.trim()) {
-        toast.warning('Topic/situation daalo pehle');
-        return;
+      let finalTopic = leTopic.trim();
+      let finalDuration = leDuration;
+
+      if (leStyle === 'multi_situation') {
+        const validSits = leSituations.filter(s => s.topic.trim());
+        if (validSits.length === 0) {
+          toast.warning('Kam se kam ek situation daalo');
+          return;
+        }
+        finalTopic = JSON.stringify(validSits);
+        finalDuration = validSits.reduce((acc, curr) => acc + curr.duration, 0);
+      } else {
+        if (!finalTopic) {
+          toast.warning('Topic/situation daalo pehle');
+          return;
+        }
       }
+
       onGenerate({
-        topic: leTopic.trim(),
+        topic: finalTopic,
         specificDetails: `LEARN_ENGLISH_STYLE:${leStyle}\nLEARN_ENGLISH_LANGUAGE:english${leGenerateQuestions ? '\nLEARN_ENGLISH_QUESTIONS:true' : ''}${!leNarrator ? '\nLEARN_ENGLISH_NARRATOR:false' : ''}`,
-        duration: leDuration,
+        duration: finalDuration,
         includeNarrator: leIntro,
         model,
         language: 'English',
@@ -418,19 +433,71 @@ const DebateInput: React.FC<DebateInputProps> = ({
         <div className="relative group">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-emerald-600 rounded-[18px] opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
           <div className="relative bg-[#0a0a0a] rounded-[16px] border border-white/5 p-5 space-y-5">
-            <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Topic / Situation</label>
-              <textarea
-                value={leTopic}
-                onChange={e => setLeTopic(e.target.value)}
-                placeholder="e.g. Someone stole my phone and I'm reporting it to a police officer"
-                rows={3}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 resize-none"
-              />
-            </div>
+            {leStyle !== 'multi_situation' ? (
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Topic / Situation</label>
+                <textarea
+                  value={leTopic}
+                  onChange={e => setLeTopic(e.target.value)}
+                  placeholder="e.g. Someone stole my phone and I'm reporting it to a police officer"
+                  rows={3}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 resize-none"
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <label className="text-xs text-gray-500 uppercase tracking-wider block">Multiple Situations</label>
+                {leSituations.map((sit, idx) => (
+                  <div key={idx} className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-3 relative">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-cyan-400 uppercase">Situation {idx + 1}</span>
+                      {leSituations.length > 1 && (
+                        <button onClick={() => setLeSituations(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 text-xs">Remove</button>
+                      )}
+                    </div>
+                    <textarea
+                      value={sit.topic}
+                      onChange={e => {
+                        const newSits = [...leSituations];
+                        newSits[idx].topic = e.target.value;
+                        setLeSituations(newSits);
+                      }}
+                      placeholder="Describe this situation..."
+                      rows={2}
+                      className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 resize-none"
+                    />
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500">Duration:</span>
+                      <select
+                        value={sit.duration}
+                        onChange={e => {
+                          const newSits = [...leSituations];
+                          newSits[idx].duration = parseInt(e.target.value, 10);
+                          setLeSituations(newSits);
+                        }}
+                        className="bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-cyan-500/50"
+                      >
+                        <option value={1}>1 Min</option>
+                        <option value={2}>2 Min</option>
+                        <option value={3}>3 Min</option>
+                        <option value={5}>5 Min</option>
+                        <option value={8}>8 Min</option>
+                        <option value={10}>10 Min</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setLeSituations(prev => [...prev, {topic: '', duration: 3}])}
+                  className="w-full py-2 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 text-cyan-400 text-sm rounded-xl transition-colors"
+                >
+                  + Add Another Situation
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+              <div className={leStyle === 'multi_situation' ? "col-span-1 sm:col-span-2" : ""}>
                 <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Style</label>
                 <select
                   value={leStyle}
@@ -447,6 +514,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
                 >
+                  <option value="multi_situation">Multi-Situation (Story/Scenes)</option>
                   <option value="podcast">Podcast Style (Boy & Girl Hosts)</option>
                   <option value="situational">Situational</option>
                   <option value="roleplay">Roleplay Practice</option>
@@ -455,6 +523,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <option value="debate">Debate</option>
                 </select>
               </div>
+              {leStyle !== 'multi_situation' && (
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Duration</label>
                 <select
@@ -471,6 +540,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   <option value={40} className="bg-[#111]">40 Min</option>
                 </select>
               </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -566,7 +636,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
 
             <button
               onClick={handleSubmit}
-              disabled={isLoading || !leTopic.trim()}
+              disabled={isLoading || (leStyle !== 'multi_situation' && !leTopic.trim()) || (leStyle === 'multi_situation' && !leSituations.some(s => s.topic.trim()))}
               className="w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-cyan-600 to-emerald-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
             >
               {isLoading

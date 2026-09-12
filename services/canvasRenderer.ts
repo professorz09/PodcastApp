@@ -75,6 +75,24 @@ export const drawDebateFrame = (
       if (scene?.imageUrl && assets.segmentBackgrounds.has(scene.imageUrl)) {
           currentSegment = { ...rawSegment, visualConfig: { ...rawSegment.visualConfig, backgroundUrl: scene.imageUrl } };
       }
+  } else if (!currentSegment.visualConfig?.backgroundUrl) {
+      // If the current segment has no background, look backwards for the most recent intro scene's background.
+      // This ensures different situations in a multi-situation script persist their respective backgrounds across dialogue.
+      for (let i = currentSegmentIndex - 1; i >= 0; i--) {
+          const prevScenes = script[i].learnEnglish?.introScenes;
+          if (prevScenes && prevScenes.length > 0) {
+              const lastScene = prevScenes[prevScenes.length - 1];
+              if (lastScene?.imageUrl && assets.segmentBackgrounds.has(lastScene.imageUrl)) {
+                  currentSegment = { ...rawSegment, visualConfig: { ...rawSegment.visualConfig, backgroundUrl: lastScene.imageUrl } };
+              }
+              break;
+          } else if (script[i].visualConfig?.backgroundUrl) {
+              if (assets.segmentBackgrounds.has(script[i].visualConfig!.backgroundUrl)) {
+                  currentSegment = { ...rawSegment, visualConfig: { ...rawSegment.visualConfig, backgroundUrl: script[i].visualConfig!.backgroundUrl } };
+              }
+              break;
+          }
+      }
   }
 
   // Determine Theme

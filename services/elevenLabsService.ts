@@ -1,3 +1,4 @@
+import { fetchWithRetry } from "./fetchUtils";
 export interface ElevenLabsVoice {
   voice_id: string;
   name: string;
@@ -12,7 +13,7 @@ export interface ElevenLabsVoice {
 }
 
 export const getElevenLabsVoices = async (): Promise<ElevenLabsVoice[]> => {
-  const response = await fetch('/api/elevenlabs/voices');
+  const response = await fetchWithRetry('/api/elevenlabs/voices');
   const text = await response.text();
   let data;
   try {
@@ -33,7 +34,7 @@ export const generateElevenLabsSpeech = async (text: string, voiceId: string): P
   if (cleanText.length < 5 && cleanText.length > 0) cleanText = `${cleanText} ...`;
   if (!cleanText) cleanText = "...";
 
-  const response = await fetch('/api/elevenlabs/tts', {
+  const response = await fetchWithRetry('/api/elevenlabs/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: cleanText, voiceId })

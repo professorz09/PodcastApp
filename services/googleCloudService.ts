@@ -1,3 +1,4 @@
+import { fetchWithRetry } from "./fetchUtils";
 // ── Offline fallback: decode audio duration purely in the browser ──────────
 export const getAudioDurationFromBlob = async (blob: Blob): Promise<number> => {
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -230,7 +231,7 @@ const transcribeChunk = async (
   const base64Audio = await blobToBase64(audioBlob);
   const audioContent = base64Audio.split(',')[1];
 
-  const response = await fetch('/api/google/speech-to-text', {
+  const response = await fetchWithRetry('/api/google/speech-to-text', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ audioContent, mimeType: 'audio/wav', sampleRate, languageCode }),
@@ -268,7 +269,7 @@ const pollOperation = async (
   for (let i = 0; i < maxRetries; i++) {
     await new Promise(r => setTimeout(r, 2000));
 
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `/api/google/operations?name=${encodeURIComponent(operationName)}`
     );
     const text = await response.text();

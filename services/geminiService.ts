@@ -1,6 +1,7 @@
 import { Type, Modality, ThinkingLevel } from "@google/genai";
 import { TranscriptSegment, DebateSegment, DebateSpeaker } from "../types";
 import { fetchRandomStyleReference } from "./styleRefClient";
+import { fetchWithRetry } from "./fetchUtils";
 
 // Nano Banana 2 — Gemini image model, used for all image generation
 // (thumbnails, avatars, storyboard illustrations, etc). A global switch (not
@@ -32,7 +33,7 @@ const IMAGE_SAFETY_SETTINGS = [
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const callGemini = async (model: string, contents: any, config?: any): Promise<any> => {
-  const response = await fetch('/api/gemini', {
+  const response = await fetchWithRetry('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, contents, config }),
@@ -1647,7 +1648,7 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               ? `इन नामों का उपयोग करें: ${speakers[0]} (Prosecution/For) और ${speakers[1]} (Defense/Against).`
               : `दो ऐसे नाम चुनो जो lawyer, expert या debater लगें।`
             }
-            साथ ही एक "Narrator" (या Voiceover) जो documentary sections बोलेगा।
+            साथ ही एक "Narrator" (या Voiceover) जो documentary sections बोलेगा (लेकिन COLD OPEN के लिए speaker tag "Intro" इस्तेमाल करना है)।
 
             ══════════════════════════════════════════
             【 STRUCTURE & FORMAT RULES 】
@@ -1655,8 +1656,9 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
             Script का structure EXACTLY ऐसा होना चाहिए:
 
             ${includeIntro ? `1. [COLD OPEN — DOCUMENTARY STYLE]
-               - Narrator: cinematic तरीके से case/situation को explain करे। Suspenseful, scene-setting, aur main debate question ko raise kare (jaise: "Toh ab sawaal yeh nahi tha ki... sawaal yeh tha ki...").
-               - Text format: [COLD OPEN — DOCUMENTARY STYLE] (as a non-spoken marker or spoken by Narrator as an intro)` : `1. [START DEBATE IMMEDIATELY]
+               - Speaker Tag MUST BE EXACTLY "Intro" (NOT "Narrator").
+               - Intro: cinematic तरीके से case/situation को explain करे। Suspenseful, scene-setting, aur main debate question ko raise kare.
+               - Text format: Use the speaker name "Intro" for this beginning section.` : `1. [START DEBATE IMMEDIATELY]
                - Do not include any Cold Open or documentary intro. Start directly with Round 1.`}
 
             2. ROUND 1, 2, 3... (PROSECUTION VS DEFENSE / FOR VS AGAINST)
@@ -1674,7 +1676,7 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
                - Narrator wapas aaye. Story ko wrap up kare aur audience ke liye ek open, thought-provoking question chhod de (jaise: "Aap kya choose karenge...?").
 
             RULES:
-            - "Intro" tag documentary style ke shuru mein lagna chahiye.
+            - CRITICAL: The very first cold open section MUST use the speaker name "Intro" (e.g. "Intro: In the dark corners..."). Do NOT use "Narrator" for the cold open.
             - Cinematic + Legal/Logical Debate ka perfect mix hona chahiye.
             - Dono debaters strong hone chahiye, koi strawman nahi.
             ${durFillHi}
@@ -3633,7 +3635,7 @@ Speaker B (Curious): choose a different name — asks what the audience is think
               ? `Use these names: ${speakers[0]} (Prosecution/For) and ${speakers[1]} (Defense/Against).`
               : `Choose two names that feel like legal experts or sharp debaters.`
             }
-            Plus a "Narrator" (or Voiceover) to handle the documentary sections.
+            Plus a "Narrator" (or Voiceover) to handle the documentary sections (but the COLD OPEN must use the speaker tag "Intro").
 
             ══════════════════════════════════════════
             【 STRUCTURE & FORMAT RULES 】
@@ -3641,8 +3643,9 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             The script structure MUST follow this exact flow:
 
             ${includeIntro ? `1. [COLD OPEN — DOCUMENTARY STYLE]
-               - Narrator: Explain the case/situation cinematically. Suspenseful, scene-setting. It must end by raising the core moral/legal debate question.
-               - Text format: Include "[COLD OPEN — DOCUMENTARY STYLE]" as a scene marker or intro tag.` : `1. [START DEBATE IMMEDIATELY]
+               - Speaker Tag MUST BE EXACTLY "Intro" (NOT "Narrator").
+               - Intro: Explain the case/situation cinematically. Suspenseful, scene-setting. It must end by raising the core moral/legal debate question.
+               - Text format: Use the speaker name "Intro" for this beginning section.` : `1. [START DEBATE IMMEDIATELY]
                - Do not include any Cold Open or documentary intro. Start directly with Round 1.`}
 
             2. ROUND 1, ROUND 2, ROUND 3... (PROSECUTION VS DEFENSE / FOR VS AGAINST)
@@ -3659,7 +3662,7 @@ Speaker B (Curious): choose a different name — asks what the audience is think
                - Narrator returns. Wraps up the story and leaves the audience with an open, thought-provoking question ("So what would you choose...?").
 
             RULES:
-            - Use an "Intro" tag at the start of the documentary style section.
+            - CRITICAL: The very first cold open section MUST use the speaker name "Intro" (e.g. "Intro: In the dark corners..."). Do NOT use "Narrator" for the cold open.
             - Perfect mix of Cinematic storytelling + Legal/Logical Debate.
             - Both debaters must be strong; no strawman arguments.
             ${durFillEn}
@@ -5780,7 +5783,7 @@ export const generateLearnEnglishScript = async (
     ? `PODCAST SETUP & INTRO: The podcast MUST start with a highly natural, warm, multi-turn co-host introduction by the two chosen co-host names (tag "dialogue"). It must feel like a real podcast opening. Follow this exact flow: 1) Start with a tagline (e.g., "Listen, learn, and speak English with confidence."). 2) Welcome the listeners (e.g., "Hey English learners, welcome back to the English Goal Podcast. Your cozy place to learn simple English through real-life conversations..."). 3) The hosts must introduce themselves individually (e.g., "I'm Rachel", "And I'm Kevin"). 4) Include a brief, friendly banter or an icebreaker question relevant to the topic (e.g., "Kevin, can I ask you a question?" -> [laughter] -> "When was the last time you..."). 5) Seamlessly transition into today's topic (e.g., "Exactly. And I think that brings us perfectly to today's topic: ${topic}"). Use [laughter] tags and natural reactions to make it lively and engaging before diving into the main discussion.`
     : includeNarrator
       ? `MODE: CINEMATIC INTRO HOOK ON
-Segment 1 MUST be spoken by "Narrator", tag "intro" — an immersive, scene-setting opening that puts the listener right in the situation. Give it real substance: 4-8 sentences. Follow this EXACT narrative style and flow:
+${leStyle === 'multi_situation' ? 'For EACH situation in the list, the very first segment of that situation MUST be spoken by "Narrator", tag "intro"' : 'Segment 1 MUST be spoken by "Narrator", tag "intro"'} — an immersive, scene-setting opening that puts the listener right in the situation. Give it real substance: 4-8 sentences. Follow this EXACT narrative style and flow:
 - Start with an "Imagine you're..." statement placing the listener directly in the location (e.g., "Imagine you're walking down a busy street in London...").
 - Describe a sudden turn of events or conflict in short, punchy sentences (e.g., "You're enjoying your day when, suddenly... someone grabs your phone and runs.").
 - State the listener's internal reaction/emotion (e.g., "You're frustrated, confused, and you don't know what to do.").
@@ -5825,6 +5828,12 @@ At the very end of the dialogue, add 2-4 "quiz" segments (speaker "Question", ta
 - Roleplay scenarios within the conversation (e.g., Host: "Imagine karo main tumhara boss hoon...").
 - Intentionally or naturally discuss common mistakes and better alternatives ("Isko aise ki jagah aise bol sakte hain").`
     : {
+        multi_situation: `MULTI-SITUATION SCENARIOS:
+- The user has provided multiple situations as a JSON array or list in the topic: "${topic}".
+- Treat each situation in the list as its own separate mini-scene or chapter.
+- ${includeNarrator ? 'For EACH situation, you MUST start with a cinematic "intro" segment spoken by "Narrator" to set up that specific scene. This means there will be multiple "intro" segments across the script.' : 'Start each scene directly with dialogue.'}
+- Ensure the transition between situations is clear.
+- This is a compilation of different, independent scenarios happening one after another.`,
         situational: `SITUATIONAL ENGLISH STYLE:
 - Focus on practical, everyday conversational English for "${topic}".
 - Create a realistic, engaging scenario with high-frequency idioms, phrasal verbs, and natural polite expressions.
@@ -6436,7 +6445,7 @@ export const generateSpeechChirp3HD = async (
   if (cleanText.length < 5 && cleanText.length > 0) cleanText = `${cleanText} ...`;
   if (!cleanText) cleanText = "...";
 
-  const response = await fetch('/api/google/text-to-speech', {
+  const response = await fetchWithRetry('/api/google/text-to-speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: cleanText, voiceName, languageCode }),
