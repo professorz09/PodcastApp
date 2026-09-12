@@ -85,7 +85,15 @@ const ThumbnailGenerator: React.FC<ThumbnailGeneratorProps> = ({
 
   const getSourceText = (source: TitleSource): string => {
     if (source === 'transcript' && hasTranscript) return youtubeData!.fullText;
-    return script.map(s => `${s.speaker}: ${s.text}`).join('\n');
+    
+    let cumulativeTime = 0;
+    return script.map(s => {
+      const m = Math.floor(cumulativeTime / 60).toString().padStart(2, '0');
+      const sec = Math.floor(cumulativeTime % 60).toString().padStart(2, '0');
+      const timestampStr = `[${m}:${sec}]`;
+      cumulativeTime += (s.duration || (s.text.split(' ').length / 2.5));
+      return `${timestampStr} ${s.speaker}: ${s.text}`;
+    }).join('\n');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

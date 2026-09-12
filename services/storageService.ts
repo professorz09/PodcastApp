@@ -81,7 +81,7 @@ const saveScenesToKey = async (key: string, script: DebateSegment[], scenes: Sto
   const scenesToStore: StoredScene[] = await Promise.all(scenes.map(async sc => {
     let imageBlob: Blob | null = null;
     if (sc.imageUrl) {
-      try { imageBlob = await (await fetch(sc.imageUrl)).blob(); } catch (e) { console.error('Failed to fetch scene image for storage', e); }
+      try { imageBlob = await urlToBlob(sc.imageUrl); } catch (e) { console.error('Failed to fetch scene image for storage', e); }
     }
     const { imageUrl, ...rest } = sc;
     return { ...rest, imageBlob };
@@ -185,15 +185,51 @@ interface StoredEnglishVideoVisuals {
 
 let _englishVideoVisualsBlobUrls: string[] = [];
 
-const imageToBlob = async (img: HTMLImageElement | null): Promise<Blob | null> => {
-  if (!img?.src) return null;
+export const urlToBlob = async (url: string | null | undefined): Promise<Blob | null> => {
+  if (!url) return null;
   try {
-    const res = await fetch(img.src);
+    if (url.startsWith('data:')) {
+      const arr = url.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Fetch failed');
     return await res.blob();
   } catch (e) {
-    console.error('Failed to convert image to blob for storage', e);
-    return null;
+    console.warn('urlToBlob fetch failed, trying canvas fallback...', e);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 500;
+          canvas.height = img.naturalHeight || img.height || 500;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(null);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => resolve(blob), 'image/png');
+        } catch (err) {
+          console.error('Canvas fallback failed', err);
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
   }
+};
+
+const imageToBlob = async (img: HTMLImageElement | null): Promise<Blob | null> => {
+  if (!img?.src) return null;
+  return urlToBlob(img.src);
 };
 
 const blobToImage = (blob: Blob | null, blobUrls: string[]): Promise<HTMLImageElement | null> => {
@@ -279,11 +315,9 @@ export const saveEnglishIntroScenes = async (
           seg.learnEnglish.introScenes.map(async (sc) => {
             let imageBlob: Blob | null = null;
             if (sc.imageUrl) {
-              try {
-                const res = await fetch(sc.imageUrl);
-                imageBlob = await res.blob();
-              } catch (e) {
-                console.error('Failed to convert intro scene image to blob', e);
+              imageBlob = await urlToBlob(sc.imageUrl);
+              if (!imageBlob) {
+                console.error('Failed to convert intro scene image to blob');
               }
             }
             return {
@@ -398,11 +432,9 @@ export const saveState = async (
         const scenesWithBlobs = await Promise.all(learnEnglish.introScenes.map(async (sc) => {
           let imageBlob: Blob | null = null;
           if (sc.imageUrl) {
-            try {
-              const res = await fetch(sc.imageUrl);
-              imageBlob = await res.blob();
-            } catch (e) {
-              console.error("Failed to fetch intro scene image for storage", e);
+            imageBlob = await urlToBlob(sc.imageUrl);
+            if (!imageBlob) {
+              console.error("Failed to fetch intro scene image for storage");
             }
           }
           const { imageUrl, ...rest } = sc;
@@ -416,8 +448,7 @@ export const saveState = async (
       if (visualConfig?.backgroundUrl) {
         let backgroundBlob: Blob | null = null;
         try {
-          const res = await fetch(visualConfig.backgroundUrl);
-          backgroundBlob = await res.blob();
+          backgroundBlob = await urlToBlob(visualConfig.backgroundUrl);
         } catch (e) {
           // ignore
         }

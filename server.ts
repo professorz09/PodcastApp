@@ -444,14 +444,20 @@ async function startServer() {
 
   // Local FFmpeg Merge Intro Endpoint (prepends public/intro.mp4)
   const handleMergeIntro = async (req: any, res: any) => {
-    if (!req.file) {
+    const renderedFile = req.files?.['rendered_video']?.[0] || req.file;
+    if (!renderedFile) {
       return res.status(400).json({ error: 'Missing rendered_video file' });
     }
 
-    const renderedPath = req.file.path;
-    const introPath = path.join(process.cwd(), 'public', 'intro.mp4');
+    const renderedPath = renderedFile.path;
+    const customIntroFile = req.files?.['custom_intro']?.[0];
+    let introPath = path.join(process.cwd(), 'public', 'intro.mp4');
+    let usingCustomIntro = false;
 
-    if (!fs.existsSync(introPath)) {
+    if (customIntroFile) {
+      introPath = customIntroFile.path;
+      usingCustomIntro = true;
+    } else if (!fs.existsSync(introPath)) {
       console.warn('Intro file public/intro.mp4 not found, returning rendered video');
       return res.download(renderedPath, 'rendered_video.mp4', () => {
         try { fs.unlinkSync(renderedPath); } catch {}
@@ -492,6 +498,9 @@ async function startServer() {
 
     child.on('close', (code) => {
       try { fs.unlinkSync(renderedPath); } catch {}
+      if (usingCustomIntro) {
+        try { fs.unlinkSync(introPath); } catch {}
+      }
 
       if (code !== 0) {
         console.error('[FFmpeg] Merge failed with code:', code, stderr.slice(-400));
@@ -515,8 +524,8 @@ async function startServer() {
     });
   };
 
-  app.post('/api/video/merge-intro', upload.single('rendered_video'), handleMergeIntro);
-  app.post('/api/video/merge', upload.single('rendered_video'), handleMergeIntro);
+  app.post('/api/video/merge-intro', upload.fields([{ name: 'rendered_video', maxCount: 1 }, { name: 'custom_intro', maxCount: 1 }]), handleMergeIntro);
+  app.post('/api/video/merge', upload.fields([{ name: 'rendered_video', maxCount: 1 }, { name: 'custom_intro', maxCount: 1 }]), handleMergeIntro);
 
   const flaskRoutes = ['/api/youtube', '/api/video', '/api/files', '/api/instagram', '/api/cookies', '/api/reddit', '/api/shorts'];
 

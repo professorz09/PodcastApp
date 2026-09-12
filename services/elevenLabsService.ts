@@ -29,10 +29,14 @@ export const getElevenLabsVoices = async (): Promise<ElevenLabsVoice[]> => {
 };
 
 export const generateElevenLabsSpeech = async (text: string, voiceId: string): Promise<{ audioUrl: string, duration: number }> => {
+  let cleanText = text.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').replace(/\(.*?\)/g, '').trim();
+  if (cleanText.length < 5 && cleanText.length > 0) cleanText = `${cleanText} ...`;
+  if (!cleanText) cleanText = "...";
+
   const response = await fetch('/api/elevenlabs/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceId })
+    body: JSON.stringify({ text: cleanText, voiceId })
   });
 
   if (!response.ok) {

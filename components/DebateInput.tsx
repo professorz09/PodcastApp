@@ -34,11 +34,12 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [specificDetails, setSpecificDetails] = useState('');
   const [customScript, setCustomScript] = useState('');
   const [includeNarrator, setIncludeNarrator] = useState(false);
+  const [includeIntro, setIncludeIntro] = useState(true);
   const [useGrounding, setUseGrounding] = useState(false);
   const [model, setModel] = useState<'gemini-3.8-flash' | 'gemini-3.1-pro-preview'>('gemini-3.8-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -440,6 +441,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       setLeIntro(false);
                       setLeNarrator(false);
                       setLeGenerateQuestions(false);
+                    } else if (val === 'situational') {
+                      setLeIntro(true);
                     }
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
@@ -1123,6 +1126,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                     <option value="deep_explainer">🔍 Deep Explainer</option>
                     <option value="image">🖼 Imagen Style (Solo)</option>
                     <option value="documentary">Documentary</option>
+                    <option value="docu_debate">⚖️ Docu-Debate (Case Study)</option>
                     <option value="joe_rogan">🎙 Joe Rogan Experience</option>
                     <option value="podcast_panel">Podcast Panel</option>
                     <option value="podcast_breakdown">Podcast Breakdown</option>
@@ -1182,7 +1186,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
               )}
 
-              {/* Language & Narrator Row */}
+              {/* Language & Narrator/Intro Row */}
               <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/5">
                 {/* Language */}
                 <div>
@@ -1207,8 +1211,40 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   </div>
                 </div>
 
-                {/* Narrator — hidden for Joe Rogan style */}
-                {style !== 'joe_rogan' && (
+                {/* Intro — specific to Docu-Debate */}
+                {style === 'docu_debate' && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
+                    <Mic size={12} className="text-pink-400" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">Intro</span>
+                  </div>
+                  <div className="flex bg-[#111111] p-0.5 rounded-lg border border-white/5">
+                    <button
+                      onClick={() => setIncludeIntro(true)}
+                      className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${
+                        includeIntro
+                          ? 'bg-white/10 text-white shadow-sm'
+                          : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      On
+                    </button>
+                    <button
+                      onClick={() => setIncludeIntro(false)}
+                      className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${
+                        !includeIntro
+                          ? 'bg-white/10 text-white shadow-sm'
+                          : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      Off
+                    </button>
+                  </div>
+                </div>
+                )}
+
+                {/* Narrator — hidden for Joe Rogan & Docu-Debate styles (handled automatically) */}
+                {(style !== 'joe_rogan' && style !== 'docu_debate') && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
                     <Mic size={12} className="text-blue-400" />

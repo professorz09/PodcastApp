@@ -360,6 +360,12 @@ export async function callGemini(model: string, contents: any, genConfig: any) {
       }
     }
 
+    // 1.5 Fallback to gemini-3.1-flash on quota exceeded for 3.5
+    if (isQuota && model === 'gemini-3.5-flash') {
+      console.warn(`Quota exceeded for ${model}, falling back to gemini-3.1-flash...`);
+      return await clientInfo.ai.models.generateContent({ model: 'gemini-3.1-flash', contents: finalContents, config: finalConfig });
+    }
+
     // 2. Fallback to GEMINI_API_KEY if available
     if (clientInfo.mode === 'vertex' && process.env.GEMINI_API_KEY && !(isImageModel && isQuota)) {
       console.warn(`Vertex AI call failed (${msg}), falling back to GEMINI_API_KEY...`);

@@ -74,6 +74,7 @@ export type DebateSpeaker = string;
 export interface DebateSegment {
   id: string;
   speaker: DebateSpeaker;
+  speakerGender?: 'male' | 'female';
   text: string;
   audioUrl?: string;
   duration?: number; // seconds
@@ -197,10 +198,11 @@ export interface DebateConfig {
   commentsFileContent?: string;
   model: 'gemini-3.8-flash' | 'gemini-3.1-pro-preview';
   language: string;
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'learn_english';
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'learn_english';
   speakerCount: number;
   speakerNames?: string[]; // Optional, if user provides them. Otherwise auto-detected.
   specificDetails?: string;
   youtubeUrl?: string;
   useGrounding?: boolean;
+  includeIntro?: boolean;
 }

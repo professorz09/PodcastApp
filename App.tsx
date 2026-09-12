@@ -325,7 +325,7 @@ Return JSON only (no markdown):
             config.customScript, config.contextFileContent, config.model,
             config.language, config.style, config.speakerCount,
             config.speakerNames, config.specificDetails, config.youtubeUrl,
-            config.commentsFileContent
+            config.commentsFileContent, config.useGrounding, config.includeIntro
           ),
           generateContextBridgeConclusion(
             config.topic, config.language, speakerName,
@@ -350,7 +350,7 @@ Return JSON only (no markdown):
           config.customScript, config.contextFileContent, config.model,
           config.language, config.style, config.speakerCount,
           config.speakerNames, config.specificDetails, config.youtubeUrl,
-          config.commentsFileContent
+          config.commentsFileContent, config.useGrounding, config.includeIntro
         );
         if (!generatedScript.length) throw new Error('Script generate nahi hua — Gemini ne empty response diya. Dobara try karo ya alag topic use karo.');
         setScript(generatedScript);

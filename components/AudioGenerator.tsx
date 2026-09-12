@@ -47,24 +47,49 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     return speakers;
   }, [script]);
 
+  const speakerGenders = React.useMemo(() => {
+    const genders: Record<string, 'male' | 'female'> = {};
+    script.forEach(s => {
+      if (s.speakerGender && !genders[s.speaker]) {
+        genders[s.speaker] = s.speakerGender;
+      }
+    });
+    return genders;
+  }, [script]);
+
   const [voices, setVoices] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setVoices(prev => {
       const newVoices = { ...prev };
+      let maleIdx = 0;
+      let femaleIdx = 0;
+      
+      const maleDefaults = ['Charon', 'Fenrir', 'Orus', 'Puck'];
+      const femaleDefaults = ['Zephyr', 'Kore', 'Aoede', 'Leda'];
+      const anyDefaults = ['Charon', 'Zephyr', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
+
       uniqueSpeakers.forEach((speaker) => {
         if (!newVoices[speaker]) {
           if (isNarrator(speaker)) newVoices[speaker] = 'Puck';
           else {
-            const defaults = ['Charon', 'Zephyr', 'Kore', 'Fenrir', 'Aoede', 'Orus', 'Leda'];
-            const speakerIndex = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(speaker);
-            newVoices[speaker] = defaults[speakerIndex % defaults.length];
+            const gender = speakerGenders[speaker];
+            if (gender === 'male') {
+              newVoices[speaker] = maleDefaults[maleIdx % maleDefaults.length];
+              maleIdx++;
+            } else if (gender === 'female') {
+              newVoices[speaker] = femaleDefaults[femaleIdx % femaleDefaults.length];
+              femaleIdx++;
+            } else {
+              const speakerIndex = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(speaker);
+              newVoices[speaker] = anyDefaults[speakerIndex % anyDefaults.length];
+            }
           }
         }
       });
       return newVoices;
     });
-  }, [uniqueSpeakers]);
+  }, [uniqueSpeakers, speakerGenders]);
 
   useEffect(() => {
     if (onVoicesChange && Object.keys(voices).length > 0) {
@@ -166,6 +191,10 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     if (!introAudioRef.current) {
       introAudioRef.current = new Audio(introAudioUrl);
       introAudioRef.current.onended = () => { setIsPlayingIntro(false); clearActivePlayback(stopIntroPreview); };
+      introAudioRef.current.onerror = () => {
+        toast.error('Failed to load intro audio source. Please regenerate it.');
+        setIsPlayingIntro(false);
+      };
     }
     if (isPlayingIntro) {
       introAudioRef.current.pause();
@@ -173,7 +202,16 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       clearActivePlayback(stopIntroPreview);
     } else {
       registerActivePlayback(stopIntroPreview);
-      introAudioRef.current.play();
+      const playPromise = introAudioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => {
+          if (e.name !== 'AbortError') {
+            console.error('Intro audio play failed', e);
+            toast.error('Intro audio could not be played. Please regenerate it.');
+          }
+          setIsPlayingIntro(false);
+        });
+      }
       setIsPlayingIntro(true);
     }
   };
@@ -230,15 +268,34 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     } else if (ttsProvider === 'chirp3hd') {
       setVoices(prev => {
         const newVoices = { ...prev };
-        uniqueSpeakers.forEach((speaker, idx) => {
+        let maleIdx = 0;
+        let femaleIdx = 0;
+        const maleDefaults = ['Charon', 'Fenrir', 'Puck', 'Enceladus'];
+        const femaleDefaults = ['Aoede', 'Zephyr', 'Kore', 'Leda'];
+        const anyDefaults = ['Charon', 'Puck', 'Aoede', 'Zephyr', 'Kore', 'Fenrir'];
+
+        uniqueSpeakers.forEach((speaker) => {
           if (!newVoices[speaker] || !chirp3HdValidIds.includes(newVoices[speaker])) {
-            newVoices[speaker] = chirp3HdDefaults[idx % chirp3HdDefaults.length];
+            if (isNarrator(speaker)) newVoices[speaker] = 'Puck';
+            else {
+              const gender = speakerGenders[speaker];
+              if (gender === 'male') {
+                newVoices[speaker] = maleDefaults[maleIdx % maleDefaults.length];
+                maleIdx++;
+              } else if (gender === 'female') {
+                newVoices[speaker] = femaleDefaults[femaleIdx % femaleDefaults.length];
+                femaleIdx++;
+              } else {
+                const speakerIndex = uniqueSpeakers.filter(s => !isNarrator(s)).indexOf(speaker);
+                newVoices[speaker] = anyDefaults[speakerIndex % anyDefaults.length];
+              }
+            }
           }
         });
         return newVoices;
       });
     }
-  }, [ttsProvider, uniqueSpeakers]);
+  }, [ttsProvider, uniqueSpeakers, speakerGenders]);
 
   if (!script || script.length === 0) {
     return (
@@ -410,13 +467,13 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       return next;
     });
 
-    const BATCH_SIZE = 8;
+    const BATCH_SIZE = 10;
     let completedCount = 0;
     let rateLimitHit = false;
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Process in parallel batches of 8. Each batch settles fully before the
-    // next starts so we cap concurrent TTS provider load while running ~8×
+    // Process in parallel batches of 10. Each batch settles fully before the
+    // next starts so we cap concurrent TTS provider load while running ~10×
     // faster than the previous serial-with-2s-delay loop.
     for (let batchStart = 0; batchStart < targetSegments.length && !rateLimitHit; batchStart += BATCH_SIZE) {
       const batch = targetSegments.slice(batchStart, batchStart + BATCH_SIZE);
@@ -496,6 +553,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
 
   const [playingSegment, setPlayingSegment] = useState<string | null>(null);
   const [syncingSegments, setSyncingSegments] = useState<Record<string, boolean>>({});
+  const [syncErrors, setSyncErrors] = useState<Record<string, boolean>>({});
   const [expandedSegments, setExpandedSegments] = useState<Record<string, boolean>>({});
   const audioPreviewRef = React.useRef<HTMLAudioElement | null>(null);
 
@@ -547,13 +605,21 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
       audioPreviewRef.current.src = '';
     }
     const audio = new Audio(url);
+    audio.onerror = () => {
+      console.error('Audio load error', audio.error);
+      toast.error('Failed to load audio source. Please regenerate this segment.');
+      if (audioPreviewRef.current === audio) setPlayingSegment(null);
+    };
     audioPreviewRef.current = audio;
     setPlayingSegment(id);
     registerActivePlayback(stopAudioPreview);
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise.catch(e => {
-        if (e.name !== 'AbortError') console.error('Preview play failed', e);
+        if (e.name !== 'AbortError') {
+          console.error('Preview play failed', e);
+          toast.error('Audio could not be played. It may be missing or invalid. Please regenerate this segment.');
+        }
         if (audioPreviewRef.current === audio) setPlayingSegment(null);
       });
     }
@@ -581,6 +647,11 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     const seg = script[index];
     if (!seg.audioUrl) return;
     setSyncingSegments(prev => ({ ...prev, [seg.id]: true }));
+    setSyncErrors(prev => {
+      const next = { ...prev };
+      delete next[seg.id];
+      return next;
+    });
     try {
       const response = await fetch(seg.audioUrl);
       if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
@@ -608,6 +679,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     } catch (error) {
       console.error('Failed to sync transcript', error);
       toast.error('Failed to sync transcript: ' + (error as Error).message);
+      setSyncErrors(prev => ({ ...prev, [seg.id]: true }));
     } finally {
       setSyncingSegments(prev => ({ ...prev, [seg.id]: false }));
     }
@@ -615,15 +687,15 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
 
   const handleSyncAll = async () => {
     setSyncStatus('loading');
-    const BATCH_SIZE = 8;
+    const BATCH_SIZE = 10;
     let fallbackCount = 0;
     let okCount = 0;
     let failCount = 0;
 
-    // Sync ONLY segments that have audio. Process in parallel batches of 8 —
-    // each batch waits for all 8 STT calls to finish before starting the next,
-    // so we cap concurrent network load while still being ~8x faster than serial.
-    const targets = script.map((seg, i) => ({ seg, i })).filter(({ seg }) => !!seg.audioUrl);
+    // Sync ONLY segments that have audio. Process in parallel batches of 10 —
+    // each batch waits for all STT calls to finish before starting the next,
+    // so we cap concurrent network load.
+    const targets = script.map((seg, i) => ({ seg, i })).filter(({ seg }) => !!seg.audioUrl && (!seg.phraseTimings || seg.phraseTimings.length === 0));
     if (!targets.length) { setSyncStatus('success'); return; }
 
     try {
@@ -638,47 +710,67 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         });
 
         await Promise.all(batch.map(async ({ seg, i }) => {
-          try {
-            const response = await fetch(seg.audioUrl!);
-            if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-            const blob = await response.blob();
-
-            let wordTimings: { word: string; start: number; end: number }[];
-            let usedFallback = false;
+          let attempt = 0;
+          let success = false;
+          
+          while (attempt < 3 && !success) {
             try {
-              wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
-            } catch (cloudErr: any) {
-              console.warn(`Segment ${i}: Cloud STT unavailable, using offline fallback`, cloudErr);
-              fallbackCount++;
-              usedFallback = true;
-              const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
-              wordTimings = generateProportionalWordTimings(seg.text, duration);
-            }
-            const phraseTimings = buildPhrases(wordTimings);
+              const response = await fetch(seg.audioUrl!);
+              if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+              const blob = await response.blob();
 
-            // Update incrementally so the user sees per-turn progress mid-run
-            onUpdateScript(prev => {
-              const idx = prev.findIndex(s => s.id === seg.id);
-              if (idx === -1) return prev;
-              const next = [...prev];
-              next[idx] = { ...next[idx], wordTimings, phraseTimings, isApproximate: usedFallback };
-              return next;
-            });
-            okCount++;
-          } catch (err) {
-            console.error(`Failed to sync segment ${i}`, err);
-            failCount++;
-          } finally {
-            setSyncingSegments(prev => {
-              const next = { ...prev };
-              delete next[seg.id];
-              return next;
-            });
+              let wordTimings: { word: string; start: number; end: number }[];
+              let usedFallback = false;
+              try {
+                wordTimings = await transcribeAudioGoogleCloud(blob, transcriptLanguage);
+              } catch (cloudErr: any) {
+                console.warn(`Segment ${i}: Cloud STT unavailable, using offline fallback`, cloudErr);
+                fallbackCount++;
+                usedFallback = true;
+                const duration = seg.duration ?? await getAudioDurationFromBlob(blob);
+                wordTimings = generateProportionalWordTimings(seg.text, duration);
+              }
+              const phraseTimings = buildPhrases(wordTimings);
+
+              // Update incrementally so the user sees per-turn progress mid-run
+              onUpdateScript(prev => {
+                const idx = prev.findIndex(s => s.id === seg.id);
+                if (idx === -1) return prev;
+                const next = [...prev];
+                next[idx] = { ...next[idx], wordTimings, phraseTimings, isApproximate: usedFallback };
+                return next;
+              });
+              
+              setSyncErrors(prev => {
+                const next = { ...prev };
+                delete next[seg.id];
+                return next;
+              });
+              
+              okCount++;
+              success = true;
+            } catch (err) {
+              attempt++;
+              if (attempt >= 3) {
+                console.error(`Failed to sync segment ${i} after 3 attempts`, err);
+                failCount++;
+                setSyncErrors(prev => ({ ...prev, [seg.id]: true }));
+              } else {
+                console.warn(`Segment ${i} sync failed, retrying (${attempt}/3)...`);
+                await new Promise(r => setTimeout(r, 1000));
+              }
+            }
           }
         }));
+        
+        setSyncingSegments(prev => {
+          const next = { ...prev };
+          batch.forEach(({ seg }) => { delete next[seg.id]; });
+          return next;
+        });
       }
 
-      setSyncStatus(okCount > 0 ? 'success' : 'error');
+      setSyncStatus(failCount > 0 ? 'error' : 'success');
       if (fallbackCount > 0) {
         toast.info(`Offline mode: ${fallbackCount} segment(s) used approximate timings (Google Cloud STT unavailable)`);
       }
@@ -701,7 +793,14 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
   };
 
   const handleFetchTranscript = () => {
-    const content = script.map(s => `[${s.speaker}]: ${s.text}`).join('\n\n');
+    let cumulativeTime = 0;
+    const content = script.map(s => {
+      const m = Math.floor(cumulativeTime / 60).toString().padStart(2, '0');
+      const sec = Math.floor(cumulativeTime % 60).toString().padStart(2, '0');
+      const timestampStr = `[${m}:${sec}]`;
+      cumulativeTime += (s.duration || (s.text.split(' ').length / 2.5));
+      return `${timestampStr} [${s.speaker}]: ${s.text}`;
+    }).join('\n\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     downloadSegment(url, 'transcript.txt');
@@ -806,7 +905,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
         <div className="text-[11px] font-bold text-white whitespace-nowrap">{audioReadyCount}/{script.length} done</div>
         <div className="ml-auto flex items-center gap-2 shrink-0">
           <button onClick={handleGenerateAll} disabled={globalGenerating} className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-[11px] font-bold px-3 py-2 rounded-xl transition-all active:scale-95">
-            <Wand2 size={13} className={globalGenerating ? 'animate-spin' : ''} /> {globalGenerating ? 'Generating' : allAudioGenerated ? 'Regen All' : 'Gen All'}
+            <Wand2 size={13} className={globalGenerating ? 'animate-spin' : ''} /> {globalGenerating ? 'Generating' : allAudioGenerated ? 'Regen All' : 'Sync All'}
           </button>
           <button onClick={onNext} disabled={!allAudioGenerated} className={`flex items-center gap-1 text-[11px] font-bold px-3 py-2 rounded-xl transition-all active:scale-95 ${allAudioGenerated ? 'bg-white text-black hover:bg-gray-200' : 'bg-white/8 text-gray-600 cursor-not-allowed'}`}>
             Next <ArrowRight size={12} />
@@ -896,7 +995,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
             className="w-full flex flex-col items-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[10px] font-bold py-2.5 rounded-xl transition-all shadow-lg shadow-purple-900/30"
           >
             <Wand2 size={14} className={globalGenerating ? 'animate-spin' : ''} />
-            {globalGenerating ? 'Generating' : allAudioGenerated ? 'Regen All' : 'Gen All'}
+            {globalGenerating ? 'Generating' : allAudioGenerated ? 'Regen All' : 'Sync All'}
           </button>
 
           {/* Sync All */}
@@ -912,8 +1011,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
             {syncStatus === 'loading'
               ? <RefreshCw size={12} className="animate-spin" />
               : syncStatus === 'success' ? <Check size={12} />
+              : syncStatus === 'error' ? <RefreshCw size={12} />
               : <RefreshCw size={12} />}
-            {syncStatus === 'loading' ? 'Syncing' : syncStatus === 'success' ? 'Synced' : 'Sync All'}
+            {syncStatus === 'loading' ? 'Syncing' : syncStatus === 'success' ? 'Synced' : syncStatus === 'error' ? 'Sync Failed' : 'Sync All'}
           </button>
 
           {/* Download buttons */}
@@ -1198,15 +1298,17 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                                 onClick={() => syncTranscript(idx)}
                                 disabled={syncingSegments[seg.id]}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors border disabled:opacity-50 ${
-                                  seg.phraseTimings && seg.phraseTimings.length > 0
+                                  syncErrors[seg.id]
+                                    ? 'text-red-400 border-red-500/30 bg-red-900/10 hover:bg-red-900/30'
+                                    : seg.phraseTimings && seg.phraseTimings.length > 0
                                     ? seg.isApproximate
                                       ? 'text-yellow-400 border-yellow-500/30 bg-yellow-900/10 hover:bg-yellow-900/30'
                                       : 'text-green-400 border-green-500/30 bg-green-900/10 hover:bg-green-900/30'
                                     : 'text-blue-400 border-blue-500/30 bg-blue-900/10 hover:bg-blue-900/30 hover:text-white'
                                 }`}
                               >
-                                {syncingSegments[seg.id] ? <RefreshCw size={14} className="animate-spin" /> : seg.phraseTimings && seg.phraseTimings.length > 0 ? (seg.isApproximate ? <AlertCircle size={14} /> : <Check size={14} />) : <RefreshCw size={14} />}
-                                <span className="text-xs font-medium">{seg.phraseTimings && seg.phraseTimings.length > 0 ? (seg.isApproximate ? 'Approx' : 'Synced') : 'Sync'}</span>
+                                {syncingSegments[seg.id] ? <RefreshCw size={14} className="animate-spin" /> : syncErrors[seg.id] ? <RefreshCw size={14} /> : seg.phraseTimings && seg.phraseTimings.length > 0 ? (seg.isApproximate ? <AlertCircle size={14} /> : <Check size={14} />) : <RefreshCw size={14} />}
+                                <span className="text-xs font-medium">{syncingSegments[seg.id] ? 'Syncing' : syncErrors[seg.id] ? 'Failed' : seg.phraseTimings && seg.phraseTimings.length > 0 ? (seg.isApproximate ? 'Approx' : 'Synced') : 'Sync'}</span>
                               </button>
                               <button
                                 onClick={() => handleDownloadSingleTranscript(seg, idx)}

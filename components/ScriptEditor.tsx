@@ -470,10 +470,18 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, onUpdateScript, onN
     };
     onUpdateThumbnailState?.({ ...baseState, titleThumbData: null });
     try {
+      let cumulativeTime = 0;
+      const scriptWithTimestamps = script.map(s => {
+        const m = Math.floor(cumulativeTime / 60).toString().padStart(2, '0');
+        const sec = Math.floor(cumulativeTime % 60).toString().padStart(2, '0');
+        const timestampStr = `[${m}:${sec}]`;
+        cumulativeTime += (s.duration || (s.text.split(' ').length / 2.5));
+        return `${timestampStr} ${s.speaker}: ${s.text}`;
+      }).join('\n');
+
       const clipText = getTimedTranscript().map(t => t.text).join(' ');
-      const scriptText = script.map(s => s.text).join(' ');
-      const combined = [clipText, scriptText].filter(Boolean).join(' ').slice(0, 6000);
-      const result = await generateTitleTextPair(combined || scriptText, scriptStyle);
+      const combined = [clipText, scriptWithTimestamps].filter(Boolean).join('\n\n').slice(0, 6000);
+      const result = await generateTitleTextPair(combined || scriptWithTimestamps, scriptStyle);
       if (!result.length) { toast.error('Koi title/thumbnail nahi aaya — dobara try karo'); return; }
       setTitleThumbData(result[0]);
       onUpdateThumbnailState?.({ ...baseState, titleThumbData: result[0] });

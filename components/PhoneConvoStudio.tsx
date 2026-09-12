@@ -5192,7 +5192,16 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             {script.length > 0 && (
               <TitleThumbComboCard
                 srcText={[
-                  script.map(t => t.text).join(' '),
+                  (() => {
+                    let cTime = 0;
+                    return script.map(s => {
+                      const phone = phones.find(p => p.id === s.phoneId);
+                      const m = Math.floor(cTime / 60).toString().padStart(2, '0');
+                      const sec = Math.floor(cTime % 60).toString().padStart(2, '0');
+                      cTime += ((s.durationMs || 0) / 1000) || (s.text.split(' ').length / 2.5);
+                      return `[${m}:${sec}] ${phone?.name || 'Speaker'}: ${s.text}`;
+                    }).join('\n');
+                  })(),
                   podcastSegments.filter(s => {
                     const mid = s.start + (s.duration || 0) / 2;
                     return sourceClips.some(c => mid >= c.startSec && mid <= c.endSec);

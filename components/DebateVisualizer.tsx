@@ -459,6 +459,7 @@ const DebateVisualizer: React.FC<DebateVisualizerProps> = ({ script: initialScri
               playPromise.catch(e => {
                   if (e.name !== 'AbortError') {
                       console.error("Play error", e);
+                      toast.error('Failed to play audio. The source may be invalid or missing.');
                       setIsPlaying(false);
                       clearActivePlayback(stopDebatePlayback);
                   }

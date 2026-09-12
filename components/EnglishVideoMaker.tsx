@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check, Sparkles, CheckCircle2, Copy } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
@@ -498,6 +498,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // Rendered video blob kept in memory for merge
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
   // Merge state
+  const [attachChannelIntro, setAttachChannelIntro] = useState(true);
+  const [customIntroFile, setCustomIntroFile] = useState<File | null>(null);
   const [mergeFlaskUrl, setMergeFlaskUrl] = useState(() => youtubeData?.flaskUrl || '');
   const [isMergingVideos, setIsMergingVideos] = useState(false);
   const [mergeVideoError, setMergeVideoError] = useState('');
@@ -891,6 +893,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               playPromise.catch(e => {
                   if (e.name !== 'AbortError') {
                       console.error("Play error", e);
+                      toast.error('Failed to play audio. The source may be invalid or missing.');
                       setIsPlaying(false);
                       clearActivePlayback(stopDebatePlayback);
                   }
@@ -1171,19 +1174,15 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     }
   };
 
-  // Update a single scene prompt manually
-  const handleUpdateIntroScenePrompt = (segId: string, sceneIdx: number, newPrompt: string) => {
-    setScript(prev => prev.map(s => {
-      if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
-      const newScenes = [...s.learnEnglish.introScenes];
-      if (newScenes[sceneIdx]) {
-        newScenes[sceneIdx] = { ...newScenes[sceneIdx], prompt: newPrompt };
-      }
-      return {
-        ...s,
-        learnEnglish: { ...s.learnEnglish, introScenes: newScenes }
-      };
-    }));
+  const handleCopyAllPrompts = (segId: string) => {
+    const seg = script.find(s => s.id === segId);
+    if (!seg?.learnEnglish?.introScenes) return;
+    const allPrompts = seg.learnEnglish.introScenes.map((s, i) => `Scene #${i + 1}:\n${s.prompt}`).join('\n\n');
+    navigator.clipboard.writeText(allPrompts).then(() => {
+      toast.success('All scene prompts copied to clipboard!');
+    }).catch(() => {
+      toast.error('Failed to copy text.');
+    });
   };
 
   // Generate / regenerate images for existing scene prompts
@@ -1224,6 +1223,27 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     setScript(prev => prev.map(s => s.id === segId
       ? { ...s, learnEnglish: { ...s.learnEnglish!, introScenes: undefined }, visualConfig: { ...s.visualConfig, backgroundUrl: undefined } }
       : s));
+  };
+
+  const handleIntroSceneUpload = (e: React.ChangeEvent<HTMLInputElement>, segId: string, sceneIdx: number) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setScript(prev => prev.map(s => {
+        if (s.id !== segId || !s.learnEnglish?.introScenes) return s;
+        const newScenes = [...s.learnEnglish.introScenes];
+        newScenes[sceneIdx] = { ...newScenes[sceneIdx], imageUrl: result };
+        return {
+          ...s,
+          learnEnglish: { ...s.learnEnglish, introScenes: newScenes },
+          visualConfig: sceneIdx === 0 ? { ...s.visualConfig, backgroundUrl: result, backgroundColor: undefined } : s.visualConfig,
+        };
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleLabelChange = (index: number, value: string) => {
@@ -3310,39 +3330,44 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             setRenderedBlob(videoBlob as Blob);
             
             let mergedSuccessfully = false;
-            try {
-                setStatusMessage("Channel Intro video jod rahe hain (Attaching intro.mp4)...");
-                const formData = new FormData();
-                formData.append('rendered_video', videoBlob as Blob, 'rendered_podcast.mp4');
-                formData.append('resolution', exportResolution);
-
-                const mergeRes = await fetch('/api/video/merge-intro', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (mergeRes.ok) {
-                    const mergedBlob = await mergeRes.blob();
-                    if (mergedBlob && mergedBlob.size > 10000) {
-                        const url = URL.createObjectURL(mergedBlob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `english_podcast_show_${Date.now()}.mp4`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        mergedSuccessfully = true;
-                        setStatusMessage("Complete! Channel Intro ke saath video download ho gaya!");
-                        toast.success("Channel Intro ke saath podcast video successfully download ho gaya!");
-                        setStatusSafe("", 6000);
+            if (attachChannelIntro) {
+                try {
+                    setStatusMessage("Channel Intro video jod rahe hain (Attaching intro.mp4)...");
+                    const formData = new FormData();
+                    formData.append('rendered_video', videoBlob as Blob, 'rendered_podcast.mp4');
+                    formData.append('resolution', exportResolution);
+                    if (customIntroFile) {
+                        formData.append('custom_intro', customIntroFile);
                     }
+
+                    const mergeRes = await fetch('/api/video/merge-intro', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (mergeRes.ok) {
+                        const mergedBlob = await mergeRes.blob();
+                        if (mergedBlob && mergedBlob.size > 10000) {
+                            const url = URL.createObjectURL(mergedBlob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `english_podcast_show_${Date.now()}.mp4`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            mergedSuccessfully = true;
+                            setStatusMessage("Complete! Channel Intro ke saath video download ho gaya!");
+                            toast.success("Channel Intro ke saath podcast video successfully download ho gaya!");
+                            setStatusSafe("", 6000);
+                        }
+                    }
+                } catch (mergeErr) {
+                    console.warn("Auto merge intro failed, falling back to direct download:", mergeErr);
                 }
-            } catch (mergeErr) {
-                console.warn("Auto merge intro failed, falling back to direct download:", mergeErr);
             }
 
-            // Fallback: If merge failed or intro was unavailable, download rendered video directly
+            // Fallback: If merge failed, intro was unavailable, or attachChannelIntro was false
             if (!mergedSuccessfully) {
                 setStatusMessage("Download ready!");
                 const url = URL.createObjectURL(videoBlob as Blob);
@@ -3386,6 +3411,9 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           const formData = new FormData();
           formData.append('rendered_video', renderedBlob, 'rendered_debate.mp4');
           formData.append('resolution', exportResolution);
+          if (customIntroFile) {
+              formData.append('custom_intro', customIntroFile);
+          }
 
           const res = await fetch('/api/video/merge-intro', {
               method: 'POST',
@@ -3780,7 +3808,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           <div className="px-3.5 py-2.5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                             <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
                               <Layers size={11} />
-                              Timeline · {seg.learnEnglish.introScenes.length} scenes (MS Paint Style)
+                              Timeline · {seg.learnEnglish.introScenes.length} scenes
                             </span>
                             <button onClick={() => handleClearIntroScenes(seg.id)} className="text-[10px] text-gray-500 hover:text-red-400 font-bold uppercase transition-colors">Clear</button>
                           </div>
@@ -3793,38 +3821,54 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                     <span className="text-[10px] text-cyan-400 font-mono font-bold">
                                       Scene #{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s
                                     </span>
-                                    <button
-                                      onClick={() => handleRegenerateIntroScene(seg.id, sceneIdx)}
-                                      disabled={!!introImageLoading[sceneKey]}
-                                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-600/15 hover:bg-cyan-600/25 border border-cyan-500/20 text-cyan-300 text-[10px] font-semibold transition-all disabled:opacity-40"
-                                      title="Generate / Regenerate this scene image in MS Paint style"
-                                    >
-                                      <RefreshCw size={10} className={introImageLoading[sceneKey] ? 'animate-spin' : ''} />
-                                      {scene.imageUrl ? 'Regenerate' : 'Generate Visual'}
-                                    </button>
                                   </div>
 
-                                  <div className="flex items-start gap-2.5">
-                                    <div className="relative w-20 h-12 shrink-0 rounded-lg overflow-hidden bg-[#111] border border-white/10">
-                                      {introImageLoading[sceneKey] ? (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/60"><Loader2 size={13} className="text-cyan-400 animate-spin" /></div>
-                                      ) : scene.imageUrl ? (
-                                        <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} className="w-full h-full object-cover" />
-                                      ) : (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-700 gap-0.5">
-                                          <ImagePlus size={14} />
-                                          <span className="text-[8px] text-gray-600">No image</span>
-                                        </div>
-                                      )}
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="flex flex-col gap-1.5 shrink-0">
+                                      <div className="relative w-20 h-12 rounded-lg overflow-hidden bg-[#111] border border-white/10 group cursor-pointer hover:border-cyan-500/50 transition-colors">
+                                        <input type="file" accept="image/*" onChange={(e) => handleIntroSceneUpload(e, seg.id, sceneIdx)} className="absolute inset-0 opacity-0 cursor-pointer z-10" title="Upload custom image" />
+                                        {introImageLoading[sceneKey] ? (
+                                          <div className="absolute inset-0 flex items-center justify-center bg-black/60"><Loader2 size={13} className="text-cyan-400 animate-spin" /></div>
+                                        ) : scene.imageUrl ? (
+                                          <>
+                                            <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                              <Upload size={14} className="text-white" />
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-700 gap-0.5 group-hover:text-cyan-500 transition-colors">
+                                            <ImagePlus size={14} />
+                                            <span className="text-[8px]">Upload</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <button
+                                        onClick={() => handleRegenerateIntroScene(seg.id, sceneIdx)}
+                                        disabled={!!introImageLoading[sceneKey]}
+                                        className="w-full flex items-center justify-center gap-1 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 text-[9px] font-medium transition-all disabled:opacity-40"
+                                        title="Generate / Regenerate this scene image"
+                                      >
+                                        <RefreshCw size={9} className={introImageLoading[sceneKey] ? 'animate-spin' : ''} />
+                                        {scene.imageUrl ? 'Regen' : 'Generate'}
+                                      </button>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                      <textarea
-                                        rows={2}
-                                        value={scene.prompt}
-                                        onChange={(e) => handleUpdateIntroScenePrompt(seg.id, sceneIdx, e.target.value)}
-                                        placeholder="Scene prompt (who is there, what they are doing)..."
-                                        className="w-full bg-[#111] border border-white/8 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-200 placeholder-gray-600 resize-none focus:outline-none focus:border-cyan-500/50 leading-relaxed font-sans"
-                                      />
+                                    <div className="flex-1 min-w-0 relative">
+                                      <div className="w-full bg-[#111] border border-white/8 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-200 leading-relaxed font-sans min-h-[42px] pr-8 select-text">
+                                        {scene.prompt || "No prompt available"}
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          if (scene.prompt) {
+                                            navigator.clipboard.writeText(scene.prompt);
+                                            toast.success("Prompt copied!");
+                                          }
+                                        }}
+                                        className="absolute top-1 right-1 p-1.5 text-gray-500 hover:text-white bg-[#111] hover:bg-white/10 rounded transition-colors"
+                                        title="Copy prompt"
+                                      >
+                                        <Copy size={12} />
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -3846,27 +3890,36 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           }
                         </button>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             onClick={() => handleGenerateIntroSceneImages(seg.id)}
                             disabled={!!introImageLoading[seg.id]}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait shadow-sm"
+                            className="flex-1 min-w-[150px] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all disabled:opacity-40 disabled:cursor-wait shadow-sm"
                           >
                             {introImageLoading[seg.id]
-                              ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id]?.total ? `Images ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating MS Paint images…'}</>
+                              ? <><Loader2 size={11} className="animate-spin" /> {introScenesProgress[seg.id]?.total ? `Generating ${introScenesProgress[seg.id].done}/${introScenesProgress[seg.id].total}…` : 'Generating Visuals…'}</>
                               : hasAnyImage
-                                ? <><RefreshCw size={11} /> Regenerate All Images (MS Paint Style)</>
-                                : <><ImagePlus size={11} /> Generate Images (MS Paint Style)</>
+                                ? <><RefreshCw size={11} /> Regenerate All Visuals</>
+                                : <><ImagePlus size={11} /> Generate All Visuals</>
                             }
                           </button>
-                          <button
-                            onClick={() => handleGenerateIntroScenes(seg.id)}
-                            disabled={!!introImageLoading[seg.id]}
-                            className="px-3 py-2.5 rounded-lg text-[11px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 transition-all disabled:opacity-40"
-                            title="Re-plan scene prompts"
-                          >
-                            Re-plan
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleCopyAllPrompts(seg.id)}
+                              className="px-3 py-2.5 rounded-lg text-[11px] font-bold bg-[#111] hover:bg-white/10 text-gray-300 border border-white/5 hover:border-white/20 transition-all flex items-center gap-1.5 shadow-sm"
+                              title="Copy all scene prompts"
+                            >
+                              <Copy size={11} /> Copy All
+                            </button>
+                            <button
+                              onClick={() => handleGenerateIntroScenes(seg.id)}
+                              disabled={!!introImageLoading[seg.id]}
+                              className="px-3 py-2.5 rounded-lg text-[11px] font-bold bg-[#111] hover:bg-white/10 text-gray-300 border border-white/5 hover:border-white/20 transition-all disabled:opacity-40 flex items-center gap-1.5 shadow-sm"
+                              title="Re-plan scene prompts"
+                            >
+                              <RefreshCw size={11} /> Re-plan
+                            </button>
+                          </div>
                         </div>
                       )}
                       {!seg.phraseTimings?.length && !hasScenes && (
@@ -5335,14 +5388,54 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                       </button>
                     </div>
                     <div className="bg-[#111] border border-white/5 rounded-xl p-3 space-y-3">
-                      <label className="text-[10px] text-amber-400 uppercase tracking-widest font-semibold flex items-center gap-1.5"><Sparkles size={11} /> Channel Intro Video</label>
-                      <div className="text-xs text-gray-400 space-y-1 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-amber-300 flex items-center gap-1"><CheckCircle2 size={12} className="text-green-400" /> intro.mp4 (Public)</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 font-mono">Active</span>
-                        </div>
-                        <p className="text-[11px] text-gray-400">Har English video render hote hi yeh intro video shuru mein automatically jud jayega.</p>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] text-amber-400 uppercase tracking-widest font-semibold flex items-center gap-1.5"><Sparkles size={11} /> Channel Intro Video</label>
+                        <button
+                          onClick={() => setAttachChannelIntro(!attachChannelIntro)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${attachChannelIntro ? 'bg-amber-500' : 'bg-gray-700'}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${attachChannelIntro ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                        </button>
                       </div>
+                      
+                      {attachChannelIntro && (
+                        <div className="text-xs text-gray-400 space-y-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-amber-300 flex items-center gap-1">
+                              <CheckCircle2 size={12} className={customIntroFile ? "text-cyan-400" : "text-green-400"} /> 
+                              {customIntroFile ? customIntroFile.name : 'intro.mp4 (Default)'}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 font-mono">ON</span>
+                          </div>
+                          
+                          <div className="relative">
+                            <input 
+                              type="file" 
+                              accept="video/mp4,video/webm" 
+                              onChange={(e) => {
+                                if (e.target.files?.[0]) {
+                                  setCustomIntroFile(e.target.files[0]);
+                                }
+                              }} 
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" 
+                              title="Replace intro video" 
+                            />
+                            <div className="flex items-center justify-center gap-1.5 py-1.5 bg-black/40 border border-white/10 rounded-md text-[10px] text-gray-300 hover:bg-black/60 hover:text-white transition-colors cursor-pointer">
+                              <Upload size={12} />
+                              {customIntroFile ? 'Change Video' : 'Replace Default Intro'}
+                            </div>
+                          </div>
+                          
+                          <p className="text-[10px] text-gray-400 leading-tight">Har English video render hote hi yeh intro video shuru mein automatically jud jayega.</p>
+                        </div>
+                      )}
+                      
+                      {!attachChannelIntro && (
+                        <div className="text-xs text-gray-500 space-y-1 bg-white/5 border border-white/10 rounded-lg p-2.5">
+                          <p className="text-[11px]">Channel Intro disabled. Video direct download hogi bina intro ke.</p>
+                        </div>
+                      )}
+
                       <div className="space-y-1 text-xs">
                         <p className="text-gray-500">Rendered Video: <span className={renderedBlob ? 'text-green-400 font-medium' : 'text-gray-600'}>{renderedBlob ? 'Ready in memory' : 'Click Render Podcast Video'}</span></p>
                       </div>

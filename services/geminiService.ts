@@ -120,20 +120,67 @@ export const generateTitleTextPair = async (scriptText: string, scriptStyle?: st
     channelType = 'interactive English learning channels';
     exampleTitle = '"Ordering Food at a Restaurant Like a Native | English Roleplay"';
   } else if (scriptStyle === 'situational') {
-    prefix = 'The exact situation followed by " | Real Life English" or " | Daily English"';
-    keywords = 'situational English, real life English conversation, speak English naturally, daily English phrases';
+    prefix = 'The exact situation followed by " | Real-Life English Conversation for B1-B2 | Learn Spoken English"';
+    keywords = 'situational English, real life English conversation, speak English naturally, daily English phrases, learn spoken english, B1-B2 English';
     channelType = 'practical English learning channels';
-    exampleTitle = '"Essential Phrases for Traveling Abroad | Real Life English"';
+    exampleTitle = '"FIRST DATE in English ❤️ | Real-Life English Conversation for B1-B2 | Learn Spoken English"';
   } else if (scriptStyle === 'casual') {
     prefix = 'The topic followed by " | Casual English Chat"';
     keywords = 'casual English conversation, informal English, natural English speaking, learn English with friends';
     channelType = 'informal and conversational English learning channels';
     exampleTitle = '"Talking About Weekend Plans with Friends | Casual English Chat"';
+  } else if (scriptStyle === 'docu_debate') {
+    prefix = 'The case name or core mystery followed by " | Docu-Debate" or " | Case Study"';
+    keywords = 'true crime debate, docu-debate, legal case study, documentary debate';
+    channelType = 'true crime and legal debate channels';
+    exampleTitle = '"The Lindsay Clancy Case: Justice or Punishment? | Docu-Debate"';
   } else if (scriptStyle) {
     // If a different style is provided that we don't have a specific rule for
     prefix = 'A compelling, highly clickable, and searchable title relevant to the topic (No strict prefix required, but make it catchy)';
     keywords = 'English speaking practice, learn English, English conversation, spoken English';
     exampleTitle = '"How to Master English Speaking in 30 Days"';
+  }
+
+  let descriptionRules = `
+DESCRIPTION RULES — a comprehensive, highly optimized YouTube video description targeting high-searchable keywords for English learners:
+- Must target high-searchable keywords like: ${keywords}.
+- Include structured paragraph overview of what learners will master, REAL timestamps/chapters based exactly on the timestamps provided in the text (DO NOT use placeholders, use the actual [MM:SS] timestamps from the script), engagement hook, call to action, and relevant hashtags (#LearnEnglish #SpokenEnglish).
+- Keep it 3-4 professional, SEO-packed paragraphs.
+`;
+
+  const englishLearningStyles = ['podcast', 'debate', 'interview', 'roleplay', 'situational', 'casual'];
+  if (englishLearningStyles.includes(scriptStyle || '')) {
+    descriptionRules = `
+DESCRIPTION RULES — MUST FOLLOW THIS EXACT TEMPLATE STRUCTURE:
+
+Welcome to another Learn English Podcast episode! 🎙️
+
+Imagine [Write a 2-3 sentence engaging scenario intro based on the script topic].
+
+In this episode, you'll follow a natural, real-life conversation as they talk about [List 3-4 topics from the script].
+
+This episode is perfect for B1-B2 English learners who want to improve their spoken English, listening skills, vocabulary, confidence, and everyday conversation skills.
+
+In this episode, you'll learn useful English expressions for:
+[Emoji] [Topic 1]
+[Emoji] [Topic 2]
+[Emoji] [Topic 3]
+[Emoji] [Topic 4]
+🗣️ Speaking English confidently in real-life situations
+
+⏱️ TIMESTAMPS
+[Use the EXACT REAL [MM:SS] timestamps provided in the script text to build the chapters. DO NOT invent timestamps. If the script starts at [00:00], start there.]
+
+🎧 HOW TO USE THIS PODCAST
+Listen once for the story, then listen again and repeat the conversations aloud. Try to copy the expressions, pronunciation, and natural rhythm of the speakers.
+
+[Write a question for the viewers to answer in the comments]? ❤️
+Tell us in the comments!
+
+Don't forget to LIKE 👍, SUBSCRIBE 🔔, and SHARE this episode with someone learning English.
+
+#LearnEnglish #EnglishPodcast #SpokenEnglish #EnglishConversation #EnglishSpeaking #B1English #B2English #EnglishListening
+`;
   }
 
   const prompt = `You are a world-class YouTube growth strategist and SEO expert for ${channelType}.
@@ -146,12 +193,7 @@ TITLE RULES:
 
 THUMBNAIL TEXT RULES:
 - 2-4 words. ALL CAPS. The emotional punch the title builds toward — must ADD a new dimension, never repeat title words (e.g., "NO ACCENT FEAR" / "SPEAK FLUENT" / "REAL SECRETS").
-
-DESCRIPTION RULES — a comprehensive, highly optimized YouTube video description targeting high-searchable keywords for English learners:
-- Must target high-searchable keywords like: ${keywords}.
-- Include structured paragraph overview of what learners will master, timestamps/chapters placeholder, engagement hook, call to action, and relevant hashtags (#LearnEnglish #SpokenEnglish).
-- Keep it 3-4 professional, SEO-packed paragraphs.
-
+${descriptionRules}
 ━━━ GLOBAL RULES ━━━
 1. Each of the 3 combos must approach the topic from a DIFFERENT ANGLE:
    - Combo 1: Lead with the fluency breakthrough / core concept
@@ -167,7 +209,7 @@ ${scriptText.slice(0, 3500)}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { responseMimeType: 'application/json', temperature: 1.2 },
     });
@@ -179,7 +221,8 @@ ${scriptText.slice(0, 3500)}`;
       .slice(0, 3)
       .map((p: any) => ({ title: p.title, thumbnailText: p.thumbnailText, description: p.description || '' }));
   } catch (error: any) {
-    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
+    const errorMsg = error?.message || '';
+    if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429 || errorMsg.includes('Quota Exceeded') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
       throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");
     }
     console.error("Error in generateTitleTextPair:", error);
@@ -204,7 +247,7 @@ Write in plain English. No bullet points. No JSON. Just a short, crisp scene des
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
     return response.text?.trim() || '';
@@ -241,7 +284,7 @@ export const generateNarratorPrompts = async (scriptText: string): Promise<strin
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -287,7 +330,7 @@ export const transcribeAudioBlob = async (audioBlob: Blob): Promise<TranscriptSe
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash', 
+      model: 'gemini-3.5-transcribe', 
       contents: {
         parts: [
             {
@@ -342,15 +385,16 @@ export const generateDebateScript = async (
   includeNarrator: boolean,
   customScript?: string,
   contextFileContent?: string,
-  model: string = 'gemini-3.8-flash',
+  model: string = 'gemini-3.5-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
   youtubeUrl?: string,
   commentsFileContent?: string,
-  useGrounding: boolean = false
+  useGrounding: boolean = false,
+  includeIntro: boolean = true
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -1591,7 +1635,51 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               ${durFillHi}
             `;
           }
-        } else if (style === 'documentary') {
+        
+        } else if (style === 'docu_debate') {
+          prompt = `
+            विषय/Topic: "${topic}" पर एक "Docu-Debate (Case Study)" style वीडियो script बनाओ।
+            ${specificDetails ? `Context: ${specificDetails}` : ''}
+            ${durLineHi}
+            भाषा: हिंदी + Hinglish (cinematic, serious documentary tone and sharp debate)।
+            पात्र (Speakers):
+            ${speakers.length >= 2
+              ? `इन नामों का उपयोग करें: ${speakers[0]} (Prosecution/For) और ${speakers[1]} (Defense/Against).`
+              : `दो ऐसे नाम चुनो जो lawyer, expert या debater लगें।`
+            }
+            साथ ही एक "Narrator" (या Voiceover) जो documentary sections बोलेगा।
+
+            ══════════════════════════════════════════
+            【 STRUCTURE & FORMAT RULES 】
+            ══════════════════════════════════════════
+            Script का structure EXACTLY ऐसा होना चाहिए:
+
+            ${includeIntro ? `1. [COLD OPEN — DOCUMENTARY STYLE]
+               - Narrator: cinematic तरीके से case/situation को explain करे। Suspenseful, scene-setting, aur main debate question ko raise kare (jaise: "Toh ab sawaal yeh nahi tha ki... sawaal yeh tha ki...").
+               - Text format: [COLD OPEN — DOCUMENTARY STYLE] (as a non-spoken marker or spoken by Narrator as an intro)` : `1. [START DEBATE IMMEDIATELY]
+               - Do not include any Cold Open or documentary intro. Start directly with Round 1.`}
+
+            2. ROUND 1, 2, 3... (PROSECUTION VS DEFENSE / FOR VS AGAINST)
+               - Narrator debate rounds announce kar sakta hai ya speakers direct shuru kar sakte hain.
+               - Round 1, Round 2 aadi headings use karo (script ke topic/themes ke mutabiq).
+               - Ek speaker strongly defend kare, doosra strongly oppose kare. Logical, factual, aur deep arguments hone chahiye.
+
+            3. CROSS-EXAMINATION
+               - Ek rapid-fire section jisme ek speaker seedhe doosre se sharp sawal pooche aur doosra turant sharp jawab de. (PROSECUTION -> DEFENSE aur vice-versa).
+
+            4. FINAL ROUND — JUSTICE KYA HAI? (या CONCLUSION)
+               - Dono sides apna closing, strong emotional/logical argument dein.
+
+            5. [ENDING — DOCUMENTARY STYLE]
+               - Narrator wapas aaye. Story ko wrap up kare aur audience ke liye ek open, thought-provoking question chhod de (jaise: "Aap kya choose karenge...?").
+
+            RULES:
+            - "Intro" tag documentary style ke shuru mein lagna chahiye.
+            - Cinematic + Legal/Logical Debate ka perfect mix hona chahiye.
+            - Dono debaters strong hone chahiye, koi strawman nahi.
+            ${durFillHi}
+          `;
+} else if (style === 'documentary') {
             prompt = `
               विषय/Case: "${topic}" पर एक Documentary / True Crime style वीडियो script बनाओ।
               ${specificDetails ? `Case की details और context: ${specificDetails}` : ''}
@@ -3533,7 +3621,50 @@ Speaker B (Curious): choose a different name — asks what the audience is think
               ${durFillEn}
             `;
           }
-        } else if (style === 'documentary') {
+        
+        } else if (style === 'docu_debate') {
+          prompt = `
+            Write a "Docu-Debate (Case Study)" style video script on: "${topic}".
+            ${specificDetails ? `Context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}. Tone: serious, gripping, cinematic documentary mixed with sharp, high-level debate.
+            Characters (Speakers):
+            ${speakers.length >= 2
+              ? `Use these names: ${speakers[0]} (Prosecution/For) and ${speakers[1]} (Defense/Against).`
+              : `Choose two names that feel like legal experts or sharp debaters.`
+            }
+            Plus a "Narrator" (or Voiceover) to handle the documentary sections.
+
+            ══════════════════════════════════════════
+            【 STRUCTURE & FORMAT RULES 】
+            ══════════════════════════════════════════
+            The script structure MUST follow this exact flow:
+
+            ${includeIntro ? `1. [COLD OPEN — DOCUMENTARY STYLE]
+               - Narrator: Explain the case/situation cinematically. Suspenseful, scene-setting. It must end by raising the core moral/legal debate question.
+               - Text format: Include "[COLD OPEN — DOCUMENTARY STYLE]" as a scene marker or intro tag.` : `1. [START DEBATE IMMEDIATELY]
+               - Do not include any Cold Open or documentary intro. Start directly with Round 1.`}
+
+            2. ROUND 1, ROUND 2, ROUND 3... (PROSECUTION VS DEFENSE / FOR VS AGAINST)
+               - Break the debate down into logical thematic rounds.
+               - One speaker strongly defends, the other strongly opposes. Logical, factual, deep arguments.
+
+            3. CROSS-EXAMINATION
+               - A rapid-fire section where one speaker directly asks sharp questions to the other, followed by immediate, sharp answers.
+
+            4. FINAL ROUND
+               - Both sides give their closing, strong emotional/logical arguments.
+
+            5. [ENDING — DOCUMENTARY STYLE]
+               - Narrator returns. Wraps up the story and leaves the audience with an open, thought-provoking question ("So what would you choose...?").
+
+            RULES:
+            - Use an "Intro" tag at the start of the documentary style section.
+            - Perfect mix of Cinematic storytelling + Legal/Logical Debate.
+            - Both debaters must be strong; no strawman arguments.
+            ${durFillEn}
+          `;
+} else if (style === 'documentary') {
           prompt = `
             Write a Documentary / True Crime style video script on: "${topic}".
             ${specificDetails ? `Case details and context: ${specificDetails}` : ''}
@@ -4369,7 +4500,7 @@ export const detectSpeakers = async (topic: string, count: number = 2): Promise<
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: { parts: [{ text: prompt }] },
       config: {
         responseMimeType: "application/json",
@@ -4425,7 +4556,7 @@ export const rewriteScriptSegment = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: { parts: [{ text: prompt }] },
     });
 
@@ -4478,10 +4609,24 @@ const generateFallbackAudio = (text: string): { audioUrl: string, duration: numb
 export const generateSpeech = async (text: string, voiceName: string): Promise<{ audioUrl: string, duration: number }> => {
   const ai = getAi();
 
+  // AUDIO TEXT SANITIZER & LENGTH BUFFER
+  // 1. Remove stage directions like *sighs*, [laughs], (crying)
+  let cleanText = text.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').replace(/\(.*?\)/g, '').trim();
+  
+  // 2. Pad extremely short phrases so TTS engine doesn't glitch/skip
+  if (cleanText.length < 5 && cleanText.length > 0) {
+    cleanText = `${cleanText} ...`;
+  }
+  
+  // 3. Fallback if everything was removed (e.g. text was just "*sighs*")
+  if (!cleanText) {
+    cleanText = "..."; 
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview",
-      contents: { parts: [{ text }] },
+      contents: { parts: [{ text: cleanText }] },
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -4622,7 +4767,7 @@ ${topicName ? `TOPIC: ${topicName}\n` : ''}SCRIPT CONTEXT (first 2000 chars):
 ${scriptText.slice(0, 2000)}`;
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
     return response.text?.trim() || '';
@@ -4805,7 +4950,7 @@ Comments:
 ${JSON.stringify(sample)}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -4827,7 +4972,7 @@ export const pickFunnyCommentsForSong = async (
   comments: string[],
   count: number = 20,
   language: string = 'Hindi',
-  model: string = 'gemini-3.8-flash',
+  model: string = 'gemini-3.5-flash',
 ): Promise<string[]> => {
   const ai = getAi();
   const cleaned = comments
@@ -4887,7 +5032,7 @@ Comments:
 ${sample}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
   return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Every opinion matters. Every voice counts.";
@@ -4906,7 +5051,7 @@ Input:
 ${textsJson}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -4944,7 +5089,7 @@ Script excerpt:
 ${excerpt}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: { responseMimeType: 'application/json' }
   });
@@ -4985,7 +5130,7 @@ Return ONLY the topic phrase, nothing else. Example outputs:
 - "celebrity mental health crisis"`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
@@ -5187,7 +5332,7 @@ Return JSON array only: [{"startOffset": number, "endOffset": number, "prompt": 
   let scenes: IntroSceneBreakdown[] = [];
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash',
       contents: { parts: [{ text: prompt }] },
       config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
     });
@@ -5359,7 +5504,7 @@ ${commentSample}
 Write ONE complete, detailed Veo 3 prompt. Start directly with the scene description. No preamble, no explanation, no markdown headers. Just the prompt text (150-250 words).`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
   return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
@@ -5418,7 +5563,7 @@ SCRIPT POINTS TO MAP (each point = Narrator intro + full speaker discussion):
 ${narratorStr}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 
@@ -5521,7 +5666,7 @@ export const generateContextBridgeConclusion = async (
   language: string,
   speakerName: string,
   contextContent: string,
-  model: string = 'gemini-3.8-flash',
+  model: string = 'gemini-3.5-flash',
 ): Promise<DebateSegment[]> => {
   const ai = getAi();
 
@@ -5609,7 +5754,7 @@ export const generateLearnEnglishScript = async (
   includeNarrator: boolean,    // adds a short cinematic-hook Narrator "intro" line at the start
   generateQuestions: boolean,  // appends "quiz" segments at the end, spoken by Narrator
   duration: number = 5,        // minutes — rough length guide
-  model: string = 'gemini-3.8-flash',
+  model: string = 'gemini-3.5-flash',
   leStyle: string = 'situational',
   leLanguage: 'hinglish' | 'english' = 'hinglish', // language of Narrator's teaching asides/quiz — dialogue is ALWAYS English
   includeTeachingAsides: boolean = true, // mid-dialogue Narrator phrase/grammar explanations — independent of includeNarrator (intro)
@@ -5635,10 +5780,12 @@ export const generateLearnEnglishScript = async (
     ? `PODCAST SETUP & INTRO: The podcast MUST start with a highly natural, warm, multi-turn co-host introduction by the two chosen co-host names (tag "dialogue"). It must feel like a real podcast opening. Follow this exact flow: 1) Start with a tagline (e.g., "Listen, learn, and speak English with confidence."). 2) Welcome the listeners (e.g., "Hey English learners, welcome back to the English Goal Podcast. Your cozy place to learn simple English through real-life conversations..."). 3) The hosts must introduce themselves individually (e.g., "I'm Rachel", "And I'm Kevin"). 4) Include a brief, friendly banter or an icebreaker question relevant to the topic (e.g., "Kevin, can I ask you a question?" -> [laughter] -> "When was the last time you..."). 5) Seamlessly transition into today's topic (e.g., "Exactly. And I think that brings us perfectly to today's topic: ${topic}"). Use [laughter] tags and natural reactions to make it lively and engaging before diving into the main discussion.`
     : includeNarrator
       ? `MODE: CINEMATIC INTRO HOOK ON
-Segment 1 MUST be spoken by "Narrator", tag "intro" — a proper cinematic movie-trailer-style opening, NOT just a one-line hook. Give it real substance: 4-8 sentences (roughly 20-40 seconds spoken). It should:
-- Set the scene (who, where, what's at stake) with rich texture tailored specifically to "${topic}".
-- Preview/tease 2-3 specific conversational moments or emotional turns coming up in the dialogue below.
-- Build genuine curiosity and tension.
+Segment 1 MUST be spoken by "Narrator", tag "intro" — an immersive, scene-setting opening that puts the listener right in the situation. Give it real substance: 4-8 sentences. Follow this EXACT narrative style and flow:
+- Start with an "Imagine you're..." statement placing the listener directly in the location (e.g., "Imagine you're walking down a busy street in London...").
+- Describe a sudden turn of events or conflict in short, punchy sentences (e.g., "You're enjoying your day when, suddenly... someone grabs your phone and runs.").
+- State the listener's internal reaction/emotion (e.g., "You're frustrated, confused, and you don't know what to do.").
+- Set up the immediate next action or encounter (e.g., "Then, you spot a police officer nearby. You walk up to him and try to explain what happened.").
+- ALWAYS end the intro with the exact question and phrase: "But how would you explain this situation in English? Let's find out." or "So, how would you handle this situation in English? Let's find out."
 After this intro, hand off entirely to the characters for the main scene.`
       : `MODE: INTRO OFF (IN MEDIA RES)
 Do NOT include an intro segment. Start instantly with the first line of dialogue (tag "dialogue") right in the middle of the action, as if the conversation is already underway regarding "${topic}".`;
@@ -5736,8 +5883,8 @@ DIALOGUE QUALITY:
 ${teachingLine}${questionsLine}
 
 Return JSON only (no markdown, no commentary before or after), an array of objects in speaking order:
-{"speaker": "...", "text": "...", "tag": "intro"|"dialogue"|"narrator"|"quiz", "explanation": {...} (ONLY for tag "narrator"), "quiz": {...} (ONLY for tag "quiz")}
-"speaker" must be "Question" for quiz segments, "Narrator" for narrator asides, "You", or the other character's exact name/role string (spelled identically every single time it's used).`;
+{"speaker": "...", "speakerGender": "male" | "female", "text": "...", "tag": "intro"|"dialogue"|"narrator"|"quiz", "explanation": {...} (ONLY for tag "narrator"), "quiz": {...} (ONLY for tag "quiz")}
+"speaker" must be "Question" for quiz segments, "Narrator" for narrator asides, "You", or the other character's exact name/role string (spelled identically every single time it's used). "speakerGender" is REQUIRED for every segment except narrator/quiz, indicating if this specific character is male or female.`;
 
   try {
     const ai = getAi();
@@ -5776,6 +5923,7 @@ Return JSON only (no markdown, no commentary before or after), an array of objec
       const result: DebateSegment = {
         id: `learn-english-${i}`,
         speaker,
+        speakerGender: seg.speakerGender || undefined,
         text: seg.text || '',
         scores: [],
         averageScore: 0,
@@ -5807,7 +5955,7 @@ export const generateQuizForSegment = async (
   segmentText: string,
   contextDialogue?: string
 ): Promise<{ question: string; options: string[]; answer: string }> => {
-  const model = 'gemini-3.8-flash';
+  const model = 'gemini-3.5-flash';
   const prompt = `You are an expert English teacher creating a multiple choice comprehension/vocabulary question for an English learning video.
 Current Segment / Line: "${segmentText}"
 ${contextDialogue ? `Surrounding Dialogue Context:\n${contextDialogue}` : ''}
@@ -5938,7 +6086,7 @@ Return ONLY a JSON array. Each item: {"title": "...", "start_seconds": 0, "end_s
 The first chunk's start_seconds must be 0. The last chunk's end_seconds must be ${Math.floor(totalDuration)}.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: prompt,
   });
 
@@ -6014,7 +6162,7 @@ STRICT RULES:
 
   try {
     const response = await ai.models.generateContent({
-      model: params.model || 'gemini-3.8-flash',
+      model: params.model || 'gemini-3.5-flash',
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -6086,7 +6234,7 @@ export interface StoryboardScenesResult {
 export const generateStoryboardScenes = async (
   segments: { speaker: string; text: string; duration?: number; startTime?: number; endTime?: number }[],
   sceneCount: number,
-  model: string = 'gemini-3.8-flash',
+  model: string = 'gemini-3.5-flash',
 ): Promise<StoryboardScenesResult> => {
   const ai = getAi();
 
@@ -6199,7 +6347,7 @@ Do not add any explanation outside the JSON.
 // AI only generates image prompts (no segmentIndices decision needed)
 export const generateStoryboardScenesTimeBased = async (
   slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
-  model: string = 'gemini-3.8-flash',
+  model: string = 'gemini-3.5-flash',
 ): Promise<{ prompts: string[]; usesCharacter: boolean[]; characterGuide: string }> => {
   const ai = getAi();
 
@@ -6284,10 +6432,14 @@ export const generateSpeechChirp3HD = async (
   voiceName: string,
   languageCode: string = 'en-US',
 ): Promise<{ audioUrl: string; duration: number }> => {
+  let cleanText = text.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').replace(/\(.*?\)/g, '').trim();
+  if (cleanText.length < 5 && cleanText.length > 0) cleanText = `${cleanText} ...`;
+  if (!cleanText) cleanText = "...";
+
   const response = await fetch('/api/google/text-to-speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceName, languageCode }),
+    body: JSON.stringify({ text: cleanText, voiceName, languageCode }),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -6519,7 +6671,7 @@ Transcript with timestamps:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
       responseMimeType: 'application/json',
@@ -6605,7 +6757,7 @@ Rules for thumbnailText:
 Return ONLY valid JSON. No markdown, no explanation.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
   });
 
@@ -6647,7 +6799,7 @@ Rules:
 Return ONLY the phrase text. No quotes, no explanation, no JSON.`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
   });
 
@@ -6819,7 +6971,7 @@ Transcript:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
       responseMimeType: 'application/json',
@@ -6915,7 +7067,7 @@ Script:
 ${lines}`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: { responseMimeType: 'application/json' },
   });
@@ -6960,7 +7112,7 @@ export const generatePhoneStudioScript = async (
   duration: number,
   description?: string,
   contextFileContent?: string,
-  model: string = 'gemini-3.8-flash',
+  model: string = 'gemini-3.5-flash',
   language: string = 'English',
   includeNarrator: boolean = false,
   youtubeComments?: string[],
@@ -7283,7 +7435,7 @@ Before finalizing, AUDIT your output:
 Transcript:
 ${promptBody}`;
 
-  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
     responseMimeType: 'application/json',
   });
 
@@ -7476,7 +7628,7 @@ Just:
     config.responseMimeType = 'application/json';
   }
 
-  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
   const raw: string = data.text
     ?? data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('')
     ?? '';
@@ -7693,7 +7845,7 @@ Return ONLY a JSON array. No markdown. No preamble. Just:
     config.responseMimeType = 'application/json';
   }
 
-  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
 
   const raw: string = data.text
     ?? data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('')
@@ -7765,7 +7917,7 @@ ${transcript_text}
 Return ONLY a JSON array of up to 5 objects, ranked best first, no prose, no markdown fences:
 [{"label": "...", "start_sec": <float>, "end_sec": <float>, "reason": "..."}, ...]`;
 
-  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
     responseMimeType: 'application/json',
   });
   const raw = extractGeminiText(data);
@@ -7829,7 +7981,7 @@ stretch in the middle worth cutting. Ranges must not overlap, and their combined
 Return ONLY a JSON object, no prose, no markdown fences:
 {"keep_ranges": [{"start_sec": <float>, "end_sec": <float>}, ...]}`;
 
-  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
     responseMimeType: 'application/json',
   });
   const raw = extractGeminiText(data);
@@ -8002,7 +8154,7 @@ Return ONLY a JSON array, no prose, no markdown fences — omit "timestamp_sec" 
     config.responseMimeType = 'application/json';
   }
 
-  const data = await callGemini('gemini-3.8-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
+  const data = await callGemini('gemini-3.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], config);
   const raw = extractGeminiText(data);
   const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
   let parsed: any[];
