@@ -65,6 +65,10 @@ export interface StudioState {
   phoneZPulse?: boolean;
   // VU meter (audio-reactive vertical bar) beside the active phone. Default OFF.
   vuMeter?: boolean;
+  // "Phone Studio 2" split-screen — a clip plays cover-fit in the top band
+  // of the frame; everything else (background/phones/narrator) is confined
+  // to the remaining bottom band instead of the full canvas.
+  splitScreen?: { videoEl: HTMLVideoElement | null; topRatio?: number };
 }
 
 export class CanvasRenderer {
@@ -96,6 +100,13 @@ export class CanvasRenderer {
 
   updateState(s: StudioState) {
     this.state = s;
+    if (!this.playing) this.drawFrame();
+  }
+
+  // Attach/detach the top-band clip video for split-screen mode without
+  // requiring the caller to rebuild the whole StudioState object.
+  setSplitScreen(cfg: StudioState['splitScreen']) {
+    this.state = { ...this.state, splitScreen: cfg };
     if (!this.playing) this.drawFrame();
   }
 
@@ -142,7 +153,28 @@ export class CanvasRenderer {
     const { ctx, canvas, state, currentTime } = this;
     const w = canvas.width, h = canvas.height;
 
-    // ── Background ────────────────────────────────────────────────────────
+    // ── Split-screen: clip in the top band, everything else confined to
+    // the bottom band ────────────────────────────────────────────────────
+    const split = state.splitScreen;
+    const regionY = split ? h * (split.topRatio ?? 0.5) : 0;
+    const regionH = h - regionY;
+
+    if (split) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, w, regionY); ctx.clip();
+      const vid = split.videoEl;
+      if (vid && vid.readyState >= 2 && vid.videoWidth > 0) {
+        const vScl = Math.max(w / vid.videoWidth, regionY / vid.videoHeight);
+        const vdw = vid.videoWidth * vScl, vdh = vid.videoHeight * vScl;
+        ctx.drawImage(vid, (w - vdw) / 2, (regionY - vdh) / 2, vdw, vdh);
+      } else {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, regionY);
+      }
+      ctx.restore();
+    }
+
+    // ── Background (bottom band when split, full canvas otherwise) ────────
     if (state.bgImageUrl) {
       let img = this.bgImageCache.get(state.bgImageUrl);
       if (!img) {
@@ -153,24 +185,27 @@ export class CanvasRenderer {
           if (!this.playing) this.drawFrame();
         };
         newImg.src = state.bgImageUrl;
-        ctx.fillStyle = '#111'; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#111'; ctx.fillRect(0, regionY, w, regionH);
       } else {
-        // Cover fit — fill canvas preserving aspect ratio
-        const scl = Math.max(w / img.width, h / img.height);
+        // Cover fit — fill region preserving aspect ratio
+        const scl = Math.max(w / img.width, regionH / img.height);
         const dw = img.width * scl, dh = img.height * scl;
-        ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, regionY, w, regionH); ctx.clip();
+        ctx.drawImage(img, (w - dw) / 2, regionY + (regionH - dh) / 2, dw, dh);
+        ctx.restore();
       }
     } else {
       const bgVal = state.background.value || '#0f172a';
       if (bgVal.startsWith('linear:')) {
         const colors = bgVal.substring(7).split(',');
-        const grad = ctx.createLinearGradient(0, 0, w, h);
+        const grad = ctx.createLinearGradient(0, regionY, w, regionY + regionH);
         colors.forEach((c, i) => grad.addColorStop(i / Math.max(1, colors.length - 1), c.trim()));
         ctx.fillStyle = grad;
       } else {
         ctx.fillStyle = bgVal;
       }
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(0, regionY, w, regionH);
     }
 
     const phones = state.phones;
@@ -188,23 +223,23 @@ export class CanvasRenderer {
       elapsed += turn.durationMs;
     }
 
-    // ── Narrator card — full-screen white slide ───────────────────────────
+    // ── Narrator card — white slide, confined to the bottom band when split ─
     if (activeTurn?.isNarrator) {
-      this.drawNarratorCard(w, h, activeTurn.text, turnProgress);
+      this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY);
       return;
     }
 
     if (!phones.length) return;
 
-    // Layout
+    // Layout — confined to the bottom band when split-screen is active
     const phoneAspect = 9 / 19.5;
     const isSingle = phones.length === 1;
     const spacingRatio = (state.deviceSpacing ?? 50) / 100;
     // Quadratic scale: at 100% gives large visible gap; at 0% phones are close
     const padding = w * 0.06 * (1 - spacingRatio);
-    const yPadding = h * 0.09;
+    const yPadding = regionH * 0.09;
     const availW = w - padding * 2;
-    const availH = h - yPadding * 2;
+    const availH = regionH - yPadding * 2;
     const spacing = availW * (0.02 + 0.44 * spacingRatio * spacingRatio + 0.06 * spacingRatio);
     let pw = (availW - spacing * (phones.length - 1)) / phones.length;
     let ph = pw / phoneAspect;
@@ -215,7 +250,7 @@ export class CanvasRenderer {
     // Single-speaker mode: phone sits on the LEFT side of the frame so the
     // right side is free for subtitles / overlays. Multi-speaker stays centred.
     const startX = isSingle ? (w * 0.04) : (w - totalW) / 2;
-    const startY = (h - ph) / 2;
+    const startY = regionY + (regionH - ph) / 2;
 
     // Z-pulse: default ON when single-speaker, OFF for multi. Consumer can
     // override either way via state.phoneZPulse.
@@ -232,7 +267,7 @@ export class CanvasRenderer {
     });
   }
 
-  private drawNarratorCard(w: number, h: number, text: string, progress: number) {
+  private drawNarratorCard(w: number, h: number, text: string, progress: number, offsetY = 0) {
     const { ctx } = this;
 
     // Fade in/out
@@ -243,7 +278,7 @@ export class CanvasRenderer {
     // White card
     const cardW = w * 0.78;
     const cardH = h * 0.42;
-    const cx = w / 2, cy = h / 2;
+    const cx = w / 2, cy = offsetY + h / 2;
     const rx = cx - cardW / 2, ry = cy - cardH / 2;
     const corner = Math.min(cardW, cardH) * 0.07;
 
