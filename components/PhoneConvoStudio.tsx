@@ -357,6 +357,21 @@ const speakerToPhoneId = (speaker: string) =>
 // the call mockup doesn't look identical across renders.
 const randomBattery = () => `${Math.floor(Math.random() * (99 - 28 + 1)) + 28}%`;
 
+// Gemini's inline video understanding needs raw base64 (no "data:...;base64,"
+// prefix) — used by the "Phone Studio 2" clip-analysis generate mode.
+const fileToBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const result = reader.result as string;
+    resolve(result.slice(result.indexOf(',') + 1));
+  };
+  reader.onerror = () => reject(reader.error ?? new Error('File read failed'));
+  reader.readAsDataURL(file);
+});
+// Inline video requests must stay well under Gemini's ~20MB total request
+// cap — base64 inflates size ~33%, so cap the raw file well below that.
+const MAX_INLINE_CLIP_BYTES = 14 * 1024 * 1024;
+
 // Podcast Pro — max raw-clip length (seconds) the best-moment finder and
 // tightener are allowed to work with. The generated POV1/POV2 discussion
 // itself runs longer (it's a conversation ABOUT the clip), this only bounds
@@ -2321,6 +2336,10 @@ interface GenPanelProps {
   genYtUrl: string; setGenYtUrl: (s: string) => void;
   genTurns: number; setGenTurns: (n: number) => void;
   genAutoTurns: boolean; setGenAutoTurns: (b: boolean) => void;
+  genClipMode: boolean; setGenClipMode: (b: boolean) => void;
+  uploadedVideoForClip: File | null; setUploadedVideoForClip: React.Dispatch<React.SetStateAction<File | null>>;
+  uploadedVideoUrlForClip: string | null; setUploadedVideoUrlForClip: React.Dispatch<React.SetStateAction<string | null>>;
+  splitScreenClip: boolean; setSplitScreenClip: (b: boolean) => void;
   phones: PhoneConfig[];
   generating: boolean;
   onGenerate: () => void;
@@ -2348,8 +2367,13 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
   genTopic, setGenTopic, genYtMode, setGenYtMode,
   genYtUrl, setGenYtUrl, genTurns, setGenTurns,
   genAutoTurns, setGenAutoTurns,
+  genClipMode, setGenClipMode,
+  uploadedVideoForClip, setUploadedVideoForClip,
+  uploadedVideoUrlForClip, setUploadedVideoUrlForClip,
+  splitScreenClip, setSplitScreenClip,
   phones, generating, onGenerate, onPodcastGenerate,
 }) => {
+  const clipFileInputRef = useRef<HTMLInputElement>(null);
   const sel = CONVO_STYLES.find(s => s.id === genStyle)!;
   const isPodcastAnalysis = genStyle === 'podcast_analysis'
     || genStyle === 'podcast_analysis_funny'
@@ -2490,7 +2514,7 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
           {/* YouTube toggle */}
           <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
             <button
-              onClick={() => setGenYtMode(!genYtMode)}
+              onClick={() => { setGenYtMode(!genYtMode); if (!genYtMode) setGenClipMode(false); }}
               style={{
                 width: '100%', padding: '10px 12px', background: genYtMode ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)',
                 border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
@@ -2533,8 +2557,93 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
             )}
           </div>
 
+          {/* Video Clip toggle — "Phone Studio 2": Gemini watches the clip
+              (+ Google Search) and writes a news script about it */}
+          <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <button
+              onClick={() => { setGenClipMode(!genClipMode); if (!genClipMode) setGenYtMode(false); }}
+              style={{
+                width: '100%', padding: '10px 12px', background: genClipMode ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)',
+                border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'inherit', borderBottom: genClipMode ? '1px solid rgba(239,68,68,0.2)' : 'none',
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🎞️📰</span>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: genClipMode ? '#fca5a5' : 'rgba(255,255,255,0.7)' }}>
+                  Video Clip se Generate (News)
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                  Gemini clip dekhega + Google Search karega, phir news script likhega
+                </div>
+              </div>
+              <div style={{
+                width: 36, height: 20, borderRadius: 50, position: 'relative',
+                background: genClipMode ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s',
+              }}>
+                <div style={{
+                  position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%',
+                  background: '#fff', transition: 'left 0.2s', left: genClipMode ? 18 : 2,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                }} />
+              </div>
+            </button>
+            {genClipMode && (
+              <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  ref={clipFileInputRef}
+                  type="file" accept="video/*" style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadedVideoForClip(file);
+                    setUploadedVideoUrlForClip(prev => { if (prev) { try { URL.revokeObjectURL(prev); } catch {} } return URL.createObjectURL(file); });
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  onClick={() => clipFileInputRef.current?.click()}
+                  style={{
+                    padding: '9px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                    border: `1.5px dashed ${uploadedVideoForClip ? '#ef4444' : 'rgba(255,255,255,0.15)'}`,
+                    background: uploadedVideoForClip ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+                    color: uploadedVideoForClip ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 12,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}
+                >
+                  <span>🎞️</span>
+                  <span>{uploadedVideoForClip ? `${uploadedVideoForClip.name} ✓` : 'Clip upload karo'}</span>
+                </button>
+
+                {uploadedVideoForClip && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px' }}>
+                    <div
+                      onClick={() => setSplitScreenClip(!splitScreenClip)}
+                      style={{
+                        width: 34, height: 18, borderRadius: 50, position: 'relative', cursor: 'pointer',
+                        background: splitScreenClip ? '#10b981' : 'rgba(255,255,255,0.12)', transition: 'background 0.2s', flexShrink: 0,
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%',
+                        background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                        left: splitScreenClip ? 18 : 2,
+                      }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>📱 Split-Screen Render</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                        Upar clip video (mute), niche white bg pe phone studio
+                      </div>
+                    </div>
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Topic input */}
-          {!genYtMode && (
+          {!genYtMode && !genClipMode && (
             <div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Topic / Question
@@ -2615,16 +2724,20 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
           </div>
 
           {/* Generate button */}
+          {(() => {
+            const genDisabled = generating
+              || (genClipMode ? !uploadedVideoForClip : (genYtMode ? !genYtUrl.trim() : !genTopic.trim()));
+            return (
           <button
             onClick={onGenerate}
-            disabled={generating || (!genTopic.trim() && !genYtMode) || (genYtMode && !genYtUrl.trim())}
+            disabled={genDisabled}
             style={{
               padding: '13px', borderRadius: 12, border: 'none',
               background: generating ? 'rgba(239,68,68,0.3)' : '#ef4444',
               color: '#fff', fontSize: 14, fontWeight: 800,
               cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              opacity: (!genTopic.trim() && !genYtMode) || (genYtMode && !genYtUrl.trim()) ? 0.4 : 1,
+              opacity: genDisabled ? 0.4 : 1,
             }}
           >
             {generating ? (
@@ -2636,6 +2749,8 @@ const ScriptGeneratorPanel: React.FC<GenPanelProps> = ({
               <>✨ Script Generate Karo</>
             )}
           </button>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -2702,6 +2817,10 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [genStep, setGenStep] = useState<1 | 2>(1);
   const [genTurns, setGenTurns] = useState(14);
   const [genAutoTurns, setGenAutoTurns] = useState(true);
+  // "Phone Studio 2" — generate the script FROM an uploaded video clip
+  // (Gemini watches it + Google Search verifies/adds context) instead of a
+  // typed topic or a YouTube URL.
+  const [genClipMode, setGenClipMode] = useState(false);
 
   // Canvas + renderer
   const canvasRef   = useRef<HTMLCanvasElement>(null);
@@ -2751,6 +2870,10 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
   const [clipping, setClipping] = useState(false);
   const [clipProgress, setClipProgress] = useState(0);
   const [addLetterbox, setAddLetterbox] = useState(false);
+  // "Phone Studio 2" — clip plays in the top half of the frame, the phone
+  // studio discussion continues in the bottom half on a plain background.
+  const [splitScreenClip, setSplitScreenClip] = useState(false);
+  const previewClipVideoRef = useRef<HTMLVideoElement | null>(null);
   // Which timeline segment the Settings tab is configuring — 'discussion'
   // is the existing Phones/Background/Subtitles panel; 'intro' and
   // 'footage' are their own contextual panels, selected via the two extra
@@ -2859,7 +2982,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     vuMeter: vuMeterOn,
     // Default: z-pulse on for 1 speaker, off for 2+. User can override.
     phoneZPulse: phoneZPulseOverride ?? (phones.length === 1),
-  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride]);
+    splitScreen: splitScreenClip ? { videoEl: previewClipVideoRef.current, topRatio: 0.5 } : undefined,
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -3061,6 +3185,15 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     killAudio();
   }, [killAudio]);
 
+  // Best-effort sync of the split-screen preview clip to the timeline —
+  // exact frame accuracy isn't needed here (that's what the export path's
+  // per-frame seek does); this just keeps the live preview roughly aligned.
+  const syncClipPreviewTime = (ms: number) => {
+    const v = previewClipVideoRef.current;
+    if (!v || !isFinite(v.duration) || v.duration <= 0) return;
+    try { v.currentTime = (ms / 1000) % v.duration; } catch {}
+  };
+
   const togglePlay = async () => {
     const r = rendererRef.current;
     if (!r) return;
@@ -3070,6 +3203,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       setIsPlaying(false);
       killAudio();
       clearActivePlayback(stopPhonePreview);
+      previewClipVideoRef.current?.pause();
       return;
     }
 
@@ -3079,12 +3213,17 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     // Decode buffers FIRST, then start renderer — both begin simultaneously
     await scheduleAudioFrom(startMs);
     r.play();
+    if (splitScreenClip) {
+      syncClipPreviewTime(startMs);
+      previewClipVideoRef.current?.play().catch(() => {});
+    }
   };
 
   // Visual-only seek (called continuously while dragging)
   const seek = (ms: number) => {
     rendererRef.current?.seek(ms);
     setCurrentTime(ms);
+    syncClipPreviewTime(ms);
   };
 
   // Full seek: update visual + restart audio from new position (called on mouse-up)
@@ -3092,6 +3231,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     const r = rendererRef.current;
     r?.seek(ms);
     setCurrentTime(ms);
+    syncClipPreviewTime(ms);
     if (isPlayingRef.current) {
       r?.pause();                     // stop loop while audio decodes
       await scheduleAudioFrom(ms);    // decode buffers first
@@ -3169,6 +3309,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     const state = buildState();
     const exportRenderer = new CanvasRenderer(exportCanvas, state);
 
+    const useSplitScreen = splitScreenClip && !!uploadedVideoUrlForClip;
     const blob = await renderVideoOffline({
       canvas: exportCanvas,
       audioChannels: [mixed],
@@ -3178,9 +3319,11 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       bitrate: 8_000_000,
       width: W,
       height: H,
-      renderCallback: (_time, _level, _vid, offCtx) => {
+      backgroundVideoUrl: useSplitScreen ? uploadedVideoUrlForClip! : undefined,
+      renderCallback: (_time, _level, vid, offCtx) => {
         exportRenderer.currentTime = _time * 1000;
         exportRenderer.audioLevel = _level;
+        if (useSplitScreen) exportRenderer.setSplitScreen({ videoEl: vid, topRatio: 0.5 });
         exportRenderer.drawFrame();
         offCtx.drawImage(exportCanvas, 0, 0, W, H);
       },
@@ -3382,8 +3525,9 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
         await new Promise(r => setTimeout(r, 300));
       }
 
-      // ② Raw Clip — trim from uploaded video in memory
-      if (uploadedVideoForClip && sourceClips.length > 0) {
+      // ② Raw Clip — trim from uploaded video in memory. Skipped in
+      // split-screen mode: the clip already plays live inside the discussion.
+      if (!splitScreenClip && uploadedVideoForClip && sourceClips.length > 0) {
         setCombineStatus('② Raw clip trim ho rahi hai…');
         const clipBlob = await trimClipToBlob(
           sourceClips[0],
@@ -3530,6 +3674,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       const exportRenderer = new CanvasRenderer(exportCanvas, state);
 
       // ── 3. Offline render via WebCodecs (mp4-muxer) ───────────────────────
+      const useSplitScreen = splitScreenClip && !!uploadedVideoUrlForClip;
       const blob = await renderVideoOffline({
         canvas: exportCanvas,
         audioChannels: [mixed],
@@ -3539,9 +3684,13 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
         bitrate: 8_000_000,
         width: W,
         height: H,
-        renderCallback: (_time, _level, _vid, offCtx) => {
+        // The uploaded clip's own audio is intentionally NOT decoded/mixed
+        // above — split-screen mode is silent video on top, AI voices only.
+        backgroundVideoUrl: useSplitScreen ? uploadedVideoUrlForClip! : undefined,
+        renderCallback: (_time, _level, vid, offCtx) => {
           exportRenderer.currentTime = _time * 1000;
           exportRenderer.audioLevel = _level;
+          if (useSplitScreen) exportRenderer.setSplitScreen({ videoEl: vid, topRatio: 0.5 });
           exportRenderer.drawFrame();
           offCtx.drawImage(exportCanvas, 0, 0, W, H);
         },
@@ -3573,7 +3722,7 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
       setExporting(false); setExportProgress(0); setExportStatus('');
       await releaseWakeLock();
     }
-  }, [buildState, script]);
+  }, [buildState, script, splitScreenClip, uploadedVideoUrlForClip]);
 
   // ── Script Generator ──────────────────────────────────────────────────────
 
@@ -3582,8 +3731,8 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
     const speaker1 = phones[0]?.name ?? 'ChatGPT';
     const speaker2 = phones[1]?.name ?? 'Gemini';
 
-    if (!genTopic.trim() && !genYtMode) {
-      toast.error('Topic ya YouTube URL dalo pehle');
+    if (!genTopic.trim() && !genYtMode && !(genClipMode && uploadedVideoForClip)) {
+      toast.error(genClipMode ? 'Pehle clip upload karo' : 'Topic ya YouTube URL dalo pehle');
       return;
     }
 
@@ -3591,6 +3740,63 @@ const PhoneConvoStudio: React.FC<Props> = ({ mainScript, sourceClips: sourceClip
 
     try {
       let topicContext = genTopic.trim();
+
+      // ── Video Clip mode: Gemini watches the uploaded clip + Google Search ──
+      // verifies/adds current context, then extracts the news claims to discuss.
+      if (genClipMode && uploadedVideoForClip) {
+        if (uploadedVideoForClip.size > MAX_INLINE_CLIP_BYTES) {
+          throw new Error(`Clip bahut badi hai (${Math.round(uploadedVideoForClip.size / 1024 / 1024)}MB) — ${Math.round(MAX_INLINE_CLIP_BYTES / 1024 / 1024)}MB se chhoti clip use karo.`);
+        }
+        toast.info('Gemini clip dekh raha hai + Google Search kar raha hai…');
+        const base64 = await fileToBase64(uploadedVideoForClip);
+        const analyzeRes = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-3.8-flash',
+            contents: [{
+              role: 'user',
+              parts: [
+                { inlineData: { mimeType: uploadedVideoForClip.type || 'video/mp4', data: base64 } },
+                { text: `Watch this video clip carefully — it shows a news story or current event.
+
+Your task:
+1. Identify exactly what this clip is about — who, what, when, where.
+2. Use Google Search to verify the facts and pull in any up-to-date context or recent developments about this story.
+3. Extract 4-6 specific, sharable claims or facts from it — real numbers, names, quotes where possible.
+
+Also write a 2-3 sentence summary of the story.
+
+Return JSON only:
+{
+  "topic": "2-3 sentence summary of the news story",
+  "points": ["claim 1", "claim 2", ...]
+}` },
+              ],
+            }],
+            config: { tools: [{ googleSearch: {} }] },
+          }),
+        });
+        if (!analyzeRes.ok) {
+          let errDetail = '';
+          try { const e = await analyzeRes.json(); errDetail = e?.error || e?.message || ''; } catch {}
+          throw new Error(errDetail || `Clip analyze failed: ${analyzeRes.status}`);
+        }
+        const analyzeJson = await analyzeRes.json();
+        const analyzeText = analyzeJson.candidates?.[0]?.content?.parts?.[0]?.text ?? analyzeJson.text ?? '';
+        const match = analyzeText.match(/\{[\s\S]*\}/);
+        let analyzed: { topic?: string; points?: unknown } | null = null;
+        if (match) { try { analyzed = JSON.parse(match[0]); } catch { analyzed = null; } }
+        if (!analyzed || !Array.isArray(analyzed.points) || !analyzed.points.length) {
+          throw new Error('Clip se claims extract nahi ho paye — dobara try karo.');
+        }
+        const pointsList = (analyzed.points as unknown[])
+          .filter((p): p is string => typeof p === 'string')
+          .map((p, i) => `${i + 1}. ${p}`)
+          .join('\n');
+        const topicLine = typeof analyzed.topic === 'string' ? analyzed.topic : '(news clip)';
+        topicContext = `Based on this news video clip:\n${topicLine}\n\nKey facts to discuss:\n${pointsList}${genTopic.trim() ? `\n\nExtra focus: ${genTopic.trim()}` : ''}`;
+      }
 
       // ── YouTube mode: fetch transcript → summarize with Gemini ─────────────
       if (genYtMode && genYtUrl.trim()) {
@@ -3665,7 +3871,9 @@ Return JSON only:
 
       // ── Generate conversation script via Gemini ────────────────────────────
       toast.info('Script generate ho raha hai…');
-      const sourceLenHint = genYtMode
+      const sourceLenHint = genClipMode
+        ? `Source: news facts extracted from an uploaded video clip (+ Google Search verification).`
+        : genYtMode
         ? `Source: YouTube transcript (~${Math.round(topicContext.length / 1000)}k chars of context).`
         : `Source: topic prompt (user-supplied, no transcript).`;
       const lengthRule = genAutoTurns
@@ -3765,7 +3973,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
     } finally {
       setGenerating(false);
     }
-  }, [genStyle, genTopic, genYtMode, genYtUrl, genTurns, genAutoTurns, phones]);
+  }, [genStyle, genTopic, genYtMode, genYtUrl, genTurns, genAutoTurns, phones, genClipMode, uploadedVideoForClip]);
 
   // ── Podcast Deep-Analysis Generator ───────────────────────────────────────
 
@@ -4021,6 +4229,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           genYtUrl={genYtUrl} setGenYtUrl={setGenYtUrl}
           genTurns={genTurns} setGenTurns={setGenTurns}
           genAutoTurns={genAutoTurns} setGenAutoTurns={setGenAutoTurns}
+          genClipMode={genClipMode} setGenClipMode={setGenClipMode}
+          uploadedVideoForClip={uploadedVideoForClip} setUploadedVideoForClip={setUploadedVideoForClip}
+          uploadedVideoUrlForClip={uploadedVideoUrlForClip} setUploadedVideoUrlForClip={setUploadedVideoUrlForClip}
+          splitScreenClip={splitScreenClip} setSplitScreenClip={setSplitScreenClip}
           phones={phones}
           generating={generating}
           onGenerate={handleGenerate}
@@ -4072,6 +4284,19 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             height={1080}
             style={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
           />
+          {/* Hidden source for the split-screen live preview — never shown
+              directly, phoneCanvasRenderer draws its frames into the canvas */}
+          {splitScreenClip && uploadedVideoUrlForClip && (
+            <video
+              ref={previewClipVideoRef}
+              src={uploadedVideoUrlForClip}
+              muted
+              loop
+              playsInline
+              style={{ display: 'none' }}
+              onLoadedMetadata={() => rendererRef.current?.updateState(buildState())}
+            />
+          )}
           {!exporting && (
             <div style={{
               position: 'absolute', bottom: 10, left: 10,

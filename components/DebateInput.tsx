@@ -1134,6 +1134,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       { id: 'explain_examples', emoji: '💡', label: 'w/ Examples'      },
                       { id: 'explain_funny',    emoji: '🤪', label: 'Explain Funny'    },
                       { id: 'explain_deep',     emoji: '🌊', label: 'Explain Deep'     },
+                      { id: 'ai_verdicts',      emoji: '⚖️', label: 'AI Verdicts'      },
                     ] as { id: PhoneConvoStyle; emoji: string; label: string }[]).map(opt => (
                       <button
                         key={opt.id}

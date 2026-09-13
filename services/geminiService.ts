@@ -7112,7 +7112,11 @@ ${lines}`;
   }));
 };
 
-export type PhoneConvoStyle = 'podcast' | 'roast' | 'sarcastic' | 'factual' | 'devils_advocate' | 'hot_takes' | 'factcheck' | 'react' | 'experts' | 'detailed' | 'funny' | 'debate' | 'debate_sarcasm' | 'fight' | 'romantic' | 'celebrity_call' | 'ground_search' | 'explain_examples' | 'explain_funny' | 'explain_deep';
+export type PhoneConvoStyle = 'podcast' | 'roast' | 'sarcastic' | 'factual' | 'devils_advocate' | 'hot_takes' | 'factcheck' | 'react' | 'experts' | 'detailed' | 'funny' | 'debate' | 'debate_sarcasm' | 'fight' | 'romantic' | 'celebrity_call' | 'ground_search' | 'explain_examples' | 'explain_funny' | 'explain_deep' | 'ai_verdicts';
+
+// Real AI chatbot names the model picks from for the 'ai_verdicts' style —
+// each dilemma gets independent one-shot answers attributed to different bots.
+const AI_VERDICT_BOTS = ['ChatGPT', 'Claude', 'Gemini', 'Grok', 'Meta AI', 'Perplexity', 'DeepSeek', 'Copilot', 'Mistral'];
 
 export const generatePhoneStudioScript = async (
   topic: string,
@@ -7175,6 +7179,9 @@ export const generatePhoneStudioScript = async (
     explain_deep: isHindi
       ? 'DEEP explanation mode. Har layer ke neeche aur layers hain. First principles se shuru karo. "Lekin socho kyu?" / "Iski root cause kya hai?" / "Yeh sirf surface level hai — asli cheez yeh hai..." Philosophical aur analytical depth. Nothing is taken at face value.'
       : 'DEEP explanation mode. Every layer reveals more layers underneath. Start from first principles. "But why does that even work?" / "The root cause is..." / "That\'s just surface — the real mechanism is..." Philosophical and analytical depth. Nothing is taken at face value. Go three levels deeper than anyone else would.',
+    ai_verdicts: isHindi
+      ? 'Yeh conversation nahi hai — ek provocative hypothetical dilemma poocha jaata hai, aur phir alag-alag real AI chatbots (ChatGPT, Claude, Gemini, Grok, waghera) apna-apna independent, one-shot verdict dete hain. Koi back-and-forth nahi, koi cross-talk nahi — har jawaab bilkul akela khada hota hai, clear Haan/Nahi se shuru hota hai, aur apne alag ethical ya reasoning framework se argue karta hai.'
+      : 'Not a conversation — a provocative hypothetical dilemma is posed once, then different real AI chatbots (ChatGPT, Claude, Gemini, Grok, etc.) each give their own independent, one-shot verdict. No back-and-forth, no cross-talk — each answer stands completely alone, opens with a clear Yes/No, and argues from its own distinct ethical or reasoning framework.',
   };
 
   const isYtClaims = contextFileContent?.startsWith('YOUTUBE_CLAIMS:') ?? false;
@@ -7201,9 +7208,10 @@ export const generatePhoneStudioScript = async (
     explain_examples: `- For each claim: explain it using a concrete real-world example or analogy.\n- One speaker states the claim, the other explains it with "Think of it like..." or gives a real case study.\n- Build on each other's examples to make the concept crystal clear.`,
     explain_funny: `- Explain each claim using absurd, funny analogies and ridiculous comparisons.\n- "Okay this is basically like if your immune system was a bouncer at a club who's had too much coffee..."\n- Keep it hilarious but make sure the actual explanation lands correctly.`,
     explain_deep: `- Go deep on every claim. Start from first principles. Ask "but WHY does that happen?" three times.\n- One speaker gives the surface explanation, the other keeps drilling down: "Okay but what's actually causing that?" / "One level deeper — the real mechanism is..."\n- By the end of each claim, cover root causes, second-order effects, and what most people miss.`,
+    ai_verdicts: `- For each claim, generate 2-3 independent one-shot verdicts from different real AI chatbots — each opens with a clear stance and gives its own self-contained reasoning.\n- No bot ever references another's answer — treat each as if it's the only response given.\n- Vary stances and reasoning frameworks across verdicts on the same claim so none feel repeated.`,
   };
 
-  const ytDynamicInstructions = isYtClaims
+  const ytDynamicInstructions = (isYtClaims && phoneConvoStyle !== 'ai_verdicts')
     ? (isHindi
         ? `\n⚠️ CONVERSATION OPENING (pehle 2 turns):\n- ${speakers[0] ?? 'Speaker 1'} seedha TOPIC/QUESTION se shuru kare — koi podcast/video reference NAHI.\n- Opening mein sirf woh MAIN QUESTION ya CLAIM uthao jo sabse interesting ya controversial hai content mein se.\n- GALAT opening: "Yaar, tune The Ranveer Show ka episode dekha?" ya "Bhai, is podcast mein unhone jo bola..."\n- SAHI opening: "Yaar, kya sach mein shadi ka future khatam ho raha hai? Mujhe lagta hai..." ya "Ek cheez jo mujhe genuinely confuse karti hai — [topic] — tum kya sochte ho?"\n- Template mat use karo — natural rakhna. Seedha point pe aao.\n- ${speakers[1] ?? 'Speaker 2'} naturally respond kare aur pehle claim ki taraf move ho.\n\n⚠️ CLAIM DISCUSSION RULES:\n- हर claim को specifically discuss करो — generic mat bolo.\n- Claim quote करो, react करो, phir context/facts/science bolo.\n- Alag alag claims par alag dynamics rakhna — kabhi ek defend kare doosra destroy kare, kabhi dono skeptical, kabhi shocked + explain.\n- Roles swap karte raho — kabhi ${speakers[0] ?? 'Speaker 1'} defend kare, kabhi ${speakers[1] ?? 'Speaker 2'}.\n- CONCLUSION (last 2 turns): Dono apna personal final take den topic par — genuine opinion, koi video rating nahi.`
         : `\n⚠️ CONVERSATION OPENING (first 1-2 turns — very important):\n- ${speakers[0] ?? 'Speaker 1'} opens by immediately stating the MAIN QUESTION or CLAIM from the content — NO show name, NO "did you watch/see" opener.\n- WRONG opening: "Okay so that [Show Name] episode with [Guest] — did you see it?" or "Hey, I just watched that [Host] podcast..."\n- RIGHT opening: "So here's what I keep thinking about — [main claim/question from the content]. Like, is that actually true?" or "I genuinely can't stop thinking about this idea — [topic]. What's your take?"\n- ${speakers[1] ?? 'Speaker 2'} responds to the QUESTION/CLAIM directly — not "oh yeah I saw that too".\n- NEVER mention a show name, podcast name, or "did you watch/see/read" in the opening.\n\n⚠️ CLAIM DISCUSSION RULES (follow exactly):\n\nSTYLE-SPECIFIC DYNAMICS FOR EACH CLAIM:\n${ytClaimDynamics[phoneConvoStyle]}\n\nGENERAL RULES:\n- Reference each claim specifically — do NOT speak generically about the topic.\n- Quote or paraphrase the claim, react to it, then dig into the real facts/science/context.\n- Vary the dynamic on each claim — do NOT repeat the same pattern twice in a row.\n- Rotate roles — sometimes ${speakers[0] ?? 'Speaker 1'} leads/defends, sometimes ${speakers[1] ?? 'Speaker 2'} does.\n\nCONCLUSION (MANDATORY — last 2 turns of the script):\n- ${speakers[0] ?? 'Speaker 1'}: Give your genuine personal take on the topic overall — what you actually believe, one clear opinion.\n- ${speakers[1] ?? 'Speaker 2'}: Give YOUR take — it must be DIFFERENT or add a new angle. Specific, not generic.\n- Conclusions must feel personal — not "great discussion" wrap-up lines.`)
@@ -7252,7 +7260,70 @@ NARRATOR FORMAT (IMPORTANT):
       )
     : '';
 
-  const prompt = isHindi ? `
+  const numVerdicts = Math.max(5, Math.min(AI_VERDICT_BOTS.length, Math.round(duration * 1.5)));
+  const botPool = AI_VERDICT_BOTS.join(', ');
+
+  const prompt = phoneConvoStyle === 'ai_verdicts'
+    ? (isHindi ? `
+तुम एक viral short-form video ka script likh rahe ho jisme ek provocative hypothetical dilemma ek baar poocha jaata hai, aur phir alag-alag real AI chatbots apna-apna independent, one-shot jawaab dete hain.
+
+Topic/Dilemma: "${topic}"
+${contextSection ? `\n${contextSection}\n` : ''}
+Format Style: ${styleGuides[phoneConvoStyle]}
+Target Duration: ${duration} minutes (~${targetWords} words total)
+
+STRUCTURE (bilkul isi tarah follow karo):
+1. Pehla item: speaker = "NARRATOR". Text = poora hypothetical scenario vivid detail mein set up karo (kaun, kya, guaranteed outcome, stakes), aur end mein ek direct Haan/Nahi wala sawaal poochho. Ye kai lines ka ho sakta hai — isse short mat karo, dilemma poori tarah establish hona chahiye.
+2. Uske baad ${numVerdicts} independent verdict turns generate karo. Har turn ka speaker ek ALAG real AI chatbot ka naam ho, in mein se: ${botPool}. Ek hi naam do baar mat use karo.
+3. Har verdict mein:
+   - Shuruaat clear "Haan" ya "Nahi" (ya seedha jawaab) se ho
+   - Phir 4-8 lines ka apna khud ka reasoning ho — alag ethical/philosophical/practical framework (jaise utilitarian calculation, deontological rule, historical complexity, emotional argument, slippery-slope warning, uncertainty argument, systemic/root-cause argument)
+   - Kabhi bhi doosre AI ke jawaab ko reference, agree, ya acknowledge mat karo — har verdict aisa lage jaise ye PEHLA aur AKELA jawaab hai
+   - "isse aage badhte hue" jaise conversational connectors bilkul mat use karo — koi cross-talk nahi
+4. Stances mix rakho — sab verdict agree na karein; alag-alag reasoning styles rakho taaki koi do verdict same na lage.
+
+ONLY valid JSON array return karo, no markdown:
+[
+  {"speaker": "NARRATOR", "text": "poora dilemma setup, ant mein ek sawaal"},
+  {"speaker": "ChatGPT", "text": "Haan/Nahi. ...apna reasoning..."},
+  ...
+]
+
+Rules:
+- Exactly 1 NARRATOR turn, uske baad ${numVerdicts} independent AI verdict turns
+- Total length ~${targetWords} words
+- ${styleGuides[phoneConvoStyle]}
+` : `
+You are writing the script for a viral short-form video where a provocative hypothetical dilemma is posed once, and then several different real AI chatbots each give their own independent, one-shot verdict.
+
+Topic/Dilemma: "${topic}"
+${contextSection ? `\n${contextSection}\n` : ''}
+Format Style: ${styleGuides[phoneConvoStyle]}
+Target Duration: ${duration} minutes (~${targetWords} words total)
+
+STRUCTURE (follow exactly):
+1. First item: speaker = "NARRATOR". Text = the full hypothetical scenario, set up in vivid, concrete detail (who, what, the guaranteed outcome, the stakes), ending with a direct Yes/No question. This can run several sentences — don't shorten it, the dilemma needs to be fully established.
+2. Then generate ${numVerdicts} independent verdict turns. Each turn's speaker must be a DIFFERENT real AI chatbot name, chosen from: ${botPool}. Never reuse the same name twice in one script.
+3. Each verdict must:
+   - Open with a clear "Yes" or "No" (or the direct answer to the dilemma)
+   - Then give 4-8 sentences of its OWN self-contained reasoning — a distinct ethical/philosophical/practical framework (e.g. utilitarian calculation, deontological rule, historical complexity, emotional/visceral argument, slippery-slope warning, uncertainty/epistemics argument, systemic/root-cause argument)
+   - NEVER reference, agree with, disagree with, or acknowledge any other AI's answer — each verdict must read as if it's the FIRST and ONLY answer given
+   - NEVER use conversational connectors like "building on that" or "unlike the previous answer" — zero cross-talk
+4. Mix the stances — don't have every verdict agree; vary reasoning styles so no two verdicts feel the same.
+
+Return ONLY a valid JSON array, no markdown:
+[
+  {"speaker": "NARRATOR", "text": "the full dilemma setup, ending in a question"},
+  {"speaker": "ChatGPT", "text": "Yes/No. ...its own reasoning..."},
+  ...
+]
+
+Rules:
+- Exactly 1 NARRATOR turn followed by ${numVerdicts} independent AI verdict turns
+- Total length ~${targetWords} words
+- ${styleGuides[phoneConvoStyle]}
+`)
+    : (isHindi ? `
 तुम एक phone conversation script बना रहे हो जिसमें AI agents आपस में बात कर रहे हैं।
 
 Speakers: ${speakerList}
@@ -7302,7 +7373,7 @@ Rules:
 - ${styleGuides[phoneConvoStyle]}
 - Total length ~${targetWords} words
 - Generate at least ${Math.max(6, duration * 3)} turns
-`;
+`);
 
   const data = await callGemini(model, [{ role: 'user', parts: [{ text: prompt }] }], { tools: useGrounding ? [{ googleSearch: {} }] : undefined });
   const raw: string = data.text ?? data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
