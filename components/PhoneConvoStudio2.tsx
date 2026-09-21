@@ -33,6 +33,17 @@ import { DebateSegment, PhoneStudioSourceClip } from '../types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Any casing/language variant a script's raw "Narrator" speaker tag can come
+// back as (mirrors AudioGenerator.tsx's NARRATOR_KEYS) — checked case-
+// insensitively except the Hindi variants, which have no case to normalize.
+const NARRATOR_SPEAKER_KEYS = new Set(['narrator', 'नैरेटर', 'नारेटर', 'narator', 'voiceover']);
+const isTrueNarratorSpeaker = (sp: string): boolean => NARRATOR_SPEAKER_KEYS.has(sp.trim().toLowerCase());
+// "Intro" — docu_debate's real-audio cold-open tag (see geminiService.ts's
+// docu_debate prompt: "Speaker Tag MUST BE EXACTLY 'Intro'").
+const isIntroSpeaker = (sp: string): boolean => sp.trim().toLowerCase() === 'intro';
+// Either of the above should render as the white card, never a phone mockup.
+const isNarratorLikeSpeaker = (sp: string): boolean => isTrueNarratorSpeaker(sp) || isIntroSpeaker(sp);
+
 // ─── AI Model Presets ─────────────────────────────────────────────────────────
 
 const AI_MODEL_PRESETS: {
@@ -2977,15 +2988,22 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   useEffect(() => {
     if (!mainScript.length) return;
 
-    // Exclude NARRATOR from phone list
+    // Exclude Narrator (any casing/language variant) AND "Intro" (docu_debate's
+    // cold-open tag) from the phone list — neither should get a phone mockup.
     const uniqueSpeakers = Array.from(
-      new Set<string>(mainScript.map(s => s.speaker).filter(sp => sp !== 'NARRATOR'))
+      new Set<string>(mainScript.map(s => s.speaker).filter(sp => !isNarratorLikeSpeaker(sp)))
     );
 
     setPhones(prev => buildPhonesFromSpeakers(uniqueSpeakers, prev));
 
     const turns: ScriptTurn[] = mainScript.map(seg => {
-      const isNarrator = seg.speaker === 'NARRATOR';
+      // "True" Narrator interludes are a silent 4s white-card beat (no audio
+      // of their own — see phoneCanvasRenderer2's drawNarratorCard). "Intro"
+      // is a real spoken cold-open (docu_debate) — it keeps its actual audio/
+      // duration/word-timings, it just also renders as the white card instead
+      // of a phone mockup.
+      const isTrueNarrator = isTrueNarratorSpeaker(seg.speaker);
+      const hidePhoneUI = isTrueNarrator || isIntroSpeaker(seg.speaker);
       const wt = seg.wordTimings;
       // Priority: real STT timings → audio.duration → text estimate (last resort)
       const realDurMs = wt?.length
@@ -2995,13 +3013,13 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
           : null;
       return {
         id: seg.id,
-        phoneId: isNarrator ? 'narrator' : speakerToPhoneId(seg.speaker),
+        phoneId: hidePhoneUI ? 'narrator' : speakerToPhoneId(seg.speaker),
         text: seg.text,
-        isNarrator,
-        durationMs: isNarrator ? 4000 : (realDurMs ?? Math.max(2500, seg.text.length * 75)),
-        audioUrl: isNarrator ? undefined : seg.audioUrl,
+        isNarrator: hidePhoneUI,
+        durationMs: isTrueNarrator ? 4000 : (realDurMs ?? Math.max(2500, seg.text.length * 75)),
+        audioUrl: isTrueNarrator ? undefined : seg.audioUrl,
         // Use real STT timings directly — no estimation when real data exists
-        wordTimings: isNarrator ? undefined : (wt?.length
+        wordTimings: isTrueNarrator ? undefined : (wt?.length
           ? wt.map(w => ({ word: w.word, startTime: w.start, endTime: w.end }))
           : undefined),
       };
@@ -4479,27 +4497,9 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Intro</span>
           </button>
 
-          {/* Footage chip */}
-          <button
-            onClick={() => { setActiveSettingsSection('footage'); setTab('visual'); }}
-            style={{
-              flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
-              width: 44, padding: '5px 4px', borderRadius: 10, cursor: 'pointer',
-              border: `1px solid ${activeSettingsSection === 'footage' ? '#ef4444aa' : 'rgba(255,255,255,0.05)'}`,
-              background: activeSettingsSection === 'footage' ? 'rgba(239,68,68,0.18)' : 'rgba(255,255,255,0.03)',
-              position: 'relative', transition: 'all 0.15s',
-              opacity: uploadedVideoForClip || activeSettingsSection === 'footage' ? 1 : 0.55,
-            }}
-          >
-            <div style={{
-              width: 24, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(239,68,68,0.28)', border: '1px solid rgba(239,68,68,0.44)',
-              color: '#fca5a5', fontSize: 12, marginBottom: 2,
-            }}>🎞️</div>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
-              {sourceClips.length > 0 ? fmtTime(((sourceClips[0]?.endSec ?? 0) - (sourceClips[0]?.startSec ?? 0)) * 1000) : 'Footage'}
-            </span>
-          </button>
+          {/* Footage chip removed in Phone Studio 2 — this copy doesn't offer
+              the source-footage upload/trim flow, only phone conversation +
+              intro. activeSettingsSection can no longer become 'footage'. */}
 
           <div style={{ width: 1, background: 'rgba(255,255,255,0.08)', flexShrink: 0, margin: '2px 2px' }} />
 
