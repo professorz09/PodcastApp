@@ -3,7 +3,7 @@ import {
   Play, Square, Download, Check,
   Volume2, Loader2,
   MonitorSmartphone,
-  Wand2, ImagePlus, RefreshCw, Copy,
+  Wand2, ImagePlus, RefreshCw,
 } from 'lucide-react';
 import { CanvasRenderer, PhoneConfig, ScriptTurn, StudioState, AnimStyle } from '../services/phoneCanvasRenderer2';
 import { renderVideoOffline } from '../services/videoRenderer';
@@ -22,7 +22,7 @@ import {
   generateTitleTextPair,
   generateThumbnail,
   generateStoryboardImage,
-  generateIntroSceneBreakdown,
+  generateStoryboardScenesTimeBased,
   IntroSceneBreakdown,
   PodcastTranscriptSeg,
   PodcastChapter,
@@ -594,19 +594,21 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   const [topic, setTopic] = useState<string | null>(null);
   const [detectedHost, setDetectedHost] = useState<string | null>(null);
 
-  // Intro scenes — same two-step system as EnglishVideoMaker's own intro
-  // scenes: first "Plan Scenes" breaks the generated intro narration (itself
-  // read from the main script's transcript in Step 1) into a timed sequence
-  // of scene-beat prompts (no images yet, see generateIntroSceneBreakdown),
-  // then each scene can be generated, regenerated, or replaced with an
-  // uploaded image individually — or all at once via "Generate All Visuals".
-  // The render step below picks whichever scene is active at each timestamp.
-  const [introScenes, setIntroScenes] = useState<(IntroSceneBreakdown & { imageUrl?: string })[] | null>(null);
-  const [planningLoading, setPlanningLoading] = useState(false);
+  // Intro scenes — ONE button generates a consistent illustrated STORY (like
+  // Storyboard's own engine — generateStoryboardScenesTimeBased): a shared
+  // characterGuide is derived once and reused on every scene that needs it,
+  // so the sequence reads as one coherent chapter instead of disconnected
+  // panels, using simple MS-Paint-style prompts (see generateStoryboardImage,
+  // which appends that style automatically). After that, each scene can
+  // still be individually regenerated (same character) or replaced with an
+  // uploaded image. The render step below picks whichever scene is active at
+  // each timestamp.
+  const [introScenes, setIntroScenes] = useState<(IntroSceneBreakdown & { imageUrl?: string; usesCharacter?: boolean })[] | null>(null);
   const [sceneLoading, setSceneLoading] = useState<Record<number, boolean>>({});
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
-  const introScenesRef = useRef<(IntroSceneBreakdown & { imageUrl?: string })[] | null>(null);
+  const introScenesRef = useRef<(IntroSceneBreakdown & { imageUrl?: string; usesCharacter?: boolean })[] | null>(null);
+  const introCharacterGuideRef = useRef('');
 
   // Cached intermediate results — refs so the pipeline can read them sync
   const introTextRef = useRef<string | null>(null);
@@ -633,44 +635,99 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
   const STEP_ORDER: IntroStepKey[] = INTRO_STEPS.map(s => s.key);
 
-  // Step 1: Plan Scenes — reads the generated intro narration (from Step 1
-  // of THIS pipeline, which itself reads the main transcript) and breaks it
-  // into a dense sequence of timed scene-beat PROMPTS only, no images yet —
-  // same call + same two-step shape as EnglishVideoMaker's "Plan Scenes" /
-  // "Generate All Visuals" split. When the real TTS audio + STT word timings
-  // are already available (Steps 2-3 below), those are passed in as exact
-  // spoken timing so each scene cut lands on an actual word boundary instead
-  // of a proportional text-length guess.
-  const planScenes = async () => {
-    if (planningLoading) return;
-    setPlanningLoading(true);
+  // ONE button: builds timed slots from the generated intro narration (real
+  // STT word timings when Steps 2-3 are already done, so slots land on actual
+  // spoken word boundaries — else a proportional text-length estimate), then
+  // calls the same consistent-story engine Storyboard uses
+  // (generateStoryboardScenesTimeBased) — it derives ONE shared characterGuide
+  // for the whole intro and writes each scene's prompt to match it (only when
+  // that scene actually needs the character), so the sequence reads as one
+  // coherent illustrated chapter instead of disconnected panels. Then
+  // generates every scene's image sequentially — a failure on one never
+  // blocks the rest, retry that one from its own row. generateStoryboardImage
+  // appends the flat MS-Paint-style look automatically, so scene prompts here
+  // stay plain "who/what/where" descriptions.
+  const generateStoryScenes = async () => {
+    if (bulkLoading) return;
+    setBulkLoading(true);
+    setBulkProgress({ done: 0, total: 0 });
     try {
       const basis = introTextRef.current || topic
         || 'A podcast host about to introduce a topic, mid-sentence, engaging expression.';
       const realDuration = audioRef.current?.duration;
       const estDuration = realDuration || Math.max(6, basis.split(/\s+/).length / 2.3);
-      const phraseTimings = (realDuration && timingsRef.current?.length)
-        ? timingsRef.current.map(w => ({ text: w.word, start: w.start, end: w.end }))
-        : undefined;
-      const breakdown = await generateIntroSceneBreakdown(basis, estDuration, phraseTimings);
-      const scenes: (IntroSceneBreakdown & { imageUrl?: string })[] = breakdown.map(s => ({ ...s }));
+      const words = timingsRef.current;
+
+      // Build ~3s timed slots — from real word timings when available, else
+      // an even proportional split of the estimated duration.
+      const TARGET_SEC = 3;
+      let slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[] = [];
+      if (realDuration && words?.length) {
+        let slotStart = 0, buf: string[] = [], n = 1;
+        for (const w of words) {
+          buf.push(w.word);
+          if (w.end - slotStart >= TARGET_SEC) {
+            slots.push({ sceneNumber: n++, startTime: slotStart, endTime: w.end, voiceover: buf.join(' ') });
+            slotStart = w.end; buf = [];
+          }
+        }
+        if (buf.length) slots.push({ sceneNumber: n++, startTime: slotStart, endTime: estDuration, voiceover: buf.join(' ') });
+      } else {
+        const targetCount = Math.max(3, Math.min(12, Math.round(estDuration / TARGET_SEC)));
+        const wordsArr = basis.split(/\s+/).filter(Boolean);
+        const perSlot = Math.max(2, Math.ceil(wordsArr.length / targetCount));
+        const chunks: string[] = [];
+        for (let i = 0; i < wordsArr.length; i += perSlot) chunks.push(wordsArr.slice(i, i + perSlot).join(' '));
+        const sliceDur = estDuration / Math.max(1, chunks.length);
+        slots = chunks.map((c, i) => ({ sceneNumber: i + 1, startTime: i * sliceDur, endTime: i === chunks.length - 1 ? estDuration : (i + 1) * sliceDur, voiceover: c }));
+      }
+      if (!slots.length) throw new Error('Intro text khaali hai');
+
+      const { prompts, usesCharacter, characterGuide } = await generateStoryboardScenesTimeBased(slots);
+      introCharacterGuideRef.current = characterGuide;
+      const scenes: (IntroSceneBreakdown & { imageUrl?: string; usesCharacter?: boolean })[] = slots.map((s, i) => ({
+        startOffset: s.startTime, endOffset: s.endTime,
+        prompt: prompts[i] || s.voiceover,
+        usesCharacter: !!usesCharacter[i],
+      }));
       introScenesRef.current = scenes;
-      setIntroScenes(scenes);
-      toast.success(`${scenes.length} scene prompts ready — ab "Generate All Visuals" dabao ya har scene individually generate/upload karo.`);
+      setIntroScenes([...scenes]);
+      setBulkProgress({ done: 0, total: scenes.length });
+
+      let ok = 0;
+      for (let i = 0; i < scenes.length; i++) {
+        setSceneLoading(prev => ({ ...prev, [i]: true }));
+        try {
+          const url = await generateStoryboardImage(scenes[i].prompt, scenes[i].usesCharacter ? characterGuide : undefined);
+          scenes[i] = { ...scenes[i], imageUrl: url };
+          ok++;
+        } catch (e) {
+          console.warn(`Intro scene #${i + 1} image failed:`, e);
+        } finally {
+          setSceneLoading(prev => ({ ...prev, [i]: false }));
+          introScenesRef.current = [...scenes];
+          setIntroScenes([...scenes]);
+          setBulkProgress({ done: i + 1, total: scenes.length });
+        }
+      }
+      if (ok === 0) toast.error('Koi bhi scene image nahi ban payi');
+      else if (ok < scenes.length) toast.success(`${ok}/${scenes.length} scenes ban gaye — baaki individually retry karo.`);
+      else toast.success(`${ok} scenes ban gaye — ek consistent story!`);
     } catch (e: any) {
-      toast.error(e?.message || 'Scene planning fail hui');
+      toast.error(e?.message || 'Story scenes generate nahi hue');
     } finally {
-      setPlanningLoading(false);
+      setBulkLoading(false);
     }
   };
 
-  // Step 2 (per-scene): generate or regenerate just ONE scene's image.
+  // Per-scene regenerate — reuses the same characterGuide so a manual retry
+  // still matches the rest of the story.
   const generateOneScene = async (idx: number) => {
     const scenes = introScenesRef.current;
     if (!scenes?.[idx] || sceneLoading[idx]) return;
     setSceneLoading(prev => ({ ...prev, [idx]: true }));
     try {
-      const url = await generateStoryboardImage(scenes[idx].prompt);
+      const url = await generateStoryboardImage(scenes[idx].prompt, scenes[idx].usesCharacter ? introCharacterGuideRef.current : undefined);
       scenes[idx] = { ...scenes[idx], imageUrl: url };
       introScenesRef.current = [...scenes];
       setIntroScenes([...scenes]);
@@ -679,34 +736,6 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
     } finally {
       setSceneLoading(prev => ({ ...prev, [idx]: false }));
     }
-  };
-
-  // Step 2 (bulk): generate every scene's image sequentially — a failure on
-  // one never blocks the rest, retry that one individually afterward.
-  const generateAllScenes = async () => {
-    const scenes = introScenesRef.current;
-    if (!scenes?.length || bulkLoading) return;
-    setBulkLoading(true);
-    setBulkProgress({ done: 0, total: scenes.length });
-    let ok = 0;
-    for (let i = 0; i < scenes.length; i++) {
-      setSceneLoading(prev => ({ ...prev, [i]: true }));
-      try {
-        scenes[i] = { ...scenes[i], imageUrl: await generateStoryboardImage(scenes[i].prompt) };
-        ok++;
-      } catch (e) {
-        console.warn(`Intro scene #${i + 1} image failed:`, e);
-      } finally {
-        setSceneLoading(prev => ({ ...prev, [i]: false }));
-        introScenesRef.current = [...scenes];
-        setIntroScenes([...scenes]);
-        setBulkProgress({ done: i + 1, total: scenes.length });
-      }
-    }
-    setBulkLoading(false);
-    if (ok === 0) toast.error('Koi bhi scene image nahi ban payi');
-    else if (ok < scenes.length) toast.success(`${ok}/${scenes.length} scenes ban gaye — baaki individually retry karo.`);
-    else toast.success('Saare scenes ke visuals ban gaye!');
   };
 
   // Manual override — user uploads their own image for one specific scene
@@ -722,15 +751,6 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
       setIntroScenes([...scenes]);
     };
     reader.readAsDataURL(file);
-  };
-
-  const copyAllScenePrompts = () => {
-    const scenes = introScenesRef.current;
-    if (!scenes?.length) return;
-    const text = scenes.map((s, i) => `Scene #${i + 1}:\n${s.prompt}`).join('\n\n');
-    navigator.clipboard.writeText(text)
-      .then(() => toast.success('Saare prompts copy ho gaye'))
-      .catch(() => toast.error('Copy fail hui'));
   };
 
   const clearScenes = () => {
@@ -1178,52 +1198,20 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
           </div>
         )}
 
-        {!introScenes?.length ? (
-          <button
-            onClick={planScenes}
-            disabled={planningLoading}
-            style={{
-              padding: '9px', borderRadius: 8, border: 'none', cursor: planningLoading ? 'default' : 'pointer',
-              background: planningLoading ? 'rgba(168,85,247,0.25)' : 'rgba(168,85,247,0.18)',
-              color: '#e9d5ff', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            {planningLoading
-              ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Scenes plan ho rahe hain…</>
-              : <><Wand2 size={12} /> Plan Scenes (Storyboard Prompts)</>}
-          </button>
-        ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            <button
-              onClick={generateAllScenes}
-              disabled={bulkLoading}
-              style={{
-                flex: 1, minWidth: 150, padding: '9px', borderRadius: 8, border: 'none', cursor: bulkLoading ? 'default' : 'pointer',
-                background: bulkLoading ? 'rgba(168,85,247,0.25)' : 'rgba(168,85,247,0.18)',
-                color: '#e9d5ff', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              {bulkLoading
-                ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generating… {bulkProgress.done}/{bulkProgress.total}</>
-                : introScenes.some(s => s.imageUrl) ? <><RefreshCw size={12} /> Regenerate All Visuals</> : <><ImagePlus size={12} /> Generate All Visuals</>}
-            </button>
-            <button
-              onClick={copyAllScenePrompts}
-              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
-            >
-              <Copy size={11} /> Copy All
-            </button>
-            <button
-              onClick={planScenes}
-              disabled={planningLoading}
-              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: planningLoading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 5, opacity: planningLoading ? 0.5 : 1 }}
-            >
-              <RefreshCw size={11} /> Re-plan
-            </button>
-          </div>
-        )}
+        <button
+          onClick={generateStoryScenes}
+          disabled={bulkLoading}
+          style={{
+            padding: '15px', borderRadius: 12, border: 'none', cursor: bulkLoading ? 'default' : 'pointer',
+            background: bulkLoading ? 'rgba(168,85,247,0.3)' : 'linear-gradient(135deg,#a855f7,#7c3aed)',
+            color: '#fff', fontSize: 13, fontWeight: 800, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          {bulkLoading
+            ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Story ban rahi hai… {bulkProgress.done}/{bulkProgress.total || '?'}</>
+            : <><Wand2 size={15} /> {introScenes?.length ? 'Regenerate Story Scenes' : 'Generate Story Scenes'}</>}
+        </button>
         {!timingsRef.current?.length && !introScenes?.length && (
           <div style={{ fontSize: 10, color: 'rgba(245,158,11,0.7)' }}>Tip: pehle Step 2-3 (TTS + STT) chalao — scenes real bole gaye words ke saath match honge.</div>
         )}
