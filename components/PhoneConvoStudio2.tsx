@@ -591,6 +591,16 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   const [topic, setTopic] = useState<string | null>(null);
   const [detectedHost, setDetectedHost] = useState<string | null>(null);
 
+  // AI Illustration — a separate, previewable settings section (like
+  // EnglishVideoMaker's storyboard scenes) instead of a silent one-shot
+  // generation buried inside the render step. User can generate/regenerate
+  // and see the result before hitting the main render button; the render
+  // step below reuses whatever's here instead of generating a fresh one.
+  const [aiImage, setAiImage] = useState<{ url: string; prompt: string } | null>(null);
+  const [aiImageLoading, setAiImageLoading] = useState(false);
+  const [aiImagePrompt, setAiImagePrompt] = useState('');
+  const aiImageRef = useRef<{ url: string; prompt: string } | null>(null);
+
   // Cached intermediate results — refs so the pipeline can read them sync
   const introTextRef = useRef<string | null>(null);
   const audioRef = useRef<{ blob: Blob; url: string; duration: number } | null>(null);
@@ -615,6 +625,28 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   };
 
   const STEP_ORDER: IntroStepKey[] = INTRO_STEPS.map(s => s.key);
+
+  // Generates (or regenerates) the intro's AI illustration on demand — uses
+  // the edited prompt if the user typed one, else falls back to the
+  // generated intro text, else a generic placeholder. Stored in aiImageRef
+  // so the render step below picks it up instead of generating its own.
+  const generateAiImage = async () => {
+    if (aiImageLoading) return;
+    setAiImageLoading(true);
+    try {
+      const basis = aiImagePrompt.trim() || introTextRef.current || topic
+        || 'A podcast host about to introduce a topic, mid-sentence, engaging expression.';
+      const scenePrompt = `A single clear illustrated scene for a podcast intro, visualizing: ${basis}`;
+      const url = await generateStoryboardImage(scenePrompt);
+      const result = { url, prompt: basis };
+      aiImageRef.current = result;
+      setAiImage(result);
+    } catch (e: any) {
+      toast.error(e?.message || 'Illustration generate nahi hui');
+    } finally {
+      setAiImageLoading(false);
+    }
+  };
 
   // Run the pipeline from `fromStep` to end. Earlier steps reuse cached refs.
   const runFrom = async (fromStep: IntroStepKey) => {
@@ -825,11 +857,19 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
           let storyboardFrame: HTMLCanvasElement | null = null;
           if (!footageFrame) {
             try {
-              patchStep('render', { status: 'running', detail: 'AI illustration bana raha hai…' });
-              const scenePrompt = introTextRef.current
-                ? `A single clear illustrated scene for a podcast intro, visualizing: ${introTextRef.current}`
-                : 'A podcast host about to introduce a topic, mid-sentence, engaging expression.';
-              const imgUrl = await generateStoryboardImage(scenePrompt);
+              // Reuse whatever the user already generated/approved in the AI
+              // Illustration settings section — only auto-generate here if
+              // they never touched it.
+              let imgUrl = aiImageRef.current?.url;
+              if (!imgUrl) {
+                patchStep('render', { status: 'running', detail: 'AI illustration bana raha hai…' });
+                const scenePrompt = introTextRef.current
+                  ? `A single clear illustrated scene for a podcast intro, visualizing: ${introTextRef.current}`
+                  : 'A podcast host about to introduce a topic, mid-sentence, engaging expression.';
+                imgUrl = await generateStoryboardImage(scenePrompt);
+                aiImageRef.current = { url: imgUrl, prompt: scenePrompt };
+                setAiImage({ url: imgUrl, prompt: scenePrompt });
+              }
               storyboardFrame = await loadImageIntoCanvas(imgUrl, W, H);
               patchStep('render', { status: 'running', detail: '0%' });
             } catch (e) {
@@ -950,6 +990,50 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             ))}
           </div>
         )}
+
+        {/* AI Illustration — separate, previewable settings section (like
+            EnglishVideoMaker's storyboard scenes) instead of a silent
+            one-shot generation buried inside the render step. Only used
+            when no real footage video is uploaded (real footage always
+            wins in the render step), but stays visible either way so it
+            can be prepared ahead of time. */}
+        <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+            🎨 AI Illustration {videoFile ? '(footage upload hai to ye use nahi hogi)' : ''}
+          </div>
+          {aiImage && (
+            <img
+              src={aiImage.url}
+              alt="Intro illustration preview"
+              style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}
+            />
+          )}
+          <textarea
+            value={aiImagePrompt}
+            onChange={e => setAiImagePrompt(e.target.value)}
+            placeholder={introText || topic || 'Optional — kya scene banana hai likho (khaali chhodo to intro text/topic se auto-generate hoga)'}
+            rows={2}
+            style={{
+              width: '100%', resize: 'vertical', borderRadius: 8, padding: '8px 10px',
+              background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)',
+              color: '#fff', fontSize: 11, fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+          <button
+            onClick={generateAiImage}
+            disabled={aiImageLoading}
+            style={{
+              padding: '9px', borderRadius: 8, border: 'none', cursor: aiImageLoading ? 'default' : 'pointer',
+              background: aiImageLoading ? 'rgba(168,85,247,0.25)' : 'rgba(168,85,247,0.18)',
+              color: '#e9d5ff', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            {aiImageLoading
+              ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+              : aiImage ? <>🔁 Regenerate Illustration</> : <>🎨 Generate Illustration</>}
+          </button>
+        </div>
 
         {/* Main button */}
         <button
@@ -5231,7 +5315,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             {activeSettingsSection === 'intro' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                  🎬 Intro video — real footage se ek frame freeze hoke, uspar "In this clip [host] [talks about] [topic]…" caption/voiceover ban ta hai.
+                  🎬 Intro video — AI illustration (ya video upload ho to real footage ka freeze frame) ke upar "In this clip [host] [talks about] [topic]…" caption/voiceover ban ta hai.
                 </div>
                 <IntroFlow
                   segments={podcastSegments}
