@@ -1661,24 +1661,34 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               }
 
               ══════════════════════════════════════════
-              【 NARRATOR — OPENING: SITUATION 】
+              【 TURN 1 (NARRATOR) — SITUATION — MANDATORY, chhota mat karo ya skip mat karo 】
               ══════════════════════════════════════════
-              3-5 lines में एक specific इंसान को नाम के साथ introduce करो — concrete, believable details के साथ
-              (age, job/context, aur exactly kya ho raha hai) — vague generic scenario नहीं।
+              Ye apna poora, alag Narrator turn hai aur poori video mein SABSE PEHLE bola jaata hai —
+              audience ko abhi tak kuch pata nahi hai, isliye sirf isi turn ko poori situation samjhani hai.
+              Ye 3-5 COMPLETE lines ka hona chahiye — ek specific इंसान को नाम के साथ introduce karo, concrete
+              believable details ke saath (age, job/context, aur exactly kya ho raha hai) — ek chhoti si line
+              nahi, skip nahi, aur neeche wale TURN 2 mein merge bhi nahi karna.
               जैसे: "जेम्स 30 साल का है। उसकी stable ₹70K/month job है, कोई debt नहीं, और ₹5 लाख savings में पड़े हैं।
               Job secure है, लेकिन यही उसका इकलौता safety net है। Invest करे long-term growth के लिए, ya safe रखे?"
-              इस section को एक clear, direct MAIN QUESTION पर खत्म करो जिसके इर्द-गिर्द पूरा episode घूमेगा, फिर सीधे
-              पहले sub-question पर चले जाओ — सारे sub-questions को पहले एक साथ बोलकर मत सुनाओ; audience screen पर
-              पूरी question sheet already dekh raha hoga, toh sab pehle bata dena sirf repeat lagega.
-              🔴 CRITICAL — इस line के बिल्कुल आखिर में main question ka ek chhota bracketed heading जोड़ो,
-              जैसे: ...invest kare ya safe rakhe? [Invest kare ya safe rakhe?]
+              Turn 1 ko ek clear, direct MAIN QUESTION par khatam karo jiske ird-gird poora episode ghoomega.
+              🔴 CRITICAL — is turn ke text ke bilkul aakhir mein main question ka ek chhota bracketed heading
+              jodo, जैसे: ...invest kare ya safe rakhe? [Invest kare ya safe rakhe?]
               Bracket sirf on-screen display ke liye silent tag hai — kabhi bola nahi jaata, isliye bracket se
               pehle wala sentence khud mein complete aur natural rehna chahiye.
 
               ══════════════════════════════════════════
+              【 TURN 2 (NARRATOR) — PEHLE SUB-QUESTION MEIN — Turn 1 se ALAG turn 】
+              ══════════════════════════════════════════
+              Turn 1 ke turant baad, ek NAYE alag Narrator turn mein, pehla sub-question introduce karo
+              (neeche Hosts section dekho ki sub-question transition kaisi dikhti hai). Narrator se sare
+              sub-questions pehle ek saath mat bulwao — audience screen par poori question sheet already
+              dekh raha hoga, toh sab pehle bata dena sirf repeat lagega.
+
+              ══════════════════════════════════════════
               【 HOSTS — एक-एक SUB-QUESTION पर DEBATE 】
               ══════════════════════════════════════════
-              Dilemma ko 4-7 concrete sub-questions mein todo. Har ek ke liye, order mein:
+              Dilemma ko 4-7 concrete sub-questions mein todo. Har ek ke liye, order mein (pehla wala Turn 2
+              hai; baad wale bhi isi tarah apna-apna alag Narrator turn honge):
               - Narrator us specific sub-question ko ek natural line mein introduce kare (form item ki tarah
                 nahi) — yahi ek jagah hai jahan wo sub-question bola jaata hai.
                 🔴 CRITICAL — is line ke bilkul aakhir mein sirf usi sub-question ka chhota bracketed version
@@ -3730,26 +3740,36 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             }
 
             ══════════════════════════════════════════
-            【 NARRATOR — OPENING: THE SITUATION 】
+            【 TURN 1 (NARRATOR) — THE SITUATION — MANDATORY, DO NOT SHORTEN OR SKIP 】
             ══════════════════════════════════════════
-            In 3-5 sentences, introduce ONE specific person by name with concrete, believable details
-            (age, job/context, and exactly what's happening) — not a vague generic scenario.
+            This is its own full Narrator turn and the FIRST thing spoken in the whole video — the
+            audience has no idea what's going on yet, so this turn alone has to make them understand the
+            full scenario. It must be 3-5 COMPLETE sentences introducing ONE specific person by name with
+            concrete, believable details (age, job/context, and exactly what's happening) — not a vague
+            one-liner, not skipped, not merged into Turn 2 below.
             e.g. "James is 30. He's got a stable $70K job, no debt, and $50,000 sitting in savings.
             His job is secure, but that's the only safety net he has. Should he invest it for long-term
             growth, or keep it safe in case something goes wrong?"
-            End this section with ONE clear, direct MAIN QUESTION the whole episode revolves around, then
-            go STRAIGHT into introducing the first sub-question below — do NOT separately list out all the
-            sub-questions out loud first; the audience sees the full question sheet on screen as it comes
-            up, so narrating the whole list before starting would just repeat what they're already reading.
-            🔴 CRITICAL — append this line with a short bracketed heading version of the main question,
-            e.g.: ...should he invest it, or keep it safe? [Invest or play it safe?]
+            End Turn 1 with ONE clear, direct MAIN QUESTION the whole episode revolves around.
+            🔴 CRITICAL — append this turn's text with a short bracketed heading version of that main
+            question, e.g.: ...should he invest it, or keep it safe? [Invest or play it safe?]
             The bracket is a SILENT tag for on-screen display only — it is never spoken, so keep the
             spoken sentence before it complete and natural on its own.
 
             ══════════════════════════════════════════
+            【 TURN 2 (NARRATOR) — INTO THE FIRST SUB-QUESTION — A SEPARATE TURN FROM TURN 1 】
+            ══════════════════════════════════════════
+            Immediately after Turn 1, in a NEW separate Narrator turn, introduce the first sub-question
+            (see the Hosts section below for what a sub-question transition looks like). Do NOT have the
+            Narrator separately list out all the sub-questions before this — the audience sees the full
+            question sheet on screen as it comes up, so reading the whole list out loud first would just
+            repeat what they're already reading.
+
+            ══════════════════════════════════════════
             【 HOSTS — DEBATE, ONE SUB-QUESTION AT A TIME 】
             ══════════════════════════════════════════
-            Break the dilemma into 4-7 concrete sub-questions. For EACH one, in order:
+            Break the dilemma into 4-7 concrete sub-questions. For EACH one, in order (the first one is
+            Turn 2 above; later ones are their own Narrator turn the same way):
             - The Narrator introduces THAT specific sub-question in one natural line (not read like a
               form item) — this is the ONLY place that sub-question gets stated out loud.
               🔴 CRITICAL — append this line with a short bracketed version of just that sub-question,
