@@ -39,7 +39,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3.8-flash' | 'gemini-3.1-pro-preview'>('gemini-3.8-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'case_debate' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -1174,7 +1174,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel' || newStyle === 'situational') { setSpeakerCount(3); }
                       else if (newStyle === 'questioning') { setSpeakerCount(4); setIncludeNarrator(true); }
-                      else if (newStyle === 'debate2') { setSpeakerCount(2); setIncludeNarrator(true); }
+                      else if (newStyle === 'debate2' || newStyle === 'case_debate') { setSpeakerCount(2); setIncludeNarrator(true); }
                       else if (['narration', 'monkey_explain', 'viral_recap', 'image', 'professor_jiang', 'transcript_review', 'summarizer_pov', 'context_bridge', 'explained_solo'].includes(newStyle)) { setSpeakerCount(1); setIncludeNarrator(false); }
                       else { setSpeakerCount(2); }
                     }}
@@ -1182,6 +1182,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   >
                     <option value="podcast">🎙️ Podcast Style (Boy & Girl Hosts)</option>
                     <option value="situational">🌍 Situational</option>
+                    <option value="case_debate">🧩 Case Debate (Life Dilemma)</option>
                     <option value="roleplay">🎭 Roleplay Practice</option>
                     <option value="formal_interview">👔 Formal / Interview</option>
                     <option value="casual_chat">☕ Casual Chat</option>
@@ -1314,8 +1315,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
                 )}
 
-                {/* Narrator — hidden for Joe Rogan & Docu-Debate styles (handled automatically) */}
-                {(style !== 'joe_rogan' && style !== 'docu_debate') && (
+                {/* Narrator — hidden for Joe Rogan, Docu-Debate & Case Debate styles (handled automatically) */}
+                {(style !== 'joe_rogan' && style !== 'docu_debate' && style !== 'case_debate') && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
                     <Mic size={12} className="text-blue-400" />

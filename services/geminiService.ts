@@ -388,7 +388,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.5-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1636,7 +1636,83 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               ${durFillHi}
             `;
           }
-        
+
+        } else if (style === 'case_debate') {
+          prompt = `
+              ═══════════════════════════════════════
+              STYLE: CASE DEBATE — एक इंसान की असली दुविधा, सवालों में तोड़ी हुई
+              Narrator एक specific इंसान का real, relatable dilemma introduce करता है
+              (relationship, money, family, moral, या AI-era decision)। फिर उस dilemma को
+              4-7 concrete sub-questions में तोड़ा जाता है, और दो hosts — जिनकी सोच genuinely
+              अलग है — हर sub-question पर बारी-बारी debate करते हैं। generic "for vs against"
+              नहीं — हमेशा इसी एक इंसान की specific situation पर grounded।
+              ═══════════════════════════════════════
+              विषय: "${topic}"
+              ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: हिंदी + Hinglish (natural, emotionally grounded — जैसे दो smart दोस्त genuinely असहमत हों, formal debate नहीं)।
+
+              पात्र — ठीक 3 (fixed):
+              - Narrator: situation set up करेगा, question sheet बताएगा, सवालों के बीच transition करेगा, और closing देगा
+              - 2 Hosts:
+              ${speakers.length >= 2
+                ? `इन नामों का उपयोग करें: ${speakers[0]} और ${speakers[1]}.`
+                : `Topic के हिसाब से 2 fresh नाम चुनो — जो genuinely इस specific dilemma पर अलग-अलग side लें।`
+              }
+
+              ══════════════════════════════════════════
+              【 NARRATOR — OPENING: SITUATION 】
+              ══════════════════════════════════════════
+              3-5 lines में एक specific इंसान को नाम के साथ introduce करो — concrete, believable details के साथ
+              (age, job/context, aur exactly kya ho raha hai) — vague generic scenario नहीं।
+              जैसे: "जेम्स 30 साल का है। उसकी stable ₹70K/month job है, कोई debt नहीं, और ₹5 लाख savings में पड़े हैं।
+              Job secure है, लेकिन यही उसका इकलौता safety net है। Invest करे long-term growth के लिए, ya safe रखे?"
+              इस section को एक clear, direct MAIN QUESTION पर खत्म करो जिसके इर्द-गिर्द पूरा episode घूमेगा।
+
+              ══════════════════════════════════════════
+              【 NARRATOR — QUESTION SHEET 】
+              ══════════════════════════════════════════
+              Main question के तुरंत बाद, Narrator 4-7 concrete sub-questions naturally एक quick list की तरह बताए —
+              form की तरह पढ़ते हुए नहीं, बातचीत की तरह।
+              जैसे: "यहाँ हमें ये पता लगाना है: क्या वो सारा पैसा invest करे, या split करे? Emergency fund कितना होना
+              चाहिए पहले? क्या उसकी job सच में उतनी secure है? और अगर invest करने के तुरंत बाद market गिर जाए — तब?"
+              ये sub-questions ही आगे के debate का structure बनेंगे — एक-एक करके, इसी order में।
+
+              ══════════════════════════════════════════
+              【 HOSTS — एक-एक SUB-QUESTION पर DEBATE 】
+              ══════════════════════════════════════════
+              Question Sheet के हर sub-question के लिए, order में:
+              - Narrator उस specific sub-question में briefly transition करे (1 line)।
+              - दोनों hosts उसी sub-question पर अपनी OWN real position दें — सिर्फ एक-दूसरे को react नहीं
+                करते, हर एक genuinely कुछ मानता है और उसके लिए argue करता है।
+              - Real back-and-forth: हर sub-question पर 3-8 turns, alternating, genuine reactions के साथ
+                ("रुक, लेकिन—", "ठीक है पर फिर—")।
+              - हर turn 1-2 पूरे sentences का हो और किसी concrete चीज़ का reference हो — number, नाम,
+                real consequence — सिर्फ vibe या abstract principle नहीं।
+              - कोई technical/financial/legal term आए तो उसे तुरंत एक concrete example या comparison से simple करो —
+                jargon dump कभी नहीं।
+              - अगले sub-question पर तभी बढ़ो जब इस पर genuine tension या disagreement आ चुका हो।
+
+              ══════════════════════════════════════════
+              【 CLOSING — आप क्या करते? 】
+              ══════════════════════════════════════════
+              आखिरी sub-question के बाद, Narrator सीधे audience से पूछे: "तो — अगर आप [नाम] की जगह होते तो क्या करते?"
+              फिर दोनों hosts अपनी एक final, honest, personal position दें — दोनों का agree करना ज़रूरी नहीं,
+              और किसी को "सही" घोषित नहीं किया जाता।
+              Narrator एक sharp, thought-provoking final line से खत्म करे। कोई moralizing नहीं, कोई neat bow नहीं।
+
+              ══════════════════════════════════════════
+              HARD RULES:
+              ══════════════════════════════════════════
+              ✓ दोनों hosts की एक REAL, specific position हो — सिर्फ दूसरे को react नहीं करते
+              ✓ हर sub-question पर genuine disagreement हो, politely agree करना नहीं
+              ✓ पूरे script में concrete details — real number, real नाम, real consequence
+              ✗ सीधे "balanced" answer पर मत कूदो — tension ही video है
+              ✗ Banned: "ध्यान देने योग्य है", "निष्कर्ष में", "आइए जानते हैं", "अंत में"
+              ✗ कोई obvious winner नहीं — audience genuinely torn महसूस करे
+              ══════════════════════════════════════════
+              ${durFillHi}
+          `;
         } else if (style === 'docu_debate') {
           prompt = `
             विषय/Topic: "${topic}" पर एक "Docu-Debate (Case Study)" style वीडियो script बनाओ।
@@ -3623,7 +3699,86 @@ Speaker B (Curious): choose a different name — asks what the audience is think
               ${durFillEn}
             `;
           }
-        
+
+        } else if (style === 'case_debate') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: CASE DEBATE — ONE CHARACTER'S REAL DILEMMA, BROKEN INTO QUESTIONS
+            A Narrator introduces ONE specific person facing a real, relatable life dilemma
+            (relationship, money, family, moral, or AI-era decision). The dilemma is then
+            broken into 4-7 concrete sub-questions, and two hosts with genuinely different
+            worldviews debate EACH sub-question in turn — never generic "for vs against"
+            rambling, always grounded in this one character's specific situation.
+            ═══════════════════════════════════════
+            Topic: "${topic}"
+            ${specificDetails ? `Additional context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}. Tone: natural, conversational, emotionally grounded — two smart friends who genuinely disagree, not a formal debate.
+
+            Characters — exactly 3 (fixed):
+            - Narrator: sets up the situation, states the question sheet, transitions between questions, and delivers the closing
+            - 2 Hosts:
+            ${speakers.length >= 2
+              ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
+              : `Choose two fresh, topic-appropriate names for the hosts — people who would naturally take genuinely different sides on THIS specific dilemma.`
+            }
+
+            ══════════════════════════════════════════
+            【 NARRATOR — OPENING: THE SITUATION 】
+            ══════════════════════════════════════════
+            In 3-5 sentences, introduce ONE specific person by name with concrete, believable details
+            (age, job/context, and exactly what's happening) — not a vague generic scenario.
+            e.g. "James is 30. He's got a stable $70K job, no debt, and $50,000 sitting in savings.
+            His job is secure, but that's the only safety net he has. Should he invest it for long-term
+            growth, or keep it safe in case something goes wrong?"
+            End this section with ONE clear, direct MAIN QUESTION the whole episode revolves around.
+
+            ══════════════════════════════════════════
+            【 NARRATOR — THE QUESTION SHEET 】
+            ══════════════════════════════════════════
+            Right after the main question, the Narrator lays out 4-7 concrete sub-questions that break
+            the dilemma down — spoken naturally as a quick list, not read like a form.
+            e.g. "Here's what we need to figure out: Should he invest all of it, or split it? How much
+            of an emergency fund does he actually need first? Is his job really as secure as he thinks?
+            And if the market drops right after he invests — then what?"
+            These sub-questions become the actual structure of the debate below — one at a time, in order.
+
+            ══════════════════════════════════════════
+            【 HOSTS — DEBATE, ONE SUB-QUESTION AT A TIME 】
+            ══════════════════════════════════════════
+            For EACH sub-question from the Question Sheet, in order:
+            - The Narrator briefly re-states or transitions into that specific sub-question (1 line).
+            - Both hosts give their OWN real position on THAT sub-question — not just reacting to each
+              other, each one actually believes something and argues for it.
+            - Real back-and-forth: 3-8 turns per sub-question, alternating, with genuine reactions
+              ("Wait, but—", "Okay sure, but what about—").
+            - Every turn is 1-2 full sentences and references something concrete — a number, a name,
+              a real consequence — never just vibes or abstract principle.
+            - If a technical/financial/legal term comes up, simplify it immediately with one concrete
+              example or comparison — never a jargon dump.
+            - Move to the next sub-question only once this one has a real moment of tension or disagreement.
+
+            ══════════════════════════════════════════
+            【 CLOSING — WHAT WOULD YOU DO? 】
+            ══════════════════════════════════════════
+            After the last sub-question, the Narrator turns to the audience directly: "So — what would
+            YOU do in [name]'s position?" (or equivalent, in ${language}).
+            Then each host gives ONE final, honest, personal position — they do NOT have to agree, and
+            neither is declared "right".
+            Narrator closes with ONE sharp, thought-provoking final line. No moralizing, no neat bow.
+
+            ══════════════════════════════════════════
+            NON-NEGOTIABLE RULES:
+            ══════════════════════════════════════════
+            ✓ Both hosts hold a REAL, specific position — not just reacting to the other person
+            ✓ Every sub-question gets genuine disagreement, not two people politely agreeing
+            ✓ Concrete details throughout — a real number, a real name, a real consequence
+            ✗ NEVER skip straight to a "balanced" answer — the tension IS the video
+            ✗ Banned: "It's important to note", "In conclusion", "Let's delve into", "At the end of the day"
+            ✗ No obvious winner — the audience should genuinely be torn
+            ══════════════════════════════════════════
+            ${durFillEn}
+          `;
         } else if (style === 'docu_debate') {
           prompt = `
             Write a "Docu-Debate (Case Study)" style video script on: "${topic}".
