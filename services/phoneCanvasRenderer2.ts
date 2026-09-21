@@ -855,9 +855,14 @@ export class CanvasRenderer {
     }
     this.voiceIntensities[phone.id] = volt;
 
-    // ── Animation styles ──────────────────────────────────────────────────
+    // ── Animation styles — skipped entirely when a real speaker photo is
+    // uploaded (phone.backgroundImage): a glowing orb/wave/particle overlay
+    // centered right where the face is just reads as clutter on top of an
+    // actual photo, so an uploaded image shows clean instead. ──────────────
 
-    if (phone.style === 'orb') {
+    if (phone.backgroundImage) {
+      // no animated overlay — the photo speaks for itself
+    } else if (phone.style === 'orb') {
       const maxR = sw * 0.34;
       const baseR = sw * 0.13;
       const radius = baseR + (maxR - baseR) * volt;
