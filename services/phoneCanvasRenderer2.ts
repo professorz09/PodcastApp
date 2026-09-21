@@ -468,13 +468,14 @@ export class CanvasRenderer {
     ctx.fillText(board.title.toUpperCase(), rx + cardW / 2, ry + cardH * 0.1);
     ctx.letterSpacing = '0';
 
-    // Questions list — each item gets an equal vertical slot. Font size
-    // shrinks (down to a legibility floor) until every wrapped item fits
-    // its own slot, so this holds up whether there are 3 questions or 10.
+    // Questions list — TOP-ANCHORED: items stack compactly right under the
+    // title with a fixed, count-independent row height/gap, never spread
+    // out to fill the card (so 2 questions don't float with huge gaps).
+    // Font only shrinks (down to a legibility floor) when the stack would
+    // otherwise overflow the card — so it holds up whether there are 3
+    // questions or 10, without ever affecting the layout when there aren't.
     const listTop = ry + cardH * 0.18;
-    const listH = cardH * 0.78;
-    const n = board.questions.length;
-    const slotH = listH / n;
+    const listH = cardH * 0.8;
     const textX = rx + cardW * 0.05;
     const maxTextW = cardW * 0.9;
     const MIN_FS = 9;
@@ -495,24 +496,29 @@ export class CanvasRenderer {
         return lines;
       });
     };
+    const stackHeight = (lines: string[][], lineH: number, gap: number) =>
+      lines.reduce((h, ls) => h + ls.length * lineH + gap, -gap);
 
-    let fs = Math.min(cardW * 0.026, slotH * 0.42);
+    let fs = cardW * 0.026;
     let lh = fs * 1.25;
+    let rowGap = fs * 0.85;
     let allLines = wrapAt(fs);
-    while (fs > MIN_FS && Math.max(...allLines.map(l => l.length)) * lh > slotH * 0.92) {
-      fs *= 0.9;
+    while (fs > MIN_FS && stackHeight(allLines, lh, rowGap) > listH) {
+      fs *= 0.92;
       lh = fs * 1.25;
+      rowGap = fs * 0.85;
       allLines = wrapAt(fs);
     }
 
     ctx.textAlign = 'left';
     ctx.font = `700 ${fs}px -apple-system,sans-serif`;
 
+    let cursorY = listTop;
     board.questions.forEach((q, i) => {
       const lines = allLines[i];
-      const slotCy = listTop + slotH * (i + 0.5);
-      const blockH = lh * lines.length;
-      const startY = slotCy - blockH / 2 + fs * 0.8;
+      const blockH = lines.length * lh;
+      const blockCy = cursorY + blockH / 2;
+      const startY = cursorY + fs * 0.8;
 
       // Currently-being-discussed item gets a highlight color instead of
       // plain black, so it reads at a glance which point is live right now.
@@ -526,10 +532,12 @@ export class CanvasRenderer {
         ctx.strokeStyle = '#dc2626';
         ctx.lineWidth = fs * 0.09;
         ctx.beginPath();
-        ctx.moveTo(textX - fs * 0.2, slotCy);
-        ctx.lineTo(textX + widest + fs * 0.2, slotCy);
+        ctx.moveTo(textX - fs * 0.2, blockCy);
+        ctx.lineTo(textX + widest + fs * 0.2, blockCy);
         ctx.stroke();
       }
+
+      cursorY += blockH + rowGap;
     });
 
     ctx.restore();
