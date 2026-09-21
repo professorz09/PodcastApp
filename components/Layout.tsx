@@ -17,6 +17,7 @@ import {
   MonitorSmartphone,
   Instagram,
   GraduationCap,
+  Presentation,
 } from 'lucide-react';
 import { AppState } from '../types';
 
@@ -39,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeStep, onStepChange, onN
     { id: AppState.VISUALIZER,        label: 'Video',          icon: Video },
     { id: AppState.ENGLISH_VIDEO,     label: 'English Video',  icon: GraduationCap, optional: true },
     { id: AppState.PHONE_STUDIO,      label: 'Phone Studio',   icon: MonitorSmartphone, optional: true },
+    { id: AppState.PHONE_STUDIO_2,    label: 'Phone Studio 2', icon: Presentation,      optional: true },
     { id: AppState.THUMBNAIL,         label: 'Thumbnail',      icon: Image },
     { id: AppState.STORYBOARD,        label: 'Storyboard',     icon: Film },
     { id: AppState.SHORTS,            label: 'Shorts',         icon: Smartphone },

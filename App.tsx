@@ -47,6 +47,7 @@ const Storyboard       = lazyWithRetry(() => import('./components/Storyboard'));
 const Shorts           = lazyWithRetry(() => import('./components/Shorts'));
 const LyricsGenerator  = lazyWithRetry(() => import('./components/LyricsGenerator'));
 const PhoneConvoStudio = lazyWithRetry(() => import('./components/PhoneConvoStudio'));
+const PhoneConvoStudio2 = lazyWithRetry(() => import('./components/PhoneConvoStudio2'));
 const IgSongStudio     = lazyWithRetry(() => import('./components/IgSongStudio'));
 const ShortsStudio     = lazyWithRetry(() => import('./components/ShortsStudio'));
 import { generateDebateScript, generateContextBridgeConclusion, generatePhoneStudioScript, generateLearnEnglishScript } from './services/geminiService';
@@ -561,6 +562,10 @@ Return JSON only (no markdown):
 
       {appState === AppState.PHONE_STUDIO && (
         <PhoneConvoStudio mainScript={script} sourceClips={phoneSourceClips} videoFile={phoneVideoFile} />
+      )}
+
+      {appState === AppState.PHONE_STUDIO_2 && (
+        <PhoneConvoStudio2 mainScript={script} sourceClips={phoneSourceClips} videoFile={phoneVideoFile} />
       )}
 
       {appState === AppState.IG_SONG_STUDIO && (
