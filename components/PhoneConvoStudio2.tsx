@@ -3011,9 +3011,13 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
         : seg.duration
           ? Math.round(seg.duration * 1000)           // from HTML Audio element
           : null;
+      const isIntro = isIntroSpeaker(seg.speaker);
       return {
         id: seg.id,
-        phoneId: hidePhoneUI ? 'narrator' : speakerToPhoneId(seg.speaker),
+        // Distinct virtual ids (not real phones, see timelineItems below) so
+        // the timeline/playback readout can still show "Narrator" vs "Intro"
+        // instead of a bare "?" now that neither gets a phone mockup entry.
+        phoneId: isTrueNarrator ? 'narrator' : isIntro ? 'intro' : speakerToPhoneId(seg.speaker),
         text: seg.text,
         isNarrator: hidePhoneUI,
         durationMs: isTrueNarrator ? 4000 : (realDurMs ?? Math.max(2500, seg.text.length * 75)),
@@ -3313,8 +3317,18 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     const start = timelineElapsed;
     const end = timelineElapsed + turn.durationMs;
     timelineElapsed = end;
-    const phone = phones.find(p => p.id === turn.phoneId);
-    return { ...turn, start, end, idx, phoneName: phone?.name ?? '?', color: phone?.color ?? '#888' };
+    // 'narrator'/'intro' are virtual ids — they're deliberately never in
+    // `phones` (no mockup for them), so name/color come from here instead
+    // of the phones lookup, which would otherwise fall through to '?'.
+    let phoneName: string, color: string;
+    if (turn.phoneId === 'narrator') { phoneName = 'Narrator'; color = '#a855f7'; }
+    else if (turn.phoneId === 'intro') { phoneName = 'Intro'; color = '#ec4899'; }
+    else {
+      const phone = phones.find(p => p.id === turn.phoneId);
+      phoneName = phone?.name ?? '?';
+      color = phone?.color ?? '#888';
+    }
+    return { ...turn, start, end, idx, phoneName, color };
   });
   const activeTurn = timelineItems.find(it => currentTime >= it.start && currentTime < it.end);
 
