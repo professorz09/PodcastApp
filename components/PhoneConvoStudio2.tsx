@@ -2945,7 +2945,15 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
   const [tab, setTab] = useState<'visual' | 'export'>('visual');
-  const [visualSub, setVisualSub] = useState<'phones' | 'background' | 'subtitle'>('phones');
+  const [visualSub, setVisualSub] = useState<'phones' | 'background' | 'subtitle' | 'image'>('phones');
+
+  // Per-turn AI illustration — manually generated for whichever discussion
+  // turns the user picks (see the "Image" sub-tab). Full-bleed, replaces
+  // the phones for that turn only (see phoneCanvasRenderer2's
+  // drawSegmentImage) — most turns won't have one. Keyed by turn id.
+  const [segmentImages, setSegmentImages] = useState<Record<string, string>>({});
+  const [segmentImageLoading, setSegmentImageLoading] = useState<Record<string, boolean>>({});
+  const [segmentImagePrompts, setSegmentImagePrompts] = useState<Record<string, string>>({});
 
   // Script generator state
   const [genStyle, setGenStyle] = useState('podcast');
@@ -3169,9 +3177,27 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     }
   }, [mainScript]);
 
+  // Generates (or regenerates) a specific turn's AI illustration on demand.
+  const generateSegmentImage = async (turnId: string, promptText: string, fallbackText: string) => {
+    if (segmentImageLoading[turnId]) return;
+    setSegmentImageLoading(prev => ({ ...prev, [turnId]: true }));
+    try {
+      const basis = promptText.trim() || fallbackText;
+      const scenePrompt = `A single clear illustrated scene, visualizing: ${basis}`;
+      const url = await generateStoryboardImage(scenePrompt);
+      setSegmentImages(prev => ({ ...prev, [turnId]: url }));
+    } catch (e: any) {
+      toast.error(e?.message || 'Illustration generate nahi hui');
+    } finally {
+      setSegmentImageLoading(prev => ({ ...prev, [turnId]: false }));
+    }
+  };
+
   const buildState = useCallback((): StudioState => ({
     phones,
-    script,
+    script: Object.keys(segmentImages).length
+      ? script.map(t => segmentImages[t.id] ? { ...t, visualImageUrl: segmentImages[t.id] } : t)
+      : script,
     background: { type: 'color', value: bg },
     bgImageUrl: bgImageUrl ?? undefined,
     deviceSpacing: spacing,
@@ -3188,7 +3214,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     phoneZPulse: phoneZPulseOverride ?? (phones.length === 1),
     splitScreen: splitScreenClip ? { videoEl: previewClipVideoRef.current, topRatio: 0.5 } : undefined,
     narratorBoard: narratorQuestions.length ? { title: narratorBoardTitle, questions: narratorQuestions } : undefined,
-  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText]);
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText, segmentImages]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -4735,7 +4761,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             <>
             {/* Sub-tabs */}
             <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 4 }}>
-              {(['phones', 'background', 'subtitle'] as const).map(s => (
+              {(['phones', 'background', 'subtitle', 'image'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setVisualSub(s)}
@@ -5352,6 +5378,82 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   })()}
                 </div>
 
+              </div>
+            )}
+
+            {/* ── Image sub-tab — per-turn AI illustration ── */}
+            {visualSub === 'image' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                  🖼️ Kisi bhi turn ke liye AI illustration generate kar sakte ho — jab wo turn play hoga, poora frame us image se cover ho jayega (phones us waqt hide rahenge). Timeline se jo turn dikhna hai wo select karo, fir yahan generate karo.
+                </div>
+                {!activeTurn ? (
+                  <div style={{ padding: 12, fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                    Pehle timeline se koi turn select karo
+                  </div>
+                ) : activeTurn.isNarrator ? (
+                  <div style={{ padding: 12, fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                    Narrator/Intro turns ke liye ye lagu nahi — unka apna whiteboard/illustration hota hai (Narrator ya Intro chip dekho).
+                  </div>
+                ) : (
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                      Turn {activeTurn.idx + 1} · {activeTurn.phoneName}
+                    </div>
+                    {segmentImages[activeTurn.id] && (
+                      <img
+                        src={segmentImages[activeTurn.id]}
+                        alt="Segment illustration preview"
+                        style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}
+                      />
+                    )}
+                    <textarea
+                      value={segmentImagePrompts[activeTurn.id] ?? ''}
+                      onChange={e => setSegmentImagePrompts(prev => ({ ...prev, [activeTurn.id]: e.target.value }))}
+                      placeholder={activeTurn.text || 'Optional — kya scene banana hai likho (khaali chhodo to is turn ke dialogue se auto-generate hoga)'}
+                      rows={2}
+                      style={{
+                        width: '100%', resize: 'vertical', borderRadius: 8, padding: '8px 10px',
+                        background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)',
+                        color: '#fff', fontSize: 11, fontFamily: 'inherit', outline: 'none',
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => generateSegmentImage(activeTurn.id, segmentImagePrompts[activeTurn.id] ?? '', activeTurn.text)}
+                        disabled={!!segmentImageLoading[activeTurn.id]}
+                        style={{
+                          flex: 1, padding: '9px', borderRadius: 8, border: 'none',
+                          cursor: segmentImageLoading[activeTurn.id] ? 'default' : 'pointer',
+                          background: segmentImageLoading[activeTurn.id] ? 'rgba(96,165,250,0.25)' : 'rgba(96,165,250,0.18)',
+                          color: '#bfdbfe', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}
+                      >
+                        {segmentImageLoading[activeTurn.id]
+                          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
+                          : segmentImages[activeTurn.id] ? <>🔁 Regenerate</> : <>🎨 Generate Illustration</>}
+                      </button>
+                      {segmentImages[activeTurn.id] && (
+                        <button
+                          onClick={() => setSegmentImages(prev => { const next = { ...prev }; delete next[activeTurn.id]; return next; })}
+                          style={{
+                            padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)',
+                            background: 'rgba(239,68,68,0.1)', color: '#fca5a5', fontSize: 11, fontWeight: 700,
+                            cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {Object.keys(segmentImages).length > 0 && (
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
+                        {Object.keys(segmentImages).length} turn{Object.keys(segmentImages).length === 1 ? '' : 's'} mein image set hai
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             </>

@@ -46,6 +46,11 @@ export interface ScriptTurn {
   // single question). Drives which board items are "done" vs the one
   // currently being discussed (see drawFrame/drawWhiteboardContent).
   narratorPointIndex?: number;
+  // A manually-attached AI illustration for this specific turn (host/phone
+  // turns, picked per-turn in the "Image" settings sub-tab) — when set, this
+  // turn renders as a full-bleed image instead of the phone mockups for its
+  // whole duration, same full-frame treatment as the Narrator card.
+  visualImageUrl?: string;
 }
 
 export interface StudioState {
@@ -264,6 +269,14 @@ export class CanvasRenderer {
       return;
     }
 
+    // ── Manually-attached segment image — full-bleed, replaces the phones
+    // for this turn's whole duration (picked per-turn in the "Image"
+    // settings sub-tab; most turns won't have one).
+    if (activeTurn?.visualImageUrl) {
+      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl);
+      return;
+    }
+
     if (!phones.length) return;
 
     // Layout — confined to the bottom band when split-screen is active
@@ -300,6 +313,31 @@ export class CanvasRenderer {
       const force0Rotation = isSingle;
       this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn, pulse, force0Rotation);
     });
+  }
+
+  // Full-bleed cover-fit image for a manually-attached segment illustration
+  // — reuses bgImageCache (keyed by URL, no reason for a separate cache).
+  private drawSegmentImage(w: number, h: number, offsetY: number, url: string) {
+    const { ctx } = this;
+    let img = this.bgImageCache.get(url);
+    if (!img) {
+      const newImg = new Image();
+      newImg.crossOrigin = 'anonymous';
+      newImg.onload = () => {
+        this.bgImageCache.set(url, newImg);
+        if (!this.playing) this.drawFrame();
+      };
+      newImg.src = url;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, offsetY, w, h);
+      return;
+    }
+    const scl = Math.max(w / img.width, h / img.height);
+    const dw = img.width * scl, dh = img.height * scl;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
+    ctx.drawImage(img, (w - dw) / 2, offsetY + (h - dh) / 2, dw, dh);
+    ctx.restore();
   }
 
   // Slides down from off-screen top into position, holds, then slides back
