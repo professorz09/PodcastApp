@@ -1646,6 +1646,12 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               4-7 concrete sub-questions में तोड़ा जाता है, और दो hosts — जिनकी सोच genuinely
               अलग है — हर sub-question पर बारी-बारी debate करते हैं। generic "for vs against"
               नहीं — हमेशा इसी एक इंसान की specific situation पर grounded।
+
+              🚨 Output array ka BILKUL PEHLA element hamesha ek "Narrator" turn hona chahiye jisme
+              poori 3-5 line ki opening situation ho (neeche TURN 1 dekho) — ye optional nahi hai,
+              kabhi skip nahi hota, ek line mein chhota nahi hota, aur kisi aur cheez ke saath merge
+              nahi hota. Viewer ne abhi kuch nahi dekha — usko debate shuru hone se pehle hi pata
+              chalna chahiye ki ye kiske baare mein hai aur dilemma kya hai.
               ═══════════════════════════════════════
               विषय: "${topic}"
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
@@ -3725,6 +3731,11 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             broken into 4-7 concrete sub-questions, and two hosts with genuinely different
             worldviews debate EACH sub-question in turn — never generic "for vs against"
             rambling, always grounded in this one character's specific situation.
+
+            🚨 THE VERY FIRST ELEMENT OF THE OUTPUT ARRAY MUST BE A "Narrator" TURN CONTAINING THE
+            FULL 3-5 SENTENCE OPENING SITUATION (see TURN 1 below) — this is not optional and is never
+            skipped, shortened to one line, or merged with anything else. A viewer who has seen nothing
+            yet MUST understand who this is about and what the dilemma is before any debate starts.
             ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Additional context: ${specificDetails}` : ''}

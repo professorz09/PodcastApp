@@ -248,21 +248,16 @@ export class CanvasRenderer {
           activeIndex = activeTurn.narratorPointIndex;
         } else {
           // Opening or closing turn — find the highest question index any
-          // EARLIER turn already introduced.
+          // EARLIER turn already introduced. Static, no animation: whatever
+          // is already done shows as already-crossed from this turn's very
+          // first frame — 0 for the opening (nothing done yet), n for the
+          // closing (everything done) — same as every other turn.
           let maxSeen = -1;
           for (const turn of state.script) {
             if (turn === activeTurn) break;
             if (turn.narratorPointIndex !== undefined) maxSeen = Math.max(maxSeen, turn.narratorPointIndex);
           }
-          if (maxSeen >= n - 1) {
-            // Closing recap — progressively cross off the whole list across
-            // this turn's own duration ("as the Narrator speaks, the points
-            // render one by one").
-            doneCount = Math.min(n, Math.floor(turnProgress * (n + 0.999)));
-          } else {
-            // Opening — nothing introduced yet.
-            doneCount = maxSeen + 1;
-          }
+          doneCount = maxSeen + 1;
         }
       }
       this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY, board, doneCount, activeIndex);
