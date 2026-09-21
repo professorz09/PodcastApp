@@ -69,6 +69,12 @@ export interface StudioState {
   // of the frame; everything else (background/phones/narrator) is confined
   // to the remaining bottom band instead of the full canvas.
   splitScreen?: { videoEl: HTMLVideoElement | null; topRatio?: number };
+  // Narrator "whiteboard" — a grid-paper roadmap of debate questions shown
+  // instead of the plain single-line card, one item struck through per
+  // Narrator turn already passed (see drawNarratorCard). Omit/empty
+  // questions to keep the plain single-line card for styles that don't use
+  // a question sheet.
+  narratorBoard?: { title: string; questions: string[] };
 }
 
 export class CanvasRenderer {
@@ -225,7 +231,14 @@ export class CanvasRenderer {
 
     // ── Narrator card — white slide, confined to the bottom band when split ─
     if (activeTurn?.isNarrator) {
-      this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY);
+      // How many Narrator turns have already played before this one — drives
+      // how many whiteboard questions are shown struck-through as "covered".
+      let doneCount = 0;
+      for (const turn of state.script) {
+        if (turn === activeTurn) break;
+        if (turn.isNarrator) doneCount++;
+      }
+      this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY, state.narratorBoard, doneCount);
       return;
     }
 
@@ -269,18 +282,25 @@ export class CanvasRenderer {
 
   // Slides down from off-screen top into position, holds, then slides back
   // up before the turn ends — "a whiteboard drops down while the Narrator
-  // talks" instead of a static centered fade card.
-  private drawNarratorCard(w: number, h: number, text: string, progress: number, offsetY = 0) {
+  // talks" instead of a static centered fade card. With a narratorBoard
+  // configured (question-sheet styles like case_debate) this becomes a
+  // near full-bleed grid-paper roadmap with questions struck through as
+  // the debate passes them; otherwise it's the original small floating
+  // "QUESTION" card.
+  private drawNarratorCard(
+    w: number, h: number, text: string, progress: number, offsetY = 0,
+    board?: { title: string; questions: string[] }, doneCount = 0,
+  ) {
     const { ctx } = this;
+    const hasBoard = !!(board && board.questions.length);
 
     const SLIDE_IN = 0.15;
     const SLIDE_OUT = 0.15;
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
     const easeInCubic = (t: number) => t * t * t;
 
-    // White card
-    const cardW = w * 0.78;
-    const cardH = h * 0.42;
+    const cardW = hasBoard ? w * 0.94 : w * 0.78;
+    const cardH = hasBoard ? h * 0.86 : h * 0.42;
     const cx = w / 2;
     const restCy = offsetY + h / 2;
     const offscreenCy = offsetY - cardH; // fully above the visible frame
@@ -301,7 +321,7 @@ export class CanvasRenderer {
     }
 
     const rx = cx - cardW / 2, ry = cy - cardH / 2;
-    const corner = Math.min(cardW, cardH) * 0.07;
+    const corner = hasBoard ? cardW * 0.018 : Math.min(cardW, cardH) * 0.07;
 
     ctx.save();
     ctx.beginPath();
@@ -309,7 +329,7 @@ export class CanvasRenderer {
     ctx.clip();
     ctx.globalAlpha = alpha;
 
-    // Drop shadow
+    // Drop shadow + base white fill (shared by both variants)
     ctx.shadowColor = 'rgba(0,0,0,0.45)';
     ctx.shadowBlur = 48;
     ctx.shadowOffsetY = 16;
@@ -319,6 +339,23 @@ export class CanvasRenderer {
     ctx.fill();
     ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.shadowOffsetY = 0;
 
+    if (hasBoard) {
+      this.drawWhiteboardContent(rx, ry, cardW, cardH, corner, board!, doneCount);
+    } else {
+      this.drawPlainNarratorContent(rx, ry, cardW, cardH, cx, text);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  // Original small floating "QUESTION" card — used when no narratorBoard
+  // question sheet is configured for this video.
+  private drawPlainNarratorContent(rx: number, ry: number, cardW: number, cardH: number, cx: number, text: string) {
+    const { ctx } = this;
+    const w = cardW / 0.78; // recover the original `w` scale factor used for font sizing below
+
     // Subtle top accent bar
     const accentH = cardH * 0.012;
     const accentGrad = ctx.createLinearGradient(rx, ry, rx + cardW, ry);
@@ -326,7 +363,7 @@ export class CanvasRenderer {
     accentGrad.addColorStop(1, '#ec4899');
     ctx.fillStyle = accentGrad;
     ctx.beginPath();
-    ctx.roundRect(rx, ry, cardW, accentH, [corner, corner, 0, 0]);
+    ctx.roundRect(rx, ry, cardW, accentH, [cardW * 0.09, cardW * 0.09, 0, 0]);
     ctx.fill();
 
     // Question label
@@ -367,9 +404,88 @@ export class CanvasRenderer {
     lines.forEach((line, i) => {
       ctx.fillText(line, cx, textStartY + i * lh);
     });
+  }
 
-    ctx.globalAlpha = 1;
+  // Grid-paper "debate roadmap" whiteboard — a bold title up top, then the
+  // full question sheet below with `doneCount` items struck through (a red
+  // line through ones the debate has already covered), matching a real
+  // whiteboard being crossed off as a discussion progresses.
+  private drawWhiteboardContent(
+    rx: number, ry: number, cardW: number, cardH: number, corner: number,
+    board: { title: string; questions: string[] }, doneCount: number,
+  ) {
+    const { ctx } = this;
+
+    // Clip to the board's rounded-rect footprint so the grid lines don't
+    // spill past the corners.
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, cardW, cardH, corner);
+    ctx.clip();
+
+    // Grid-paper background
+    const gridStep = cardW * 0.032;
+    ctx.strokeStyle = 'rgba(15,23,42,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = rx; x <= rx + cardW; x += gridStep) { ctx.moveTo(x, ry); ctx.lineTo(x, ry + cardH); }
+    for (let y = ry; y <= ry + cardH; y += gridStep) { ctx.moveTo(rx, y); ctx.lineTo(rx + cardW, y); }
+    ctx.stroke();
+
+    // Title
+    const titleFs = cardW * 0.032;
+    ctx.font = `800 ${titleFs}px -apple-system,sans-serif`;
+    ctx.fillStyle = '#dc2626';
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '0.02em';
+    ctx.fillText(board.title.toUpperCase(), rx + cardW / 2, ry + cardH * 0.1);
+    ctx.letterSpacing = '0';
+
+    // Questions list — each item gets an equal vertical slot, word-wrapped,
+    // struck through in red once its index is below doneCount.
+    const listTop = ry + cardH * 0.18;
+    const listH = cardH * 0.78;
+    const n = board.questions.length;
+    const slotH = listH / n;
+    const fs = Math.min(cardW * 0.026, slotH * 0.34);
+    const lh = fs * 1.3;
+    const textX = rx + cardW * 0.05;
+    const maxTextW = cardW * 0.9;
     ctx.textAlign = 'left';
+    ctx.font = `700 ${fs}px -apple-system,sans-serif`;
+
+    board.questions.forEach((q, i) => {
+      const label = `${i + 1}. ${q}`;
+      const words = label.split(' ').filter(Boolean);
+      const lines: string[] = [];
+      let cur = '';
+      for (const word of words) {
+        const test = cur ? cur + ' ' + word : word;
+        if (ctx.measureText(test).width > maxTextW && cur) { lines.push(cur); cur = word; }
+        else cur = test;
+      }
+      if (cur) lines.push(cur);
+
+      const slotCy = listTop + slotH * (i + 0.5);
+      const blockH = lh * lines.length;
+      const startY = slotCy - blockH / 2 + fs * 0.8;
+
+      ctx.fillStyle = '#111111';
+      lines.forEach((line, li) => ctx.fillText(line, textX, startY + li * lh));
+
+      if (i < doneCount) {
+        // Red strike-through across the whole wrapped block, like it's
+        // been crossed off with a marker.
+        const widest = Math.max(...lines.map(l => ctx.measureText(l).width));
+        ctx.strokeStyle = '#dc2626';
+        ctx.lineWidth = fs * 0.09;
+        ctx.beginPath();
+        ctx.moveTo(textX - fs * 0.2, slotCy);
+        ctx.lineTo(textX + widest + fs * 0.2, slotCy);
+        ctx.stroke();
+      }
+    });
+
     ctx.restore();
   }
 

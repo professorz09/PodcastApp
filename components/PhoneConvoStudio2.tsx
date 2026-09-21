@@ -3017,7 +3017,17 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   // is the existing Phones/Background/Subtitles panel; 'intro' and
   // 'footage' are their own contextual panels, selected via the two extra
   // chips prepended to the timeline strip.
-  const [activeSettingsSection, setActiveSettingsSection] = useState<'discussion' | 'intro' | 'footage'>('discussion');
+  const [activeSettingsSection, setActiveSettingsSection] = useState<'discussion' | 'intro' | 'footage' | 'narrator'>('discussion');
+
+  // Narrator whiteboard — a title + question-sheet roadmap shown (with items
+  // struck through as the debate covers them) instead of the plain single-
+  // line card, whenever questions are configured. Textarea holds one
+  // question per line; auto-seeded from the main script's own Narrator
+  // turns on first load, editable after that.
+  const [narratorBoardTitle, setNarratorBoardTitle] = useState('');
+  const [narratorQuestionsText, setNarratorQuestionsText] = useState('');
+  const narratorBoardSeededRef = useRef(false);
+  const narratorQuestions = narratorQuestionsText.split('\n').map(s => s.trim()).filter(Boolean);
   const replaceVideoInputRef = useRef<HTMLInputElement>(null);
   const [rawClipDurationSec, setRawClipDurationSec] = useState(0);
   useEffect(() => {
@@ -3113,6 +3123,21 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       };
     });
     setScript(turns);
+
+    // Seed the whiteboard's question list from the main script's own true
+    // Narrator turns (case_debate's per-sub-question transitions read
+    // naturally as a question sheet already) — once only, so it doesn't
+    // clobber edits the user makes afterward in the Narrator settings panel.
+    if (!narratorBoardSeededRef.current) {
+      const narratorLines = mainScript
+        .filter(seg => isTrueNarratorSpeaker(seg.speaker))
+        .map(seg => seg.text.trim())
+        .filter(Boolean);
+      if (narratorLines.length) {
+        setNarratorQuestionsText(narratorLines.join('\n'));
+        narratorBoardSeededRef.current = true;
+      }
+    }
   }, [mainScript]);
 
   const buildState = useCallback((): StudioState => ({
@@ -3133,7 +3158,8 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     // Default: z-pulse on for 1 speaker, off for 2+. User can override.
     phoneZPulse: phoneZPulseOverride ?? (phones.length === 1),
     splitScreen: splitScreenClip ? { videoEl: previewClipVideoRef.current, topRatio: 0.5 } : undefined,
-  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip]);
+    narratorBoard: narratorQuestions.length ? { title: narratorBoardTitle, questions: narratorQuestions } : undefined,
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -4595,6 +4621,26 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Intro</span>
           </button>
 
+          {/* Narrator chip */}
+          <button
+            onClick={() => { setActiveSettingsSection('narrator'); setTab('visual'); }}
+            style={{
+              flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              width: 44, padding: '5px 4px', borderRadius: 10, cursor: 'pointer',
+              border: `1px solid ${activeSettingsSection === 'narrator' ? '#60a5faaa' : 'rgba(255,255,255,0.05)'}`,
+              background: activeSettingsSection === 'narrator' ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.03)',
+              position: 'relative', transition: 'all 0.15s',
+              opacity: narratorQuestions.length || activeSettingsSection === 'narrator' ? 1 : 0.55,
+            }}
+          >
+            <div style={{
+              width: 24, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(96,165,250,0.28)', border: '1px solid rgba(96,165,250,0.44)',
+              color: '#bfdbfe', fontSize: 12, marginBottom: 2,
+            }}>📋</div>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Narrator</span>
+          </button>
+
           {/* Footage chip removed in Phone Studio 2 — this copy doesn't offer
               the source-footage upload/trim flow, only phone conversation +
               intro. activeSettingsSection can no longer become 'footage'. */}
@@ -5328,6 +5374,48 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   onBlobReady={blob => setIntroVideoBlob(blob)}
                   buttonOnly
                 />
+              </div>
+            )}
+
+            {/* ── Narrator settings section ── */}
+            {activeSettingsSection === 'narrator' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                  📋 Narrator ke turns par phone mockup ki jagah ek grid-paper whiteboard aata hai — is question sheet ke saath. Debate jitna aage badhta hai, utne questions crossed-off dikhte hain. Khaali chhodo to plain "QUESTION" card wapas aa jaayega.
+                </div>
+                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                    Board Title
+                  </div>
+                  <input
+                    type="text"
+                    value={narratorBoardTitle}
+                    onChange={e => setNarratorBoardTitle(e.target.value)}
+                    placeholder="e.g. HOW TO MAKE MONEY"
+                    style={{
+                      width: '100%', borderRadius: 8, padding: '8px 10px',
+                      background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#fff', fontSize: 12, fontFamily: 'inherit', outline: 'none',
+                    }}
+                  />
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginTop: 4 }}>
+                    Questions (ek line = ek question)
+                  </div>
+                  <textarea
+                    value={narratorQuestionsText}
+                    onChange={e => setNarratorQuestionsText(e.target.value)}
+                    placeholder={'Should he tell his wife?\nShould he try to understand why?\nShould they seek professional help?'}
+                    rows={6}
+                    style={{
+                      width: '100%', resize: 'vertical', borderRadius: 8, padding: '8px 10px',
+                      background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', lineHeight: 1.5,
+                    }}
+                  />
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
+                    {narratorQuestions.length} question{narratorQuestions.length === 1 ? '' : 's'} · Main script ke Narrator turns se auto-filled hua tha, edit kar sakte ho.
+                  </div>
+                </div>
               </div>
             )}
 
