@@ -41,6 +41,11 @@ export interface ScriptTurn {
   audioUrl?: string;
   wordTimings?: CloudWord[];
   isNarrator?: boolean;
+  // 0-based index into narratorBoard.questions this turn is introducing —
+  // undefined for the opening/closing Narrator turns (they don't map to a
+  // single question). Drives which board items are "done" vs the one
+  // currently being discussed (see drawFrame/drawWhiteboardContent).
+  narratorPointIndex?: number;
 }
 
 export interface StudioState {
@@ -231,14 +236,36 @@ export class CanvasRenderer {
 
     // ── Narrator card — white slide, confined to the bottom band when split ─
     if (activeTurn?.isNarrator) {
-      // How many Narrator turns have already played before this one — drives
-      // how many whiteboard questions are shown struck-through as "covered".
+      const board = state.narratorBoard;
       let doneCount = 0;
-      for (const turn of state.script) {
-        if (turn === activeTurn) break;
-        if (turn.isNarrator) doneCount++;
+      let activeIndex = -1;
+      if (board && board.questions.length) {
+        const n = board.questions.length;
+        if (activeTurn.narratorPointIndex !== undefined) {
+          // This turn IS introducing a specific question — everything before
+          // it is done/crossed, this one is the highlighted "current" item.
+          doneCount = activeTurn.narratorPointIndex;
+          activeIndex = activeTurn.narratorPointIndex;
+        } else {
+          // Opening or closing turn — find the highest question index any
+          // EARLIER turn already introduced.
+          let maxSeen = -1;
+          for (const turn of state.script) {
+            if (turn === activeTurn) break;
+            if (turn.narratorPointIndex !== undefined) maxSeen = Math.max(maxSeen, turn.narratorPointIndex);
+          }
+          if (maxSeen >= n - 1) {
+            // Closing recap — progressively cross off the whole list across
+            // this turn's own duration ("as the Narrator speaks, the points
+            // render one by one").
+            doneCount = Math.min(n, Math.floor(turnProgress * (n + 0.999)));
+          } else {
+            // Opening — nothing introduced yet.
+            doneCount = maxSeen + 1;
+          }
+        }
       }
-      this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY, state.narratorBoard, doneCount);
+      this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY, board, doneCount, activeIndex);
       return;
     }
 
@@ -289,7 +316,7 @@ export class CanvasRenderer {
   // "QUESTION" card.
   private drawNarratorCard(
     w: number, h: number, text: string, progress: number, offsetY = 0,
-    board?: { title: string; questions: string[] }, doneCount = 0,
+    board?: { title: string; questions: string[] }, doneCount = 0, activeIndex = -1,
   ) {
     const { ctx } = this;
     const hasBoard = !!(board && board.questions.length);
@@ -340,7 +367,7 @@ export class CanvasRenderer {
     ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.shadowOffsetY = 0;
 
     if (hasBoard) {
-      this.drawWhiteboardContent(rx, ry, cardW, cardH, corner, board!, doneCount);
+      this.drawWhiteboardContent(rx, ry, cardW, cardH, corner, board!, doneCount, activeIndex);
     } else {
       this.drawPlainNarratorContent(rx, ry, cardW, cardH, cx, text);
     }
@@ -412,7 +439,7 @@ export class CanvasRenderer {
   // whiteboard being crossed off as a discussion progresses.
   private drawWhiteboardContent(
     rx: number, ry: number, cardW: number, cardH: number, corner: number,
-    board: { title: string; questions: string[] }, doneCount: number,
+    board: { title: string; questions: string[] }, doneCount: number, activeIndex: number,
   ) {
     const { ctx } = this;
 
@@ -441,36 +468,55 @@ export class CanvasRenderer {
     ctx.fillText(board.title.toUpperCase(), rx + cardW / 2, ry + cardH * 0.1);
     ctx.letterSpacing = '0';
 
-    // Questions list — each item gets an equal vertical slot, word-wrapped,
-    // struck through in red once its index is below doneCount.
+    // Questions list — each item gets an equal vertical slot. Font size
+    // shrinks (down to a legibility floor) until every wrapped item fits
+    // its own slot, so this holds up whether there are 3 questions or 10.
     const listTop = ry + cardH * 0.18;
     const listH = cardH * 0.78;
     const n = board.questions.length;
     const slotH = listH / n;
-    const fs = Math.min(cardW * 0.026, slotH * 0.34);
-    const lh = fs * 1.3;
     const textX = rx + cardW * 0.05;
     const maxTextW = cardW * 0.9;
+    const MIN_FS = 9;
+
+    const wrapAt = (size: number): string[][] => {
+      ctx.font = `700 ${size}px -apple-system,sans-serif`;
+      return board.questions.map((q, i) => {
+        const label = `${i + 1}. ${q}`;
+        const words = label.split(' ').filter(Boolean);
+        const lines: string[] = [];
+        let cur = '';
+        for (const word of words) {
+          const test = cur ? cur + ' ' + word : word;
+          if (ctx.measureText(test).width > maxTextW && cur) { lines.push(cur); cur = word; }
+          else cur = test;
+        }
+        if (cur) lines.push(cur);
+        return lines;
+      });
+    };
+
+    let fs = Math.min(cardW * 0.026, slotH * 0.42);
+    let lh = fs * 1.25;
+    let allLines = wrapAt(fs);
+    while (fs > MIN_FS && Math.max(...allLines.map(l => l.length)) * lh > slotH * 0.92) {
+      fs *= 0.9;
+      lh = fs * 1.25;
+      allLines = wrapAt(fs);
+    }
+
     ctx.textAlign = 'left';
     ctx.font = `700 ${fs}px -apple-system,sans-serif`;
 
     board.questions.forEach((q, i) => {
-      const label = `${i + 1}. ${q}`;
-      const words = label.split(' ').filter(Boolean);
-      const lines: string[] = [];
-      let cur = '';
-      for (const word of words) {
-        const test = cur ? cur + ' ' + word : word;
-        if (ctx.measureText(test).width > maxTextW && cur) { lines.push(cur); cur = word; }
-        else cur = test;
-      }
-      if (cur) lines.push(cur);
-
+      const lines = allLines[i];
       const slotCy = listTop + slotH * (i + 0.5);
       const blockH = lh * lines.length;
       const startY = slotCy - blockH / 2 + fs * 0.8;
 
-      ctx.fillStyle = '#111111';
+      // Currently-being-discussed item gets a highlight color instead of
+      // plain black, so it reads at a glance which point is live right now.
+      ctx.fillStyle = i === activeIndex ? '#2563eb' : '#111111';
       lines.forEach((line, li) => ctx.fillText(line, textX, startY + li * lh));
 
       if (i < doneCount) {

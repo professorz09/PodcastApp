@@ -1653,7 +1653,7 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               भाषा: हिंदी + Hinglish (natural, emotionally grounded — जैसे दो smart दोस्त genuinely असहमत हों, formal debate नहीं)।
 
               पात्र — ठीक 3 (fixed):
-              - Narrator: situation set up करेगा, question sheet बताएगा, सवालों के बीच transition करेगा, और closing देगा
+              - Narrator: situation set up करेगा, हर sub-question में transition करेगा, और closing देगा
               - 2 Hosts:
               ${speakers.length >= 2
                 ? `इन नामों का उपयोग करें: ${speakers[0]} और ${speakers[1]}.`
@@ -1667,22 +1667,23 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               (age, job/context, aur exactly kya ho raha hai) — vague generic scenario नहीं।
               जैसे: "जेम्स 30 साल का है। उसकी stable ₹70K/month job है, कोई debt नहीं, और ₹5 लाख savings में पड़े हैं।
               Job secure है, लेकिन यही उसका इकलौता safety net है। Invest करे long-term growth के लिए, ya safe रखे?"
-              इस section को एक clear, direct MAIN QUESTION पर खत्म करो जिसके इर्द-गिर्द पूरा episode घूमेगा।
-
-              ══════════════════════════════════════════
-              【 NARRATOR — QUESTION SHEET 】
-              ══════════════════════════════════════════
-              Main question के तुरंत बाद, Narrator 4-7 concrete sub-questions naturally एक quick list की तरह बताए —
-              form की तरह पढ़ते हुए नहीं, बातचीत की तरह।
-              जैसे: "यहाँ हमें ये पता लगाना है: क्या वो सारा पैसा invest करे, या split करे? Emergency fund कितना होना
-              चाहिए पहले? क्या उसकी job सच में उतनी secure है? और अगर invest करने के तुरंत बाद market गिर जाए — तब?"
-              ये sub-questions ही आगे के debate का structure बनेंगे — एक-एक करके, इसी order में।
+              इस section को एक clear, direct MAIN QUESTION पर खत्म करो जिसके इर्द-गिर्द पूरा episode घूमेगा, फिर सीधे
+              पहले sub-question पर चले जाओ — सारे sub-questions को पहले एक साथ बोलकर मत सुनाओ; audience screen पर
+              पूरी question sheet already dekh raha hoga, toh sab pehle bata dena sirf repeat lagega.
+              🔴 CRITICAL — इस line के बिल्कुल आखिर में main question ka ek chhota bracketed heading जोड़ो,
+              जैसे: ...invest kare ya safe rakhe? [Invest kare ya safe rakhe?]
+              Bracket sirf on-screen display ke liye silent tag hai — kabhi bola nahi jaata, isliye bracket se
+              pehle wala sentence khud mein complete aur natural rehna chahiye.
 
               ══════════════════════════════════════════
               【 HOSTS — एक-एक SUB-QUESTION पर DEBATE 】
               ══════════════════════════════════════════
-              Question Sheet के हर sub-question के लिए, order में:
-              - Narrator उस specific sub-question में briefly transition करे (1 line)।
+              Dilemma ko 4-7 concrete sub-questions mein todo. Har ek ke liye, order mein:
+              - Narrator us specific sub-question ko ek natural line mein introduce kare (form item ki tarah
+                nahi) — yahi ek jagah hai jahan wo sub-question bola jaata hai.
+                🔴 CRITICAL — is line ke bilkul aakhir mein sirf usi sub-question ka chhota bracketed version
+                jodo, jaise: To — emergency fund pehle kitna chahiye? [Emergency fund pehle?]
+                Wahi rule — bracket silent/on-screen-only hai, kabhi bola nahi jaata.
               - दोनों hosts उसी sub-question पर अपनी OWN real position दें — सिर्फ एक-दूसरे को react नहीं
                 करते, हर एक genuinely कुछ मानता है और उसके लिए argue करता है।
               - Real back-and-forth: हर sub-question पर 3-8 turns, alternating, genuine reactions के साथ
@@ -1697,6 +1698,7 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               【 CLOSING — आप क्या करते? 】
               ══════════════════════════════════════════
               आखिरी sub-question के बाद, Narrator सीधे audience से पूछे: "तो — अगर आप [नाम] की जगह होते तो क्या करते?"
+              Is line mein koi bracket mat jodo — ye recap moment hai, koi naya point nahi।
               फिर दोनों hosts अपनी एक final, honest, personal position दें — दोनों का agree करना ज़रूरी नहीं,
               और किसी को "सही" घोषित नहीं किया जाता।
               Narrator एक sharp, thought-provoking final line से खत्म करे। कोई moralizing नहीं, कोई neat bow नहीं।
@@ -1707,9 +1709,13 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               ✓ दोनों hosts की एक REAL, specific position हो — सिर्फ दूसरे को react नहीं करते
               ✓ हर sub-question पर genuine disagreement हो, politely agree करना नहीं
               ✓ पूरे script में concrete details — real number, real नाम, real consequence
+              ✓ Har bracketed heading SHORT ho (8 words se kam) aur English mein ho — ye ek screen label hai,
+                sentence nahi
               ✗ सीधे "balanced" answer पर मत कूदो — tension ही video है
               ✗ Banned: "ध्यान देने योग्य है", "निष्कर्ष में", "आइए जानते हैं", "अंत में"
               ✗ कोई obvious winner नहीं — audience genuinely torn महसूस करे
+              ✗ Bracket sirf Narrator ki opening line aur har Narrator sub-question transition line ke bilkul
+                aakhir mein hi aaye — hosts ki lines aur closing mein KABHI nahi
               ══════════════════════════════════════════
               ${durFillHi}
           `;
@@ -3716,7 +3722,7 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             Language: ${language}. Tone: natural, conversational, emotionally grounded — two smart friends who genuinely disagree, not a formal debate.
 
             Characters — exactly 3 (fixed):
-            - Narrator: sets up the situation, states the question sheet, transitions between questions, and delivers the closing
+            - Narrator: sets up the situation, transitions into each sub-question, and delivers the closing
             - 2 Hosts:
             ${speakers.length >= 2
               ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
@@ -3731,23 +3737,24 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             e.g. "James is 30. He's got a stable $70K job, no debt, and $50,000 sitting in savings.
             His job is secure, but that's the only safety net he has. Should he invest it for long-term
             growth, or keep it safe in case something goes wrong?"
-            End this section with ONE clear, direct MAIN QUESTION the whole episode revolves around.
-
-            ══════════════════════════════════════════
-            【 NARRATOR — THE QUESTION SHEET 】
-            ══════════════════════════════════════════
-            Right after the main question, the Narrator lays out 4-7 concrete sub-questions that break
-            the dilemma down — spoken naturally as a quick list, not read like a form.
-            e.g. "Here's what we need to figure out: Should he invest all of it, or split it? How much
-            of an emergency fund does he actually need first? Is his job really as secure as he thinks?
-            And if the market drops right after he invests — then what?"
-            These sub-questions become the actual structure of the debate below — one at a time, in order.
+            End this section with ONE clear, direct MAIN QUESTION the whole episode revolves around, then
+            go STRAIGHT into introducing the first sub-question below — do NOT separately list out all the
+            sub-questions out loud first; the audience sees the full question sheet on screen as it comes
+            up, so narrating the whole list before starting would just repeat what they're already reading.
+            🔴 CRITICAL — append this line with a short bracketed heading version of the main question,
+            e.g.: ...should he invest it, or keep it safe? [Invest or play it safe?]
+            The bracket is a SILENT tag for on-screen display only — it is never spoken, so keep the
+            spoken sentence before it complete and natural on its own.
 
             ══════════════════════════════════════════
             【 HOSTS — DEBATE, ONE SUB-QUESTION AT A TIME 】
             ══════════════════════════════════════════
-            For EACH sub-question from the Question Sheet, in order:
-            - The Narrator briefly re-states or transitions into that specific sub-question (1 line).
+            Break the dilemma into 4-7 concrete sub-questions. For EACH one, in order:
+            - The Narrator introduces THAT specific sub-question in one natural line (not read like a
+              form item) — this is the ONLY place that sub-question gets stated out loud.
+              🔴 CRITICAL — append this line with a short bracketed version of just that sub-question,
+              e.g.: So — how much of an emergency fund does he actually need first? [Emergency fund first?]
+              Same rule as above: the bracket is silent/on-screen-only, never spoken.
             - Both hosts give their OWN real position on THAT sub-question — not just reacting to each
               other, each one actually believes something and argues for it.
             - Real back-and-forth: 3-8 turns per sub-question, alternating, with genuine reactions
@@ -3762,7 +3769,8 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             【 CLOSING — WHAT WOULD YOU DO? 】
             ══════════════════════════════════════════
             After the last sub-question, the Narrator turns to the audience directly: "So — what would
-            YOU do in [name]'s position?" (or equivalent, in ${language}).
+            YOU do in [name]'s position?" (or equivalent, in ${language}). Do NOT add a bracket to this
+            line — this is the recap moment, not a new point.
             Then each host gives ONE final, honest, personal position — they do NOT have to agree, and
             neither is declared "right".
             Narrator closes with ONE sharp, thought-provoking final line. No moralizing, no neat bow.
@@ -3773,9 +3781,13 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             ✓ Both hosts hold a REAL, specific position — not just reacting to the other person
             ✓ Every sub-question gets genuine disagreement, not two people politely agreeing
             ✓ Concrete details throughout — a real number, a real name, a real consequence
+            ✓ Every bracketed heading is SHORT (under 8 words) and in ${language === 'Hindi' ? 'English' : language} — a
+              screen label, not a sentence
             ✗ NEVER skip straight to a "balanced" answer — the tension IS the video
             ✗ Banned: "It's important to note", "In conclusion", "Let's delve into", "At the end of the day"
             ✗ No obvious winner — the audience should genuinely be torn
+            ✗ NEVER put a bracket anywhere except at the very end of the Narrator's opening line and each
+              Narrator sub-question transition line — hosts' lines and the closing NEVER get one
             ══════════════════════════════════════════
             ${durFillEn}
           `;
@@ -4626,14 +4638,26 @@ Speaker B (Curious): choose a different name — asks what the audience is think
       throw new Error(parseErr.message || "Could not parse script response as JSON array");
     }
     
-    return rawSegments.map((seg: any, index: number) => ({
-      id: `seg-${index}`,
-      speaker: seg.speaker,
-      text: seg.text,
-      scores: seg.scores,
-      averageScore: seg.averageScore,
-      ...(seg.sourceTimestamp !== undefined && { sourceTimestamp: seg.sourceTimestamp }),
-    }));
+    return rawSegments.map((seg: any, index: number) => {
+      // Case Debate style: the AI appends a trailing "[short point]" to
+      // Narrator lines (see that style's prompt) — pull it into boardPoint
+      // and strip it from the spoken/displayed text so it's never read
+      // aloud or shown as dialogue. No-op for every other style (no bracket
+      // present).
+      const rawText = String(seg.text ?? '');
+      const bracketMatch = rawText.match(/\s*\[([^\]]+)\]\s*$/);
+      const text = bracketMatch ? rawText.slice(0, bracketMatch.index).trim() : rawText;
+      const boardPoint = bracketMatch ? bracketMatch[1].trim() : undefined;
+      return {
+        id: `seg-${index}`,
+        speaker: seg.speaker,
+        text,
+        ...(boardPoint !== undefined && { boardPoint }),
+        scores: seg.scores,
+        averageScore: seg.averageScore,
+        ...(seg.sourceTimestamp !== undefined && { sourceTimestamp: seg.sourceTimestamp }),
+      };
+    });
   } catch (error: any) {
     if (error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
       throw new Error("Gemini API Quota Exceeded. Please check your billing or wait a few minutes before trying again.");

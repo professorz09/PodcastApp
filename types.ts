@@ -88,6 +88,12 @@ export interface DebateSegment {
   }[];
   averageScore?: number;
   sourceTimestamp?: string; // For context_bridge style: timestamp in source video where this context is relevant
+  /** Case Debate style: a short "[bracketed]" point the AI appends to a
+   *  Narrator line's raw text, stripped from `text` at parse time (see
+   *  generateDebateScript) so it's never spoken/displayed as dialogue —
+   *  Phone Studio 2's Narrator whiteboard uses it as that line's heading/
+   *  question-sheet item instead of the full spoken sentence. */
+  boardPoint?: string;
   /** Tagging used only by the "Learn English" feature — drives which parts of the
    *  render pipeline (intro storyboard, narrator teaching card, quiz overlay) apply. */
   learnEnglish?: {

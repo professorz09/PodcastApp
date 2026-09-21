@@ -3090,6 +3090,16 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
 
     setPhones(prev => buildPhonesFromSpeakers(uniqueSpeakers, prev));
 
+    // Case Debate's Narrator lines carry a `boardPoint` (a short "[bracketed]"
+    // tag the AI appends, already stripped out of `text` in geminiService —
+    // see generateDebateScript). The FIRST Narrator line with one is the
+    // opening/main-question — that becomes the board's title, not a list
+    // item. Every later one is a specific sub-question — sequential
+    // narratorPointIndex values, matching the whiteboard's questions[] order,
+    // so the current turn's own point never gets marked "done" while it's
+    // the one actually being discussed (see phoneCanvasRenderer2 drawFrame).
+    let pointIndex = 0;
+    let sawTitlePoint = false;
     const turns: ScriptTurn[] = mainScript.map(seg => {
       // "True" Narrator interludes are a silent 4s white-card beat (no audio
       // of their own — see phoneCanvasRenderer2's drawNarratorCard). "Intro"
@@ -3106,6 +3116,13 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
           ? Math.round(seg.duration * 1000)           // from HTML Audio element
           : null;
       const isIntro = isIntroSpeaker(seg.speaker);
+
+      let narratorPointIndex: number | undefined;
+      if (isTrueNarrator && seg.boardPoint) {
+        if (!sawTitlePoint) sawTitlePoint = true;
+        else narratorPointIndex = pointIndex++;
+      }
+
       return {
         id: seg.id,
         // Distinct virtual ids (not real phones, see timelineItems below) so
@@ -3120,22 +3137,34 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
         wordTimings: isTrueNarrator ? undefined : (wt?.length
           ? wt.map(w => ({ word: w.word, startTime: w.start, endTime: w.end }))
           : undefined),
+        ...(narratorPointIndex !== undefined && { narratorPointIndex }),
       };
     });
     setScript(turns);
 
-    // Seed the whiteboard's question list from the main script's own true
-    // Narrator turns (case_debate's per-sub-question transitions read
-    // naturally as a question sheet already) — once only, so it doesn't
+    // Seed the whiteboard's title + question list — once only, so it doesn't
     // clobber edits the user makes afterward in the Narrator settings panel.
     if (!narratorBoardSeededRef.current) {
-      const narratorLines = mainScript
-        .filter(seg => isTrueNarratorSpeaker(seg.speaker))
-        .map(seg => seg.text.trim())
-        .filter(Boolean);
-      if (narratorLines.length) {
-        setNarratorQuestionsText(narratorLines.join('\n'));
+      const boardPoints = mainScript
+        .filter(seg => isTrueNarratorSpeaker(seg.speaker) && seg.boardPoint)
+        .map(seg => seg.boardPoint!.trim());
+      if (boardPoints.length) {
+        const [title, ...questions] = boardPoints;
+        setNarratorBoardTitle(title);
+        if (questions.length) setNarratorQuestionsText(questions.join('\n'));
         narratorBoardSeededRef.current = true;
+      } else {
+        // Fallback for scripts with no bracketed points (older scripts, or
+        // any other style) — dump the raw Narrator lines as a starting
+        // point the user can clean up in the settings panel.
+        const narratorLines = mainScript
+          .filter(seg => isTrueNarratorSpeaker(seg.speaker))
+          .map(seg => seg.text.trim())
+          .filter(Boolean);
+        if (narratorLines.length) {
+          setNarratorQuestionsText(narratorLines.join('\n'));
+          narratorBoardSeededRef.current = true;
+        }
       }
     }
   }, [mainScript]);
