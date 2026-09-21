@@ -21,6 +21,8 @@ import {
   generateTitleTextPair,
   generateThumbnail,
   generateStoryboardImage,
+  generateIntroSceneBreakdown,
+  IntroSceneBreakdown,
   PodcastTranscriptSeg,
   PodcastChapter,
 } from '../services/geminiService';
@@ -591,15 +593,16 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
   const [topic, setTopic] = useState<string | null>(null);
   const [detectedHost, setDetectedHost] = useState<string | null>(null);
 
-  // AI Illustration — a separate, previewable settings section (like
-  // EnglishVideoMaker's storyboard scenes) instead of a silent one-shot
-  // generation buried inside the render step. User can generate/regenerate
-  // and see the result before hitting the main render button; the render
-  // step below reuses whatever's here instead of generating a fresh one.
-  const [aiImage, setAiImage] = useState<{ url: string; prompt: string } | null>(null);
-  const [aiImageLoading, setAiImageLoading] = useState(false);
-  const [aiImagePrompt, setAiImagePrompt] = useState('');
-  const aiImageRef = useRef<{ url: string; prompt: string } | null>(null);
+  // Intro scenes — reads the generated intro narration (itself read from the
+  // main script's transcript in Step 1) and breaks it into a dense sequence
+  // of cinematic scene-beats with one image each, exactly like
+  // EnglishVideoMaker's "Generate Scenes" (generateIntroSceneBreakdown) —
+  // instead of one static illustration for the whole intro. One button; the
+  // render step below picks whichever scene is active at each timestamp.
+  const [introScenes, setIntroScenes] = useState<(IntroSceneBreakdown & { imageUrl?: string })[] | null>(null);
+  const [scenesLoading, setScenesLoading] = useState(false);
+  const [scenesProgress, setScenesProgress] = useState({ done: 0, total: 0 });
+  const introScenesRef = useRef<(IntroSceneBreakdown & { imageUrl?: string })[] | null>(null);
 
   // Cached intermediate results — refs so the pipeline can read them sync
   const introTextRef = useRef<string | null>(null);
@@ -626,25 +629,52 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
 
   const STEP_ORDER: IntroStepKey[] = INTRO_STEPS.map(s => s.key);
 
-  // Generates (or regenerates) the intro's AI illustration on demand — uses
-  // the edited prompt if the user typed one, else falls back to the
-  // generated intro text, else a generic placeholder. Stored in aiImageRef
-  // so the render step below picks it up instead of generating its own.
-  const generateAiImage = async () => {
-    if (aiImageLoading) return;
-    setAiImageLoading(true);
+  // Reads the generated intro narration (from Step 1, which itself reads the
+  // main transcript) and breaks it into a dense sequence of scene-beats —
+  // same call EnglishVideoMaker's "Generate Scenes" button uses — then
+  // generates one image per beat, sequentially so a slow/failed image never
+  // blocks the rest. Result cached in introScenesRef for the render step.
+  // When the real TTS audio + STT word timings are already available (Steps
+  // 2-3), those are passed in as exact spoken timing so each scene cut lands
+  // on an actual word boundary instead of a proportional text-length guess —
+  // scenes then match what's actually being said, not just estimated.
+  const generateScenes = async () => {
+    if (scenesLoading) return;
+    setScenesLoading(true);
+    setScenesProgress({ done: 0, total: 0 });
     try {
-      const basis = aiImagePrompt.trim() || introTextRef.current || topic
+      const basis = introTextRef.current || topic
         || 'A podcast host about to introduce a topic, mid-sentence, engaging expression.';
-      const scenePrompt = `A single clear illustrated scene for a podcast intro, visualizing: ${basis}`;
-      const url = await generateStoryboardImage(scenePrompt);
-      const result = { url, prompt: basis };
-      aiImageRef.current = result;
-      setAiImage(result);
+      const realDuration = audioRef.current?.duration;
+      const estDuration = realDuration || Math.max(6, basis.split(/\s+/).length / 2.3);
+      const phraseTimings = (realDuration && timingsRef.current?.length)
+        ? timingsRef.current.map(w => ({ text: w.word, start: w.start, end: w.end }))
+        : undefined;
+      const breakdown = await generateIntroSceneBreakdown(basis, estDuration, phraseTimings);
+      const scenes: (IntroSceneBreakdown & { imageUrl?: string })[] = breakdown.map(s => ({ ...s }));
+      setScenesProgress({ done: 0, total: scenes.length });
+      introScenesRef.current = scenes;
+      setIntroScenes([...scenes]);
+
+      let ok = 0;
+      for (let i = 0; i < scenes.length; i++) {
+        try {
+          scenes[i] = { ...scenes[i], imageUrl: await generateStoryboardImage(scenes[i].prompt) };
+          ok++;
+        } catch (e) {
+          console.warn(`Intro scene #${i + 1} image failed:`, e); // skip — one failure shouldn't stop the rest
+        }
+        introScenesRef.current = [...scenes];
+        setIntroScenes([...scenes]);
+        setScenesProgress({ done: i + 1, total: scenes.length });
+      }
+      if (ok === 0) toast.error('Koi bhi scene image nahi ban payi');
+      else if (ok < scenes.length) toast.success(`${ok}/${scenes.length} scenes ban gaye`);
+      else toast.success(`${ok} scenes ready!`);
     } catch (e: any) {
-      toast.error(e?.message || 'Illustration generate nahi hui');
+      toast.error(e?.message || 'Scenes generate nahi hue');
     } finally {
-      setAiImageLoading(false);
+      setScenesLoading(false);
     }
   };
 
@@ -854,26 +884,39 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             }
           }
 
+          // Multi-scene storyboard: whichever scenes the user generated via
+          // the "Generate Scenes" button (see introScenesRef) switch over
+          // time at their own startOffset/endOffset, matching the actual
+          // narration beat-by-beat instead of one static image for the
+          // whole intro.
+          let sceneCanvases: { startOffset: number; endOffset: number; canvas: HTMLCanvasElement }[] = [];
           let storyboardFrame: HTMLCanvasElement | null = null;
           if (!footageFrame) {
-            try {
-              // Reuse whatever the user already generated/approved in the AI
-              // Illustration settings section — only auto-generate here if
-              // they never touched it.
-              let imgUrl = aiImageRef.current?.url;
-              if (!imgUrl) {
+            const readyScenes = (introScenesRef.current || []).filter(s => s.imageUrl);
+            if (readyScenes.length) {
+              try {
+                sceneCanvases = await Promise.all(readyScenes.map(async s => ({
+                  startOffset: s.startOffset,
+                  endOffset: s.endOffset,
+                  canvas: await loadImageIntoCanvas(s.imageUrl!, W, H),
+                })));
+              } catch (e) {
+                console.warn('[IntroFlow] scene canvases failed to load, falling back to single illustration', e);
+                sceneCanvases = [];
+              }
+            }
+            if (!sceneCanvases.length) {
+              try {
                 patchStep('render', { status: 'running', detail: 'AI illustration bana raha hai…' });
                 const scenePrompt = introTextRef.current
                   ? `A single clear illustrated scene for a podcast intro, visualizing: ${introTextRef.current}`
                   : 'A podcast host about to introduce a topic, mid-sentence, engaging expression.';
-                imgUrl = await generateStoryboardImage(scenePrompt);
-                aiImageRef.current = { url: imgUrl, prompt: scenePrompt };
-                setAiImage({ url: imgUrl, prompt: scenePrompt });
+                const imgUrl = await generateStoryboardImage(scenePrompt);
+                storyboardFrame = await loadImageIntoCanvas(imgUrl, W, H);
+                patchStep('render', { status: 'running', detail: '0%' });
+              } catch (e) {
+                console.warn('[IntroFlow] storyboard illustration failed, falling back to phone mockup', e);
               }
-              storyboardFrame = await loadImageIntoCanvas(imgUrl, W, H);
-              patchStep('render', { status: 'running', detail: '0%' });
-            } catch (e) {
-              console.warn('[IntroFlow] storyboard illustration failed, falling back to phone mockup', e);
             }
           }
 
@@ -890,7 +933,7 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             subtitleConfig: { enabled: true, size: 1.6, background: 'dark', textColor: '#ffffff' },
             phoneZPulse: false,
           };
-          const exportRenderer = (footageFrame || storyboardFrame) ? null : new CanvasRenderer(exportCanvas, state);
+          const exportRenderer = (footageFrame || sceneCanvases.length || storyboardFrame) ? null : new CanvasRenderer(exportCanvas, state);
           const introTextForCaption = introTextRef.current || '';
 
           const blob = await renderVideoOffline({
@@ -905,6 +948,11 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
             renderCallback: (_time, _level, _vid, offCtx) => {
               if (footageFrame) {
                 offCtx.drawImage(footageFrame, 0, 0, W, H);
+                drawFootageCaption(offCtx, W, H, introTextForCaption);
+              } else if (sceneCanvases.length) {
+                const active = sceneCanvases.find(s => _time >= s.startOffset && _time < s.endOffset)
+                  || sceneCanvases[sceneCanvases.length - 1];
+                offCtx.drawImage(active.canvas, 0, 0, W, H);
                 drawFootageCaption(offCtx, W, H, introTextForCaption);
               } else if (storyboardFrame) {
                 offCtx.drawImage(storyboardFrame, 0, 0, W, H);
@@ -991,49 +1039,27 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
           </div>
         )}
 
-        {/* AI Illustration — separate, previewable settings section (like
-            EnglishVideoMaker's storyboard scenes) instead of a silent
-            one-shot generation buried inside the render step. Only used
-            when no real footage video is uploaded (real footage always
-            wins in the render step), but stays visible either way so it
-            can be prepared ahead of time. */}
-        <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
-            🎨 AI Illustration {videoFile ? '(footage upload hai to ye use nahi hogi)' : ''}
-          </div>
-          {aiImage && (
-            <img
-              src={aiImage.url}
-              alt="Intro illustration preview"
-              style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}
-            />
-          )}
-          <textarea
-            value={aiImagePrompt}
-            onChange={e => setAiImagePrompt(e.target.value)}
-            placeholder={introText || topic || 'Optional — kya scene banana hai likho (khaali chhodo to intro text/topic se auto-generate hoga)'}
-            rows={2}
-            style={{
-              width: '100%', resize: 'vertical', borderRadius: 8, padding: '8px 10px',
-              background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)',
-              color: '#fff', fontSize: 11, fontFamily: 'inherit', outline: 'none',
-            }}
-          />
-          <button
-            onClick={generateAiImage}
-            disabled={aiImageLoading}
-            style={{
-              padding: '9px', borderRadius: 8, border: 'none', cursor: aiImageLoading ? 'default' : 'pointer',
-              background: aiImageLoading ? 'rgba(168,85,247,0.25)' : 'rgba(168,85,247,0.18)',
-              color: '#e9d5ff', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            {aiImageLoading
-              ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
-              : aiImage ? <>🔁 Regenerate Illustration</> : <>🎨 Generate Illustration</>}
-          </button>
-        </div>
+        {/* Intro scenes — one clean button. Reads the generated intro
+            narration and breaks it into a dense cinematic scene-beat
+            sequence (same as EnglishVideoMaker's "Generate Scenes"),
+            switching images over time instead of one static illustration.
+            Only used when no real footage video is uploaded (real footage
+            always wins in the render step), but stays visible either way so
+            it can be prepared ahead of time. */}
+        <button
+          onClick={generateScenes}
+          disabled={scenesLoading}
+          style={{
+            padding: '9px', borderRadius: 8, border: 'none', cursor: scenesLoading ? 'default' : 'pointer',
+            background: scenesLoading ? 'rgba(168,85,247,0.25)' : 'rgba(168,85,247,0.18)',
+            color: '#e9d5ff', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          {scenesLoading
+            ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Scenes ban rahe hain… {scenesProgress.done}/{scenesProgress.total || '?'}</>
+            : introScenes?.length ? <>🔁 Regenerate Scenes ({introScenes.length}){videoFile ? ' (footage upload hai to use nahi hogi)' : ''}</> : <>🎬 Generate Scenes{videoFile ? ' (footage upload hai to use nahi hogi)' : ''}</>}
+        </button>
 
         {/* Main button */}
         <button
@@ -2954,16 +2980,15 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [segmentImages, setSegmentImages] = useState<Record<string, string>>({});
   const [segmentImageLoading, setSegmentImageLoading] = useState<Record<string, boolean>>({});
   const [segmentImagePrompts, setSegmentImagePrompts] = useState<Record<string, string>>({});
-  // Auto-illustrate — an opt-in toggle (default OFF, see Intro settings) that,
-  // instead of the user manually picking a turn in the Image sub-tab, walks the
-  // script itself and generates one illustration per topic block (the run of
+  // Auto-illustrate — a single button in Intro settings that, instead of the
+  // user manually picking a turn in the Image sub-tab, walks the script
+  // itself and generates one illustration per topic block (the run of
   // discussion turns between two Narrator/Intro breaks) wherever one isn't
-  // already set. Any block whose generation fails is simply skipped — never
-  // blocks the rest of the run.
-  const [autoIllustrate, setAutoIllustrate] = useState(false);
+  // already set — full-frame, replacing the phones for that block. Any
+  // block whose generation fails is simply skipped — never blocks the rest
+  // of the run.
   const [autoIllustrateRunning, setAutoIllustrateRunning] = useState(false);
   const [autoIllustrateStatus, setAutoIllustrateStatus] = useState('');
-  const autoIllustrateRanForRef = useRef<string | null>(null);
 
   // Script generator state
   const [genStyle, setGenStyle] = useState('podcast');
@@ -3223,7 +3248,10 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     if (current.length) blocks.push(current);
 
     const pending = blocks.filter(b => !b.some(t => segmentImages[t.id]));
-    if (!pending.length) return;
+    if (!pending.length) {
+      toast.success(blocks.length ? 'Sabhi blocks mein pehle se image hai' : 'Script mein koi discussion turn nahi mila');
+      return;
+    }
 
     setAutoIllustrateRunning(true);
     let done = 0, skipped = 0;
@@ -3250,18 +3278,6 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       );
     }
   };
-
-  // Kick off (or top-up) the auto run whenever the toggle is on and the
-  // script has new blocks without an image yet — e.g. right when it's
-  // switched on, or after regenerating a script while it was already on.
-  useEffect(() => {
-    if (!autoIllustrate || autoIllustrateRunning) return;
-    const key = script.map(t => t.id).join(',');
-    if (autoIllustrateRanForRef.current === key) return;
-    autoIllustrateRanForRef.current = key;
-    runAutoIllustrate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoIllustrate, script]);
 
   const buildState = useCallback((): StudioState => ({
     phones,
@@ -5536,26 +5552,23 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   🎬 Intro video — AI illustration (ya video upload ho to real footage ka freeze frame) ke upar "In this clip [host] [talks about] [topic]…" caption/voiceover ban ta hai.
                 </div>
 
-                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={autoIllustrate}
-                      onChange={e => setAutoIllustrate(e.target.checked)}
-                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#a855f7' }}
-                    />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>🎨 Script mein auto illustrations</span>
-                  </label>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                    ON karne par main script ke kuch zaroori jagah (har topic block par ek) AI illustration khud ban jaayegi — Image sub-tab mein manually jaake har turn nahi chunna padega. Kisi ki image generate nahi hui to wo simply skip ho jaayegi, poora run nahi rukega. Default OFF hai.
-                  </div>
-                  {autoIllustrateRunning && (
-                    <div style={{ fontSize: 10, color: '#c4b5fd' }}>⏳ {autoIllustrateStatus}</div>
-                  )}
-                  {!autoIllustrateRunning && autoIllustrateStatus && (
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>✓ {autoIllustrateStatus}</div>
-                  )}
-                </div>
+                <button
+                  onClick={runAutoIllustrate}
+                  disabled={autoIllustrateRunning}
+                  style={{
+                    padding: '9px', borderRadius: 8, border: 'none', cursor: autoIllustrateRunning ? 'default' : 'pointer',
+                    background: autoIllustrateRunning ? 'rgba(168,85,247,0.25)' : 'rgba(168,85,247,0.18)',
+                    color: '#e9d5ff', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  {autoIllustrateRunning
+                    ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> {autoIllustrateStatus || 'Script Images ban rahe hain…'}</>
+                    : <>🎨 Script Images Banao (mobiles ke upar aayengi)</>}
+                </button>
+                {!autoIllustrateRunning && autoIllustrateStatus && (
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>✓ {autoIllustrateStatus}</div>
+                )}
 
                 <IntroFlow
                   segments={podcastSegments}
