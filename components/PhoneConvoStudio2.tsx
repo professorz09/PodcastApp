@@ -2954,6 +2954,16 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [segmentImages, setSegmentImages] = useState<Record<string, string>>({});
   const [segmentImageLoading, setSegmentImageLoading] = useState<Record<string, boolean>>({});
   const [segmentImagePrompts, setSegmentImagePrompts] = useState<Record<string, string>>({});
+  // Auto-illustrate — an opt-in toggle (default OFF, see Intro settings) that,
+  // instead of the user manually picking a turn in the Image sub-tab, walks the
+  // script itself and generates one illustration per topic block (the run of
+  // discussion turns between two Narrator/Intro breaks) wherever one isn't
+  // already set. Any block whose generation fails is simply skipped — never
+  // blocks the rest of the run.
+  const [autoIllustrate, setAutoIllustrate] = useState(false);
+  const [autoIllustrateRunning, setAutoIllustrateRunning] = useState(false);
+  const [autoIllustrateStatus, setAutoIllustrateStatus] = useState('');
+  const autoIllustrateRanForRef = useRef<string | null>(null);
 
   // Script generator state
   const [genStyle, setGenStyle] = useState('podcast');
@@ -3098,16 +3108,16 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
 
     setPhones(prev => buildPhonesFromSpeakers(uniqueSpeakers, prev));
 
-    // Case Debate's Narrator lines carry a `boardPoint` (a short "[bracketed]"
-    // tag the AI appends, already stripped out of `text` in geminiService —
-    // see generateDebateScript). The FIRST Narrator line with one is the
-    // opening/main-question — that becomes the board's title, not a list
-    // item. Every later one is a specific sub-question — sequential
-    // narratorPointIndex values, matching the whiteboard's questions[] order,
-    // so the current turn's own point never gets marked "done" while it's
-    // the one actually being discussed (see phoneCanvasRenderer2 drawFrame).
+    // Case Debate's Intro line (Turn 1 — the opening/main-question) and its
+    // Narrator lines (every sub-question after that) each carry a
+    // `boardPoint` (a short "[bracketed]" tag the AI appends, already
+    // stripped out of `text` in geminiService — see generateDebateScript).
+    // The Intro turn's point becomes the board's title; every Narrator
+    // point is a specific sub-question — sequential narratorPointIndex
+    // values, matching the whiteboard's questions[] order, so the current
+    // turn's own point never gets marked "done" while it's the one
+    // actually being discussed (see phoneCanvasRenderer2 drawFrame).
     let pointIndex = 0;
-    let sawTitlePoint = false;
     const turns: ScriptTurn[] = mainScript.map(seg => {
       // "True" Narrator interludes are a silent 4s white-card beat (no audio
       // of their own — see phoneCanvasRenderer2's drawNarratorCard). "Intro"
@@ -3127,8 +3137,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
 
       let narratorPointIndex: number | undefined;
       if (isTrueNarrator && seg.boardPoint) {
-        if (!sawTitlePoint) sawTitlePoint = true;
-        else narratorPointIndex = pointIndex++;
+        narratorPointIndex = pointIndex++;
       }
 
       return {
@@ -3153,13 +3162,13 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     // Seed the whiteboard's title + question list — once only, so it doesn't
     // clobber edits the user makes afterward in the Narrator settings panel.
     if (!narratorBoardSeededRef.current) {
-      const boardPoints = mainScript
+      const introBoardPoint = mainScript.find(seg => isIntroSpeaker(seg.speaker) && seg.boardPoint)?.boardPoint?.trim();
+      const narratorBoardPoints = mainScript
         .filter(seg => isTrueNarratorSpeaker(seg.speaker) && seg.boardPoint)
         .map(seg => seg.boardPoint!.trim());
-      if (boardPoints.length) {
-        const [title, ...questions] = boardPoints;
-        setNarratorBoardTitle(title);
-        if (questions.length) setNarratorQuestionsText(questions.join('\n'));
+      if (introBoardPoint || narratorBoardPoints.length) {
+        if (introBoardPoint) setNarratorBoardTitle(introBoardPoint);
+        if (narratorBoardPoints.length) setNarratorQuestionsText(narratorBoardPoints.join('\n'));
         narratorBoardSeededRef.current = true;
       } else {
         // Fallback for scripts with no bracketed points (older scripts, or
@@ -3192,6 +3201,67 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       setSegmentImageLoading(prev => ({ ...prev, [turnId]: false }));
     }
   };
+
+  // Groups the current script into "topic blocks" (consecutive discussion
+  // turns between two Narrator/Intro breaks) and generates one illustration
+  // per block — reused across every turn in that block — for whichever
+  // blocks don't already have a manual image. Runs sequentially so a slow/
+  // failed generation never races another; a failure on one block just
+  // skips it and moves on, it never stops the run.
+  const runAutoIllustrate = async () => {
+    if (autoIllustrateRunning) return;
+    const blocks: ScriptTurn[][] = [];
+    let current: ScriptTurn[] = [];
+    for (const t of script) {
+      if (t.isNarrator) {
+        if (current.length) blocks.push(current);
+        current = [];
+      } else {
+        current.push(t);
+      }
+    }
+    if (current.length) blocks.push(current);
+
+    const pending = blocks.filter(b => !b.some(t => segmentImages[t.id]));
+    if (!pending.length) return;
+
+    setAutoIllustrateRunning(true);
+    let done = 0, skipped = 0;
+    try {
+      for (const block of pending) {
+        setAutoIllustrateStatus(`Illustrations ban rahi hain… ${done + skipped + 1}/${pending.length}`);
+        const basis = block.map(t => t.text).join(' ').trim();
+        try {
+          const url = await generateStoryboardImage(`A single clear illustrated scene, visualizing: ${basis}`);
+          setSegmentImages(prev => {
+            const next = { ...prev };
+            block.forEach(t => { next[t.id] = url; });
+            return next;
+          });
+          done++;
+        } catch {
+          skipped++; // one block failing shouldn't stop the rest
+        }
+      }
+    } finally {
+      setAutoIllustrateRunning(false);
+      setAutoIllustrateStatus(
+        skipped ? `${done} ban gayi, ${skipped} skip hui (generate nahi hui)` : `${done} illustrations ban gayi`
+      );
+    }
+  };
+
+  // Kick off (or top-up) the auto run whenever the toggle is on and the
+  // script has new blocks without an image yet — e.g. right when it's
+  // switched on, or after regenerating a script while it was already on.
+  useEffect(() => {
+    if (!autoIllustrate || autoIllustrateRunning) return;
+    const key = script.map(t => t.id).join(',');
+    if (autoIllustrateRanForRef.current === key) return;
+    autoIllustrateRanForRef.current = key;
+    runAutoIllustrate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoIllustrate, script]);
 
   const buildState = useCallback((): StudioState => ({
     phones,
@@ -5465,6 +5535,28 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
                   🎬 Intro video — AI illustration (ya video upload ho to real footage ka freeze frame) ke upar "In this clip [host] [talks about] [topic]…" caption/voiceover ban ta hai.
                 </div>
+
+                <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={autoIllustrate}
+                      onChange={e => setAutoIllustrate(e.target.checked)}
+                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#a855f7' }}
+                    />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>🎨 Script mein auto illustrations</span>
+                  </label>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                    ON karne par main script ke kuch zaroori jagah (har topic block par ek) AI illustration khud ban jaayegi — Image sub-tab mein manually jaake har turn nahi chunna padega. Kisi ki image generate nahi hui to wo simply skip ho jaayegi, poora run nahi rukega. Default OFF hai.
+                  </div>
+                  {autoIllustrateRunning && (
+                    <div style={{ fontSize: 10, color: '#c4b5fd' }}>⏳ {autoIllustrateStatus}</div>
+                  )}
+                  {!autoIllustrateRunning && autoIllustrateStatus && (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>✓ {autoIllustrateStatus}</div>
+                  )}
+                </div>
+
                 <IntroFlow
                   segments={podcastSegments}
                   podcastTitle={podcastTitle}

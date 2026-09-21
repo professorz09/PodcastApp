@@ -1647,19 +1647,21 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               अलग है — हर sub-question पर बारी-बारी debate करते हैं। generic "for vs against"
               नहीं — हमेशा इसी एक इंसान की specific situation पर grounded।
 
-              🚨 Output array ka BILKUL PEHLA element hamesha ek "Narrator" turn hona chahiye jisme
-              poori 3-5 line ki opening situation ho (neeche TURN 1 dekho) — ye optional nahi hai,
-              kabhi skip nahi hota, ek line mein chhota nahi hota, aur kisi aur cheez ke saath merge
-              nahi hota. Viewer ne abhi kuch nahi dekha — usko debate shuru hone se pehle hi pata
-              chalna chahiye ki ye kiske baare mein hai aur dilemma kya hai.
+              🚨 Output array ka BILKUL PEHLA element hamesha ek turn hona chahiye jiska speaker tag
+              EXACTLY "Intro" ho (NAHI "Narrator") jisme poori 3-5 line ki opening situation ho (neeche
+              TURN 1 dekho) — ye optional nahi hai, kabhi skip nahi hota, ek line mein chhota nahi hota,
+              aur kisi aur cheez ke saath merge nahi hota. Viewer ne abhi kuch nahi dekha — usko debate
+              shuru hone se pehle hi pata chalna chahiye ki ye kiske baare mein hai aur dilemma kya hai.
               ═══════════════════════════════════════
               विषय: "${topic}"
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
               ${durLineHi}
               भाषा: हिंदी + Hinglish (natural, emotionally grounded — जैसे दो smart दोस्त genuinely असहमत हों, formal debate नहीं)।
 
-              पात्र — ठीक 3 (fixed):
-              - Narrator: situation set up करेगा, हर sub-question में transition करेगा, और closing देगा
+              पात्र — ठीक 4 speaker tags (fixed):
+              - Intro: SIRF sabse pehla turn (opening situation, Turn 1 neeche) — speaker tag exactly
+                "Intro" hona chahiye, kabhi "Narrator" nahi
+              - Narrator: uske baad sab kuch — har sub-question mein transition karega, aur closing dega
               - 2 Hosts:
               ${speakers.length >= 2
                 ? `इन नामों का उपयोग करें: ${speakers[0]} और ${speakers[1]}.`
@@ -1667,11 +1669,12 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               }
 
               ══════════════════════════════════════════
-              【 TURN 1 (NARRATOR) — SITUATION — MANDATORY, chhota mat karo ya skip mat karo 】
+              【 TURN 1 (SPEAKER TAG "Intro") — SITUATION — MANDATORY, chhota mat karo ya skip mat karo 】
               ══════════════════════════════════════════
-              Ye apna poora, alag Narrator turn hai aur poori video mein SABSE PEHLE bola jaata hai —
-              audience ko abhi tak kuch pata nahi hai, isliye sirf isi turn ko poori situation samjhani hai.
-              Ye 3-5 COMPLETE lines ka hona chahiye — ek specific इंसान को नाम के साथ introduce karo, concrete
+              🔴 Is turn ka speaker tag EXACTLY "Intro" hona chahiye — "Narrator" NAHI. Ye apna poora, alag
+              turn hai aur poori video mein SABSE PEHLE bola jaata hai — audience ko abhi tak kuch pata
+              nahi hai, isliye sirf isi turn ko poori situation samjhani hai. Ye 3-5 COMPLETE lines ka
+              hona chahiye — ek specific इंसान को नाम के साथ introduce karo, concrete
               believable details ke saath (age, job/context, aur exactly kya ho raha hai) — ek chhoti si line
               nahi, skip nahi, aur neeche wale TURN 2 mein merge bhi nahi karna.
               जैसे: "जेम्स 30 साल का है। उसकी stable ₹70K/month job है, कोई debt नहीं, और ₹5 लाख savings में पड़े हैं।
@@ -1683,9 +1686,10 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               pehle wala sentence khud mein complete aur natural rehna chahiye.
 
               ══════════════════════════════════════════
-              【 TURN 2 (NARRATOR) — PEHLE SUB-QUESTION MEIN — Turn 1 se ALAG turn 】
+              【 TURN 2 (SPEAKER TAG "Narrator") — PEHLE SUB-QUESTION MEIN — Turn 1 se ALAG turn 】
               ══════════════════════════════════════════
-              Turn 1 ke turant baad, ek NAYE alag Narrator turn mein, pehla sub-question introduce karo
+              Turn 1 ke turant baad, ek NAYE alag turn mein jiska speaker tag "Narrator" ho (NAHI "Intro" —
+              "Intro" sirf Turn 1 ke liye hai), pehla sub-question introduce karo
               (neeche Hosts section dekho ki sub-question transition kaisi dikhti hai). Narrator se sare
               sub-questions pehle ek saath mat bulwao — audience screen par poori question sheet already
               dekh raha hoga, toh sab pehle bata dena sirf repeat lagega.
@@ -3732,18 +3736,21 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             worldviews debate EACH sub-question in turn — never generic "for vs against"
             rambling, always grounded in this one character's specific situation.
 
-            🚨 THE VERY FIRST ELEMENT OF THE OUTPUT ARRAY MUST BE A "Narrator" TURN CONTAINING THE
-            FULL 3-5 SENTENCE OPENING SITUATION (see TURN 1 below) — this is not optional and is never
-            skipped, shortened to one line, or merged with anything else. A viewer who has seen nothing
-            yet MUST understand who this is about and what the dilemma is before any debate starts.
+            🚨 THE VERY FIRST ELEMENT OF THE OUTPUT ARRAY MUST BE A TURN WITH SPEAKER TAG EXACTLY
+            "Intro" (NOT "Narrator") CONTAINING THE FULL 3-5 SENTENCE OPENING SITUATION (see TURN 1
+            below) — this is not optional and is never skipped, shortened to one line, or merged with
+            anything else. A viewer who has seen nothing yet MUST understand who this is about and what
+            the dilemma is before any debate starts.
             ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Additional context: ${specificDetails}` : ''}
             ${durLineEn}
             Language: ${language}. Tone: natural, conversational, emotionally grounded — two smart friends who genuinely disagree, not a formal debate.
 
-            Characters — exactly 3 (fixed):
-            - Narrator: sets up the situation, transitions into each sub-question, and delivers the closing
+            Characters — exactly 4 speaker tags (fixed):
+            - Intro: ONLY the very first turn (the opening situation, Turn 1 below) — speaker tag must be
+              exactly "Intro", never "Narrator"
+            - Narrator: everything after that — transitions into each sub-question, and the closing
             - 2 Hosts:
             ${speakers.length >= 2
               ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
@@ -3751,13 +3758,14 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             }
 
             ══════════════════════════════════════════
-            【 TURN 1 (NARRATOR) — THE SITUATION — MANDATORY, DO NOT SHORTEN OR SKIP 】
+            【 TURN 1 (SPEAKER TAG "Intro") — THE SITUATION — MANDATORY, DO NOT SHORTEN OR SKIP 】
             ══════════════════════════════════════════
-            This is its own full Narrator turn and the FIRST thing spoken in the whole video — the
-            audience has no idea what's going on yet, so this turn alone has to make them understand the
-            full scenario. It must be 3-5 COMPLETE sentences introducing ONE specific person by name with
-            concrete, believable details (age, job/context, and exactly what's happening) — not a vague
-            one-liner, not skipped, not merged into Turn 2 below.
+            🔴 Speaker tag for this turn MUST BE EXACTLY "Intro" — NOT "Narrator". This is its own full
+            turn and the FIRST thing spoken in the whole video — the audience has no idea what's going on
+            yet, so this turn alone has to make them understand the full scenario. It must be 3-5 COMPLETE
+            sentences introducing ONE specific person by name with concrete, believable details (age,
+            job/context, and exactly what's happening) — not a vague one-liner, not skipped, not merged
+            into Turn 2 below.
             e.g. "James is 30. He's got a stable $70K job, no debt, and $50,000 sitting in savings.
             His job is secure, but that's the only safety net he has. Should he invest it for long-term
             growth, or keep it safe in case something goes wrong?"
@@ -3768,9 +3776,10 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             spoken sentence before it complete and natural on its own.
 
             ══════════════════════════════════════════
-            【 TURN 2 (NARRATOR) — INTO THE FIRST SUB-QUESTION — A SEPARATE TURN FROM TURN 1 】
+            【 TURN 2 (SPEAKER TAG "Narrator") — INTO THE FIRST SUB-QUESTION — A SEPARATE TURN FROM TURN 1 】
             ══════════════════════════════════════════
-            Immediately after Turn 1, in a NEW separate Narrator turn, introduce the first sub-question
+            Immediately after Turn 1, in a NEW separate turn with speaker tag "Narrator" (not "Intro" —
+            "Intro" is used ONLY for Turn 1), introduce the first sub-question
             (see the Hosts section below for what a sub-question transition looks like). Do NOT have the
             Narrator separately list out all the sub-questions before this — the audience sees the full
             question sheet on screen as it comes up, so reading the whole list out loud first would just
