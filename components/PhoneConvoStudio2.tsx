@@ -4463,7 +4463,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
       {/* ── 16:9 Preview — Discussion canvas, or real Intro/Footage video when that chip is selected ── */}
       <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', flexShrink: 0, background: '#050505', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ position: 'absolute', inset: 0, display: activeSettingsSection === 'discussion' ? 'block' : 'none' }}>
+        {/* Always visible — Intro/Narrator turns render on this SAME canvas
+            (as the AI illustration/whiteboard cards), they're just regular
+            positions on the discussion timeline, not a separate preview. */}
+        <div style={{ position: 'absolute', inset: 0, display: 'block' }}>
           <canvas
             ref={canvasRef}
             width={1920}
@@ -4561,7 +4564,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
       {/* ── Playback + Seek ── */}
       <div style={{ flexShrink: 0, padding: '8px 12px 6px', background: '#0a0a0d', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        {activeSettingsSection === 'discussion' && (
+        {/* Always visible — same reasoning as the canvas above: Intro/
+            Narrator are positions on this same timeline, not a separate view. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             onClick={togglePlay}
@@ -4593,7 +4597,6 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             </div>
           </div>
         </div>
-        )}
 
         {/* Timeline chips — Intro + Footage (virtual, not part of the phone-call
             canvas timeline) prepended before the Discussion turn chips. Clicking
@@ -4601,51 +4604,12 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             seeking playback; clicking a Discussion chip does both (seek + switch
             Settings back to the phone-call panel). */}
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 6, paddingBottom: 2 }}>
-          {/* Intro chip */}
-          <button
-            onClick={() => { setActiveSettingsSection('intro'); setTab('visual'); }}
-            style={{
-              flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
-              width: 44, padding: '5px 4px', borderRadius: 10, cursor: 'pointer',
-              border: `1px solid ${activeSettingsSection === 'intro' ? '#a855f7aa' : 'rgba(255,255,255,0.05)'}`,
-              background: activeSettingsSection === 'intro' ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)',
-              position: 'relative', transition: 'all 0.15s',
-              opacity: introVideoBlob || activeSettingsSection === 'intro' ? 1 : 0.55,
-            }}
-          >
-            <div style={{
-              width: 24, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(168,85,247,0.28)', border: '1px solid rgba(168,85,247,0.44)',
-              color: '#c4b5fd', fontSize: 12, marginBottom: 2,
-            }}>🎬</div>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Intro</span>
-          </button>
-
-          {/* Narrator chip */}
-          <button
-            onClick={() => { setActiveSettingsSection('narrator'); setTab('visual'); }}
-            style={{
-              flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
-              width: 44, padding: '5px 4px', borderRadius: 10, cursor: 'pointer',
-              border: `1px solid ${activeSettingsSection === 'narrator' ? '#60a5faaa' : 'rgba(255,255,255,0.05)'}`,
-              background: activeSettingsSection === 'narrator' ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.03)',
-              position: 'relative', transition: 'all 0.15s',
-              opacity: narratorQuestions.length || activeSettingsSection === 'narrator' ? 1 : 0.55,
-            }}
-          >
-            <div style={{
-              width: 24, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(96,165,250,0.28)', border: '1px solid rgba(96,165,250,0.44)',
-              color: '#bfdbfe', fontSize: 12, marginBottom: 2,
-            }}>📋</div>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>Narrator</span>
-          </button>
-
-          {/* Footage chip removed in Phone Studio 2 — this copy doesn't offer
-              the source-footage upload/trim flow, only phone conversation +
-              intro. activeSettingsSection can no longer become 'footage'. */}
-
-          <div style={{ width: 1, background: 'rgba(255,255,255,0.08)', flexShrink: 0, margin: '2px 2px' }} />
+          {/* Standalone Intro/Narrator/Footage chips removed — Intro and
+              Narrator turns already appear inline as regular discussion
+              chips below (clicking one opens its own settings, see
+              timelineItems.map below), so a separate static entry point
+              was redundant. Phone Studio 2 doesn't offer the footage
+              upload/trim flow at all. */}
 
           {timelineItems.map(item => {
             // Intro/Narrator turns from the MAIN script (docu_debate's cold-open,
