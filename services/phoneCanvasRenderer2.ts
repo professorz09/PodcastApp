@@ -273,7 +273,7 @@ export class CanvasRenderer {
     // for this turn's whole duration (picked per-turn in the "Image"
     // settings sub-tab; most turns won't have one).
     if (activeTurn?.visualImageUrl) {
-      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl);
+      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress);
       return;
     }
 
@@ -317,7 +317,9 @@ export class CanvasRenderer {
 
   // Full-bleed cover-fit image for a manually-attached segment illustration
   // — reuses bgImageCache (keyed by URL, no reason for a separate cache).
-  private drawSegmentImage(w: number, h: number, offsetY: number, url: string) {
+  // Slow Ken Burns zoom + drift over the turn's own progress (0→1) so a
+  // static illustration never sits completely frozen on screen.
+  private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0) {
     const { ctx } = this;
     let img = this.bgImageCache.get(url);
     if (!img) {
@@ -332,11 +334,15 @@ export class CanvasRenderer {
       ctx.fillRect(0, offsetY, w, h);
       return;
     }
-    const scl = Math.max(w / img.width, h / img.height);
+    const p = Math.max(0, Math.min(1, progress));
+    const zoom = 1.04 + 0.09 * p;
+    const scl = Math.max(w / img.width, h / img.height) * zoom;
     const dw = img.width * scl, dh = img.height * scl;
+    const driftX = Math.sin(p * Math.PI * 0.5) * w * 0.02;
+    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.01;
     ctx.save();
     ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
-    ctx.drawImage(img, (w - dw) / 2, offsetY + (h - dh) / 2, dw, dh);
+    ctx.drawImage(img, (w - dw) / 2 - driftX, offsetY + (h - dh) / 2 - driftY, dw, dh);
     ctx.restore();
   }
 

@@ -952,7 +952,12 @@ const IntroFlow: React.FC<IntroFlowProps> = ({ segments, podcastTitle, podcastHo
               } else if (sceneCanvases.length) {
                 const active = sceneCanvases.find(s => _time >= s.startOffset && _time < s.endOffset)
                   || sceneCanvases[sceneCanvases.length - 1];
-                offCtx.drawImage(active.canvas, 0, 0, W, H);
+                // Slow Ken Burns zoom-in over this scene's own window so a
+                // static illustration doesn't sit completely frozen.
+                const sceneProgress = Math.max(0, Math.min(1, (_time - active.startOffset) / Math.max(0.1, active.endOffset - active.startOffset)));
+                const zoom = 1 + 0.12 * sceneProgress;
+                const srcW = W / zoom, srcH = H / zoom;
+                offCtx.drawImage(active.canvas, (W - srcW) / 2, (H - srcH) / 2, srcW, srcH, 0, 0, W, H);
                 drawFootageCaption(offCtx, W, H, introTextForCaption);
               } else if (storyboardFrame) {
                 offCtx.drawImage(storyboardFrame, 0, 0, W, H);
@@ -3227,48 +3232,31 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     }
   };
 
-  // Groups the current script into "topic blocks" (consecutive discussion
-  // turns between two Narrator/Intro breaks) and generates one illustration
-  // per block — reused across every turn in that block — for whichever
-  // blocks don't already have a manual image. Runs sequentially so a slow/
-  // failed generation never races another; a failure on one block just
-  // skips it and moves on, it never stops the run.
+  // One illustration PER discussion turn — generated from that turn's own
+  // spoken line, so whatever's on screen always matches what's actually
+  // being said (not a shared image spanning several different lines, which
+  // read as mismatched/"random" once playback moved past the line it was
+  // generated from). Runs sequentially so a slow/failed generation never
+  // races another; a failure on one turn just skips it and moves on.
   const runAutoIllustrate = async () => {
     if (autoIllustrateRunning) return;
-    const blocks: ScriptTurn[][] = [];
-    let current: ScriptTurn[] = [];
-    for (const t of script) {
-      if (t.isNarrator) {
-        if (current.length) blocks.push(current);
-        current = [];
-      } else {
-        current.push(t);
-      }
-    }
-    if (current.length) blocks.push(current);
-
-    const pending = blocks.filter(b => !b.some(t => segmentImages[t.id]));
+    const pending = script.filter(t => !t.isNarrator && !segmentImages[t.id]);
     if (!pending.length) {
-      toast.success(blocks.length ? 'Sabhi blocks mein pehle se image hai' : 'Script mein koi discussion turn nahi mila');
+      toast.success(script.some(t => !t.isNarrator) ? 'Sabhi turns mein pehle se image hai' : 'Script mein koi discussion turn nahi mila');
       return;
     }
 
     setAutoIllustrateRunning(true);
     let done = 0, skipped = 0;
     try {
-      for (const block of pending) {
+      for (const turn of pending) {
         setAutoIllustrateStatus(`Illustrations ban rahi hain… ${done + skipped + 1}/${pending.length}`);
-        const basis = block.map(t => t.text).join(' ').trim();
         try {
-          const url = await generateStoryboardImage(`A single clear illustrated scene, visualizing: ${basis}`);
-          setSegmentImages(prev => {
-            const next = { ...prev };
-            block.forEach(t => { next[t.id] = url; });
-            return next;
-          });
+          const url = await generateStoryboardImage(`A single clear illustrated scene, visualizing: ${turn.text}`);
+          setSegmentImages(prev => ({ ...prev, [turn.id]: url }));
           done++;
         } catch {
-          skipped++; // one block failing shouldn't stop the rest
+          skipped++; // one turn failing shouldn't stop the rest
         }
       }
     } finally {
