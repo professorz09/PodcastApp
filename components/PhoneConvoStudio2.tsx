@@ -4648,11 +4648,18 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           <div style={{ width: 1, background: 'rgba(255,255,255,0.08)', flexShrink: 0, margin: '2px 2px' }} />
 
           {timelineItems.map(item => {
-            const active = activeSettingsSection === 'discussion' && currentTime >= item.start && currentTime < item.end;
+            // Intro/Narrator turns from the MAIN script (docu_debate's cold-open,
+            // or any Narrator line) get their own settings panel below, same
+            // as the dedicated Intro/Narrator chips — not the generic phone
+            // (Phones/Background/Subtitles) panel, since they never get a
+            // phone mockup to configure in the first place.
+            const turnSection: typeof activeSettingsSection =
+              item.phoneId === 'intro' ? 'intro' : item.phoneId === 'narrator' ? 'narrator' : 'discussion';
+            const active = activeSettingsSection === turnSection && currentTime >= item.start && currentTime < item.end;
             return (
               <button
                 key={item.id}
-                onClick={() => { setActiveSettingsSection('discussion'); seekWithAudio(item.start); }}
+                onClick={() => { setActiveSettingsSection(turnSection); seekWithAudio(item.start); }}
                 style={{
                   flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
                   width: 44, padding: '5px 4px', borderRadius: 10,
