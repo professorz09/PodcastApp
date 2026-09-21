@@ -3394,6 +3394,17 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     }
   };
 
+  // Manual override — user uploads their own image for one specific turn
+  // instead of an AI-generated one (same as the intro scenes' upload).
+  const uploadSegmentImage = (turnId: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setSegmentImages(prev => ({ ...prev, [turnId]: result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   // One illustration PER discussion turn — generated from that turn's own
   // spoken line, so whatever's on screen always matches what's actually
   // being said (not a shared image spanning several different lines, which
@@ -5702,6 +5713,76 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   🎬 Intro video — AI illustration (ya video upload ho to real footage ka freeze frame) ke upar "In this clip [host] [talks about] [topic]…" caption/voiceover ban ta hai.
                 </div>
 
+                {/* Main script scenes — same Timeline system as the intro
+                    scenes above: every discussion turn gets its own row with
+                    a thumbnail that can be AI-generated, regenerated, or
+                    replaced with an uploaded image individually, plus a
+                    "Generate All" shortcut. Full-frame when that turn plays,
+                    phones hidden (see drawSegmentImage in phoneCanvasRenderer2). */}
+                {script.some(t => !t.isNarrator) && (
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: '#0a0a0a', overflow: 'hidden' }}>
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Script Scenes · {script.filter(t => !t.isNarrator).length} turns
+                      </span>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
+                        {Object.keys(segmentImages).length} set hai
+                      </span>
+                    </div>
+                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                      {script.filter(t => !t.isNarrator).map(turn => (
+                        <div key={turn.id} style={{ padding: 10, display: 'flex', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, width: 76 }}>
+                            <div style={{ position: 'relative', width: 76, height: 44, borderRadius: 8, overflow: 'hidden', background: '#111', border: '1px solid rgba(255,255,255,0.1)' }}>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadSegmentImage(turn.id, f); e.target.value = ''; }}
+                                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', zIndex: 1 }}
+                                title="Upload custom image"
+                              />
+                              {segmentImageLoading[turn.id] ? (
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
+                                  <Loader2 size={13} style={{ color: '#c4b5fd', animation: 'spin 1s linear infinite' }} />
+                                </div>
+                              ) : segmentImages[turn.id] ? (
+                                <img src={segmentImages[turn.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 8, gap: 2 }}>
+                                  <ImagePlus size={13} />
+                                  Upload
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => generateSegmentImage(turn.id, segmentImagePrompts[turn.id] ?? '', turn.text)}
+                              disabled={!!segmentImageLoading[turn.id]}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                                padding: '3px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
+                                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)',
+                                fontSize: 9, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                                opacity: segmentImageLoading[turn.id] ? 0.4 : 1,
+                              }}
+                            >
+                              <RefreshCw size={9} style={segmentImageLoading[turn.id] ? { animation: 'spin 1s linear infinite' } : undefined} />
+                              {segmentImages[turn.id] ? 'Regen' : 'Generate'}
+                            </button>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 9, color: '#c4b5fd', fontFamily: 'monospace', fontWeight: 700, marginBottom: 4 }}>
+                              {phones.find(p => p.id === turn.phoneId)?.name || turn.phoneId}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>
+                              {turn.text}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={runAutoIllustrate}
                   disabled={autoIllustrateRunning}
@@ -5714,7 +5795,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 >
                   {autoIllustrateRunning
                     ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> {autoIllustrateStatus || 'Script Images ban rahe hain…'}</>
-                    : <>🎨 Script Images Banao (mobiles ke upar aayengi)</>}
+                    : <><ImagePlus size={12} /> Generate All (jo baaki hain)</>}
                 </button>
                 {!autoIllustrateRunning && autoIllustrateStatus && (
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>✓ {autoIllustrateStatus}</div>
