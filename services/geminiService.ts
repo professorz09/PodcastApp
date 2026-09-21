@@ -1673,12 +1673,22 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               ══════════════════════════════════════════
               🔴 Is turn ka speaker tag EXACTLY "Intro" hona chahiye — "Narrator" NAHI. Ye apna poora, alag
               turn hai aur poori video mein SABSE PEHLE bola jaata hai — audience ko abhi tak kuch pata
-              nahi hai, isliye sirf isi turn ko poori situation samjhani hai. Ye 3-5 COMPLETE lines ka
-              hona chahiye — ek specific इंसान को नाम के साथ introduce karo, concrete
-              believable details ke saath (age, job/context, aur exactly kya ho raha hai) — ek chhoti si line
-              nahi, skip nahi, aur neeche wale TURN 2 mein merge bhi nahi karna.
+              nahi hai, isliye sirf isi turn ko poori situation samjhani hai, sirf bare facts nahi. Ye 3-5
+              COMPLETE lines ka hona chahiye aur in sabko cover karna hai, order mein:
+              1. KAUN — ek specific इंसान naam ke saath, concrete believable details ke saath (age, job/context).
+              2. KYA — exactly kya ho raha hai / kaunsa decision abhi lena hai, aur ABHI hi kyu (koi trigger
+                 event) — koi vague situation nahi jo hamesha se aise hi hai.
+              3. DONO SIDES KE STAKES — har option mein kya milega ya kya risk hai, briefly par specifically
+                 (real numbers/consequences, "achha ya bura ho sakta hai" jaisa vague nahi) — yahi cheez ise
+                 genuinely hard decision banati hai, obvious nahi — aur yahi cheez audience ko hosts ke
+                 arguments shuru hone se PEHLE hi torn feel karwati hai.
+              KAUN se seedha question par mat kudo — viewer ko samajhna chahiye ki ye HARD KYU hai, sirf
+              KYA choice hai wo nahi.
               जैसे: "जेम्स 30 साल का है। उसकी stable ₹70K/month job है, कोई debt नहीं, और ₹5 लाख savings में पड़े हैं।
-              Job secure है, लेकिन यही उसका इकलौता safety net है। Invest करे long-term growth के लिए, ya safe रखे?"
+              Company ने abhi layoffs ka announce kiya hai, isliye job security ab guaranteed nahi rahi — lekin
+              ₹5 लाख invest karne se 10 saal mein significantly grow ho sakte hain, jabki cash mein rakhne se
+              growth miss hoti hai par job jaane par full safety net milta hai। Invest करे long-term growth के लिए,
+              ya safe रखे?"
               Turn 1 ko ek clear, direct MAIN QUESTION par khatam karo jiske ird-gird poora episode ghoomega.
               🔴 CRITICAL — is turn ke text ke bilkul aakhir mein main question ka ek chhota bracketed heading
               jodo, जैसे: ...invest kare ya safe rakhe? [Invest kare ya safe rakhe?]
@@ -1706,6 +1716,10 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
                 Wahi rule — bracket silent/on-screen-only hai, kabhi bola nahi jaata.
               - दोनों hosts उसी sub-question पर अपनी OWN real position दें — सिर्फ एक-दूसरे को react नहीं
                 करते, हर एक genuinely कुछ मानता है और उसके लिए argue करता है।
+              - Arguments Turn 1 mein establish hui SPECIFIC stakes/details mein grounded ho — actual
+                numbers, actual trigger event, actual इंसान ki situation — generic advice nahi jo kisi
+                pe bhi apply ho jaaye. Host aise sound kare jaise specifically James ke ₹5 लाख aur James
+                ke layoff risk ki baat kar raha hai, kabhi general financial gyaan recite karte hue nahi।
               - Real back-and-forth: हर sub-question पर 3-8 turns, alternating, genuine reactions के साथ
                 ("रुक, लेकिन—", "ठीक है पर फिर—")।
               - हर turn 1-2 पूरे sentences का हो और किसी concrete चीज़ का reference हो — number, नाम,
@@ -3762,13 +3776,22 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             ══════════════════════════════════════════
             🔴 Speaker tag for this turn MUST BE EXACTLY "Intro" — NOT "Narrator". This is its own full
             turn and the FIRST thing spoken in the whole video — the audience has no idea what's going on
-            yet, so this turn alone has to make them understand the full scenario. It must be 3-5 COMPLETE
-            sentences introducing ONE specific person by name with concrete, believable details (age,
-            job/context, and exactly what's happening) — not a vague one-liner, not skipped, not merged
-            into Turn 2 below.
-            e.g. "James is 30. He's got a stable $70K job, no debt, and $50,000 sitting in savings.
-            His job is secure, but that's the only safety net he has. Should he invest it for long-term
-            growth, or keep it safe in case something goes wrong?"
+            yet, so this turn alone has to make them understand the full scenario, not just the bare facts.
+            It must be 3-5 COMPLETE sentences and cover ALL of these, in order:
+            1. WHO — one specific person by name, with concrete believable details (age, job/context).
+            2. WHAT — exactly what's happening / what decision they're now facing, and what triggered it
+               right now (not a vague situation that's been true forever).
+            3. THE STAKES ON BOTH SIDES — what they gain or risk with EACH option, briefly but specifically
+               (real numbers/consequences, not "it could go well or badly") — this is what makes it a genuinely
+               hard decision instead of an obvious one, and it's what the audience needs to actually feel torn
+               before the hosts even start arguing.
+            Do not skip straight from WHO to the question — a viewer must understand WHY this is hard, not
+            just WHAT the choice is.
+            e.g. "James is 30. He's got a stable $70K job, no debt, and $50,000 sitting in savings. His
+            company just announced layoffs are coming, so that job security isn't guaranteed anymore — but
+            investing the $50K could grow it significantly over 10 years, while keeping it in cash means
+            missing that growth but having a full safety net if he's let go. Should he invest it for
+            long-term growth, or keep it safe in case something goes wrong?"
             End Turn 1 with ONE clear, direct MAIN QUESTION the whole episode revolves around.
             🔴 CRITICAL — append this turn's text with a short bracketed heading version of that main
             question, e.g.: ...should he invest it, or keep it safe? [Invest or play it safe?]
@@ -3797,6 +3820,10 @@ Speaker B (Curious): choose a different name — asks what the audience is think
               Same rule as above: the bracket is silent/on-screen-only, never spoken.
             - Both hosts give their OWN real position on THAT sub-question — not just reacting to each
               other, each one actually believes something and argues for it.
+            - Ground arguments in the SPECIFIC stakes/details established in Turn 1 — the actual numbers,
+              the actual trigger event, the actual person's situation — not generic advice that could apply
+              to anyone. A host should sound like they're talking about James's $50K and James's layoff risk
+              specifically, never like they're reciting general financial wisdom.
             - Real back-and-forth: 3-8 turns per sub-question, alternating, with genuine reactions
               ("Wait, but—", "Okay sure, but what about—").
             - Every turn is 1-2 full sentences and references something concrete — a number, a name,
