@@ -1,4 +1,4 @@
-import { callGemini } from '../services/vertexProxy.ts';
+import { callGemini } from '../services/vertexProxy';
 
 // Allow maximum 60 seconds on Vercel Serverless Functions
 export const maxDuration = 60;

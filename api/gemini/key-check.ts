@@ -1,4 +1,4 @@
-import { parseGcpServiceAccount } from '../../services/vertexProxy.ts';
+import { parseGcpServiceAccount } from '../../services/vertexProxy';
 
 // Vercel serverless function — mirrors the /api/gemini/key-check route in server.ts
 export default function handler(req: any, res: any) {
