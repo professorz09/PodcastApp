@@ -368,12 +368,124 @@ export class CanvasRenderer {
     ctx.restore();
   }
 
-  // Speaker phones as a small PiP cluster over a full-bleed segment illustration.
+  // Speaker overlay on a full-bleed segment illustration — when photos are
+  // uploaded, show only circular avatar PiP (not mini phone mockups). Active
+  // speaker is slightly larger with an audio-reactive glow; inactive is dull.
   private drawPhonesPip(
     w: number, regionH: number, regionY: number,
     phones: PhoneConfig[], activeTurn: ScriptTurn, turnProgress: number,
   ) {
     if (!phones.length) return;
+    if (phones.some(p => p.backgroundImage)) {
+      this.drawSpeakerPhotosPip(w, regionH, regionY, phones, activeTurn);
+      return;
+    }
+    this.drawPhoneMockupsPip(w, regionH, regionY, phones, activeTurn, turnProgress);
+  }
+
+  private drawSpeakerPhotosPip(
+    w: number, regionH: number, regionY: number,
+    phones: PhoneConfig[], activeTurn: ScriptTurn,
+  ) {
+    const { ctx } = this;
+    const edgePad = w * 0.032;
+    const gap = w * 0.022;
+    const baseD = regionH * 0.13;
+    const zPulseOn = this.state.phoneZPulse ?? true;
+
+    type Item = { phone: PhoneConfig; isActive: boolean; d: number };
+    const items: Item[] = phones.map(phone => {
+      const isActive = activeTurn.phoneId === phone.id;
+      const audioPulse = (zPulseOn && isActive) ? 1 + this.audioLevel * 0.14 : 1;
+      const d = baseD * (isActive ? 1.22 : 0.88) * audioPulse;
+      return { phone, isActive, d };
+    });
+
+    const totalW = items.reduce((s, it, i) => s + it.d + (i > 0 ? gap : 0), 0);
+    const maxH = items.reduce((m, it) => Math.max(m, it.d), 0);
+    const startX = w - edgePad - totalW;
+    const baseY = regionY + regionH - edgePad;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = w * 0.018;
+    ctx.beginPath();
+    ctx.roundRect(startX - edgePad * 0.4, baseY - maxH - edgePad * 0.25, totalW + edgePad * 0.8, maxH + edgePad * 0.5, w * 0.016);
+    ctx.fill();
+    ctx.restore();
+
+    // Pre-compute positions left-to-right, then paint inactive before active
+    let x = startX;
+    const positioned = items.map(item => {
+      const cx = x + item.d / 2;
+      const cy = baseY - item.d / 2;
+      x += item.d + gap;
+      return { ...item, cx, cy };
+    });
+    const drawOrder = [...positioned].sort((a, b) => (a.isActive === b.isActive ? 0 : a.isActive ? 1 : -1));
+    for (const { phone, isActive, d, cx, cy } of drawOrder) {
+
+      if (isActive) {
+        const flicker = 0.7 + this.audioLevel * 0.3 + Math.sin(this.currentTime / 260) * 0.06;
+        ctx.save();
+        ctx.shadowColor = phone.color;
+        ctx.shadowBlur = d * 0.22 * flicker;
+        ctx.strokeStyle = phone.color;
+        ctx.lineWidth = d * 0.045;
+        ctx.globalAlpha = flicker;
+        ctx.beginPath();
+        ctx.arc(cx, cy, d / 2 + d * 0.04, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
+      ctx.clip();
+
+      const url = phone.backgroundImage;
+      if (url) {
+        let img = this.speakerImageCache.get(url);
+        if (!img) {
+          img = new Image();
+          img.src = url;
+          img.onload = () => { if (!this.playing) this.drawFrame(); };
+          this.speakerImageCache.set(url, img);
+        }
+        if (img.complete && img.naturalWidth > 0) {
+          const scl = Math.max(d / img.naturalWidth, d / img.naturalHeight);
+          const dw = img.naturalWidth * scl;
+          const dh = img.naturalHeight * scl;
+          ctx.globalAlpha = isActive ? 1 : 0.38;
+          ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
+          if (!isActive) {
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillRect(cx - d / 2, cy - d / 2, d, d);
+          }
+        } else {
+          ctx.fillStyle = phone.color + '55';
+          ctx.fillRect(cx - d / 2, cy - d / 2, d, d);
+        }
+      } else {
+        ctx.fillStyle = isActive ? phone.color + '88' : phone.color + '33';
+        ctx.fillRect(cx - d / 2, cy - d / 2, d, d);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${d * 0.38}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = isActive ? 1 : 0.45;
+        ctx.fillText(phone.name[0]?.toUpperCase() || '?', cx, cy);
+      }
+      ctx.restore();
+    }
+  }
+
+  private drawPhoneMockupsPip(
+    w: number, regionH: number, regionY: number,
+    phones: PhoneConfig[], activeTurn: ScriptTurn, turnProgress: number,
+  ) {
     const { ctx } = this;
     const phoneAspect = 9 / 19.5;
     const count = phones.length;
@@ -393,7 +505,6 @@ export class CanvasRenderer {
     const startY = regionY + regionH - edgePad - ph;
     const zPulseOn = this.state.phoneZPulse ?? true;
 
-    // Soft backing so phones read clearly on busy illustrations
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.42)';
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
