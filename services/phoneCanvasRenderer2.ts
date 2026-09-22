@@ -51,6 +51,9 @@ export interface ScriptTurn {
   // turn renders as a full-bleed image instead of the phone mockups for its
   // whole duration, same full-frame treatment as the Narrator card.
   visualImageUrl?: string;
+  /** Timed storyboard scenes for the Intro cold-open — switches images over
+   *  the turn's own duration (same model as English Video's introScenes). */
+  introScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string; usesCharacter?: boolean }[];
 }
 
 export interface StudioState {
@@ -239,6 +242,22 @@ export class CanvasRenderer {
       elapsed += turn.durationMs;
     }
 
+    // ── Intro storyboard — timed scene images during the cold-open turn ─
+    if (activeTurn?.phoneId === 'intro' && activeTurn.introScenes?.length) {
+      const localSec = turnProgress * (activeTurn.durationMs / 1000);
+      const scenes = activeTurn.introScenes;
+      const sceneIdx = scenes.findIndex(s => localSec >= s.startOffset && localSec < s.endOffset);
+      const scene = sceneIdx >= 0 ? scenes[sceneIdx] : scenes[scenes.length - 1];
+      if (scene?.imageUrl) {
+        const sceneDur = Math.max(0.1, scene.endOffset - scene.startOffset);
+        const sceneProgress = Math.max(0, Math.min(1, (localSec - scene.startOffset) / sceneDur));
+        // Per-scene Ken Burns — each beat gets its own slow zoom/drift instead of
+        // one zoom stretched across the whole intro (which felt static per scene).
+        this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, sceneProgress, sceneIdx);
+        return;
+      }
+    }
+
     // ── Narrator card — white slide, confined to the bottom band when split ─
     if (activeTurn?.isNarrator) {
       const board = state.narratorBoard;
@@ -269,11 +288,12 @@ export class CanvasRenderer {
       return;
     }
 
-    // ── Manually-attached segment image — full-bleed, replaces the phones
-    // for this turn's whole duration (picked per-turn in the "Image"
-    // settings sub-tab; most turns won't have one).
+    // ── Per-turn illustration — full-bleed Ken Burns background with speaker
+    // phones shrunk into a bottom-right PiP overlay (Image settings sub-tab).
     if (activeTurn?.visualImageUrl) {
-      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress);
+      const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
+      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress, turnIdx);
+      this.drawPhonesPip(w, regionH, regionY, phones, activeTurn, turnProgress);
       return;
     }
 
@@ -302,14 +322,14 @@ export class CanvasRenderer {
 
     // Z-pulse: default ON when single-speaker, OFF for multi. Consumer can
     // override either way via state.phoneZPulse.
-    const zPulseOn = state.phoneZPulse ?? isSingle;
+    const zPulseOn = state.phoneZPulse ?? true;
 
     phones.forEach((phone, idx) => {
       const x = startX + idx * (pw + spacing);
       const isActive = activeTurn?.phoneId === phone.id;
       // DebateVisualizer-style pulse: small scale-up driven by audioLevel.
       // Single-speaker uses a stronger pulse so the depth effect reads clearly.
-      const pulse = (zPulseOn && isActive) ? 1 + this.audioLevel * (isSingle ? 0.085 : 0.045) : 1;
+      const pulse = (zPulseOn && isActive) ? 1 + this.audioLevel * (isSingle ? 0.1 : 0.075) : 1;
       const force0Rotation = isSingle;
       this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn, pulse, force0Rotation);
     });
@@ -317,9 +337,10 @@ export class CanvasRenderer {
 
   // Full-bleed cover-fit image for a manually-attached segment illustration
   // — reuses bgImageCache (keyed by URL, no reason for a separate cache).
-  // Slow Ken Burns zoom + drift over the turn's own progress (0→1) so a
-  // static illustration never sits completely frozen on screen.
-  private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0) {
+  // Slow Ken Burns zoom + drift over progress (0→1) so a static illustration
+  // never sits completely frozen on screen. sceneIndex alternates drift
+  // direction so consecutive intro beats don't all pan the same way.
+  private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0, sceneIndex = 0) {
     const { ctx } = this;
     let img = this.bgImageCache.get(url);
     if (!img) {
@@ -335,15 +356,170 @@ export class CanvasRenderer {
       return;
     }
     const p = Math.max(0, Math.min(1, progress));
-    const zoom = 1.04 + 0.09 * p;
+    const zoom = 1.05 + 0.11 * p;
     const scl = Math.max(w / img.width, h / img.height) * zoom;
     const dw = img.width * scl, dh = img.height * scl;
-    const driftX = Math.sin(p * Math.PI * 0.5) * w * 0.02;
-    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.01;
+    const dir = sceneIndex % 2 === 0 ? 1 : -1;
+    const driftX = dir * Math.sin(p * Math.PI * 0.5) * w * 0.028;
+    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.014;
     ctx.save();
     ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
     ctx.drawImage(img, (w - dw) / 2 - driftX, offsetY + (h - dh) / 2 - driftY, dw, dh);
     ctx.restore();
+  }
+
+  // Speaker overlay on a full-bleed segment illustration — when photos are
+  // uploaded, show only circular avatar PiP (not mini phone mockups). Active
+  // speaker is slightly larger with an audio-reactive glow; inactive is dull.
+  private drawPhonesPip(
+    w: number, regionH: number, regionY: number,
+    phones: PhoneConfig[], activeTurn: ScriptTurn, turnProgress: number,
+  ) {
+    if (!phones.length) return;
+    if (phones.some(p => p.backgroundImage)) {
+      this.drawSpeakerPhotosPip(w, regionH, regionY, phones, activeTurn);
+      return;
+    }
+    this.drawPhoneMockupsPip(w, regionH, regionY, phones, activeTurn, turnProgress);
+  }
+
+  private drawSpeakerPhotosPip(
+    w: number, regionH: number, regionY: number,
+    phones: PhoneConfig[], activeTurn: ScriptTurn,
+  ) {
+    const { ctx } = this;
+    const edgePad = w * 0.032;
+    const gap = w * 0.022;
+    const baseD = regionH * 0.13;
+    const zPulseOn = this.state.phoneZPulse ?? true;
+
+    type Item = { phone: PhoneConfig; isActive: boolean; d: number };
+    const items: Item[] = phones.map(phone => {
+      const isActive = activeTurn.phoneId === phone.id;
+      const audioPulse = (zPulseOn && isActive) ? 1 + this.audioLevel * 0.14 : 1;
+      const d = baseD * (isActive ? 1.22 : 0.88) * audioPulse;
+      return { phone, isActive, d };
+    });
+
+    const totalW = items.reduce((s, it, i) => s + it.d + (i > 0 ? gap : 0), 0);
+    const maxH = items.reduce((m, it) => Math.max(m, it.d), 0);
+    const startX = w - edgePad - totalW;
+    const baseY = regionY + regionH - edgePad;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = w * 0.018;
+    ctx.beginPath();
+    ctx.roundRect(startX - edgePad * 0.4, baseY - maxH - edgePad * 0.25, totalW + edgePad * 0.8, maxH + edgePad * 0.5, w * 0.016);
+    ctx.fill();
+    ctx.restore();
+
+    // Pre-compute positions left-to-right, then paint inactive before active
+    let x = startX;
+    const positioned = items.map(item => {
+      const cx = x + item.d / 2;
+      const cy = baseY - item.d / 2;
+      x += item.d + gap;
+      return { ...item, cx, cy };
+    });
+    const drawOrder = [...positioned].sort((a, b) => (a.isActive === b.isActive ? 0 : a.isActive ? 1 : -1));
+    for (const { phone, isActive, d, cx, cy } of drawOrder) {
+
+      if (isActive) {
+        const flicker = 0.7 + this.audioLevel * 0.3 + Math.sin(this.currentTime / 260) * 0.06;
+        ctx.save();
+        ctx.shadowColor = phone.color;
+        ctx.shadowBlur = d * 0.22 * flicker;
+        ctx.strokeStyle = phone.color;
+        ctx.lineWidth = d * 0.045;
+        ctx.globalAlpha = flicker;
+        ctx.beginPath();
+        ctx.arc(cx, cy, d / 2 + d * 0.04, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
+      ctx.clip();
+
+      const url = phone.backgroundImage;
+      if (url) {
+        let img = this.speakerImageCache.get(url);
+        if (!img) {
+          img = new Image();
+          img.src = url;
+          img.onload = () => { if (!this.playing) this.drawFrame(); };
+          this.speakerImageCache.set(url, img);
+        }
+        if (img.complete && img.naturalWidth > 0) {
+          const scl = Math.max(d / img.naturalWidth, d / img.naturalHeight);
+          const dw = img.naturalWidth * scl;
+          const dh = img.naturalHeight * scl;
+          ctx.globalAlpha = isActive ? 1 : 0.38;
+          ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
+          if (!isActive) {
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillRect(cx - d / 2, cy - d / 2, d, d);
+          }
+        } else {
+          ctx.fillStyle = phone.color + '55';
+          ctx.fillRect(cx - d / 2, cy - d / 2, d, d);
+        }
+      } else {
+        ctx.fillStyle = isActive ? phone.color + '88' : phone.color + '33';
+        ctx.fillRect(cx - d / 2, cy - d / 2, d, d);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${d * 0.38}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = isActive ? 1 : 0.45;
+        ctx.fillText(phone.name[0]?.toUpperCase() || '?', cx, cy);
+      }
+      ctx.restore();
+    }
+  }
+
+  private drawPhoneMockupsPip(
+    w: number, regionH: number, regionY: number,
+    phones: PhoneConfig[], activeTurn: ScriptTurn, turnProgress: number,
+  ) {
+    const { ctx } = this;
+    const phoneAspect = 9 / 19.5;
+    const count = phones.length;
+    const edgePad = w * 0.032;
+    const gap = w * 0.016;
+
+    let ph = regionH * 0.24;
+    let pw = ph * phoneAspect;
+    const totalW = pw * count + gap * (count - 1);
+    const maxW = w * 0.52;
+    if (totalW > maxW) {
+      pw = (maxW - gap * (count - 1)) / count;
+      ph = pw / phoneAspect;
+    }
+
+    const startX = w - edgePad - totalW;
+    const startY = regionY + regionH - edgePad - ph;
+    const zPulseOn = this.state.phoneZPulse ?? true;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = w * 0.02;
+    ctx.beginPath();
+    ctx.roundRect(startX - edgePad * 0.45, startY - edgePad * 0.35, totalW + edgePad * 0.9, ph + edgePad * 0.7, w * 0.018);
+    ctx.fill();
+    ctx.restore();
+
+    phones.forEach((phone, idx) => {
+      const x = startX + idx * (pw + gap);
+      const isActive = activeTurn.phoneId === phone.id;
+      const pulse = (zPulseOn && isActive) ? 1 + this.audioLevel * 0.075 : 1;
+      this.drawPhone(x, startY, pw, ph, phone, isActive, true, activeTurn.text, turnProgress, activeTurn, pulse, false);
+    });
   }
 
   // Slides down from off-screen top into position, holds, then slides back
@@ -612,14 +788,15 @@ export class CanvasRenderer {
       ctx.translate(-cx, -cy);
     }
 
-    // ── Outer glow when SPEAKING ──────────────────────────────────────────
+    // ── Outer glow when SPEAKING — driven by real audio level + subtle idle wobble
     if (isActive) {
-      const pulse = 0.55 + Math.sin(this.currentTime / 350) * 0.2;
+      const audioBoost = this.audioLevel * 0.45;
+      const pulse = 0.5 + Math.sin(this.currentTime / 350) * 0.12 + audioBoost;
       ctx.shadowColor = phone.color;
-      ctx.shadowBlur = w * 0.18;
+      ctx.shadowBlur = w * (0.14 + audioBoost * 0.22);
       ctx.strokeStyle = phone.color;
-      ctx.lineWidth = w * 0.028;
-      ctx.globalAlpha = pulse;
+      ctx.lineWidth = w * (0.024 + audioBoost * 0.012);
+      ctx.globalAlpha = Math.min(1, pulse);
       ctx.beginPath();
       ctx.roundRect(x + 1, y + 1, w - 2, h - 2, r);
       ctx.stroke();
@@ -757,7 +934,8 @@ export class CanvasRenderer {
     const cx = sx + sw / 2;
     const cy = sy + sh * 0.42;
 
-    // ── Speaker background image ───────────────────────────────────────────
+    // ── Speaker background image — contain-fit so square/portrait headshots
+    // show fully (not over-cropped), with a light bottom scrim for UI text.
     if (phone.backgroundImage) {
       let img = this.speakerImageCache.get(phone.backgroundImage);
       if (!img) {
@@ -767,19 +945,38 @@ export class CanvasRenderer {
         this.speakerImageCache.set(phone.backgroundImage, img);
       }
       if (img.complete && img.naturalWidth > 0) {
-        const imgAspect = img.naturalWidth / img.naturalHeight;
-        const screenAspect = sw / sh;
-        let dW = sw, dH = sh;
-        if (imgAspect > screenAspect) { dH = sh; dW = sh * imgAspect; }
-        else { dW = sw; dH = sw / imgAspect; }
         ctx.save();
         ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
-        ctx.globalAlpha = 0.82;
-        ctx.drawImage(img, sx - (dW - sw) / 2, sy - (dH - sh) / 2, dW, dH);
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle = phone.screenColor || '#000';
+        ctx.fillStyle = phone.screenColor || '#0a0a0a';
         ctx.fillRect(sx, sy, sw, sh);
-        ctx.globalAlpha = 1;
+
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const scale = Math.min(sw / img.naturalWidth, sh / img.naturalHeight);
+        let dW = img.naturalWidth * scale;
+        let dH = img.naturalHeight * scale;
+        // Portrait / square headshots sit slightly above centre (video-call framing)
+        const isPortraitish = imgAspect <= 1.15;
+        const offsetX = sx + (sw - dW) / 2;
+        const offsetY = isPortraitish ? sy + sh * 0.06 : sy + (sh - dH) / 2;
+        const imgCx = offsetX + dW / 2;
+        const imgCy = offsetY + dH / 2;
+
+        // Subtle audio-reactive zoom on the photo itself when speaking
+        const photoPulse = isActive ? 1 + this.audioLevel * 0.05 : 1;
+        if (photoPulse !== 1) {
+          ctx.translate(imgCx, imgCy);
+          ctx.scale(photoPulse, photoPulse);
+          ctx.translate(-imgCx, -imgCy);
+        }
+
+        ctx.drawImage(img, offsetX, offsetY, dW, dH);
+
+        // Bottom gradient only — keeps status text readable without washing out the face
+        const scrim = ctx.createLinearGradient(0, sy + sh * 0.5, 0, sy + sh);
+        scrim.addColorStop(0, 'rgba(0,0,0,0)');
+        scrim.addColorStop(1, 'rgba(0,0,0,0.5)');
+        ctx.fillStyle = scrim;
+        ctx.fillRect(sx, sy, sw, sh);
         ctx.restore();
       }
     }
