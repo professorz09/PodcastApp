@@ -246,9 +246,14 @@ export class CanvasRenderer {
     if (activeTurn?.phoneId === 'intro' && activeTurn.introScenes?.length) {
       const localSec = turnProgress * (activeTurn.durationMs / 1000);
       const scenes = activeTurn.introScenes;
-      const scene = scenes.find(s => localSec >= s.startOffset && localSec < s.endOffset) || scenes[scenes.length - 1];
+      const sceneIdx = scenes.findIndex(s => localSec >= s.startOffset && localSec < s.endOffset);
+      const scene = sceneIdx >= 0 ? scenes[sceneIdx] : scenes[scenes.length - 1];
       if (scene?.imageUrl) {
-        this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, turnProgress);
+        const sceneDur = Math.max(0.1, scene.endOffset - scene.startOffset);
+        const sceneProgress = Math.max(0, Math.min(1, (localSec - scene.startOffset) / sceneDur));
+        // Per-scene Ken Burns — each beat gets its own slow zoom/drift instead of
+        // one zoom stretched across the whole intro (which felt static per scene).
+        this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, sceneProgress, sceneIdx);
         return;
       }
     }
@@ -331,9 +336,10 @@ export class CanvasRenderer {
 
   // Full-bleed cover-fit image for a manually-attached segment illustration
   // — reuses bgImageCache (keyed by URL, no reason for a separate cache).
-  // Slow Ken Burns zoom + drift over the turn's own progress (0→1) so a
-  // static illustration never sits completely frozen on screen.
-  private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0) {
+  // Slow Ken Burns zoom + drift over progress (0→1) so a static illustration
+  // never sits completely frozen on screen. sceneIndex alternates drift
+  // direction so consecutive intro beats don't all pan the same way.
+  private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0, sceneIndex = 0) {
     const { ctx } = this;
     let img = this.bgImageCache.get(url);
     if (!img) {
@@ -349,11 +355,12 @@ export class CanvasRenderer {
       return;
     }
     const p = Math.max(0, Math.min(1, progress));
-    const zoom = 1.04 + 0.09 * p;
+    const zoom = 1.05 + 0.11 * p;
     const scl = Math.max(w / img.width, h / img.height) * zoom;
     const dw = img.width * scl, dh = img.height * scl;
-    const driftX = Math.sin(p * Math.PI * 0.5) * w * 0.02;
-    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.01;
+    const dir = sceneIndex % 2 === 0 ? 1 : -1;
+    const driftX = dir * Math.sin(p * Math.PI * 0.5) * w * 0.028;
+    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.014;
     ctx.save();
     ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
     ctx.drawImage(img, (w - dw) / 2 - driftX, offsetY + (h - dh) / 2 - driftY, dw, dh);
