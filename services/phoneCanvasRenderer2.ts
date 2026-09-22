@@ -321,7 +321,7 @@ export class CanvasRenderer {
 
     // Z-pulse: default ON when single-speaker, OFF for multi. Consumer can
     // override either way via state.phoneZPulse.
-    const zPulseOn = state.phoneZPulse ?? isSingle;
+    const zPulseOn = state.phoneZPulse ?? true;
 
     phones.forEach((phone, idx) => {
       const x = startX + idx * (pw + spacing);
@@ -633,14 +633,15 @@ export class CanvasRenderer {
       ctx.translate(-cx, -cy);
     }
 
-    // ── Outer glow when SPEAKING ──────────────────────────────────────────
+    // ── Outer glow when SPEAKING — driven by real audio level + subtle idle wobble
     if (isActive) {
-      const pulse = 0.55 + Math.sin(this.currentTime / 350) * 0.2;
+      const audioBoost = this.audioLevel * 0.45;
+      const pulse = 0.5 + Math.sin(this.currentTime / 350) * 0.12 + audioBoost;
       ctx.shadowColor = phone.color;
-      ctx.shadowBlur = w * 0.18;
+      ctx.shadowBlur = w * (0.14 + audioBoost * 0.22);
       ctx.strokeStyle = phone.color;
-      ctx.lineWidth = w * 0.028;
-      ctx.globalAlpha = pulse;
+      ctx.lineWidth = w * (0.024 + audioBoost * 0.012);
+      ctx.globalAlpha = Math.min(1, pulse);
       ctx.beginPath();
       ctx.roundRect(x + 1, y + 1, w - 2, h - 2, r);
       ctx.stroke();
@@ -778,7 +779,8 @@ export class CanvasRenderer {
     const cx = sx + sw / 2;
     const cy = sy + sh * 0.42;
 
-    // ── Speaker background image ───────────────────────────────────────────
+    // ── Speaker background image — contain-fit so square/portrait headshots
+    // show fully (not over-cropped), with a light bottom scrim for UI text.
     if (phone.backgroundImage) {
       let img = this.speakerImageCache.get(phone.backgroundImage);
       if (!img) {
@@ -788,19 +790,38 @@ export class CanvasRenderer {
         this.speakerImageCache.set(phone.backgroundImage, img);
       }
       if (img.complete && img.naturalWidth > 0) {
-        const imgAspect = img.naturalWidth / img.naturalHeight;
-        const screenAspect = sw / sh;
-        let dW = sw, dH = sh;
-        if (imgAspect > screenAspect) { dH = sh; dW = sh * imgAspect; }
-        else { dW = sw; dH = sw / imgAspect; }
         ctx.save();
         ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
-        ctx.globalAlpha = 0.82;
-        ctx.drawImage(img, sx - (dW - sw) / 2, sy - (dH - sh) / 2, dW, dH);
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle = phone.screenColor || '#000';
+        ctx.fillStyle = phone.screenColor || '#0a0a0a';
         ctx.fillRect(sx, sy, sw, sh);
-        ctx.globalAlpha = 1;
+
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const scale = Math.min(sw / img.naturalWidth, sh / img.naturalHeight);
+        let dW = img.naturalWidth * scale;
+        let dH = img.naturalHeight * scale;
+        // Portrait / square headshots sit slightly above centre (video-call framing)
+        const isPortraitish = imgAspect <= 1.15;
+        const offsetX = sx + (sw - dW) / 2;
+        const offsetY = isPortraitish ? sy + sh * 0.06 : sy + (sh - dH) / 2;
+        const imgCx = offsetX + dW / 2;
+        const imgCy = offsetY + dH / 2;
+
+        // Subtle audio-reactive zoom on the photo itself when speaking
+        const photoPulse = isActive ? 1 + this.audioLevel * 0.05 : 1;
+        if (photoPulse !== 1) {
+          ctx.translate(imgCx, imgCy);
+          ctx.scale(photoPulse, photoPulse);
+          ctx.translate(-imgCx, -imgCy);
+        }
+
+        ctx.drawImage(img, offsetX, offsetY, dW, dH);
+
+        // Bottom gradient only — keeps status text readable without washing out the face
+        const scrim = ctx.createLinearGradient(0, sy + sh * 0.5, 0, sy + sh);
+        scrim.addColorStop(0, 'rgba(0,0,0,0)');
+        scrim.addColorStop(1, 'rgba(0,0,0,0.5)');
+        ctx.fillStyle = scrim;
+        ctx.fillRect(sx, sy, sw, sh);
         ctx.restore();
       }
     }

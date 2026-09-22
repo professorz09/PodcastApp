@@ -3555,8 +3555,8 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       textColor: '#ffffff',
     },
     vuMeter: vuMeterOn,
-    // Default: z-pulse on for 1 speaker, off for 2+. User can override.
-    phoneZPulse: phoneZPulseOverride ?? (phones.length === 1),
+    // Default: z-pulse ON — phone scales with real audio level while speaking.
+    phoneZPulse: phoneZPulseOverride ?? true,
     splitScreen: splitScreenClip ? { videoEl: previewClipVideoRef.current, topRatio: 0.5 } : undefined,
     narratorBoard: narratorQuestions.length ? { title: narratorBoardTitle, questions: narratorQuestions } : undefined,
   }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText, segmentImages]);
@@ -5183,7 +5183,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
                     {/* Z-pulse toggle (default = single-speaker auto) */}
                     {(() => {
-                      const effectiveOn = phoneZPulseOverride ?? (phones.length === 1);
+                      const effectiveOn = phoneZPulseOverride ?? true;
                       const isDefault = phoneZPulseOverride === null;
                       return (
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer' }}>
@@ -5201,10 +5201,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                             }} />
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>🌀 Z-Pulse (voice depth)</div>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>🌀 Audio Pulse</div>
                             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
                               {isDefault
-                                ? (phones.length === 1 ? 'Default ON (1 speaker)' : 'Default OFF (2+ speakers)')
+                                ? 'Default ON — phone zooms with voice'
                                 : 'Manual override active'}
                             </div>
                           </div>
