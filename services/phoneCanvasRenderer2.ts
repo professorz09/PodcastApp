@@ -255,19 +255,20 @@ export class CanvasRenderer {
     }
 
     // ── Timed storyboard (intro cold-open or discussion segment scenes) ─
-    const timedScenes: TimedTurnScene[] | undefined =
-      activeTurn?.phoneId === 'intro' ? activeTurn.introScenes
-        : activeTurn?.segmentScenes?.length ? activeTurn.segmentScenes
-          : undefined;
-    if (timedScenes?.length) {
+    // Intro always uses storyboard mode (white fallback if no scenes/images yet).
+    const isIntroStoryboard = activeTurn?.phoneId === 'intro';
+    const isSegmentStoryboard = !!activeTurn?.segmentScenes?.length;
+    if (isIntroStoryboard || isSegmentStoryboard) {
+      const timedScenes: TimedTurnScene[] = isIntroStoryboard
+        ? (activeTurn!.introScenes ?? [])
+        : activeTurn!.segmentScenes!;
       const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
-      if (this.drawTimedTurnScenes(w, regionH, regionY, timedScenes, turnProgress, activeTurn!.durationMs, turnIdx)) {
-        if (activeTurn!.segmentScenes?.length) {
-          this.drawPhonesPip(w, regionH, regionY, phones, activeTurn!, turnProgress);
-        }
-        this.drawStoryboardOverlays(w, regionH, regionY, activeTurn!, turnProgress);
-        return;
+      this.drawTimedTurnScenes(w, regionH, regionY, timedScenes, turnProgress, activeTurn!.durationMs, turnIdx);
+      if (isSegmentStoryboard) {
+        this.drawPhonesPip(w, regionH, regionY, phones, activeTurn!, turnProgress);
       }
+      this.drawStoryboardOverlays(w, regionH, regionY, activeTurn!, turnProgress);
+      return;
     }
 
     // ── Narrator card — white slide, confined to the bottom band when split ─
@@ -348,18 +349,52 @@ export class CanvasRenderer {
     });
   }
 
+  /** Nearest scene with an image — missing slots inherit from earlier scenes, else later ones. */
+  private resolveSceneImageUrl(scenes: TimedTurnScene[], sceneIdx: number): string | undefined {
+    if (sceneIdx < 0 || sceneIdx >= scenes.length) return undefined;
+    if (scenes[sceneIdx].imageUrl) return scenes[sceneIdx].imageUrl;
+    for (let i = sceneIdx - 1; i >= 0; i--) {
+      if (scenes[i].imageUrl) return scenes[i].imageUrl;
+    }
+    for (let i = sceneIdx + 1; i < scenes.length; i++) {
+      if (scenes[i].imageUrl) return scenes[i].imageUrl;
+    }
+    return undefined;
+  }
+
+  /** White (or letterboxed) placeholder so playback never blocks on missing images. */
+  private drawStoryboardFallback(w: number, h: number, offsetY: number) {
+    const { ctx } = this;
+    const barH = this.storyboardBarH(h);
+    if (barH > 0) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, offsetY, w, barH);
+      ctx.fillRect(0, offsetY + h - barH, w, barH);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, offsetY + barH, w, h - barH * 2);
+  }
+
   private drawTimedTurnScenes(
     w: number, regionH: number, regionY: number,
     scenes: TimedTurnScene[], turnProgress: number, durationMs: number, turnIdx: number,
-  ): boolean {
+  ): void {
+    if (!scenes.length) {
+      this.drawStoryboardFallback(w, regionH, regionY);
+      return;
+    }
     const localSec = turnProgress * (durationMs / 1000);
     const sceneIdx = scenes.findIndex(s => localSec >= s.startOffset && localSec < s.endOffset);
-    const scene = sceneIdx >= 0 ? scenes[sceneIdx] : scenes[scenes.length - 1];
-    if (!scene?.imageUrl) return false;
+    const idx = sceneIdx >= 0 ? sceneIdx : scenes.length - 1;
+    const scene = scenes[idx];
     const sceneDur = Math.max(0.1, scene.endOffset - scene.startOffset);
     const sceneProgress = Math.max(0, Math.min(1, (localSec - scene.startOffset) / sceneDur));
-    this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, sceneProgress, sceneIdx >= 0 ? sceneIdx : turnIdx);
-    return true;
+    const imageUrl = this.resolveSceneImageUrl(scenes, idx);
+    if (imageUrl) {
+      this.drawSegmentImage(w, regionH, regionY, imageUrl, sceneProgress, idx);
+    } else {
+      this.drawStoryboardFallback(w, regionH, regionY);
+    }
   }
 
   // Full-bleed cover-fit image for a manually-attached segment illustration

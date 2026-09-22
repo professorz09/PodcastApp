@@ -5146,23 +5146,6 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           </div>
         )}
 
-        {activeSettingsSection === 'intro' && (
-          <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {introVideoPreviewUrl ? (
-              <video
-                key={introVideoPreviewUrl}
-                controls
-                src={introVideoPreviewUrl}
-                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
-              />
-            ) : (
-              <div style={{ textAlign: 'center', padding: 20 }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>🎬</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Intro abhi generate nahi hua — neeche Settings mein generate karo</div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ── Playback + Seek ── */}
