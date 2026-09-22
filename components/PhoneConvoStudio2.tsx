@@ -23,7 +23,6 @@ import {
   generateThumbnail,
   generateStoryboardImage,
   generateStoryboardScenesTimeBased,
-  generateIntroSceneBreakdown,
   IntroSceneBreakdown,
   PodcastTranscriptSeg,
   PodcastChapter,
@@ -47,6 +46,45 @@ const isTrueNarratorSpeaker = (sp: string): boolean => NARRATOR_SPEAKER_KEYS.has
 const isIntroSpeaker = (sp: string): boolean => sp.trim().toLowerCase() === 'intro';
 // Either of the above should render as the white card, never a phone mockup.
 const isNarratorLikeSpeaker = (sp: string): boolean => isTrueNarratorSpeaker(sp) || isIntroSpeaker(sp);
+
+type IntroSceneWithMeta = IntroSceneBreakdown & { imageUrl?: string; usesCharacter?: boolean };
+
+// Build ~3s timed voiceover slots from real STT word timings when available,
+// else an even proportional split — same engine IntroFlow / Storyboard use so
+// scene boundaries land on what is actually being spoken.
+const buildIntroVoiceoverSlots = (
+  text: string,
+  durationSec: number,
+  wordTimings?: { word: string; startTime: number; endTime: number }[],
+): { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[] => {
+  const dur = Math.max(1, durationSec);
+  const TARGET_SEC = 3;
+  if (wordTimings?.length) {
+    let slotStart = 0, buf: string[] = [], n = 1;
+    const slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[] = [];
+    for (const w of wordTimings) {
+      buf.push(w.word);
+      if (w.endTime - slotStart >= TARGET_SEC) {
+        slots.push({ sceneNumber: n++, startTime: slotStart, endTime: w.endTime, voiceover: buf.join(' ') });
+        slotStart = w.endTime; buf = [];
+      }
+    }
+    if (buf.length) slots.push({ sceneNumber: n++, startTime: slotStart, endTime: dur, voiceover: buf.join(' ') });
+    return slots;
+  }
+  const targetCount = Math.max(3, Math.min(12, Math.round(dur / TARGET_SEC)));
+  const wordsArr = text.split(/\s+/).filter(Boolean);
+  const perSlot = Math.max(2, Math.ceil(wordsArr.length / targetCount));
+  const chunks: string[] = [];
+  for (let i = 0; i < wordsArr.length; i += perSlot) chunks.push(wordsArr.slice(i, i + perSlot).join(' '));
+  const sliceDur = dur / Math.max(1, chunks.length);
+  return chunks.map((c, i) => ({
+    sceneNumber: i + 1,
+    startTime: i * sliceDur,
+    endTime: i === chunks.length - 1 ? dur : (i + 1) * sliceDur,
+    voiceover: c,
+  }));
+};
 
 // ─── AI Model Presets ─────────────────────────────────────────────────────────
 
@@ -3140,6 +3178,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   // (same flow as English Video's Intro Settings).
   const [introSceneLoading, setIntroSceneLoading] = useState<Record<string, boolean>>({});
   const [introScenesProgress, setIntroScenesProgress] = useState<Record<string, { done: number; total: number }>>({});
+  const introCharacterGuideRef = useRef('');
 
   // Script generator state
   const [genStyle, setGenStyle] = useState('podcast');
@@ -3392,19 +3431,31 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
 
   const introTurn = script.find(t => t.phoneId === 'intro');
 
-  const updateIntroScenes = (turnId: string, scenes: (IntroSceneBreakdown & { imageUrl?: string })[] | undefined) => {
+  const updateIntroScenes = (turnId: string, scenes: IntroSceneWithMeta[] | undefined) => {
     setScript(prev => prev.map(t => t.id === turnId ? { ...t, introScenes: scenes } : t));
   };
 
   const handlePlanIntroScenes = async () => {
     if (!introTurn || introSceneLoading[introTurn.id]) return;
-    const seg = mainScript.find(s => s.id === introTurn.id);
     setIntroSceneLoading(prev => ({ ...prev, [introTurn.id]: true }));
     try {
       const duration = introTurn.durationMs / 1000;
-      const breakdown = await generateIntroSceneBreakdown(introTurn.text, duration, seg?.phraseTimings);
-      updateIntroScenes(introTurn.id, breakdown);
-      toast.success(`${breakdown.length} scene prompts ban gaye — ab visuals generate karo.`);
+      const slots = buildIntroVoiceoverSlots(introTurn.text, duration, introTurn.wordTimings);
+      if (!slots.length) throw new Error('Intro text khaali hai');
+
+      // Same consistent-story engine as IntroFlow / Storyboard — derives ONE
+      // shared characterGuide for the whole intro and matches each scene to
+      // what is actually being spoken in that time slot.
+      const { prompts, usesCharacter, characterGuide } = await generateStoryboardScenesTimeBased(slots);
+      introCharacterGuideRef.current = characterGuide;
+      const scenes: IntroSceneWithMeta[] = slots.map((s, i) => ({
+        startOffset: s.startTime,
+        endOffset: s.endTime,
+        prompt: prompts[i] || s.voiceover,
+        usesCharacter: !!usesCharacter[i],
+      }));
+      updateIntroScenes(introTurn.id, scenes);
+      toast.success(`${scenes.length} scene prompts ban gaye — ab MS Paint visuals generate karo.`);
     } catch (e: any) {
       toast.error(e?.message || 'Scene breakdown fail hui');
     } finally {
@@ -3415,6 +3466,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const handleGenerateIntroSceneImages = async () => {
     if (!introTurn?.introScenes?.length || introSceneLoading[introTurn.id]) return;
     const scenes = introTurn.introScenes;
+    const guide = introCharacterGuideRef.current;
     setIntroSceneLoading(prev => ({ ...prev, [introTurn.id]: true }));
     setIntroScenesProgress(prev => ({ ...prev, [introTurn.id]: { done: 0, total: scenes.length } }));
     let ok = 0;
@@ -3423,7 +3475,11 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       const key = `${introTurn.id}-${i}`;
       setIntroSceneLoading(prev => ({ ...prev, [key]: true }));
       try {
-        const imageUrl = await generateStoryboardImage(scenes[i].prompt);
+        const imageUrl = await generateStoryboardImage(
+          scenes[i].prompt,
+          scenes[i].usesCharacter ? guide : undefined,
+          '16:9',
+        );
         updated[i] = { ...updated[i], imageUrl };
         ok++;
         updateIntroScenes(introTurn.id, [...updated]);
@@ -3436,7 +3492,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       if (i < scenes.length - 1) await new Promise(r => setTimeout(r, 1500));
     }
     setIntroSceneLoading(prev => ({ ...prev, [introTurn.id]: false }));
-    if (ok === scenes.length) toast.success('Sabhi intro scenes ban gayi!');
+    if (ok === scenes.length) toast.success('Sabhi intro scenes MS Paint style mein ban gayi!');
     else if (ok > 0) toast.success(`${ok}/${scenes.length} scenes ban gayi — baaki individually retry karo.`);
     else toast.error('Koi scene image nahi ban payi');
   };
@@ -3447,7 +3503,12 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     if (introSceneLoading[key]) return;
     setIntroSceneLoading(prev => ({ ...prev, [key]: true }));
     try {
-      const imageUrl = await generateStoryboardImage(introTurn.introScenes[sceneIdx].prompt);
+      const scene = introTurn.introScenes[sceneIdx];
+      const imageUrl = await generateStoryboardImage(
+        scene.prompt,
+        scene.usesCharacter ? introCharacterGuideRef.current : undefined,
+        '16:9',
+      );
       const updated = [...introTurn.introScenes];
       updated[sceneIdx] = { ...updated[sceneIdx], imageUrl };
       updateIntroScenes(introTurn.id, updated);
@@ -3473,6 +3534,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
 
   const handleClearIntroScenes = () => {
     if (!introTurn) return;
+    introCharacterGuideRef.current = '';
     updateIntroScenes(introTurn.id, undefined);
   };
 
@@ -5748,7 +5810,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
             {activeSettingsSection === 'intro' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(34,211,238,0.07)', border: '1px solid rgba(34,211,238,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                  🎬 Intro storyboard — is cold-open line ke liye timed scene images (jaise English Video mein). Playback par scenes automatically switch hoti hain.
+                  🎬 Intro storyboard — jo bol raha hai uske hisaab se timed scenes (MS Paint flat cartoon style). Ek shared character guide se poori story consistent rehti hai. Har scene par custom photo upload bhi kar sakte ho.
                 </div>
 
                 {!introTurn ? (
@@ -5857,8 +5919,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                           {introSceneLoading[introTurn.id]
                             ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {introScenesProgress[introTurn.id]?.total ? `Generating ${introScenesProgress[introTurn.id].done}/${introScenesProgress[introTurn.id].total}…` : 'Generating Visuals…'}</>
                             : introTurn.introScenes.some(s => s.imageUrl)
-                              ? <><RefreshCw size={13} /> Regenerate All Visuals</>
-                              : <><ImagePlus size={13} /> Generate All Visuals</>}
+                              ? <><RefreshCw size={13} /> Regenerate All (MS Paint)</>
+                              : <><ImagePlus size={13} /> Generate All Visuals (MS Paint)</>}
                         </button>
                         <button
                           onClick={handlePlanIntroScenes}
@@ -5876,9 +5938,9 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       </div>
                     )}
 
-                    {!mainScript.find(s => s.id === introTurn.id)?.phraseTimings?.length && !introTurn.introScenes?.length && (
+                    {!introTurn.wordTimings?.length && !introTurn.introScenes?.length && (
                       <div style={{ fontSize: 10, color: 'rgba(245,158,11,0.7)' }}>
-                        Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes exact bole gaye words ke saath match honge.
+                        Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes exact bole gaye words ke saath match honge (real STT timings).
                       </div>
                     )}
                   </>

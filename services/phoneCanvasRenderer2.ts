@@ -53,7 +53,7 @@ export interface ScriptTurn {
   visualImageUrl?: string;
   /** Timed storyboard scenes for the Intro cold-open — switches images over
    *  the turn's own duration (same model as English Video's introScenes). */
-  introScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string }[];
+  introScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string; usesCharacter?: boolean }[];
 }
 
 export interface StudioState {
