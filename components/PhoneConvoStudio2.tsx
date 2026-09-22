@@ -244,6 +244,46 @@ const TurnScenesTimeline: React.FC<{
   </>
 );
 
+const StoryboardSubtitleSettings: React.FC<{
+  enabled: boolean;
+  size: number;
+  onToggle: () => void;
+  onSizeChange: (v: number) => void;
+  accentColor?: string;
+}> = ({ enabled, size, onToggle, onSizeChange, accentColor = '#FFD700' }) => (
+  <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+      Storyboard Subtitles <span style={{ color: accentColor, fontWeight: 600 }}>· Yellow · Bottom</span>
+    </div>
+    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Show Subtitles on Images</span>
+      <div
+        onClick={onToggle}
+        style={{
+          width: 40, height: 22, borderRadius: 50, position: 'relative', cursor: 'pointer',
+          background: enabled ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s',
+        }}
+      >
+        <div style={{ position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', left: enabled ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+      </div>
+    </label>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Font Size</span>
+        <span style={{ fontSize: 11, color: accentColor, fontFamily: 'monospace' }}>{size.toFixed(1)}×</span>
+      </div>
+      <input
+        type="range" min={0.8} max={2.2} step={0.05} value={size}
+        onChange={e => onSizeChange(+e.target.value)}
+        style={{ width: '100%', accentColor: '#ef4444' }}
+      />
+    </div>
+    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+      Jab storyboard image chalegi, neeche yellow subtitles dikhengi — audio ke saath sync.
+    </div>
+  </div>
+);
+
 // ─── AI Model Presets ─────────────────────────────────────────────────────────
 
 const AI_MODEL_PRESETS: {
@@ -3319,6 +3359,8 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
   const [subtitleBg, setSubtitleBg]           = useState<'dark' | 'light' | 'none'>('dark');
   const [subtitleSize, setSubtitleSize]       = useState(1.6);
+  const [storyboardSubtitleEnabled, setStoryboardSubtitleEnabled] = useState(true);
+  const [storyboardSubtitleSize, setStoryboardSubtitleSize] = useState(1.4);
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
@@ -3709,12 +3751,18 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       background: subtitleBg,
       textColor: '#ffffff',
     },
+    storyboardSubtitleConfig: {
+      enabled: storyboardSubtitleEnabled,
+      size: storyboardSubtitleSize,
+      textColor: '#FFD700',
+    },
+    storyboardLetterbox: addLetterbox,
     vuMeter: vuMeterOn,
     // Default: z-pulse OFF — user can enable Audio Pulse in settings.
     phoneZPulse: phoneZPulseOverride ?? false,
     splitScreen: splitScreenClip ? { videoEl: previewClipVideoRef.current, topRatio: 0.5 } : undefined,
     narratorBoard: narratorQuestions.length ? { title: narratorBoardTitle, questions: narratorQuestions } : undefined,
-  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText]);
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, storyboardSubtitleEnabled, storyboardSubtitleSize, addLetterbox, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -5920,6 +5968,13 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                         Tip: Voice Gen mein Sync karo — scenes exact bole gaye words ke saath match honge.
                       </div>
                     )}
+                    <StoryboardSubtitleSettings
+                      enabled={storyboardSubtitleEnabled}
+                      size={storyboardSubtitleSize}
+                      onToggle={() => setStoryboardSubtitleEnabled(p => !p)}
+                      onSizeChange={setStoryboardSubtitleSize}
+                      accentColor="#60a5fa"
+                    />
                   </div>
                 )}
               </div>
@@ -5964,6 +6019,14 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                         Tip: Voice Gen mein pehle is segment ko "Sync" kar lo — scenes exact bole gaye words ke saath match honge (real STT timings).
                       </div>
                     )}
+
+                    <StoryboardSubtitleSettings
+                      enabled={storyboardSubtitleEnabled}
+                      size={storyboardSubtitleSize}
+                      onToggle={() => setStoryboardSubtitleEnabled(p => !p)}
+                      onSizeChange={setStoryboardSubtitleSize}
+                      accentColor="#22d3ee"
+                    />
                   </>
                 )}
               </div>
@@ -6133,12 +6196,70 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
         {/* ════ EXPORT TAB ════ */}
         {tab === 'export' && (
-          <div style={{ padding: 14, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ padding: 14, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+            <button
+              onClick={() => setAddLetterbox(p => !p)}
+              style={{
+                width: '100%', padding: '14px 16px', borderRadius: 12,
+                border: `2px solid ${addLetterbox ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
+                background: addLetterbox ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
+                color: addLetterbox ? '#fff' : 'rgba(255,255,255,0.65)',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>⬛</span>
+              <span>{addLetterbox ? 'Letterbox ON — Upar/Niche Black Bars' : 'Letterbox OFF — Upar/Niche Black Bars Lagao'}</span>
+            </button>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textAlign: 'center', lineHeight: 1.5, marginTop: -6 }}>
+              Intro aur segment images par upar-niche kali patti — yellow subtitles neeche dikhengi
+            </div>
+
+            {exporting && (
+              <>
+                <div style={{ fontSize: 11, color: '#fca5a5', textAlign: 'center' }}>{exportStatus}</div>
+                <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 4, width: `${exportProgress}%`, background: 'linear-gradient(90deg,#ef4444,#f97316)', transition: 'width 0.3s' }} />
+                </div>
+              </>
+            )}
+            <button
+              onClick={handleExport}
+              disabled={exporting || !script.length}
+              style={{
+                width: '100%', padding: '22px 16px', borderRadius: 16, border: 'none',
+                background: !script.length ? 'rgba(255,255,255,0.05)' : exporting ? 'rgba(239,68,68,0.35)' : '#ef4444',
+                color: !script.length ? 'rgba(255,255,255,0.25)' : '#fff',
+                fontSize: 18, fontWeight: 900, cursor: exporting || !script.length ? 'default' : 'pointer',
+                fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                opacity: !script.length ? 0.35 : 1,
+                boxShadow: !script.length || exporting ? 'none' : '0 10px 32px rgba(239,68,68,0.45)',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {exporting
+                ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Rendering… {exportProgress}%</>
+                : <><Download size={18} /> Render Video · 1080p MP4</>}
+            </button>
+            {script.length > 0 && (
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                {script.length} turns · {fmtTime(totalDuration)}
+              </div>
+            )}
+
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
+
+            <details style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', padding: '10px 12px' }}>
+              <summary style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                More Export Options
+              </summary>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
 
             {/* ① Intro */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 10, color: 'rgba(196,181,253,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                ① Intro Video <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.2)' }}>(optional)</span>
+                Intro Video <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.2)' }}>(optional)</span>
               </div>
               <IntroFlow
                 segments={podcastSegments}
@@ -6198,44 +6319,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               )}
             </div>
 
-            {/* ③ Discussion */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ fontSize: 10, color: 'rgba(252,165,165,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                ③ Discussion · 1080p MP4 {script.length > 0 ? `· ${fmtTime(totalDuration)}` : ''}
-              </div>
-              {exporting && (
-                <>
-                  <div style={{ fontSize: 10, color: '#fca5a5' }}>{exportStatus}</div>
-                  <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: 3, width: `${exportProgress}%`, background: 'linear-gradient(90deg,#ef4444,#f97316)', transition: 'width 0.3s' }} />
-                  </div>
-                </>
-              )}
-              <button
-                onClick={handleExport}
-                disabled={exporting || !script.length}
-                style={{
-                  width: '100%', padding: '13px', borderRadius: 12, border: 'none',
-                  background: !script.length ? 'rgba(255,255,255,0.05)' : exporting ? 'rgba(239,68,68,0.35)' : '#ef4444',
-                  color: !script.length ? 'rgba(255,255,255,0.25)' : '#fff',
-                  fontSize: 13, fontWeight: 800, cursor: exporting || !script.length ? 'default' : 'pointer',
-                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  opacity: !script.length ? 0.35 : 1,
-                  boxShadow: !script.length || exporting ? 'none' : '0 6px 20px rgba(239,68,68,0.3)',
-                }}
-              >
-                {exporting
-                  ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Rendering… {exportProgress}%</>
-                  : <><Download size={13} /> Export Discussion 1080p MP4</>
-                }
-              </button>
-            </div>
-
-            {/* divider */}
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
-
-            {/* ④ Title + Thumbnail — from the actual generated script + the
-                source clip's transcript, not a pre-generation guess */}
+            {/* Title + Thumbnail */}
             {script.length > 0 && (
               <TitleThumbComboCard
                 srcText={[
@@ -6258,10 +6342,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               />
             )}
 
-            {/* divider */}
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
-
-            {/* 🎥 Full Video */}
+            {/* Full Video */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.6)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                 🎥 Full Video · Intro + Clip + Discussion
@@ -6314,6 +6395,9 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                 />
               )}
             </div>
+
+              </div>
+            </details>
 
           </div>
         )}

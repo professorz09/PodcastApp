@@ -92,6 +92,14 @@ export interface StudioState {
   // questions to keep the plain single-line card for styles that don't use
   // a question sheet.
   narratorBoard?: { title: string; questions: string[] };
+  /** Yellow bottom subtitles during intro/segment storyboard image playback. */
+  storyboardSubtitleConfig?: {
+    enabled: boolean;
+    size: number;
+    textColor?: string;
+  };
+  /** Top + bottom black letterbox bars on storyboard frames; subtitles sit in the bottom bar. */
+  storyboardLetterbox?: boolean;
 }
 
 export class CanvasRenderer {
@@ -257,6 +265,7 @@ export class CanvasRenderer {
         if (activeTurn!.segmentScenes?.length) {
           this.drawPhonesPip(w, regionH, regionY, phones, activeTurn!, turnProgress);
         }
+        this.drawStoryboardOverlays(w, regionH, regionY, activeTurn!, turnProgress);
         return;
       }
     }
@@ -297,6 +306,7 @@ export class CanvasRenderer {
       const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
       this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress, turnIdx);
       this.drawPhonesPip(w, regionH, regionY, phones, activeTurn, turnProgress);
+      this.drawStoryboardOverlays(w, regionH, regionY, activeTurn, turnProgress);
       return;
     }
 
@@ -357,8 +367,22 @@ export class CanvasRenderer {
   // Slow Ken Burns zoom + drift over progress (0→1) so a static illustration
   // never sits completely frozen on screen. sceneIndex alternates drift
   // direction so consecutive intro beats don't all pan the same way.
+  private storyboardBarH(regionH: number): number {
+    return (this.state.storyboardLetterbox ?? false) ? regionH * 0.12 : 0;
+  }
+
   private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0, sceneIndex = 0) {
     const { ctx } = this;
+    const barH = this.storyboardBarH(h);
+    const imageY = offsetY + barH;
+    const imageH = h - barH * 2;
+
+    if (barH > 0) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, offsetY, w, barH);
+      ctx.fillRect(0, offsetY + h - barH, w, barH);
+    }
+
     let img = this.bgImageCache.get(url);
     if (!img) {
       const newImg = new Image();
@@ -369,20 +393,162 @@ export class CanvasRenderer {
       };
       newImg.src = url;
       ctx.fillStyle = '#111';
-      ctx.fillRect(0, offsetY, w, h);
+      ctx.fillRect(0, imageY, w, imageH);
       return;
     }
     const p = Math.max(0, Math.min(1, progress));
     const zoom = 1.05 + 0.11 * p;
-    const scl = Math.max(w / img.width, h / img.height) * zoom;
+    const scl = Math.max(w / img.width, imageH / img.height) * zoom;
     const dw = img.width * scl, dh = img.height * scl;
     const dir = sceneIndex % 2 === 0 ? 1 : -1;
     const driftX = dir * Math.sin(p * Math.PI * 0.5) * w * 0.028;
-    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.014;
+    const driftY = Math.cos(p * Math.PI * 0.5) * imageH * 0.014;
     ctx.save();
-    ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
-    ctx.drawImage(img, (w - dw) / 2 - driftX, offsetY + (h - dh) / 2 - driftY, dw, dh);
+    ctx.beginPath(); ctx.rect(0, imageY, w, imageH); ctx.clip();
+    ctx.drawImage(img, (w - dw) / 2 - driftX, imageY + (imageH - dh) / 2 - driftY, dw, dh);
     ctx.restore();
+  }
+
+  /** Yellow synced subtitles + letterbox bars on intro/segment storyboard frames. */
+  private drawStoryboardOverlays(
+    w: number, regionH: number, regionY: number,
+    activeTurn: ScriptTurn, turnProgress: number,
+  ) {
+    const subCfg = this.state.storyboardSubtitleConfig;
+    if (!subCfg?.enabled || !activeTurn.text) return;
+
+    const barH = this.storyboardBarH(regionH);
+    const letterbox = barH > 0;
+    const subY = letterbox ? regionY + regionH - barH : regionY + regionH * 0.82;
+    const subH = letterbox ? barH : regionH * 0.18;
+    const anchorY = letterbox ? 0.5 : 0.68;
+
+    this.drawSyncedSubtitles(
+      0, subY, w, subH,
+      activeTurn.text, turnProgress, activeTurn,
+      {
+        enabled: true,
+        size: subCfg.size ?? 1.4,
+        background: letterbox ? 'none' : 'dark',
+        textColor: subCfg.textColor ?? '#FFD700',
+      },
+      anchorY,
+    );
+  }
+
+  /** Word-synced subtitles in a canvas bounding box (phone screen or full storyboard). */
+  private drawSyncedSubtitles(
+    bx: number, by: number, bw: number, bh: number,
+    text: string, turnProgress: number, activeTurn: ScriptTurn | null,
+    subCfg: { enabled: boolean; size: number; background?: 'dark' | 'light' | 'none'; textColor?: string },
+    verticalAnchor = 0.68,
+  ) {
+    const { ctx } = this;
+    if (!subCfg.enabled || !text) return;
+
+    const cx = bx + bw / 2;
+
+    const bgType = subCfg.background ?? 'dark';
+    if (bgType !== 'none') {
+      const tg = ctx.createLinearGradient(0, by + bh * 0.2, 0, by + bh);
+      tg.addColorStop(0, 'transparent');
+      if (bgType === 'light') {
+        tg.addColorStop(0.4, 'rgba(255,255,255,0.4)');
+        tg.addColorStop(1, 'rgba(255,255,255,0.85)');
+      } else {
+        tg.addColorStop(0.4, 'rgba(0,0,0,0.6)');
+        tg.addColorStop(1, 'rgba(0,0,0,0.9)');
+      }
+      ctx.fillStyle = tg;
+      ctx.fillRect(bx, by + bh * 0.2, bw, bh * 0.8);
+    }
+
+    const fontSize = bw * 0.045 * (subCfg.size ?? 1);
+    ctx.font = `500 ${fontSize}px sans-serif`;
+    ctx.textAlign = 'left';
+
+    const words = text.replace(/\n/g, ' ').split(' ').filter(w => w.trim() !== '');
+    const pct = Math.max(0, Math.min(1, turnProgress / 0.95));
+
+    let targetWordFloat = 0;
+    const wtArr = activeTurn?.wordTimings;
+    if (wtArr && wtArr.length > 0) {
+      const cur = turnProgress * (activeTurn!.durationMs / 1000);
+      for (let i = 0; i < wtArr.length; i++) {
+        const wt = wtArr[i];
+        if (cur < wt.startTime) break;
+        else if (cur <= wt.endTime) {
+          const wd = wt.endTime - wt.startTime;
+          targetWordFloat = i + (wd > 0 ? (cur - wt.startTime) / wd : 1);
+          break;
+        } else { targetWordFloat = i + 1; }
+      }
+    } else {
+      const ww = words.map(w => w.length + 2);
+      const tot = ww.reduce((a, b) => a + b, 0) || 1;
+      const tgt = pct * tot;
+      let acc = 0;
+      for (let i = 0; i < words.length; i++) {
+        if (tgt <= acc + ww[i]) { targetWordFloat = i + (tgt - acc) / ww[i]; break; }
+        acc += ww[i];
+      }
+      if (tgt >= tot) targetWordFloat = words.length;
+    }
+
+    const lines: { text: string; words: string[] }[] = [];
+    let curW: string[] = [];
+    for (const w of words) {
+      const test = curW.length ? curW.join(' ') + ' ' + w : w;
+      if (curW.length && ctx.measureText(test).width > bw * 0.85) {
+        lines.push({ text: curW.join(' '), words: [...curW] }); curW = [w];
+      } else { curW.push(w); }
+    }
+    if (curW.length) lines.push({ text: curW.join(' '), words: [...curW] });
+
+    const phraseGroups: { text: string; words: string[] }[][] = [];
+    for (let i = 0; i < lines.length; i += 2) phraseGroups.push(lines.slice(i, i + 2));
+
+    let globalStart = 0;
+    let activeGroupIdx = phraseGroups.length - 1;
+    for (let g = 0; g < phraseGroups.length; g++) {
+      const groupWords = phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
+      if (targetWordFloat < globalStart + groupWords) { activeGroupIdx = g; break; }
+      globalStart += groupWords;
+    }
+    globalStart = 0;
+    for (let g = 0; g < activeGroupIdx; g++)
+      globalStart += phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
+
+    const activeGroup = phraseGroups[activeGroupIdx] || [];
+    const lh = fontSize * 1.4;
+    const groupH = activeGroup.length * lh;
+    const ty = by + bh * verticalAnchor - groupH / 2;
+
+    const col = subCfg.textColor ?? '#ffffff';
+    const rr = parseInt(col.slice(1, 3), 16) || 255;
+    const gg = parseInt(col.slice(3, 5), 16) || 255;
+    const bb = parseInt(col.slice(5, 7), 16) || 255;
+
+    let wordIdxInGroup = globalStart;
+    activeGroup.forEach((line, li) => {
+      const lineW = ctx.measureText(line.text).width;
+      const startTx = cx - lineW / 2;
+      let prevText = '';
+      line.words.forEach(w => {
+        const dist = targetWordFloat - wordIdxInGroup;
+        const alpha = dist > 0 ? Math.min(1.0, dist * 7.0) : 0;
+        if (alpha > 0.01) {
+          const ease = 1 - Math.pow(1 - Math.min(1, alpha), 3);
+          const yOffset = (1 - ease) * (bw * 0.008);
+          const xOff = prevText ? ctx.measureText(prevText + ' ').width : 0;
+          ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha})`;
+          ctx.fillText(w, startTx + xOff, ty + li * lh + yOffset);
+        }
+        prevText += (prevText ? ' ' : '') + w;
+        wordIdxInGroup++;
+      });
+    });
+    ctx.textAlign = 'center';
   }
 
   // Speaker overlay on a full-bleed segment illustration — when photos are
@@ -1499,122 +1665,7 @@ export class CanvasRenderer {
     // ── Subtitles (MobileTalk style) ──────────────────────────────────────
     const subCfg = this.state.subtitleConfig ?? { enabled: true, size: 1, background: 'dark', textColor: '#fff' };
     if (isActive && text && subCfg.enabled) {
-
-      // ── Background gradient ──────────────────────────────────────────
-      const bgType = subCfg.background ?? 'dark';
-      if (bgType !== 'none') {
-        const tg = ctx.createLinearGradient(0, sy + sh * 0.4, 0, sy + sh * 1.0);
-        tg.addColorStop(0, 'transparent');
-        if (bgType === 'light') {
-          tg.addColorStop(0.4, 'rgba(255,255,255,0.4)');
-          tg.addColorStop(1,   'rgba(255,255,255,0.85)');
-        } else {
-          tg.addColorStop(0.4, 'rgba(0,0,0,0.6)');
-          tg.addColorStop(1,   'rgba(0,0,0,0.9)');
-        }
-        ctx.fillStyle = tg;
-        ctx.fillRect(sx, sy + sh * 0.4, sw, sh * 0.6);
-      }
-
-      const fontSize = sw * 0.045 * (subCfg.size ?? 1);
-      ctx.font = `500 ${fontSize}px sans-serif`;
-      ctx.textAlign = 'left';
-
-      const words = text.replace(/\n/g, ' ').split(' ').filter(w => w.trim() !== '');
-      const pct   = Math.max(0, Math.min(1, turnProgress / 0.95));
-
-      // ── targetWordFloat — how many words are "done" (fractional) ──────
-      let targetWordFloat = 0;
-      const wtArr = activeTurn?.wordTimings;
-      if (wtArr && wtArr.length > 0) {
-        const cur = turnProgress * (activeTurn!.durationMs / 1000);
-        for (let i = 0; i < wtArr.length; i++) {
-          const wt = wtArr[i];
-          if (cur < wt.startTime) { break; }
-          else if (cur <= wt.endTime) {
-            const wd = wt.endTime - wt.startTime;
-            targetWordFloat = i + (wd > 0 ? (cur - wt.startTime) / wd : 1);
-            break;
-          } else { targetWordFloat = i + 1; }
-        }
-      } else {
-        const ww  = words.map(w => w.length + 2);
-        const tot = ww.reduce((a, b) => a + b, 0) || 1;
-        const tgt = pct * tot;
-        let acc = 0;
-        for (let i = 0; i < words.length; i++) {
-          if (tgt <= acc + ww[i]) { targetWordFloat = i + (tgt - acc) / ww[i]; break; }
-          acc += ww[i];
-        }
-        if (tgt >= tot) targetWordFloat = words.length;
-      }
-
-      // ── Word-wrap all text into lines ─────────────────────────────────
-      const lines: { text: string; words: string[] }[] = [];
-      let curW: string[] = [];
-      for (const w of words) {
-        const test = curW.length ? curW.join(' ') + ' ' + w : w;
-        if (curW.length && ctx.measureText(test).width > sw * 0.85) {
-          lines.push({ text: curW.join(' '), words: [...curW] }); curW = [w];
-        } else { curW.push(w); }
-      }
-      if (curW.length) lines.push({ text: curW.join(' '), words: [...curW] });
-
-      // ── Group wrapped lines into phrase groups of ≤2 lines ───────────
-      const phraseGroups: { text: string; words: string[] }[][] = [];
-      for (let i = 0; i < lines.length; i += 2)
-        phraseGroups.push(lines.slice(i, i + 2));
-
-      // Find which phrase group the current word falls in
-      let globalStart = 0;
-      let activeGroupIdx = phraseGroups.length - 1;
-      for (let g = 0; g < phraseGroups.length; g++) {
-        const groupWords = phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
-        if (targetWordFloat < globalStart + groupWords) { activeGroupIdx = g; break; }
-        globalStart += groupWords;
-      }
-
-      // globalStart now = index of first word in active group
-      // recalculate properly
-      globalStart = 0;
-      for (let g = 0; g < activeGroupIdx; g++)
-        globalStart += phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
-
-      const activeGroup = phraseGroups[activeGroupIdx] || [];
-      const lh          = fontSize * 1.4;
-
-      // Y: center the group vertically in the lower area
-      const groupH  = activeGroup.length * lh;
-      const ty      = sy + sh * 0.68 - groupH / 2; // 1 line → sh*0.68, 2 lines → a bit higher
-
-      const col = subCfg.textColor ?? '#ffffff';
-      const rr  = parseInt(col.slice(1, 3), 16) || 255;
-      const gg  = parseInt(col.slice(3, 5), 16) || 255;
-      const bb  = parseInt(col.slice(5, 7), 16) || 255;
-
-      let wordIdxInGroup = globalStart;
-      activeGroup.forEach((line, li) => {
-        const lineW   = ctx.measureText(line.text).width;
-        const startTx = cx - lineW / 2;
-        let prevText  = '';
-
-        line.words.forEach(w => {
-          const dist  = targetWordFloat - wordIdxInGroup;
-          // Sharp sync: word appears almost instantly when it's "active"
-          // dist > 0 means word's time has come; full alpha at dist = 0.15
-          const alpha = dist > 0 ? Math.min(1.0, dist * 7.0) : 0;
-          if (alpha > 0.01) {
-            const ease    = 1 - Math.pow(1 - Math.min(1, alpha), 3);
-            const yOffset = (1 - ease) * (sw * 0.008); // subtle slide, much less than before
-            const xOff   = prevText ? ctx.measureText(prevText + ' ').width : 0;
-            ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha})`;
-            ctx.fillText(w, startTx + xOff, ty + li * lh + yOffset);
-          }
-          prevText += (prevText ? ' ' : '') + w;
-          wordIdxInGroup++;
-        });
-      });
-      ctx.textAlign = 'center';
+      this.drawSyncedSubtitles(sx, sy, sw, sh, text, turnProgress, activeTurn, subCfg, 0.68);
     }
 
     // ── Bottom call controls (mic · dots · X) ────────────────────────────
