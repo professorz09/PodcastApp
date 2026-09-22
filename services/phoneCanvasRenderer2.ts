@@ -288,11 +288,12 @@ export class CanvasRenderer {
       return;
     }
 
-    // ── Manually-attached segment image — full-bleed, replaces the phones
-    // for this turn's whole duration (picked per-turn in the "Image"
-    // settings sub-tab; most turns won't have one).
+    // ── Per-turn illustration — full-bleed Ken Burns background with speaker
+    // phones shrunk into a bottom-right PiP overlay (Image settings sub-tab).
     if (activeTurn?.visualImageUrl) {
-      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress);
+      const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
+      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress, turnIdx);
+      this.drawPhonesPip(w, regionH, regionY, phones, activeTurn, turnProgress);
       return;
     }
 
@@ -328,7 +329,7 @@ export class CanvasRenderer {
       const isActive = activeTurn?.phoneId === phone.id;
       // DebateVisualizer-style pulse: small scale-up driven by audioLevel.
       // Single-speaker uses a stronger pulse so the depth effect reads clearly.
-      const pulse = (zPulseOn && isActive) ? 1 + this.audioLevel * (isSingle ? 0.085 : 0.045) : 1;
+      const pulse = (zPulseOn && isActive) ? 1 + this.audioLevel * (isSingle ? 0.1 : 0.075) : 1;
       const force0Rotation = isSingle;
       this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn, pulse, force0Rotation);
     });
@@ -365,6 +366,49 @@ export class CanvasRenderer {
     ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
     ctx.drawImage(img, (w - dw) / 2 - driftX, offsetY + (h - dh) / 2 - driftY, dw, dh);
     ctx.restore();
+  }
+
+  // Speaker phones as a small PiP cluster over a full-bleed segment illustration.
+  private drawPhonesPip(
+    w: number, regionH: number, regionY: number,
+    phones: PhoneConfig[], activeTurn: ScriptTurn, turnProgress: number,
+  ) {
+    if (!phones.length) return;
+    const { ctx } = this;
+    const phoneAspect = 9 / 19.5;
+    const count = phones.length;
+    const edgePad = w * 0.032;
+    const gap = w * 0.016;
+
+    let ph = regionH * 0.24;
+    let pw = ph * phoneAspect;
+    const totalW = pw * count + gap * (count - 1);
+    const maxW = w * 0.52;
+    if (totalW > maxW) {
+      pw = (maxW - gap * (count - 1)) / count;
+      ph = pw / phoneAspect;
+    }
+
+    const startX = w - edgePad - totalW;
+    const startY = regionY + regionH - edgePad - ph;
+    const zPulseOn = this.state.phoneZPulse ?? true;
+
+    // Soft backing so phones read clearly on busy illustrations
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = w * 0.02;
+    ctx.beginPath();
+    ctx.roundRect(startX - edgePad * 0.45, startY - edgePad * 0.35, totalW + edgePad * 0.9, ph + edgePad * 0.7, w * 0.018);
+    ctx.fill();
+    ctx.restore();
+
+    phones.forEach((phone, idx) => {
+      const x = startX + idx * (pw + gap);
+      const isActive = activeTurn.phoneId === phone.id;
+      const pulse = (zPulseOn && isActive) ? 1 + this.audioLevel * 0.075 : 1;
+      this.drawPhone(x, startY, pw, ph, phone, isActive, true, activeTurn.text, turnProgress, activeTurn, pulse, false);
+    });
   }
 
   // Slides down from off-screen top into position, holds, then slides back
