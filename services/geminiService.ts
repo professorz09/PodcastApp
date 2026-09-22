@@ -6603,6 +6603,7 @@ Do not add any explanation outside the JSON.
 export const generateStoryboardScenesTimeBased = async (
   slots: { sceneNumber: number; startTime: number; endTime: number; voiceover: string }[],
   model: string = 'gemini-3.5-flash',
+  existingCharacterGuide?: string,
 ): Promise<{ prompts: string[]; usesCharacter: boolean[]; characterGuide: string }> => {
   const ai = getAi();
 
@@ -6610,22 +6611,28 @@ export const generateStoryboardScenesTimeBased = async (
     `Scene ${s.sceneNumber} [${s.startTime.toFixed(1)}s–${s.endTime.toFixed(1)}s]:\n"${s.voiceover}"`
   ).join('\n\n');
 
+  const existingGuideSection = existingCharacterGuide?.trim()
+    ? `\nEXISTING CHARACTER GUIDE — reuse this EXACT same protagonist across every scene that needs them (return this characterGuide string unchanged in your JSON, do NOT redesign the character):\n"${existingCharacterGuide.trim()}"\n`
+    : '';
+
   const prompt = `
 You are a professional storyboard artist creating a consistent illustrated story.
 
 Below are ${slots.length} scenes with their exact timestamps and voiceover text (what is being spoken during each scene):
 
 ${slotText}
-
+${existingGuideSection}
 TASK:
 Step 1 — CHARACTER GUIDE (only if the voiceover actually needs one):
-Check whether the voiceover naturally centers on a recurring character/host who should
+${existingCharacterGuide?.trim()
+    ? 'An existing character guide is provided above — return it unchanged. Only set characterGuide to "" if NONE of these scenes need any recurring character at all.'
+    : `Check whether the voiceover naturally centers on a recurring character/host who should
 look the same from scene to scene (e.g. a narrator persona, a story character like a
 monkey in a fable). If yes, create a SHORT visual description (appearance, clothing,
 hair, skin tone) for consistency across all scenes — max 60 words, starting with
 "Main character: ...". If the voiceover is explaining a concept, object, event, or idea
 with no fixed protagonist, leave characterGuide as an empty string "" — do not invent a
-host just to have one; let each scene visualize whatever it actually needs.
+host just to have one; let each scene visualize whatever it actually needs.`}
 
 Step 2 — IMAGE PROMPTS:
 For each scene, create one image prompt that visually illustrates what is happening during that voiceover.
