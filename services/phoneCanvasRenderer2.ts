@@ -54,7 +54,11 @@ export interface ScriptTurn {
   /** Timed storyboard scenes for the Intro cold-open — switches images over
    *  the turn's own duration (same model as English Video's introScenes). */
   introScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string; usesCharacter?: boolean }[];
+  /** Timed storyboard scenes for a discussion turn (Image settings sub-tab). */
+  segmentScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string; usesCharacter?: boolean }[];
 }
+
+type TimedTurnScene = { prompt: string; startOffset: number; endOffset: number; imageUrl?: string };
 
 export interface StudioState {
   phones: PhoneConfig[];
@@ -242,18 +246,17 @@ export class CanvasRenderer {
       elapsed += turn.durationMs;
     }
 
-    // ── Intro storyboard — timed scene images during the cold-open turn ─
-    if (activeTurn?.phoneId === 'intro' && activeTurn.introScenes?.length) {
-      const localSec = turnProgress * (activeTurn.durationMs / 1000);
-      const scenes = activeTurn.introScenes;
-      const sceneIdx = scenes.findIndex(s => localSec >= s.startOffset && localSec < s.endOffset);
-      const scene = sceneIdx >= 0 ? scenes[sceneIdx] : scenes[scenes.length - 1];
-      if (scene?.imageUrl) {
-        const sceneDur = Math.max(0.1, scene.endOffset - scene.startOffset);
-        const sceneProgress = Math.max(0, Math.min(1, (localSec - scene.startOffset) / sceneDur));
-        // Per-scene Ken Burns — each beat gets its own slow zoom/drift instead of
-        // one zoom stretched across the whole intro (which felt static per scene).
-        this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, sceneProgress, sceneIdx);
+    // ── Timed storyboard (intro cold-open or discussion segment scenes) ─
+    const timedScenes: TimedTurnScene[] | undefined =
+      activeTurn?.phoneId === 'intro' ? activeTurn.introScenes
+        : activeTurn?.segmentScenes?.length ? activeTurn.segmentScenes
+          : undefined;
+    if (timedScenes?.length) {
+      const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
+      if (this.drawTimedTurnScenes(w, regionH, regionY, timedScenes, turnProgress, activeTurn!.durationMs, turnIdx)) {
+        if (activeTurn!.segmentScenes?.length) {
+          this.drawPhonesPip(w, regionH, regionY, phones, activeTurn!, turnProgress);
+        }
         return;
       }
     }
@@ -322,7 +325,7 @@ export class CanvasRenderer {
 
     // Z-pulse: default ON when single-speaker, OFF for multi. Consumer can
     // override either way via state.phoneZPulse.
-    const zPulseOn = state.phoneZPulse ?? true;
+    const zPulseOn = state.phoneZPulse ?? false;
 
     phones.forEach((phone, idx) => {
       const x = startX + idx * (pw + spacing);
@@ -333,6 +336,20 @@ export class CanvasRenderer {
       const force0Rotation = isSingle;
       this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn, pulse, force0Rotation);
     });
+  }
+
+  private drawTimedTurnScenes(
+    w: number, regionH: number, regionY: number,
+    scenes: TimedTurnScene[], turnProgress: number, durationMs: number, turnIdx: number,
+  ): boolean {
+    const localSec = turnProgress * (durationMs / 1000);
+    const sceneIdx = scenes.findIndex(s => localSec >= s.startOffset && localSec < s.endOffset);
+    const scene = sceneIdx >= 0 ? scenes[sceneIdx] : scenes[scenes.length - 1];
+    if (!scene?.imageUrl) return false;
+    const sceneDur = Math.max(0.1, scene.endOffset - scene.startOffset);
+    const sceneProgress = Math.max(0, Math.min(1, (localSec - scene.startOffset) / sceneDur));
+    this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, sceneProgress, sceneIdx >= 0 ? sceneIdx : turnIdx);
+    return true;
   }
 
   // Full-bleed cover-fit image for a manually-attached segment illustration
@@ -391,7 +408,7 @@ export class CanvasRenderer {
     const edgePad = w * 0.032;
     const gap = w * 0.022;
     const baseD = regionH * 0.13;
-    const zPulseOn = this.state.phoneZPulse ?? true;
+    const zPulseOn = this.state.phoneZPulse ?? false;
 
     type Item = { phone: PhoneConfig; isActive: boolean; d: number };
     const items: Item[] = phones.map(phone => {
@@ -503,7 +520,7 @@ export class CanvasRenderer {
 
     const startX = w - edgePad - totalW;
     const startY = regionY + regionH - edgePad - ph;
-    const zPulseOn = this.state.phoneZPulse ?? true;
+    const zPulseOn = this.state.phoneZPulse ?? false;
 
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.42)';
