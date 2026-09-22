@@ -422,10 +422,6 @@ export class CanvasRenderer {
   // Slow Ken Burns zoom + drift over progress (0→1) so a static illustration
   // never sits completely frozen on screen. sceneIndex alternates drift
   // direction so consecutive intro beats don't all pan the same way.
-  private storyboardBarH(regionH: number): number {
-    return (this.state.storyboardLetterbox ?? false) ? regionH * 0.12 : 0;
-  }
-
   private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0, sceneIndex = 0) {
     const { ctx } = this;
     let img = this.bgImageCache.get(url);
