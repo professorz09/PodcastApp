@@ -131,7 +131,7 @@ export class CanvasRenderer {
 
   updateState(s: StudioState) {
     this.state = s;
-    if (!this.playing) this.drawFrame();
+    this.drawFrame();
   }
 
   // Attach/detach the top-band clip video for split-screen mode without
@@ -189,6 +189,9 @@ export class CanvasRenderer {
     const split = state.splitScreen;
     const regionY = split ? h * (split.topRatio ?? 0.5) : 0;
     const regionH = h - regionY;
+    const barH = (state.storyboardLetterbox ?? false) ? regionH * 0.12 : 0;
+    const contentY = regionY + barH;
+    const contentH = regionH - barH * 2;
 
     if (split) {
       ctx.save();
@@ -216,27 +219,27 @@ export class CanvasRenderer {
           if (!this.playing) this.drawFrame();
         };
         newImg.src = state.bgImageUrl;
-        ctx.fillStyle = '#111'; ctx.fillRect(0, regionY, w, regionH);
+        ctx.fillStyle = '#111'; ctx.fillRect(0, contentY, w, contentH);
       } else {
-        // Cover fit — fill region preserving aspect ratio
-        const scl = Math.max(w / img.width, regionH / img.height);
+        // Cover fit — fill content band preserving aspect ratio
+        const scl = Math.max(w / img.width, contentH / img.height);
         const dw = img.width * scl, dh = img.height * scl;
         ctx.save();
-        ctx.beginPath(); ctx.rect(0, regionY, w, regionH); ctx.clip();
-        ctx.drawImage(img, (w - dw) / 2, regionY + (regionH - dh) / 2, dw, dh);
+        ctx.beginPath(); ctx.rect(0, contentY, w, contentH); ctx.clip();
+        ctx.drawImage(img, (w - dw) / 2, contentY + (contentH - dh) / 2, dw, dh);
         ctx.restore();
       }
     } else {
       const bgVal = state.background.value || '#0f172a';
       if (bgVal.startsWith('linear:')) {
         const colors = bgVal.substring(7).split(',');
-        const grad = ctx.createLinearGradient(0, regionY, w, regionY + regionH);
+        const grad = ctx.createLinearGradient(0, contentY, w, contentY + contentH);
         colors.forEach((c, i) => grad.addColorStop(i / Math.max(1, colors.length - 1), c.trim()));
         ctx.fillStyle = grad;
       } else {
         ctx.fillStyle = bgVal;
       }
-      ctx.fillRect(0, regionY, w, regionH);
+      ctx.fillRect(0, contentY, w, contentH);
     }
 
     const phones = state.phones;
@@ -263,11 +266,12 @@ export class CanvasRenderer {
         ? (activeTurn!.introScenes ?? [])
         : activeTurn!.segmentScenes!;
       const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
-      this.drawTimedTurnScenes(w, regionH, regionY, timedScenes, turnProgress, activeTurn!.durationMs, turnIdx);
+      this.drawTimedTurnScenes(w, contentH, contentY, timedScenes, turnProgress, activeTurn!.durationMs, turnIdx);
       if (isSegmentStoryboard) {
-        this.drawPhonesPip(w, regionH, regionY, phones, activeTurn!, turnProgress);
+        this.drawPhonesPip(w, contentH, contentY, phones, activeTurn!, turnProgress);
       }
       this.drawStoryboardOverlays(w, regionH, regionY, activeTurn!, turnProgress);
+      this.drawLetterboxBars(w, regionY, regionH);
       return;
     }
 
@@ -297,7 +301,8 @@ export class CanvasRenderer {
           doneCount = maxSeen + 1;
         }
       }
-      this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY, board, doneCount, activeIndex);
+      this.drawNarratorCard(w, contentH, activeTurn.text, turnProgress, contentY, board, doneCount, activeIndex);
+      this.drawLetterboxBars(w, regionY, regionH);
       return;
     }
 
@@ -305,13 +310,17 @@ export class CanvasRenderer {
     // phones shrunk into a bottom-right PiP overlay (Image settings sub-tab).
     if (activeTurn?.visualImageUrl) {
       const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
-      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress, turnIdx);
-      this.drawPhonesPip(w, regionH, regionY, phones, activeTurn, turnProgress);
+      this.drawSegmentImage(w, contentH, contentY, activeTurn.visualImageUrl, turnProgress, turnIdx);
+      this.drawPhonesPip(w, contentH, contentY, phones, activeTurn, turnProgress);
       this.drawStoryboardOverlays(w, regionH, regionY, activeTurn, turnProgress);
+      this.drawLetterboxBars(w, regionY, regionH);
       return;
     }
 
-    if (!phones.length) return;
+    if (!phones.length) {
+      this.drawLetterboxBars(w, regionY, regionH);
+      return;
+    }
 
     // Layout — confined to the bottom band when split-screen is active
     const phoneAspect = 9 / 19.5;
@@ -319,9 +328,9 @@ export class CanvasRenderer {
     const spacingRatio = (state.deviceSpacing ?? 50) / 100;
     // Quadratic scale: at 100% gives large visible gap; at 0% phones are close
     const padding = w * 0.06 * (1 - spacingRatio);
-    const yPadding = regionH * 0.09;
+    const yPadding = contentH * 0.09;
     const availW = w - padding * 2;
-    const availH = regionH - yPadding * 2;
+    const availH = contentH - yPadding * 2;
     const spacing = availW * (0.02 + 0.44 * spacingRatio * spacingRatio + 0.06 * spacingRatio);
     let pw = (availW - spacing * (phones.length - 1)) / phones.length;
     let ph = pw / phoneAspect;
@@ -332,7 +341,7 @@ export class CanvasRenderer {
     // Single-speaker mode: phone sits on the LEFT side of the frame so the
     // right side is free for subtitles / overlays. Multi-speaker stays centred.
     const startX = isSingle ? (w * 0.04) : (w - totalW) / 2;
-    const startY = regionY + (regionH - ph) / 2;
+    const startY = contentY + (contentH - ph) / 2;
 
     // Z-pulse: default ON when single-speaker, OFF for multi. Consumer can
     // override either way via state.phoneZPulse.
@@ -347,6 +356,17 @@ export class CanvasRenderer {
       const force0Rotation = isSingle;
       this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn, pulse, force0Rotation);
     });
+    this.drawLetterboxBars(w, regionY, regionH);
+  }
+
+  /** Top + bottom black bars — visible on canvas whenever letterbox is enabled. */
+  private drawLetterboxBars(w: number, regionY: number, regionH: number) {
+    const barH = (this.state.storyboardLetterbox ?? false) ? regionH * 0.12 : 0;
+    if (barH <= 0) return;
+    const { ctx } = this;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, regionY, w, barH);
+    ctx.fillRect(0, regionY + regionH - barH, w, barH);
   }
 
   /** Nearest scene with an image — missing slots inherit from earlier scenes, else later ones. */
@@ -362,17 +382,11 @@ export class CanvasRenderer {
     return undefined;
   }
 
-  /** White (or letterboxed) placeholder so playback never blocks on missing images. */
+  /** White placeholder so playback never blocks on missing images. */
   private drawStoryboardFallback(w: number, h: number, offsetY: number) {
     const { ctx } = this;
-    const barH = this.storyboardBarH(h);
-    if (barH > 0) {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, offsetY, w, barH);
-      ctx.fillRect(0, offsetY + h - barH, w, barH);
-    }
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, offsetY + barH, w, h - barH * 2);
+    ctx.fillRect(0, offsetY, w, h);
   }
 
   private drawTimedTurnScenes(
@@ -408,16 +422,6 @@ export class CanvasRenderer {
 
   private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0, sceneIndex = 0) {
     const { ctx } = this;
-    const barH = this.storyboardBarH(h);
-    const imageY = offsetY + barH;
-    const imageH = h - barH * 2;
-
-    if (barH > 0) {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, offsetY, w, barH);
-      ctx.fillRect(0, offsetY + h - barH, w, barH);
-    }
-
     let img = this.bgImageCache.get(url);
     if (!img) {
       const newImg = new Image();
@@ -428,19 +432,19 @@ export class CanvasRenderer {
       };
       newImg.src = url;
       ctx.fillStyle = '#111';
-      ctx.fillRect(0, imageY, w, imageH);
+      ctx.fillRect(0, offsetY, w, h);
       return;
     }
     const p = Math.max(0, Math.min(1, progress));
     const zoom = 1.05 + 0.11 * p;
-    const scl = Math.max(w / img.width, imageH / img.height) * zoom;
+    const scl = Math.max(w / img.width, h / img.height) * zoom;
     const dw = img.width * scl, dh = img.height * scl;
     const dir = sceneIndex % 2 === 0 ? 1 : -1;
     const driftX = dir * Math.sin(p * Math.PI * 0.5) * w * 0.028;
-    const driftY = Math.cos(p * Math.PI * 0.5) * imageH * 0.014;
+    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.014;
     ctx.save();
-    ctx.beginPath(); ctx.rect(0, imageY, w, imageH); ctx.clip();
-    ctx.drawImage(img, (w - dw) / 2 - driftX, imageY + (imageH - dh) / 2 - driftY, dw, dh);
+    ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
+    ctx.drawImage(img, (w - dw) / 2 - driftX, offsetY + (h - dh) / 2 - driftY, dw, dh);
     ctx.restore();
   }
 

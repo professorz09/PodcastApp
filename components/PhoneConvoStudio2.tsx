@@ -3978,7 +3978,8 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     if (!r) return;
 
     if (isPlayingRef.current) {
-      r.stop();
+      r.pause();
+      r.drawFrame();
       setIsPlaying(false);
       killAudio();
       clearActivePlayback(stopPhonePreview);
