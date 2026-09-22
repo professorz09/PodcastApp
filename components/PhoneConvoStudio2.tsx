@@ -273,7 +273,7 @@ const StoryboardSubtitleSettings: React.FC<{
         <span style={{ fontSize: 11, color: accentColor, fontFamily: 'monospace' }}>{size.toFixed(1)}×</span>
       </div>
       <input
-        type="range" min={0.8} max={2.2} step={0.05} value={size}
+        type="range" min={0.6} max={1.6} step={0.05} value={size}
         onChange={e => onSizeChange(+e.target.value)}
         style={{ width: '100%', accentColor: '#ef4444' }}
       />
@@ -3360,7 +3360,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [subtitleBg, setSubtitleBg]           = useState<'dark' | 'light' | 'none'>('dark');
   const [subtitleSize, setSubtitleSize]       = useState(1.6);
   const [storyboardSubtitleEnabled, setStoryboardSubtitleEnabled] = useState(true);
-  const [storyboardSubtitleSize, setStoryboardSubtitleSize] = useState(1.4);
+  const [storyboardSubtitleSize, setStoryboardSubtitleSize] = useState(1.0);
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
@@ -3978,7 +3978,8 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     if (!r) return;
 
     if (isPlayingRef.current) {
-      r.stop();
+      r.pause();
+      r.drawFrame();
       setIsPlaying(false);
       killAudio();
       clearActivePlayback(stopPhonePreview);
@@ -5146,23 +5147,6 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           </div>
         )}
 
-        {activeSettingsSection === 'intro' && (
-          <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {introVideoPreviewUrl ? (
-              <video
-                key={introVideoPreviewUrl}
-                controls
-                src={introVideoPreviewUrl}
-                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
-              />
-            ) : (
-              <div style={{ textAlign: 'center', padding: 20 }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>🎬</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Intro abhi generate nahi hua — neeche Settings mein generate karo</div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ── Playback + Seek ── */}

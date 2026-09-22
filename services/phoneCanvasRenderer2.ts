@@ -131,7 +131,7 @@ export class CanvasRenderer {
 
   updateState(s: StudioState) {
     this.state = s;
-    if (!this.playing) this.drawFrame();
+    this.drawFrame();
   }
 
   // Attach/detach the top-band clip video for split-screen mode without
@@ -189,6 +189,15 @@ export class CanvasRenderer {
     const split = state.splitScreen;
     const regionY = split ? h * (split.topRatio ?? 0.5) : 0;
     const regionH = h - regionY;
+    const barH = (state.storyboardLetterbox ?? false) ? regionH * 0.12 : 0;
+    const contentY = regionY + barH;
+    const contentH = regionH - barH * 2;
+
+    if (barH > 0) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, regionY, w, barH);
+      ctx.fillRect(0, regionY + regionH - barH, w, barH);
+    }
 
     if (split) {
       ctx.save();
@@ -216,27 +225,27 @@ export class CanvasRenderer {
           if (!this.playing) this.drawFrame();
         };
         newImg.src = state.bgImageUrl;
-        ctx.fillStyle = '#111'; ctx.fillRect(0, regionY, w, regionH);
+        ctx.fillStyle = '#111'; ctx.fillRect(0, contentY, w, contentH);
       } else {
-        // Cover fit — fill region preserving aspect ratio
-        const scl = Math.max(w / img.width, regionH / img.height);
+        // Cover fit — fill content band preserving aspect ratio
+        const scl = Math.max(w / img.width, contentH / img.height);
         const dw = img.width * scl, dh = img.height * scl;
         ctx.save();
-        ctx.beginPath(); ctx.rect(0, regionY, w, regionH); ctx.clip();
-        ctx.drawImage(img, (w - dw) / 2, regionY + (regionH - dh) / 2, dw, dh);
+        ctx.beginPath(); ctx.rect(0, contentY, w, contentH); ctx.clip();
+        ctx.drawImage(img, (w - dw) / 2, contentY + (contentH - dh) / 2, dw, dh);
         ctx.restore();
       }
     } else {
       const bgVal = state.background.value || '#0f172a';
       if (bgVal.startsWith('linear:')) {
         const colors = bgVal.substring(7).split(',');
-        const grad = ctx.createLinearGradient(0, regionY, w, regionY + regionH);
+        const grad = ctx.createLinearGradient(0, contentY, w, contentY + contentH);
         colors.forEach((c, i) => grad.addColorStop(i / Math.max(1, colors.length - 1), c.trim()));
         ctx.fillStyle = grad;
       } else {
         ctx.fillStyle = bgVal;
       }
-      ctx.fillRect(0, regionY, w, regionH);
+      ctx.fillRect(0, contentY, w, contentH);
     }
 
     const phones = state.phones;
@@ -255,19 +264,21 @@ export class CanvasRenderer {
     }
 
     // ── Timed storyboard (intro cold-open or discussion segment scenes) ─
-    const timedScenes: TimedTurnScene[] | undefined =
-      activeTurn?.phoneId === 'intro' ? activeTurn.introScenes
-        : activeTurn?.segmentScenes?.length ? activeTurn.segmentScenes
-          : undefined;
-    if (timedScenes?.length) {
+    // Intro always uses storyboard mode (white fallback if no scenes/images yet).
+    const isIntroStoryboard = activeTurn?.phoneId === 'intro';
+    const isSegmentStoryboard = !!activeTurn?.segmentScenes?.length;
+    if (isIntroStoryboard || isSegmentStoryboard) {
+      const timedScenes: TimedTurnScene[] = isIntroStoryboard
+        ? (activeTurn!.introScenes ?? [])
+        : activeTurn!.segmentScenes!;
       const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
-      if (this.drawTimedTurnScenes(w, regionH, regionY, timedScenes, turnProgress, activeTurn!.durationMs, turnIdx)) {
-        if (activeTurn!.segmentScenes?.length) {
-          this.drawPhonesPip(w, regionH, regionY, phones, activeTurn!, turnProgress);
-        }
-        this.drawStoryboardOverlays(w, regionH, regionY, activeTurn!, turnProgress);
-        return;
+      this.drawTimedTurnScenes(w, contentH, contentY, timedScenes, turnProgress, activeTurn!.durationMs, turnIdx);
+      if (isSegmentStoryboard) {
+        this.drawPhonesPip(w, contentH, contentY, phones, activeTurn!, turnProgress);
       }
+      this.drawLetterboxBars(w, regionY, regionH);
+      this.drawStoryboardSubtitles(w, regionH, regionY, activeTurn!, turnProgress);
+      return;
     }
 
     // ── Narrator card — white slide, confined to the bottom band when split ─
@@ -296,7 +307,8 @@ export class CanvasRenderer {
           doneCount = maxSeen + 1;
         }
       }
-      this.drawNarratorCard(w, regionH, activeTurn.text, turnProgress, regionY, board, doneCount, activeIndex);
+      this.drawNarratorCard(w, contentH, activeTurn.text, turnProgress, contentY, board, doneCount, activeIndex);
+      this.drawLetterboxBars(w, regionY, regionH);
       return;
     }
 
@@ -304,13 +316,17 @@ export class CanvasRenderer {
     // phones shrunk into a bottom-right PiP overlay (Image settings sub-tab).
     if (activeTurn?.visualImageUrl) {
       const turnIdx = activeTurn ? state.script.indexOf(activeTurn) : 0;
-      this.drawSegmentImage(w, regionH, regionY, activeTurn.visualImageUrl, turnProgress, turnIdx);
-      this.drawPhonesPip(w, regionH, regionY, phones, activeTurn, turnProgress);
-      this.drawStoryboardOverlays(w, regionH, regionY, activeTurn, turnProgress);
+      this.drawSegmentImage(w, contentH, contentY, activeTurn.visualImageUrl, turnProgress, turnIdx);
+      this.drawPhonesPip(w, contentH, contentY, phones, activeTurn, turnProgress);
+      this.drawLetterboxBars(w, regionY, regionH);
+      this.drawStoryboardSubtitles(w, regionH, regionY, activeTurn, turnProgress);
       return;
     }
 
-    if (!phones.length) return;
+    if (!phones.length) {
+      this.drawLetterboxBars(w, regionY, regionH);
+      return;
+    }
 
     // Layout — confined to the bottom band when split-screen is active
     const phoneAspect = 9 / 19.5;
@@ -318,9 +334,9 @@ export class CanvasRenderer {
     const spacingRatio = (state.deviceSpacing ?? 50) / 100;
     // Quadratic scale: at 100% gives large visible gap; at 0% phones are close
     const padding = w * 0.06 * (1 - spacingRatio);
-    const yPadding = regionH * 0.09;
+    const yPadding = contentH * 0.09;
     const availW = w - padding * 2;
-    const availH = regionH - yPadding * 2;
+    const availH = contentH - yPadding * 2;
     const spacing = availW * (0.02 + 0.44 * spacingRatio * spacingRatio + 0.06 * spacingRatio);
     let pw = (availW - spacing * (phones.length - 1)) / phones.length;
     let ph = pw / phoneAspect;
@@ -331,7 +347,7 @@ export class CanvasRenderer {
     // Single-speaker mode: phone sits on the LEFT side of the frame so the
     // right side is free for subtitles / overlays. Multi-speaker stays centred.
     const startX = isSingle ? (w * 0.04) : (w - totalW) / 2;
-    const startY = regionY + (regionH - ph) / 2;
+    const startY = contentY + (contentH - ph) / 2;
 
     // Z-pulse: default ON when single-speaker, OFF for multi. Consumer can
     // override either way via state.phoneZPulse.
@@ -346,20 +362,59 @@ export class CanvasRenderer {
       const force0Rotation = isSingle;
       this.drawPhone(x, startY, pw, ph, phone, isActive, activeTurn !== null, activeTurn?.text, turnProgress, activeTurn, pulse, force0Rotation);
     });
+    this.drawLetterboxBars(w, regionY, regionH);
+  }
+
+  /** Top + bottom black bars — visible on canvas whenever letterbox is enabled. */
+  private drawLetterboxBars(w: number, regionY: number, regionH: number) {
+    const barH = (this.state.storyboardLetterbox ?? false) ? regionH * 0.12 : 0;
+    if (barH <= 0) return;
+    const { ctx } = this;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, regionY, w, barH);
+    ctx.fillRect(0, regionY + regionH - barH, w, barH);
+  }
+
+  /** Nearest scene with an image — missing slots inherit from earlier scenes, else later ones. */
+  private resolveSceneImageUrl(scenes: TimedTurnScene[], sceneIdx: number): string | undefined {
+    if (sceneIdx < 0 || sceneIdx >= scenes.length) return undefined;
+    if (scenes[sceneIdx].imageUrl) return scenes[sceneIdx].imageUrl;
+    for (let i = sceneIdx - 1; i >= 0; i--) {
+      if (scenes[i].imageUrl) return scenes[i].imageUrl;
+    }
+    for (let i = sceneIdx + 1; i < scenes.length; i++) {
+      if (scenes[i].imageUrl) return scenes[i].imageUrl;
+    }
+    return undefined;
+  }
+
+  /** White placeholder so playback never blocks on missing images. */
+  private drawStoryboardFallback(w: number, h: number, offsetY: number) {
+    const { ctx } = this;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, offsetY, w, h);
   }
 
   private drawTimedTurnScenes(
     w: number, regionH: number, regionY: number,
     scenes: TimedTurnScene[], turnProgress: number, durationMs: number, turnIdx: number,
-  ): boolean {
+  ): void {
+    if (!scenes.length) {
+      this.drawStoryboardFallback(w, regionH, regionY);
+      return;
+    }
     const localSec = turnProgress * (durationMs / 1000);
     const sceneIdx = scenes.findIndex(s => localSec >= s.startOffset && localSec < s.endOffset);
-    const scene = sceneIdx >= 0 ? scenes[sceneIdx] : scenes[scenes.length - 1];
-    if (!scene?.imageUrl) return false;
+    const idx = sceneIdx >= 0 ? sceneIdx : scenes.length - 1;
+    const scene = scenes[idx];
     const sceneDur = Math.max(0.1, scene.endOffset - scene.startOffset);
     const sceneProgress = Math.max(0, Math.min(1, (localSec - scene.startOffset) / sceneDur));
-    this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, sceneProgress, sceneIdx >= 0 ? sceneIdx : turnIdx);
-    return true;
+    const imageUrl = this.resolveSceneImageUrl(scenes, idx);
+    if (imageUrl) {
+      this.drawSegmentImage(w, regionH, regionY, imageUrl, sceneProgress, idx);
+    } else {
+      this.drawStoryboardFallback(w, regionH, regionY);
+    }
   }
 
   // Full-bleed cover-fit image for a manually-attached segment illustration
@@ -367,22 +422,8 @@ export class CanvasRenderer {
   // Slow Ken Burns zoom + drift over progress (0→1) so a static illustration
   // never sits completely frozen on screen. sceneIndex alternates drift
   // direction so consecutive intro beats don't all pan the same way.
-  private storyboardBarH(regionH: number): number {
-    return (this.state.storyboardLetterbox ?? false) ? regionH * 0.12 : 0;
-  }
-
   private drawSegmentImage(w: number, h: number, offsetY: number, url: string, progress = 0, sceneIndex = 0) {
     const { ctx } = this;
-    const barH = this.storyboardBarH(h);
-    const imageY = offsetY + barH;
-    const imageH = h - barH * 2;
-
-    if (barH > 0) {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, offsetY, w, barH);
-      ctx.fillRect(0, offsetY + h - barH, w, barH);
-    }
-
     let img = this.bgImageCache.get(url);
     if (!img) {
       const newImg = new Image();
@@ -393,47 +434,131 @@ export class CanvasRenderer {
       };
       newImg.src = url;
       ctx.fillStyle = '#111';
-      ctx.fillRect(0, imageY, w, imageH);
+      ctx.fillRect(0, offsetY, w, h);
       return;
     }
     const p = Math.max(0, Math.min(1, progress));
     const zoom = 1.05 + 0.11 * p;
-    const scl = Math.max(w / img.width, imageH / img.height) * zoom;
+    const scl = Math.max(w / img.width, h / img.height) * zoom;
     const dw = img.width * scl, dh = img.height * scl;
     const dir = sceneIndex % 2 === 0 ? 1 : -1;
     const driftX = dir * Math.sin(p * Math.PI * 0.5) * w * 0.028;
-    const driftY = Math.cos(p * Math.PI * 0.5) * imageH * 0.014;
+    const driftY = Math.cos(p * Math.PI * 0.5) * h * 0.014;
     ctx.save();
-    ctx.beginPath(); ctx.rect(0, imageY, w, imageH); ctx.clip();
-    ctx.drawImage(img, (w - dw) / 2 - driftX, imageY + (imageH - dh) / 2 - driftY, dw, dh);
+    ctx.beginPath(); ctx.rect(0, offsetY, w, h); ctx.clip();
+    ctx.drawImage(img, (w - dw) / 2 - driftX, offsetY + (h - dh) / 2 - driftY, dw, dh);
     ctx.restore();
   }
 
-  /** Yellow synced subtitles + letterbox bars on intro/segment storyboard frames. */
-  private drawStoryboardOverlays(
+  /** Fixed bottom-center yellow subtitles on storyboard frames (inside bottom bar). */
+  private drawStoryboardSubtitles(
     w: number, regionH: number, regionY: number,
     activeTurn: ScriptTurn, turnProgress: number,
   ) {
     const subCfg = this.state.storyboardSubtitleConfig;
     if (!subCfg?.enabled || !activeTurn.text) return;
 
-    const barH = this.storyboardBarH(regionH);
-    const letterbox = barH > 0;
-    const subY = letterbox ? regionY + regionH - barH : regionY + regionH * 0.82;
-    const subH = letterbox ? barH : regionH * 0.18;
-    const anchorY = letterbox ? 0.5 : 0.68;
+    const { ctx } = this;
+    const letterbox = this.state.storyboardLetterbox ?? false;
+    const barH = letterbox ? regionH * 0.12 : regionH * 0.08;
+    const subY = regionY + regionH - barH;
 
-    this.drawSyncedSubtitles(
-      0, subY, w, subH,
-      activeTurn.text, turnProgress, activeTurn,
-      {
-        enabled: true,
-        size: subCfg.size ?? 1.4,
-        background: letterbox ? 'none' : 'dark',
-        textColor: subCfg.textColor ?? '#FFD700',
-      },
-      anchorY,
-    );
+    if (!letterbox) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, subY, w, barH);
+    }
+
+    const sizeMul = subCfg.size ?? 1;
+    const fontSize = Math.min(barH * 0.42, w * 0.014) * sizeMul;
+    const lh = fontSize * 1.25;
+    ctx.font = `600 ${fontSize}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    const text = activeTurn.text.replace(/\n/g, ' ');
+    const words = text.split(' ').filter(w => w.trim() !== '');
+    const pct = Math.max(0, Math.min(1, turnProgress / 0.95));
+
+    let targetWordFloat = 0;
+    const wtArr = activeTurn.wordTimings;
+    if (wtArr?.length) {
+      const cur = turnProgress * (activeTurn.durationMs / 1000);
+      for (let i = 0; i < wtArr.length; i++) {
+        const wt = wtArr[i];
+        if (cur < wt.startTime) break;
+        else if (cur <= wt.endTime) {
+          const wd = wt.endTime - wt.startTime;
+          targetWordFloat = i + (wd > 0 ? (cur - wt.startTime) / wd : 1);
+          break;
+        } else { targetWordFloat = i + 1; }
+      }
+    } else {
+      const ww = words.map(w => w.length + 2);
+      const tot = ww.reduce((a, b) => a + b, 0) || 1;
+      const tgt = pct * tot;
+      let acc = 0;
+      for (let i = 0; i < words.length; i++) {
+        if (tgt <= acc + ww[i]) { targetWordFloat = i + (tgt - acc) / ww[i]; break; }
+        acc += ww[i];
+      }
+      if (tgt >= tot) targetWordFloat = words.length;
+    }
+
+    const maxW = w * 0.92;
+    const lines: { text: string; words: string[] }[] = [];
+    let curW: string[] = [];
+    for (const word of words) {
+      const test = curW.length ? curW.join(' ') + ' ' + word : word;
+      if (curW.length && ctx.measureText(test).width > maxW) {
+        lines.push({ text: curW.join(' '), words: [...curW] });
+        curW = [word];
+      } else { curW.push(word); }
+    }
+    if (curW.length) lines.push({ text: curW.join(' '), words: [...curW] });
+
+    const phraseGroups: { text: string; words: string[] }[][] = [];
+    for (let i = 0; i < lines.length; i += 1) phraseGroups.push(lines.slice(i, i + 1));
+
+    let globalStart = 0;
+    let activeGroupIdx = phraseGroups.length - 1;
+    for (let g = 0; g < phraseGroups.length; g++) {
+      const groupWords = phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
+      if (targetWordFloat < globalStart + groupWords) { activeGroupIdx = g; break; }
+      globalStart += groupWords;
+    }
+    globalStart = 0;
+    for (let g = 0; g < activeGroupIdx; g++)
+      globalStart += phraseGroups[g].reduce((s, l) => s + l.words.length, 0);
+
+    const activeGroup = phraseGroups[activeGroupIdx] || [];
+    const groupH = activeGroup.length * lh;
+    const cx = w / 2;
+    const baseY = subY + (barH + groupH) / 2 - fontSize * 0.15;
+
+    const col = subCfg.textColor ?? '#FFD700';
+    const rr = parseInt(col.slice(1, 3), 16) || 255;
+    const gg = parseInt(col.slice(3, 5), 16) || 255;
+    const bb = parseInt(col.slice(5, 7), 16) || 255;
+
+    let wordIdxInGroup = globalStart;
+    activeGroup.forEach((line, li) => {
+      const lineW = ctx.measureText(line.text).width;
+      const startTx = cx - lineW / 2;
+      let prevText = '';
+      line.words.forEach(word => {
+        const dist = targetWordFloat - wordIdxInGroup;
+        const alpha = dist > 0 ? Math.min(1.0, dist * 7.0) : 0;
+        if (alpha > 0.01) {
+          const xOff = prevText ? ctx.measureText(prevText + ' ').width : 0;
+          ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha})`;
+          ctx.fillText(word, startTx + xOff, baseY + li * lh);
+        }
+        prevText += (prevText ? ' ' : '') + word;
+        wordIdxInGroup++;
+      });
+    });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
   }
 
   /** Word-synced subtitles in a canvas bounding box (phone screen or full storyboard). */
