@@ -7,6 +7,7 @@ const SCENES_KEY = 'autovid_scenes';
 const SHORTS_SCENES_KEY = 'autovid_shorts_scenes';
 const ENGLISH_VIDEO_VISUALS_KEY = 'autovid_english_video_visuals';
 const ENGLISH_INTRO_SCENES_KEY = 'autovid_english_intro_scenes';
+const PHONE_STUDIO2_SCENES_KEY = 'autovid_phone_studio2_scenes';
 
 interface StoredIntroSceneBeat {
   prompt: string;
@@ -371,6 +372,132 @@ export const loadEnglishIntroScenes = async (
     return result;
   } catch (e) {
     console.error('Failed to load English intro scenes', e);
+    return null;
+  }
+};
+
+// ── Phone Studio 2 — intro + segment storyboard scenes (survives refresh) ─────
+
+export interface PhoneStudio2StoredScene {
+  prompt: string;
+  startOffset: number;
+  endOffset: number;
+  usesCharacter?: boolean;
+  imageBlob?: Blob | null;
+}
+
+export interface PhoneStudio2StoredScenes {
+  scriptSignature: string;
+  introCharacterGuide?: string;
+  segmentCharacterGuides?: Record<string, string>;
+  introScenesByTurnId: Record<string, PhoneStudio2StoredScene[]>;
+  segmentScenesByTurnId: Record<string, PhoneStudio2StoredScene[]>;
+}
+
+export type PhoneStudio2LoadedScene = {
+  prompt: string;
+  startOffset: number;
+  endOffset: number;
+  usesCharacter?: boolean;
+  imageUrl?: string;
+};
+
+let _activePhoneStudio2BlobUrls: string[] = [];
+
+const scenesToStored = async (
+  scenes: { prompt: string; startOffset: number; endOffset: number; usesCharacter?: boolean; imageUrl?: string }[],
+): Promise<PhoneStudio2StoredScene[]> =>
+  Promise.all(scenes.map(async (sc) => {
+    let imageBlob: Blob | null = null;
+    if (sc.imageUrl) {
+      try { imageBlob = await urlToBlob(sc.imageUrl); } catch (e) { console.warn('Phone Studio 2 scene blob save failed', e); }
+    }
+    return {
+      prompt: sc.prompt,
+      startOffset: sc.startOffset,
+      endOffset: sc.endOffset,
+      usesCharacter: sc.usesCharacter,
+      imageBlob,
+    };
+  }));
+
+const storedToLoadedScenes = (stored: PhoneStudio2StoredScene[]): PhoneStudio2LoadedScene[] =>
+  stored.map(sc => {
+    let imageUrl: string | undefined;
+    if (sc.imageBlob) {
+      imageUrl = URL.createObjectURL(sc.imageBlob);
+      _activePhoneStudio2BlobUrls.push(imageUrl);
+    }
+    return {
+      prompt: sc.prompt,
+      startOffset: sc.startOffset,
+      endOffset: sc.endOffset,
+      usesCharacter: sc.usesCharacter,
+      imageUrl,
+    };
+  });
+
+export const savePhoneStudio2Scenes = async (
+  script: DebateSegment[],
+  turns: {
+    id: string;
+    introScenes?: { prompt: string; startOffset: number; endOffset: number; usesCharacter?: boolean; imageUrl?: string }[];
+    segmentScenes?: { prompt: string; startOffset: number; endOffset: number; usesCharacter?: boolean; imageUrl?: string }[];
+  }[],
+  introCharacterGuide?: string,
+  segmentCharacterGuides?: Record<string, string>,
+): Promise<void> => {
+  try {
+    const introScenesByTurnId: Record<string, PhoneStudio2StoredScene[]> = {};
+    const segmentScenesByTurnId: Record<string, PhoneStudio2StoredScene[]> = {};
+    for (const t of turns) {
+      if (t.introScenes?.length) introScenesByTurnId[t.id] = await scenesToStored(t.introScenes);
+      if (t.segmentScenes?.length) segmentScenesByTurnId[t.id] = await scenesToStored(t.segmentScenes);
+    }
+    await set(PHONE_STUDIO2_SCENES_KEY, {
+      scriptSignature: getScriptSignature(script),
+      introCharacterGuide,
+      segmentCharacterGuides,
+      introScenesByTurnId,
+      segmentScenesByTurnId,
+    } as PhoneStudio2StoredScenes);
+  } catch (e) {
+    console.error('Failed to save Phone Studio 2 scenes', e);
+  }
+};
+
+export const loadPhoneStudio2Scenes = async (
+  script: DebateSegment[],
+): Promise<{
+  introCharacterGuide?: string;
+  segmentCharacterGuides?: Record<string, string>;
+  introScenesByTurnId: Record<string, PhoneStudio2LoadedScene[]>;
+  segmentScenesByTurnId: Record<string, PhoneStudio2LoadedScene[]>;
+} | null> => {
+  try {
+    const stored = await get<PhoneStudio2StoredScenes>(PHONE_STUDIO2_SCENES_KEY);
+    if (!stored) return null;
+    if (stored.scriptSignature !== getScriptSignature(script)) return null;
+
+    _activePhoneStudio2BlobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+    _activePhoneStudio2BlobUrls = [];
+
+    const introScenesByTurnId: Record<string, PhoneStudio2LoadedScene[]> = {};
+    const segmentScenesByTurnId: Record<string, PhoneStudio2LoadedScene[]> = {};
+    for (const [id, scenes] of Object.entries(stored.introScenesByTurnId || {})) {
+      introScenesByTurnId[id] = storedToLoadedScenes(scenes);
+    }
+    for (const [id, scenes] of Object.entries(stored.segmentScenesByTurnId || {})) {
+      segmentScenesByTurnId[id] = storedToLoadedScenes(scenes);
+    }
+    return {
+      introCharacterGuide: stored.introCharacterGuide,
+      segmentCharacterGuides: stored.segmentCharacterGuides,
+      introScenesByTurnId,
+      segmentScenesByTurnId,
+    };
+  } catch (e) {
+    console.error('Failed to load Phone Studio 2 scenes', e);
     return null;
   }
 };

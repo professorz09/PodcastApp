@@ -3,8 +3,9 @@ import {
   Play, Square, Download, Check,
   Volume2, Loader2,
   MonitorSmartphone,
-  Wand2, ImagePlus, RefreshCw,
+  Wand2, ImagePlus, RefreshCw, Copy,
 } from 'lucide-react';
+import { savePhoneStudio2Scenes, loadPhoneStudio2Scenes } from '../services/storageService';
 import { CanvasRenderer, PhoneConfig, ScriptTurn, StudioState, AnimStyle } from '../services/phoneCanvasRenderer2';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { registerActivePlayback, clearActivePlayback } from '../services/audioManager';
@@ -47,7 +48,21 @@ const isIntroSpeaker = (sp: string): boolean => sp.trim().toLowerCase() === 'int
 // Either of the above should render as the white card, never a phone mockup.
 const isNarratorLikeSpeaker = (sp: string): boolean => isTrueNarratorSpeaker(sp) || isIntroSpeaker(sp);
 
-type IntroSceneWithMeta = IntroSceneBreakdown & { imageUrl?: string; usesCharacter?: boolean };
+type TurnSceneWithMeta = IntroSceneBreakdown & { imageUrl?: string; usesCharacter?: boolean };
+
+const MS_PAINT_STYLE_SUFFIX = 'MS Paint style flat 2D cartoon illustration.';
+
+const displayPromptWithMsPaint = (prompt: string): string => {
+  const p = prompt.trim();
+  return /ms paint/i.test(p) ? p : `${p} — ${MS_PAINT_STYLE_SUFFIX}`;
+};
+
+const copyScenePrompt = (prompt: string) => {
+  navigator.clipboard.writeText(displayPromptWithMsPaint(prompt)).then(
+    () => toast.success('Prompt copied!'),
+    () => toast.error('Copy nahi ho paya'),
+  );
+};
 
 // Build ~3s timed voiceover slots from real STT word timings when available,
 // else an even proportional split — same engine IntroFlow / Storyboard use so
@@ -85,6 +100,149 @@ const buildIntroVoiceoverSlots = (
     voiceover: c,
   }));
 };
+
+// ─── Shared storyboard timeline (intro + segment turns) ───────────────────────
+
+const TurnScenesTimeline: React.FC<{
+  turn: ScriptTurn;
+  scenes: TurnSceneWithMeta[];
+  accentColor: string;
+  sceneLoading: Record<string, boolean>;
+  scenesProgress: Record<string, { done: number; total: number }>;
+  onClear: () => void;
+  onUpload: (sceneIdx: number, file: File) => void;
+  onRegen: (sceneIdx: number) => void;
+  onPlan: () => void;
+  onGenerateAll: () => void;
+}> = ({ turn, scenes, accentColor, sceneLoading, scenesProgress, onClear, onUpload, onRegen, onPlan, onGenerateAll }) => (
+  <>
+    {scenes.length > 0 && (
+      <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: '#0a0a0a', overflow: 'hidden' }}>
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: accentColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Timeline · {scenes.length} scenes
+          </span>
+          <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', cursor: 'pointer' }}>Clear</button>
+        </div>
+        <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+          {scenes.map((scene, sceneIdx) => {
+            const sceneKey = `${turn.id}-${sceneIdx}`;
+            return (
+              <div key={sceneIdx} style={{ padding: 10, display: 'flex', gap: 8, borderBottom: sceneIdx < scenes.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, width: 76 }}>
+                  <div style={{ position: 'relative', width: 76, height: 44, borderRadius: 8, overflow: 'hidden', background: '#111', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(sceneIdx, f); e.target.value = ''; }}
+                      style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', zIndex: 1 }}
+                      title="Upload custom image"
+                    />
+                    {sceneLoading[sceneKey] ? (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
+                        <Loader2 size={13} style={{ color: accentColor, animation: 'spin 1s linear infinite' }} />
+                      </div>
+                    ) : scene.imageUrl ? (
+                      <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 8, gap: 2 }}>
+                        <ImagePlus size={13} />
+                        Upload
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onRegen(sceneIdx)}
+                    disabled={!!sceneLoading[sceneKey]}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                      padding: '3px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)',
+                      fontSize: 9, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                      opacity: sceneLoading[sceneKey] ? 0.4 : 1,
+                    }}
+                  >
+                    <RefreshCw size={9} style={sceneLoading[sceneKey] ? { animation: 'spin 1s linear infinite' } : undefined} />
+                    {scene.imageUrl ? 'Regen' : 'Generate'}
+                  </button>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 9, color: accentColor, fontFamily: 'monospace', fontWeight: 700, marginBottom: 4 }}>
+                    Scene #{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copyScenePrompt(scene.prompt)}
+                    title="Click to copy prompt"
+                    style={{
+                      width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                      fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4,
+                      background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8,
+                      padding: '6px 8px', position: 'relative', paddingRight: 28,
+                    }}
+                  >
+                    {displayPromptWithMsPaint(scene.prompt)}
+                    <Copy size={11} style={{ position: 'absolute', top: 8, right: 8, color: 'rgba(255,255,255,0.35)' }} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {!scenes.length ? (
+      <button
+        onClick={onPlan}
+        disabled={!!sceneLoading[turn.id]}
+        style={{
+          padding: '12px', borderRadius: 10, border: 'none', cursor: sceneLoading[turn.id] ? 'default' : 'pointer',
+          background: sceneLoading[turn.id] ? `${accentColor}40` : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+          color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}
+      >
+        {sceneLoading[turn.id]
+          ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Planning scenes…</>
+          : <><Wand2 size={13} /> Plan Scenes (Storyboard Prompts)</>}
+      </button>
+    ) : (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <button
+          onClick={onGenerateAll}
+          disabled={!!sceneLoading[turn.id]}
+          style={{
+            flex: 1, minWidth: 150, padding: '12px', borderRadius: 10, border: 'none',
+            cursor: sceneLoading[turn.id] ? 'default' : 'pointer',
+            background: sceneLoading[turn.id] ? `${accentColor}40` : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+            color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          {sceneLoading[turn.id]
+            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {scenesProgress[turn.id]?.total ? `Generating ${scenesProgress[turn.id].done}/${scenesProgress[turn.id].total}…` : 'Generating Visuals…'}</>
+            : scenes.some(s => s.imageUrl)
+              ? <><RefreshCw size={13} /> Regenerate All (MS Paint)</>
+              : <><ImagePlus size={13} /> Generate All Visuals (MS Paint)</>}
+        </button>
+        <button
+          onClick={onPlan}
+          disabled={!!sceneLoading[turn.id]}
+          style={{
+            padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)',
+            fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+          }}
+          title="Re-plan scene prompts (existing images kept where possible)"
+        >
+          <RefreshCw size={11} /> Re-plan
+        </button>
+      </div>
+    )}
+  </>
+);
 
 // ─── AI Model Presets ─────────────────────────────────────────────────────────
 
@@ -3167,18 +3325,12 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [tab, setTab] = useState<'visual' | 'export'>('visual');
   const [visualSub, setVisualSub] = useState<'phones' | 'background' | 'subtitle' | 'image'>('phones');
 
-  // Per-turn AI illustration — manually generated for whichever discussion
-  // turns the user picks (see the "Image" sub-tab). Full-bleed, replaces
-  // the phones for that turn only (see phoneCanvasRenderer2's
-  // drawSegmentImage) — most turns won't have one. Keyed by turn id.
-  const [segmentImages, setSegmentImages] = useState<Record<string, string>>({});
-  const [segmentImageLoading, setSegmentImageLoading] = useState<Record<string, boolean>>({});
-  const [segmentImagePrompts, setSegmentImagePrompts] = useState<Record<string, string>>({});
-  // Intro storyboard — timed scene-beats for the Intro cold-open turn only
-  // (same flow as English Video's Intro Settings).
-  const [introSceneLoading, setIntroSceneLoading] = useState<Record<string, boolean>>({});
-  const [introScenesProgress, setIntroScenesProgress] = useState<Record<string, { done: number; total: number }>>({});
+  // Intro + segment storyboard scene loading/progress (persisted via IndexedDB).
+  const [sceneLoading, setSceneLoading] = useState<Record<string, boolean>>({});
+  const [scenesProgress, setScenesProgress] = useState<Record<string, { done: number; total: number }>>({});
   const introCharacterGuideRef = useRef('');
+  const segmentCharacterGuidesRef = useRef<Record<string, string>>({});
+  const scenesHydratedRef = useRef(false);
 
   // Script generator state
   const [genStyle, setGenStyle] = useState('podcast');
@@ -3374,6 +3526,18 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       };
     });
     setScript(turns);
+    scenesHydratedRef.current = false;
+
+    loadPhoneStudio2Scenes(mainScript).then(loaded => {
+      if (!loaded) return;
+      if (loaded.introCharacterGuide) introCharacterGuideRef.current = loaded.introCharacterGuide;
+      if (loaded.segmentCharacterGuides) segmentCharacterGuidesRef.current = loaded.segmentCharacterGuides;
+      setScript(prev => prev.map(t => ({
+        ...t,
+        introScenes: loaded.introScenesByTurnId[t.id] ?? t.introScenes,
+        segmentScenes: loaded.segmentScenesByTurnId[t.id] ?? t.segmentScenes,
+      })));
+    }).finally(() => { scenesHydratedRef.current = true; });
 
     // Seed the whiteboard's title + question list — once only, so it doesn't
     // clobber edits the user makes afterward in the Narrator settings panel.
@@ -3402,78 +3566,75 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     }
   }, [mainScript]);
 
-  // Generates (or regenerates) a specific turn's AI illustration on demand.
-  const generateSegmentImage = async (turnId: string, promptText: string, fallbackText: string) => {
-    if (segmentImageLoading[turnId]) return;
-    setSegmentImageLoading(prev => ({ ...prev, [turnId]: true }));
-    try {
-      const basis = promptText.trim() || fallbackText;
-      const scenePrompt = `A single clear illustrated scene, visualizing: ${basis}`;
-      const url = await generateStoryboardImage(scenePrompt);
-      setSegmentImages(prev => ({ ...prev, [turnId]: url }));
-    } catch (e: any) {
-      toast.error(e?.message || 'Illustration generate nahi hui');
-    } finally {
-      setSegmentImageLoading(prev => ({ ...prev, [turnId]: false }));
-    }
-  };
-
-  // Manual override — user uploads their own image for one specific turn
-  // instead of an AI-generated one (same as the intro scenes' upload).
-  const uploadSegmentImage = (turnId: string, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      setSegmentImages(prev => ({ ...prev, [turnId]: result }));
-    };
-    reader.readAsDataURL(file);
-  };
+  // Persist intro + segment storyboards across refresh (IndexedDB blobs).
+  // Wait until the initial load attempt finishes so we never overwrite saved
+  // scenes with an empty script snapshot right after mount.
+  useEffect(() => {
+    if (!scenesHydratedRef.current || !mainScript.length || !script.length) return;
+    const timer = setTimeout(() => {
+      savePhoneStudio2Scenes(
+        mainScript,
+        script,
+        introCharacterGuideRef.current,
+        segmentCharacterGuidesRef.current,
+      );
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [script, mainScript]);
 
   const introTurn = script.find(t => t.phoneId === 'intro');
 
-  const updateIntroScenes = (turnId: string, scenes: IntroSceneWithMeta[] | undefined) => {
-    setScript(prev => prev.map(t => t.id === turnId ? { ...t, introScenes: scenes } : t));
+  const updateTurnScenes = (
+    turnId: string,
+    field: 'introScenes' | 'segmentScenes',
+    scenes: TurnSceneWithMeta[] | undefined,
+  ) => {
+    setScript(prev => prev.map(t => t.id === turnId ? { ...t, [field]: scenes } : t));
   };
 
-  const handlePlanIntroScenes = async () => {
-    if (!introTurn || introSceneLoading[introTurn.id]) return;
-    setIntroSceneLoading(prev => ({ ...prev, [introTurn.id]: true }));
+  const planTurnScenes = async (turn: ScriptTurn, field: 'introScenes' | 'segmentScenes') => {
+    if (sceneLoading[turn.id]) return;
+    setSceneLoading(prev => ({ ...prev, [turn.id]: true }));
     try {
-      const duration = introTurn.durationMs / 1000;
-      const slots = buildIntroVoiceoverSlots(introTurn.text, duration, introTurn.wordTimings);
-      if (!slots.length) throw new Error('Intro text khaali hai');
-
-      // Same consistent-story engine as IntroFlow / Storyboard — derives ONE
-      // shared characterGuide for the whole intro and matches each scene to
-      // what is actually being spoken in that time slot.
+      const duration = turn.durationMs / 1000;
+      const slots = buildIntroVoiceoverSlots(turn.text, duration, turn.wordTimings);
+      if (!slots.length) throw new Error('Turn text khaali hai');
       const { prompts, usesCharacter, characterGuide } = await generateStoryboardScenesTimeBased(slots);
-      introCharacterGuideRef.current = characterGuide;
-      const scenes: IntroSceneWithMeta[] = slots.map((s, i) => ({
+      if (field === 'introScenes') {
+        introCharacterGuideRef.current = characterGuide;
+      } else {
+        segmentCharacterGuidesRef.current = { ...segmentCharacterGuidesRef.current, [turn.id]: characterGuide };
+      }
+      const prev = field === 'introScenes' ? turn.introScenes : turn.segmentScenes;
+      const scenes: TurnSceneWithMeta[] = slots.map((s, i) => ({
         startOffset: s.startTime,
         endOffset: s.endTime,
         prompt: prompts[i] || s.voiceover,
         usesCharacter: !!usesCharacter[i],
+        imageUrl: prev?.[i]?.imageUrl,
       }));
-      updateIntroScenes(introTurn.id, scenes);
+      updateTurnScenes(turn.id, field, scenes);
       toast.success(`${scenes.length} scene prompts ban gaye — ab MS Paint visuals generate karo.`);
     } catch (e: any) {
       toast.error(e?.message || 'Scene breakdown fail hui');
     } finally {
-      setIntroSceneLoading(prev => ({ ...prev, [introTurn.id]: false }));
+      setSceneLoading(prev => ({ ...prev, [turn.id]: false }));
     }
   };
 
-  const handleGenerateIntroSceneImages = async () => {
-    if (!introTurn?.introScenes?.length || introSceneLoading[introTurn.id]) return;
-    const scenes = introTurn.introScenes;
-    const guide = introCharacterGuideRef.current;
-    setIntroSceneLoading(prev => ({ ...prev, [introTurn.id]: true }));
-    setIntroScenesProgress(prev => ({ ...prev, [introTurn.id]: { done: 0, total: scenes.length } }));
+  const generateTurnSceneImages = async (turn: ScriptTurn, field: 'introScenes' | 'segmentScenes') => {
+    const scenes = field === 'introScenes' ? turn.introScenes : turn.segmentScenes;
+    if (!scenes?.length || sceneLoading[turn.id]) return;
+    const guide = field === 'introScenes'
+      ? introCharacterGuideRef.current
+      : segmentCharacterGuidesRef.current[turn.id] ?? '';
+    setSceneLoading(prev => ({ ...prev, [turn.id]: true }));
+    setScenesProgress(prev => ({ ...prev, [turn.id]: { done: 0, total: scenes.length } }));
     let ok = 0;
     const updated = [...scenes];
     for (let i = 0; i < scenes.length; i++) {
-      const key = `${introTurn.id}-${i}`;
-      setIntroSceneLoading(prev => ({ ...prev, [key]: true }));
+      const key = `${turn.id}-${i}`;
+      setSceneLoading(prev => ({ ...prev, [key]: true }));
       try {
         const imageUrl = await generateStoryboardImage(
           scenes[i].prompt,
@@ -3482,67 +3643,74 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
         );
         updated[i] = { ...updated[i], imageUrl };
         ok++;
-        updateIntroScenes(introTurn.id, [...updated]);
+        updateTurnScenes(turn.id, field, [...updated]);
       } catch (e: any) {
-        console.warn(`Intro scene #${i + 1} failed:`, e);
+        console.warn(`Scene #${i + 1} failed:`, e);
       } finally {
-        setIntroSceneLoading(prev => ({ ...prev, [key]: false }));
-        setIntroScenesProgress(prev => ({ ...prev, [introTurn.id]: { done: i + 1, total: scenes.length } }));
+        setSceneLoading(prev => ({ ...prev, [key]: false }));
+        setScenesProgress(prev => ({ ...prev, [turn.id]: { done: i + 1, total: scenes.length } }));
       }
       if (i < scenes.length - 1) await new Promise(r => setTimeout(r, 1500));
     }
-    setIntroSceneLoading(prev => ({ ...prev, [introTurn.id]: false }));
-    if (ok === scenes.length) toast.success('Sabhi intro scenes MS Paint style mein ban gayi!');
+    setSceneLoading(prev => ({ ...prev, [turn.id]: false }));
+    if (ok === scenes.length) toast.success('Sabhi scenes MS Paint style mein ban gayi!');
     else if (ok > 0) toast.success(`${ok}/${scenes.length} scenes ban gayi — baaki individually retry karo.`);
     else toast.error('Koi scene image nahi ban payi');
   };
 
-  const handleRegenerateIntroScene = async (sceneIdx: number) => {
-    if (!introTurn?.introScenes?.[sceneIdx]) return;
-    const key = `${introTurn.id}-${sceneIdx}`;
-    if (introSceneLoading[key]) return;
-    setIntroSceneLoading(prev => ({ ...prev, [key]: true }));
+  const regenerateTurnScene = async (turn: ScriptTurn, field: 'introScenes' | 'segmentScenes', sceneIdx: number) => {
+    const scenes = field === 'introScenes' ? turn.introScenes : turn.segmentScenes;
+    if (!scenes?.[sceneIdx]) return;
+    const key = `${turn.id}-${sceneIdx}`;
+    if (sceneLoading[key]) return;
+    setSceneLoading(prev => ({ ...prev, [key]: true }));
     try {
-      const scene = introTurn.introScenes[sceneIdx];
+      const scene = scenes[sceneIdx];
+      const guide = field === 'introScenes'
+        ? introCharacterGuideRef.current
+        : segmentCharacterGuidesRef.current[turn.id] ?? '';
       const imageUrl = await generateStoryboardImage(
         scene.prompt,
-        scene.usesCharacter ? introCharacterGuideRef.current : undefined,
+        scene.usesCharacter ? guide : undefined,
         '16:9',
       );
-      const updated = [...introTurn.introScenes];
+      const updated = [...scenes];
       updated[sceneIdx] = { ...updated[sceneIdx], imageUrl };
-      updateIntroScenes(introTurn.id, updated);
+      updateTurnScenes(turn.id, field, updated);
       toast.success(`Scene #${sceneIdx + 1} regenerate ho gayi`);
     } catch (e: any) {
       toast.error(e?.message || 'Scene regenerate fail hui');
     } finally {
-      setIntroSceneLoading(prev => ({ ...prev, [key]: false }));
+      setSceneLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
-  const handleIntroSceneUpload = (sceneIdx: number, file: File) => {
-    if (!introTurn?.introScenes) return;
+  const uploadTurnScene = (turn: ScriptTurn, field: 'introScenes' | 'segmentScenes', sceneIdx: number, file: File) => {
+    const scenes = field === 'introScenes' ? turn.introScenes : turn.segmentScenes;
+    if (!scenes) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const imageUrl = ev.target?.result as string;
-      const updated = [...introTurn.introScenes!];
+      const updated = [...scenes];
       updated[sceneIdx] = { ...updated[sceneIdx], imageUrl };
-      updateIntroScenes(introTurn.id, updated);
+      updateTurnScenes(turn.id, field, updated);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleClearIntroScenes = () => {
-    if (!introTurn) return;
-    introCharacterGuideRef.current = '';
-    updateIntroScenes(introTurn.id, undefined);
+  const clearTurnScenes = (turn: ScriptTurn, field: 'introScenes' | 'segmentScenes') => {
+    if (field === 'introScenes') introCharacterGuideRef.current = '';
+    else {
+      const next = { ...segmentCharacterGuidesRef.current };
+      delete next[turn.id];
+      segmentCharacterGuidesRef.current = next;
+    }
+    updateTurnScenes(turn.id, field, undefined);
   };
 
   const buildState = useCallback((): StudioState => ({
     phones,
-    script: Object.keys(segmentImages).length
-      ? script.map(t => segmentImages[t.id] ? { ...t, visualImageUrl: segmentImages[t.id] } : t)
-      : script,
+    script,
     background: { type: 'color', value: bg },
     bgImageUrl: bgImageUrl ?? undefined,
     deviceSpacing: spacing,
@@ -3555,11 +3723,11 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
       textColor: '#ffffff',
     },
     vuMeter: vuMeterOn,
-    // Default: z-pulse ON — phone scales with real audio level while speaking.
-    phoneZPulse: phoneZPulseOverride ?? true,
+    // Default: z-pulse OFF — user can enable Audio Pulse in settings.
+    phoneZPulse: phoneZPulseOverride ?? false,
     splitScreen: splitScreenClip ? { videoEl: previewClipVideoRef.current, topRatio: 0.5 } : undefined,
     narratorBoard: narratorQuestions.length ? { title: narratorBoardTitle, questions: narratorQuestions } : undefined,
-  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText, segmentImages]);
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -5183,7 +5351,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
 
                     {/* Z-pulse toggle (default = single-speaker auto) */}
                     {(() => {
-                      const effectiveOn = phoneZPulseOverride ?? true;
+                      const effectiveOn = phoneZPulseOverride ?? false;
                       const isDefault = phoneZPulseOverride === null;
                       return (
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', cursor: 'pointer' }}>
@@ -5204,7 +5372,7 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                             <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>🌀 Audio Pulse</div>
                             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
                               {isDefault
-                                ? 'Default ON — phone zooms with voice'
+                                ? 'Default OFF — enable for voice zoom'
                                 : 'Manual override active'}
                             </div>
                           </div>
@@ -5726,11 +5894,11 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               </div>
             )}
 
-            {/* ── Image sub-tab — per-turn AI illustration ── */}
+            {/* ── Image sub-tab — per-turn storyboard scenes (like Intro) ── */}
             {visualSub === 'image' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.2)', fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                  🖼️ Kisi bhi turn ke liye AI illustration generate kar sakte ho — jab wo turn play hoga, poora frame us image se cover ho jayega (phones us waqt hide rahenge). Timeline se jo turn dikhna hai wo select karo, fir yahan generate karo.
+                  🖼️ Is turn ke dialogue ke hisaab se auto storyboard scenes — zoom effect + speaker phones PiP mein. Prompt par click = copy (MS Paint style included).
                 </div>
                 {!activeTurn ? (
                   <div style={{ padding: 12, fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
@@ -5738,63 +5906,31 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                   </div>
                 ) : activeTurn.isNarrator ? (
                   <div style={{ padding: 12, fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
-                    Narrator/Intro turns ke liye ye lagu nahi — unka apna whiteboard/illustration hota hai (Narrator ya Intro chip dekho).
+                    Narrator/Intro turns ke liye ye lagu nahi — unka apna panel hota hai (Narrator ya Intro chip dekho).
                   </div>
                 ) : (
                   <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                       Turn {activeTurn.idx + 1} · {activeTurn.phoneName}
                     </div>
-                    {segmentImages[activeTurn.id] && (
-                      <img
-                        src={segmentImages[activeTurn.id]}
-                        alt="Segment illustration preview"
-                        style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}
-                      />
-                    )}
-                    <textarea
-                      value={segmentImagePrompts[activeTurn.id] ?? ''}
-                      onChange={e => setSegmentImagePrompts(prev => ({ ...prev, [activeTurn.id]: e.target.value }))}
-                      placeholder={activeTurn.text || 'Optional — kya scene banana hai likho (khaali chhodo to is turn ke dialogue se auto-generate hoga)'}
-                      rows={2}
-                      style={{
-                        width: '100%', resize: 'vertical', borderRadius: 8, padding: '8px 10px',
-                        background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#fff', fontSize: 11, fontFamily: 'inherit', outline: 'none',
-                      }}
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontStyle: 'italic', lineHeight: 1.4, margin: 0 }}>
+                      "{activeTurn.text.slice(0, 140)}{activeTurn.text.length > 140 ? '…' : ''}"
+                    </p>
+                    <TurnScenesTimeline
+                      turn={activeTurn}
+                      scenes={activeTurn.segmentScenes ?? []}
+                      accentColor="#60a5fa"
+                      sceneLoading={sceneLoading}
+                      scenesProgress={scenesProgress}
+                      onClear={() => clearTurnScenes(activeTurn, 'segmentScenes')}
+                      onUpload={(idx, f) => uploadTurnScene(activeTurn, 'segmentScenes', idx, f)}
+                      onRegen={(idx) => regenerateTurnScene(activeTurn, 'segmentScenes', idx)}
+                      onPlan={() => planTurnScenes(activeTurn, 'segmentScenes')}
+                      onGenerateAll={() => generateTurnSceneImages(activeTurn, 'segmentScenes')}
                     />
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        onClick={() => generateSegmentImage(activeTurn.id, segmentImagePrompts[activeTurn.id] ?? '', activeTurn.text)}
-                        disabled={!!segmentImageLoading[activeTurn.id]}
-                        style={{
-                          flex: 1, padding: '9px', borderRadius: 8, border: 'none',
-                          cursor: segmentImageLoading[activeTurn.id] ? 'default' : 'pointer',
-                          background: segmentImageLoading[activeTurn.id] ? 'rgba(96,165,250,0.25)' : 'rgba(96,165,250,0.18)',
-                          color: '#bfdbfe', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        }}
-                      >
-                        {segmentImageLoading[activeTurn.id]
-                          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
-                          : segmentImages[activeTurn.id] ? <>🔁 Regenerate</> : <>🎨 Generate Illustration</>}
-                      </button>
-                      {segmentImages[activeTurn.id] && (
-                        <button
-                          onClick={() => setSegmentImages(prev => { const next = { ...prev }; delete next[activeTurn.id]; return next; })}
-                          style={{
-                            padding: '9px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)',
-                            background: 'rgba(239,68,68,0.1)', color: '#fca5a5', fontSize: 11, fontWeight: 700,
-                            cursor: 'pointer', fontFamily: 'inherit',
-                          }}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    {Object.keys(segmentImages).length > 0 && (
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
-                        {Object.keys(segmentImages).length} turn{Object.keys(segmentImages).length === 1 ? '' : 's'} mein image set hai
+                    {!activeTurn.wordTimings?.length && !activeTurn.segmentScenes?.length && (
+                      <div style={{ fontSize: 10, color: 'rgba(245,158,11,0.7)' }}>
+                        Tip: Voice Gen mein Sync karo — scenes exact bole gaye words ke saath match honge.
                       </div>
                     )}
                   </div>
@@ -5823,120 +5959,18 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       "{introTurn.text.slice(0, 120)}{introTurn.text.length > 120 ? '…' : ''}"
                     </p>
 
-                    {introTurn.introScenes?.length ? (
-                      <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: '#0a0a0a', overflow: 'hidden' }}>
-                        <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                            Timeline · {introTurn.introScenes.length} scenes
-                          </span>
-                          <button onClick={handleClearIntroScenes} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', cursor: 'pointer' }}>Clear</button>
-                        </div>
-                        <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                          {introTurn.introScenes.map((scene, sceneIdx) => {
-                            const sceneKey = `${introTurn.id}-${sceneIdx}`;
-                            return (
-                              <div key={sceneIdx} style={{ padding: 10, display: 'flex', gap: 8, borderBottom: sceneIdx < introTurn.introScenes!.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, width: 76 }}>
-                                  <div style={{ position: 'relative', width: 76, height: 44, borderRadius: 8, overflow: 'hidden', background: '#111', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={e => { const f = e.target.files?.[0]; if (f) handleIntroSceneUpload(sceneIdx, f); e.target.value = ''; }}
-                                      style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', zIndex: 1 }}
-                                      title="Upload custom image"
-                                    />
-                                    {introSceneLoading[sceneKey] ? (
-                                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
-                                        <Loader2 size={13} style={{ color: '#22d3ee', animation: 'spin 1s linear infinite' }} />
-                                      </div>
-                                    ) : scene.imageUrl ? (
-                                      <img src={scene.imageUrl} alt={`Scene ${sceneIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    ) : (
-                                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 8, gap: 2 }}>
-                                        <ImagePlus size={13} />
-                                        Upload
-                                      </div>
-                                    )}
-                                  </div>
-                                  <button
-                                    onClick={() => handleRegenerateIntroScene(sceneIdx)}
-                                    disabled={!!introSceneLoading[sceneKey]}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
-                                      padding: '3px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
-                                      background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)',
-                                      fontSize: 9, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
-                                      opacity: introSceneLoading[sceneKey] ? 0.4 : 1,
-                                    }}
-                                  >
-                                    <RefreshCw size={9} style={introSceneLoading[sceneKey] ? { animation: 'spin 1s linear infinite' } : undefined} />
-                                    {scene.imageUrl ? 'Regen' : 'Generate'}
-                                  </button>
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 9, color: '#22d3ee', fontFamily: 'monospace', fontWeight: 700, marginBottom: 4 }}>
-                                    Scene #{sceneIdx + 1} · {scene.startOffset.toFixed(1)}s → {scene.endOffset.toFixed(1)}s
-                                  </div>
-                                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>
-                                    {scene.prompt}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {!introTurn.introScenes?.length ? (
-                      <button
-                        onClick={handlePlanIntroScenes}
-                        disabled={!!introSceneLoading[introTurn.id]}
-                        style={{
-                          padding: '12px', borderRadius: 10, border: 'none', cursor: introSceneLoading[introTurn.id] ? 'default' : 'pointer',
-                          background: introSceneLoading[introTurn.id] ? 'rgba(34,211,238,0.25)' : 'linear-gradient(135deg,#0891b2,#06b6d4)',
-                          color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        }}
-                      >
-                        {introSceneLoading[introTurn.id]
-                          ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Planning scenes…</>
-                          : <><Wand2 size={13} /> Plan Scenes (Storyboard Prompts)</>}
-                      </button>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        <button
-                          onClick={handleGenerateIntroSceneImages}
-                          disabled={!!introSceneLoading[introTurn.id]}
-                          style={{
-                            flex: 1, minWidth: 150, padding: '12px', borderRadius: 10, border: 'none',
-                            cursor: introSceneLoading[introTurn.id] ? 'default' : 'pointer',
-                            background: introSceneLoading[introTurn.id] ? 'rgba(34,211,238,0.25)' : 'linear-gradient(135deg,#0891b2,#06b6d4)',
-                            color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                          }}
-                        >
-                          {introSceneLoading[introTurn.id]
-                            ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> {introScenesProgress[introTurn.id]?.total ? `Generating ${introScenesProgress[introTurn.id].done}/${introScenesProgress[introTurn.id].total}…` : 'Generating Visuals…'}</>
-                            : introTurn.introScenes.some(s => s.imageUrl)
-                              ? <><RefreshCw size={13} /> Regenerate All (MS Paint)</>
-                              : <><ImagePlus size={13} /> Generate All Visuals (MS Paint)</>}
-                        </button>
-                        <button
-                          onClick={handlePlanIntroScenes}
-                          disabled={!!introSceneLoading[introTurn.id]}
-                          style={{
-                            padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
-                            background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)',
-                            fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                          }}
-                          title="Re-plan scene prompts"
-                        >
-                          <RefreshCw size={11} /> Re-plan
-                        </button>
-                      </div>
-                    )}
+                    <TurnScenesTimeline
+                      turn={introTurn}
+                      scenes={introTurn.introScenes ?? []}
+                      accentColor="#22d3ee"
+                      sceneLoading={sceneLoading}
+                      scenesProgress={scenesProgress}
+                      onClear={() => clearTurnScenes(introTurn, 'introScenes')}
+                      onUpload={(idx, f) => uploadTurnScene(introTurn, 'introScenes', idx, f)}
+                      onRegen={(idx) => regenerateTurnScene(introTurn, 'introScenes', idx)}
+                      onPlan={() => planTurnScenes(introTurn, 'introScenes')}
+                      onGenerateAll={() => generateTurnSceneImages(introTurn, 'introScenes')}
+                    />
 
                     {!introTurn.wordTimings?.length && !introTurn.introScenes?.length && (
                       <div style={{ fontSize: 10, color: 'rgba(245,158,11,0.7)' }}>
