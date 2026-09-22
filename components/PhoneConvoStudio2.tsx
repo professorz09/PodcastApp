@@ -273,7 +273,7 @@ const StoryboardSubtitleSettings: React.FC<{
         <span style={{ fontSize: 11, color: accentColor, fontFamily: 'monospace' }}>{size.toFixed(1)}×</span>
       </div>
       <input
-        type="range" min={0.8} max={2.2} step={0.05} value={size}
+        type="range" min={0.6} max={1.6} step={0.05} value={size}
         onChange={e => onSizeChange(+e.target.value)}
         style={{ width: '100%', accentColor: '#ef4444' }}
       />
@@ -3360,7 +3360,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [subtitleBg, setSubtitleBg]           = useState<'dark' | 'light' | 'none'>('dark');
   const [subtitleSize, setSubtitleSize]       = useState(1.6);
   const [storyboardSubtitleEnabled, setStoryboardSubtitleEnabled] = useState(true);
-  const [storyboardSubtitleSize, setStoryboardSubtitleSize] = useState(1.4);
+  const [storyboardSubtitleSize, setStoryboardSubtitleSize] = useState(1.0);
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
