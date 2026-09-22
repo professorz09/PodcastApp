@@ -51,6 +51,9 @@ export interface ScriptTurn {
   // turn renders as a full-bleed image instead of the phone mockups for its
   // whole duration, same full-frame treatment as the Narrator card.
   visualImageUrl?: string;
+  /** Timed storyboard scenes for the Intro cold-open — switches images over
+   *  the turn's own duration (same model as English Video's introScenes). */
+  introScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string }[];
 }
 
 export interface StudioState {
@@ -237,6 +240,17 @@ export class CanvasRenderer {
         break;
       }
       elapsed += turn.durationMs;
+    }
+
+    // ── Intro storyboard — timed scene images during the cold-open turn ─
+    if (activeTurn?.phoneId === 'intro' && activeTurn.introScenes?.length) {
+      const localSec = turnProgress * (activeTurn.durationMs / 1000);
+      const scenes = activeTurn.introScenes;
+      const scene = scenes.find(s => localSec >= s.startOffset && localSec < s.endOffset) || scenes[scenes.length - 1];
+      if (scene?.imageUrl) {
+        this.drawSegmentImage(w, regionH, regionY, scene.imageUrl, turnProgress);
+        return;
+      }
     }
 
     // ── Narrator card — white slide, confined to the bottom band when split ─
