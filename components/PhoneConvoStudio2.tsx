@@ -5065,6 +5065,12 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#050507', color: '#e0e0e0', overflow: 'hidden', fontFamily: 'inherit' }}>
 
+      {/* ── Single scrollable body — canvas, seek bar, timeline and tab
+           content all scroll together (instead of the canvas being pinned
+           and eating most of the viewport), same layout the English Video
+           Maker uses. Only the render button below stays fixed. ── */}
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column' }}>
+
       {/* ── 16:9 Preview — Discussion canvas, or real Intro/Footage video when that chip is selected ── */}
       <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', flexShrink: 0, background: '#050505', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         {/* Always visible — Intro/Narrator turns render on this SAME canvas
@@ -5265,8 +5271,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         ))}
       </div>
 
-      {/* ── Tab Content ── */}
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      {/* ── Tab Content — flows in the same scroll body as everything above now ── */}
+      <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
 
         {/* ════ SETTINGS / VISUAL TAB ════ */}
         {tab === 'visual' && (
@@ -6200,32 +6206,8 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
               Intro aur segment images par upar-niche kali patti — yellow subtitles neeche dikhengi
             </div>
 
-            {exporting && (
-              <>
-                <div style={{ fontSize: 11, color: '#fca5a5', textAlign: 'center' }}>{exportStatus}</div>
-                <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 4, width: `${exportProgress}%`, background: 'linear-gradient(90deg,#ef4444,#f97316)', transition: 'width 0.3s' }} />
-                </div>
-              </>
-            )}
-            <button
-              onClick={handleExport}
-              disabled={exporting || !script.length}
-              style={{
-                width: '100%', padding: '22px 16px', borderRadius: 16, border: 'none',
-                background: !script.length ? 'rgba(255,255,255,0.05)' : exporting ? 'rgba(239,68,68,0.35)' : '#ef4444',
-                color: !script.length ? 'rgba(255,255,255,0.25)' : '#fff',
-                fontSize: 18, fontWeight: 900, cursor: exporting || !script.length ? 'default' : 'pointer',
-                fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                opacity: !script.length ? 0.35 : 1,
-                boxShadow: !script.length || exporting ? 'none' : '0 10px 32px rgba(239,68,68,0.45)',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {exporting
-                ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Rendering… {exportProgress}%</>
-                : <><Download size={18} /> Render Video · 1080p MP4</>}
-            </button>
+            {/* Primary "Render Video" action now lives in the fixed bottom bar
+                (always reachable, on either tab) instead of buried down here. */}
             {script.length > 0 && (
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
                 {script.length} turns · {fmtTime(totalDuration)}
@@ -6386,6 +6368,39 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
           </div>
         )}
 
+      </div>
+
+      </div>{/* end scrollable body */}
+
+      {/* ── Fixed bottom: Render button — always reachable, no matter the
+           tab or scroll position, same as the English Video Maker. ── */}
+      <div style={{ flexShrink: 0, padding: 12, background: 'rgba(5,5,7,0.95)', backdropFilter: 'blur(8px)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        {exporting && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: '#fca5a5', textAlign: 'center', marginBottom: 4 }}>{exportStatus}</div>
+            <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 4, width: `${exportProgress}%`, background: 'linear-gradient(90deg,#ef4444,#f97316)', transition: 'width 0.3s' }} />
+            </div>
+          </div>
+        )}
+        <button
+          onClick={handleExport}
+          disabled={exporting || !script.length}
+          style={{
+            width: '100%', padding: '16px', borderRadius: 16, border: 'none',
+            background: !script.length ? 'rgba(255,255,255,0.05)' : exporting ? 'rgba(239,68,68,0.35)' : '#ef4444',
+            color: !script.length ? 'rgba(255,255,255,0.25)' : '#fff',
+            fontSize: 16, fontWeight: 900, cursor: exporting || !script.length ? 'default' : 'pointer',
+            fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            opacity: !script.length ? 0.35 : 1,
+            boxShadow: !script.length || exporting ? 'none' : '0 10px 32px rgba(239,68,68,0.45)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {exporting
+            ? <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Rendering… {exportProgress}%</>
+            : <><Download size={18} /> Render Video · 1080p MP4</>}
+        </button>
       </div>
 
       <style>{`
