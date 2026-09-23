@@ -710,7 +710,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const isCharacter = currentSegment?.speaker && !isNarrator && !isYoutube && !isQuiz;
 
   const defaultX = isYoutube ? 185 : isNarrator ? 542 : isCharacter ? 395 : 192;
-  const defaultY = isYoutube ? 119 : isNarrator ? 61 : isCharacter ? 148 : 550;
+  const defaultY = isYoutube ? 119 : isNarrator ? 550 : isCharacter ? 148 : 550;
 
   const currentSubtitleConfig = currentSegment?.visualConfig?.subtitleConfig || { 
       x: defaultX, 
@@ -4221,7 +4221,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                               const isNar = s.learnEnglish?.segmentType === 'intro' || s.learnEnglish?.segmentType === 'narrator' || s.speaker?.toLowerCase() === 'narrator' || s.speaker?.toLowerCase() === 'intro' || s.speaker?.toLowerCase() === 'i' || (i === 0 && (!s.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(s.speaker.toLowerCase().trim())));
                               const isChar = s.speaker && !isNar && !isYt;
                               const defX = isYt ? 185 : isNar ? 542 : isChar ? 395 : 192;
-                              const defY = isYt ? 119 : isNar ? 61 : isChar ? 148 : 550;
+                              const defY = isYt ? 119 : isNar ? 550 : isChar ? 148 : 550;
                               return { ...s, visualConfig: { ...s.visualConfig, subtitleConfig: { ...(s.visualConfig?.subtitleConfig || currentSubtitleConfig), x: defX, y: defY } } }; 
                           } return s; })); }}
                           className="px-2.5 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors border border-red-900/40"
@@ -5566,7 +5566,14 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                   Right <ChevronRight size={14} />
                               </button>
                               <button
-                                  onClick={() => { setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) { return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: 192, y: 550 } } }; } return seg; })); }}
+                                  onClick={() => { setScript(prev => prev.map((seg, i) => { if (shouldSync(seg, i)) {
+                                      const isYt = (seg.learnEnglish?.segmentType as string) === 'youtube' || seg.speaker?.toLowerCase() === 'youtube';
+                                      const isNar = seg.learnEnglish?.segmentType === 'intro' || seg.learnEnglish?.segmentType === 'narrator' || seg.speaker?.toLowerCase() === 'narrator' || seg.speaker?.toLowerCase() === 'intro' || seg.speaker?.toLowerCase() === 'i' || (i === 0 && (!seg.speaker || ['narrator', 'intro', 'i', 'scene', 'context', 'setting', 'background'].includes(seg.speaker.toLowerCase().trim())));
+                                      const isChar = seg.speaker && !isNar && !isYt;
+                                      const defX = isYt ? 185 : isNar ? 542 : isChar ? 395 : 192;
+                                      const defY = isYt ? 119 : isNar ? 550 : isChar ? 148 : 550;
+                                      return { ...seg, visualConfig: { ...seg.visualConfig, subtitleConfig: { ...(seg.visualConfig?.subtitleConfig || currentSubtitleConfig), x: defX, y: defY } } };
+                                  } return seg; })); }}
                                   className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors border border-red-900/40"
                               >
                                   <RefreshCw size={12} /> Default
