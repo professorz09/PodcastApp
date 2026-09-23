@@ -130,9 +130,9 @@ export const generateTitleTextPair = async (scriptText: string, scriptStyle?: st
     keywords = 'casual English conversation, informal English, natural English speaking, learn English with friends';
     channelType = 'informal and conversational English learning channels';
     exampleTitle = '"Talking About Weekend Plans with Friends | Casual English Chat"';
-  } else if (scriptStyle === 'docu_debate') {
+  } else if (scriptStyle === 'docu_debate' || scriptStyle === 'real_case_debate') {
     prefix = 'The case name or core mystery followed by " | Docu-Debate" or " | Case Study"';
-    keywords = 'true crime debate, docu-debate, legal case study, documentary debate';
+    keywords = 'true crime debate, docu-debate, legal case study, documentary debate, English speaking practice';
     channelType = 'true crime and legal debate channels';
     exampleTitle = '"The Lindsay Clancy Case: Justice or Punishment? | Docu-Debate"';
   } else if (scriptStyle === 'first_person_dilemma' || scriptStyle === 'case_debate') {
@@ -154,7 +154,7 @@ DESCRIPTION RULES — a comprehensive, highly optimized YouTube video descriptio
 - Keep it 3-4 professional, SEO-packed paragraphs.
 `;
 
-  const englishLearningStyles = ['podcast', 'debate', 'interview', 'roleplay', 'situational', 'casual', 'case_debate', 'first_person_dilemma'];
+  const englishLearningStyles = ['podcast', 'debate', 'interview', 'roleplay', 'situational', 'casual', 'case_debate', 'first_person_dilemma', 'real_case_debate'];
   if (englishLearningStyles.includes(scriptStyle || '')) {
     descriptionRules = `
 DESCRIPTION RULES — MUST FOLLOW THIS EXACT TEMPLATE STRUCTURE:
@@ -393,7 +393,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.5-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'first_person_dilemma' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'first_person_dilemma' | 'real_case_debate' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -3970,6 +3970,37 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             ✓ Bracketed tags are short (under 8 words, English) and only appear at the end of Intro/Narrator turns — never on advisor lines or the closing verdicts.
             ✓ Avoid stock phrases like "In conclusion", "At the end of the day", "It's important to remember".
             ✓ No easy, obvious answer — the audience should genuinely feel torn between both choices.
+            ${durFillEn}
+          `;
+        } else if (style === 'real_case_debate') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: REAL CASE DEBATE (a real, famous, or recent real-world case — cinematic true-story hook, then open debate)
+            🔴 This is about a REAL case, not a fictional one. Use Google Search to find what actually happened — real names (where public), real dates, the real outcome or verdict — and build the script on those verified facts.
+            🔴 If the exact case can't be verified, stick as closely as possible to real, well-documented cases of this kind rather than inventing specifics from nothing.
+
+            Topic/Case: "${topic}"
+            ${specificDetails ? `Context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}. Keep the English simple, clear, and natural to follow — this is for English learners, so explain any legal or technical terms naturally in the dialogue instead of assuming the viewer already knows them.
+
+            Speakers:
+            - Intro: ONLY the first turn — a cinematic, documentary-style narrator voice that introduces the real person and case by name, e.g. "This is [Name]. [He/She/They] ..." — specific, vivid, pulls the viewer in immediately. Tag MUST be "Intro".
+            - 2 Hosts: ${speakers.length >= 2
+              ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
+              : `Pick two host names who would naturally take genuinely different views on this case.`
+            }
+
+            Loose flow (let the real case shape this, don't force a rigid template):
+            1. Intro turn — tell the real story: who's involved, what happened, why it became notable or controversial, ending on the central open question the case raises (right or wrong? guilty or not? justice done or not?).
+            2. The two hosts then have a genuine, free-flowing debate about the case — not fixed rounds, just a real conversation that naturally moves across whatever angles actually matter here (the facts, the law, the ethics, the human side, what could have been done differently). They can agree, disagree, or partly agree with each other — whatever's honest to the case, not a scripted 50/50 split.
+            3. Close with each host giving their honest take, and a final line that leaves the audience with the case's real, unresolved question.
+
+            Rules:
+            ✓ Stay grounded in the real case throughout — don't invent facts beyond what's verifiable.
+            ✓ Simple, clear, natural spoken English (B1-B2 friendly) — no unexplained jargon.
+            ✓ A genuine, engaging debate — both hosts feel real and neither side is handed an obvious win.
+            ✓ Avoid stock phrases like "In conclusion", "At the end of the day", "It's important to remember".
             ${durFillEn}
           `;
         } else if (style === 'docu_debate') {
