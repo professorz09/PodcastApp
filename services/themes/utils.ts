@@ -277,7 +277,7 @@ export const drawSubtitles = (ctx: CanvasRenderingContext2D | OffscreenCanvasRen
   const isCharacter = currentSegment.speaker && !isNarrator && !isYoutube && !isQuizSeg;
 
   const defaultX = isYoutube ? 185 : isNarrator ? 542 : isCharacter ? 395 : 192;
-  const defaultY = isYoutube ? 119 : isNarrator ? 61 : isCharacter ? 148 : 550;
+  const defaultY = isYoutube ? 119 : isNarrator ? 550 : isCharacter ? 148 : 550;
 
   const subtitleConfig = currentSegment.visualConfig?.subtitleConfig || {
     x: defaultX,
