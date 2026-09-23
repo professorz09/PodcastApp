@@ -244,44 +244,98 @@ const TurnScenesTimeline: React.FC<{
   </>
 );
 
+const STORYBOARD_SUBTITLE_COLORS = ['#ffffff', '#FFD700', '#22d3ee', '#4ade80', '#f87171', '#000000'];
+
 const StoryboardSubtitleSettings: React.FC<{
   enabled: boolean;
   size: number;
   onToggle: () => void;
   onSizeChange: (v: number) => void;
+  textColor: string;
+  onTextColorChange: (v: string) => void;
+  background: 'dark' | 'light' | 'none';
+  onBackgroundChange: (v: 'dark' | 'light' | 'none') => void;
   accentColor?: string;
-}> = ({ enabled, size, onToggle, onSizeChange, accentColor = '#FFD700' }) => (
-  <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
-      Storyboard Subtitles <span style={{ color: accentColor, fontWeight: 600 }}>· Yellow · Bottom</span>
-    </div>
-    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Show Subtitles on Images</span>
-      <div
-        onClick={onToggle}
-        style={{
-          width: 40, height: 22, borderRadius: 50, position: 'relative', cursor: 'pointer',
-          background: enabled ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s',
-        }}
-      >
-        <div style={{ position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', left: enabled ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+}> = ({ enabled, size, onToggle, onSizeChange, textColor, onTextColorChange, background, onBackgroundChange, accentColor = '#FFD700' }) => (
+  // Collapsed by default (see <details> below) — these are adjustment knobs,
+  // not something that needs to sit open and take up space every time.
+  <details style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '10px 12px' }}>
+    <summary style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 6 }}>
+      Storyboard Subtitles
+      <span style={{ color: accentColor, fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>{enabled ? '· On' : '· Off'}</span>
+    </summary>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Show Subtitles on Images</span>
+        <div
+          onClick={onToggle}
+          style={{
+            width: 40, height: 22, borderRadius: 50, position: 'relative', cursor: 'pointer',
+            background: enabled ? '#ef4444' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s',
+          }}
+        >
+          <div style={{ position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', left: enabled ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+        </div>
+      </label>
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Font Size</span>
+          <span style={{ fontSize: 11, color: accentColor, fontFamily: 'monospace' }}>{size.toFixed(1)}×</span>
+        </div>
+        <input
+          type="range" min={0.6} max={1.6} step={0.05} value={size}
+          onChange={e => onSizeChange(+e.target.value)}
+          style={{ width: '100%', accentColor: '#ef4444' }}
+        />
       </div>
-    </label>
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Font Size</span>
-        <span style={{ fontSize: 11, color: accentColor, fontFamily: 'monospace' }}>{size.toFixed(1)}×</span>
+      <div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Text Color</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {STORYBOARD_SUBTITLE_COLORS.map(c => (
+            <button
+              key={c}
+              onClick={() => onTextColorChange(c)}
+              title={c}
+              style={{
+                width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer',
+                border: textColor.toLowerCase() === c.toLowerCase() ? '2px solid #ef4444' : '1px solid rgba(255,255,255,0.25)',
+                padding: 0,
+              }}
+            />
+          ))}
+          <input
+            type="color" value={textColor}
+            onChange={e => onTextColorChange(e.target.value)}
+            style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.25)', padding: 0, background: 'none', cursor: 'pointer' }}
+            title="Custom color"
+          />
+        </div>
       </div>
-      <input
-        type="range" min={0.6} max={1.6} step={0.05} value={size}
-        onChange={e => onSizeChange(+e.target.value)}
-        style={{ width: '100%', accentColor: '#ef4444' }}
-      />
+      <div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Background</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['dark', 'light', 'none'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => onBackgroundChange(s)}
+              style={{
+                flex: 1, padding: '7px 4px', borderRadius: 8,
+                border: `1px solid ${background === s ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
+                background: background === s ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
+                color: background === s ? '#fff' : 'rgba(255,255,255,0.4)',
+                fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize',
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+        Jab storyboard image chalegi, subtitles yahan chuni gayi color/background ke saath dikhengi — audio ke saath sync.
+      </div>
     </div>
-    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-      Jab storyboard image chalegi, neeche yellow subtitles dikhengi — audio ke saath sync.
-    </div>
-  </div>
+  </details>
 );
 
 // ─── AI Model Presets ─────────────────────────────────────────────────────────
@@ -3361,6 +3415,8 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
   const [subtitleSize, setSubtitleSize]       = useState(1.6);
   const [storyboardSubtitleEnabled, setStoryboardSubtitleEnabled] = useState(true);
   const [storyboardSubtitleSize, setStoryboardSubtitleSize] = useState(1.0);
+  const [storyboardSubtitleTextColor, setStoryboardSubtitleTextColor] = useState('#ffffff');
+  const [storyboardSubtitleBg, setStoryboardSubtitleBg] = useState<'dark' | 'light' | 'none'>('dark');
   const [startTime, setStartTime]             = useState('09:41');
   const [spacing, setSpacing]   = useState(50);
   const [scale, setScale]       = useState(100);
@@ -3754,7 +3810,8 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     storyboardSubtitleConfig: {
       enabled: storyboardSubtitleEnabled,
       size: storyboardSubtitleSize,
-      textColor: '#FFD700',
+      textColor: storyboardSubtitleTextColor,
+      background: storyboardSubtitleBg,
     },
     storyboardLetterbox: addLetterbox,
     vuMeter: vuMeterOn,
@@ -3762,7 +3819,7 @@ const PhoneConvoStudio2: React.FC<Props> = ({ mainScript, sourceClips: sourceCli
     phoneZPulse: phoneZPulseOverride ?? false,
     splitScreen: splitScreenClip ? { videoEl: previewClipVideoRef.current, topRatio: 0.5 } : undefined,
     narratorBoard: narratorQuestions.length ? { title: narratorBoardTitle, questions: narratorQuestions } : undefined,
-  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, storyboardSubtitleEnabled, storyboardSubtitleSize, addLetterbox, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText]);
+  }), [phones, script, bg, bgImageUrl, spacing, scale, startTime, subtitleEnabled, subtitleBg, subtitleSize, storyboardSubtitleEnabled, storyboardSubtitleSize, storyboardSubtitleTextColor, storyboardSubtitleBg, addLetterbox, vuMeterOn, phoneZPulseOverride, splitScreenClip, narratorBoardTitle, narratorQuestionsText]);
 
   // Init canvas renderer
   useEffect(() => {
@@ -5946,6 +6003,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       size={storyboardSubtitleSize}
                       onToggle={() => setStoryboardSubtitleEnabled(p => !p)}
                       onSizeChange={setStoryboardSubtitleSize}
+                      textColor={storyboardSubtitleTextColor}
+                      onTextColorChange={setStoryboardSubtitleTextColor}
+                      background={storyboardSubtitleBg}
+                      onBackgroundChange={setStoryboardSubtitleBg}
                       accentColor="#60a5fa"
                     />
                   </div>
@@ -5998,6 +6059,10 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
                       size={storyboardSubtitleSize}
                       onToggle={() => setStoryboardSubtitleEnabled(p => !p)}
                       onSizeChange={setStoryboardSubtitleSize}
+                      textColor={storyboardSubtitleTextColor}
+                      onTextColorChange={setStoryboardSubtitleTextColor}
+                      background={storyboardSubtitleBg}
+                      onBackgroundChange={setStoryboardSubtitleBg}
                       accentColor="#22d3ee"
                     />
                   </>

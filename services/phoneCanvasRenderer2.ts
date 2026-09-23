@@ -100,15 +100,20 @@ export interface StudioState {
   // questions to keep the plain single-line card for styles that don't use
   // a question sheet.
   narratorBoard?: { title: string; questions: string[] };
-  /** Yellow bottom subtitles during intro/segment storyboard image playback. */
+  /** Bottom subtitles during intro/segment storyboard image playback. */
   storyboardSubtitleConfig?: {
     enabled: boolean;
     size: number;
     textColor?: string;
     x?: number;
     y?: number;
+    /** 'dark'/'light' = soft gradient fade (default 'dark'); 'none' = no background at all. */
+    background?: 'dark' | 'light' | 'none';
+    /** Explicit solid/rgba box instead of the gradient fade — sized to fit the text, not a full-width bar. */
     backgroundColor?: string;
     borderRadius?: number;
+    borderColor?: string;
+    borderWidth?: number;
   };
   /** Top + bottom black letterbox bars on storyboard frames; subtitles sit in the bottom bar. */
   storyboardLetterbox?: boolean;
@@ -462,7 +467,9 @@ export class CanvasRenderer {
     ctx.restore();
   }
 
-  /** Fixed bottom-center yellow subtitles on storyboard frames (inside bottom bar). */
+  /** Bottom-center subtitles on storyboard frames — a properly-sized box (or
+   *  soft gradient fade) hugging the text, not a full-width bar plastered
+   *  across the bottom of the image regardless of how much text there is. */
   private drawStoryboardSubtitles(
     w: number, regionH: number, regionY: number,
     activeTurn: ScriptTurn, turnProgress: number,
@@ -472,19 +479,13 @@ export class CanvasRenderer {
 
     const { ctx } = this;
     const letterbox = this.state.storyboardLetterbox ?? false;
+    // Reserved band used only to anchor the text vertically — the letterbox's
+    // own bars (drawn separately by drawLetterboxBars) are what's actually
+    // visible when letterbox is on; this is just where subtitles sit within it.
     const barH = letterbox ? regionH * 0.12 : regionH * 0.08;
-    const subY = subCfg.y !== undefined 
+    const subY = subCfg.y !== undefined
       ? Math.max(0, Math.min(regionH - barH, (subCfg.y / 720) * regionH))
       : (regionY + regionH - barH);
-
-    if (!letterbox) {
-      if (subCfg.backgroundColor) {
-        ctx.fillStyle = subCfg.backgroundColor;
-      } else {
-        ctx.fillStyle = '#000000cc';
-      }
-      ctx.fillRect(0, subY, w, barH);
-    }
 
     const sizeMul = subCfg.size ?? 1;
     const fontSize = Math.min(barH * 0.42, w * 0.014) * sizeMul;
@@ -553,7 +554,51 @@ export class CanvasRenderer {
     const cx = w / 2;
     const baseY = subY + (barH + groupH) / 2 - fontSize * 0.15;
 
-    const col = subCfg.textColor ?? '#FFD700';
+    // ── Background: an explicit color gets a box sized to fit the text (like
+    // English Video's subtitle box); otherwise a soft gradient fade, or
+    // nothing at all for 'none' — never a hard bar spanning the full width.
+    const bgType = subCfg.background ?? 'dark';
+    if (subCfg.backgroundColor) {
+      let maxLineW = 0;
+      activeGroup.forEach(l => {
+        const lw = ctx.measureText(l.text).width;
+        if (lw > maxLineW) maxLineW = lw;
+      });
+      const padX = w * 0.03;
+      const padY = fontSize * 0.35;
+      const boxW = Math.min(w * 0.94, maxLineW + padX * 2);
+      const boxH = groupH + padY * 2;
+      const boxX = cx - boxW / 2;
+      const boxY = baseY - fontSize * 0.85 - padY;
+      const r = subCfg.borderRadius ?? 14;
+      ctx.save();
+      ctx.fillStyle = subCfg.backgroundColor;
+      ctx.beginPath();
+      if ((ctx as any).roundRect) (ctx as any).roundRect(boxX, boxY, boxW, boxH, r);
+      else ctx.rect(boxX, boxY, boxW, boxH);
+      ctx.fill();
+      if (subCfg.borderWidth && subCfg.borderColor) {
+        ctx.lineWidth = subCfg.borderWidth;
+        ctx.strokeStyle = subCfg.borderColor;
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (bgType !== 'none') {
+      const fadeTop = subY + barH * 0.15;
+      const tg = ctx.createLinearGradient(0, fadeTop, 0, subY + barH);
+      tg.addColorStop(0, 'transparent');
+      if (bgType === 'light') {
+        tg.addColorStop(0.4, 'rgba(255,255,255,0.35)');
+        tg.addColorStop(1, 'rgba(255,255,255,0.8)');
+      } else {
+        tg.addColorStop(0.4, 'rgba(0,0,0,0.55)');
+        tg.addColorStop(1, 'rgba(0,0,0,0.85)');
+      }
+      ctx.fillStyle = tg;
+      ctx.fillRect(0, fadeTop, w, subY + barH - fadeTop);
+    }
+
+    const col = subCfg.textColor ?? '#ffffff';
     const rr = parseInt(col.slice(1, 3), 16) || 255;
     const gg = parseInt(col.slice(3, 5), 16) || 255;
     const bb = parseInt(col.slice(5, 7), 16) || 255;
