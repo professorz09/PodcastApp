@@ -3939,7 +3939,7 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             ═══════════════════════════════════════
             STYLE: FIRST-PERSON DILEMMA (protagonist + 2 advisors)
             🔴 The Narrator IS the protagonist, speaking in first person — never a third-person voice describing someone else's story ("Meet Alex" is forbidden).
-            🔴 Build the whole script around the user's own topic/scenario exactly as given (finance, relationship, career, family, or anything else) — don't swap it for a different dilemma.
+            🔴 Build the whole script around the user's own topic/scenario exactly as given — don't swap it for a different dilemma, and don't slot it into any fixed category. Let the topic itself decide what kind of dilemma this is; it could be about money, a relationship, family, career, ethics, or anything else — figure that out from what's actually written, don't assume one going in.
 
             Topic: "${topic}"
             ${specificDetails ? `Context: ${specificDetails}` : ''}
@@ -3947,7 +3947,7 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             Language: ${language}.
             Tone: honest, personal, emotionally real — like someone genuinely torn talking to two people they trust. The advisors should push back on each other, not just take turns lecturing.
 
-            Ground the details (money, places, people) in whatever fits the actual topic — default to a realistic Western/US setting with plausible numbers if the topic doesn't specify one, but don't force finance jargon or US city names onto a dilemma that isn't about US finances.
+            Ground every detail — money, places, people, stakes — entirely in whatever the actual topic calls for. Don't default to any fixed country, city, currency, or setting; only use specifics (like US cities or dollar figures) if the topic itself points that way.
 
             Speakers — exactly 4 speaker tags (fixed):
             - Intro: ONLY the very first turn — the protagonist introducing themselves and the situation, first person ("I", "my"). Tag MUST be "Intro".
