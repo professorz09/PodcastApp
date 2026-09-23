@@ -3,8 +3,9 @@ import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check, Sparkles, CheckCircle2, Copy, Grid } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
-import { renderVideoOffline } from '../services/videoRenderer';
-import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
+import { renderVideoOffline, seekVideoTo } from '../services/videoRenderer';
+import { drawDebateFrame, resolveEffectiveSegment, VisualConfig, RenderAssets } from '../services/canvasRenderer';
+import { resolveBackgroundAsset } from '../services/themes/utils';
 import { themes, getThemeProperties, getDefaultThemeConfig } from '../services/themes';
 import { generateSpeakerImage, generateVideoBackground, generateSpeakerBackgroundScene, generateCinematicSceneImage, generateIntroSceneBreakdown, generateStoryboardImage, generateQuizForSegment, isUsingLiteImageModel, setUseLiteImageModel } from '../services/geminiService';
 import { analyzeAllScores, saveScores, loadScores } from '../services/scoreAnalyzer';
@@ -44,6 +45,14 @@ const withRetry = async <T,>(fn: () => Promise<T>, attempts: number, timeoutMs: 
   }
   throw lastErr;
 };
+
+// A per-segment/per-scene background asset is stored as a single URL string
+// (usually a data: URL from an uploaded file). Detect whether it's a video so
+// it can be loaded into a <video> element instead of an <img> — the upload
+// input already accepts "image/*,video/*" but everywhere the URL gets loaded
+// back needs to agree on which element type to create.
+const isVideoAssetUrl = (url: string): boolean =>
+  /^data:video\//i.test(url) || /\.(mp4|webm|mov|m4v|ogv)(\?.*)?$/i.test(url);
 
 interface EnglishVideoMakerProps {
   script: DebateSegment[];
@@ -567,7 +576,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const [draggingSubtitle, setDraggingSubtitle] = useState(false);
   const [resizingSubtitle, setResizingSubtitle] = useState<string | null>(null); // 'tl', 'tr', 'bl', 'br'
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [currentSegmentBackground, setCurrentSegmentBackground] = useState<HTMLImageElement | null>(null);
+  const [currentSegmentBackground, setCurrentSegmentBackground] = useState<HTMLImageElement | HTMLVideoElement | null>(null);
   
   // Merged Audio State
   const mergedAudioUrlRef = useRef<string | null>(null);
@@ -835,14 +844,31 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           }
       }
       if (bgUrl) {
-          const img = new Image();
-          img.crossOrigin = "anonymous"; // Enable CORS to prevent canvas tainting
-          img.src = bgUrl;
-          img.onload = () => setCurrentSegmentBackground(img);
-          img.onerror = () => {
-              console.warn(`Failed to load background image: ${bgUrl}`);
-              setCurrentSegmentBackground(null);
-          };
+          if (isVideoAssetUrl(bgUrl)) {
+              const video = document.createElement('video');
+              if (!bgUrl.startsWith('data:') && !bgUrl.startsWith('blob:')) {
+                  video.crossOrigin = "anonymous"; // Enable CORS to prevent canvas tainting
+              }
+              video.muted = true;
+              video.loop = true;
+              video.playsInline = true;
+              video.src = bgUrl;
+              video.onloadeddata = () => setCurrentSegmentBackground(video);
+              video.onerror = () => {
+                  console.warn(`Failed to load background video: ${bgUrl}`);
+                  setCurrentSegmentBackground(null);
+              };
+              video.load();
+          } else {
+              const img = new Image();
+              img.crossOrigin = "anonymous"; // Enable CORS to prevent canvas tainting
+              img.src = bgUrl;
+              img.onload = () => setCurrentSegmentBackground(img);
+              img.onerror = () => {
+                  console.warn(`Failed to load background image: ${bgUrl}`);
+                  setCurrentSegmentBackground(null);
+              };
+          }
       } else {
           setCurrentSegmentBackground(null);
       }
@@ -1109,7 +1135,15 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               }
           }
       });
-  }, [isPlaying, backgroundVideo, speakerBackgroundsMap]);
+      if (currentSegmentBackground instanceof HTMLVideoElement || (currentSegmentBackground as any)?.tagName === "VIDEO") {
+          const vid = currentSegmentBackground as unknown as HTMLVideoElement;
+          if (isPlaying) {
+              vid.play().catch(() => {});
+          } else {
+              vid.pause();
+          }
+      }
+  }, [isPlaying, backgroundVideo, speakerBackgroundsMap, currentSegmentBackground]);
 
   const handleGenerateSpeakerImage = async (index: number) => {
     setSpeakerImageLoading(prev => { const a = [...prev]; a[index] = true; return a; });
@@ -3222,7 +3256,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const handleExport = async () => {
       setStatusMessage("Initializing...");
       let wakeLock: any = null;
-      
+      let fileStream: any = null;
+
       try {
         if (!mergedAudioUrl) {
             setStatusMessage("Error: Audio not ready");
@@ -3278,6 +3313,26 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         setShowExportSettings(false);
         setStatusMessage("Starting export...");
 
+        // Long video → stream straight to disk instead of buffering the whole
+        // encoded file in memory (RAM stays flat regardless of duration), same
+        // approach Phone Studio uses. Only when Channel Intro attach is off —
+        // that step needs the fully rendered file in memory to POST to the
+        // merge server, so it always uses the in-memory path below.
+        const isLongVideo = duration > 3 * 60;
+        if (isLongVideo && !attachChannelIntro && 'showSaveFilePicker' in window) {
+            try {
+                const fileHandle = await (window as any).showSaveFilePicker({
+                    suggestedName: `podcast_video_${Date.now()}.mp4`,
+                    types: [{ description: 'MP4 Video', accept: { 'video/mp4': ['.mp4'] } }],
+                });
+                fileStream = await fileHandle.createWritable();
+                toast.info('Long video — disk pe seedha stream ho raha hai (RAM bachegi)');
+            } catch {
+                // User cancelled the picker or browser doesn't support it — fall back to in-memory
+                fileStream = null;
+            }
+        }
+
         // Allow UI to update
         await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -3305,16 +3360,32 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         const bgPromises = Array.from(bgUrls).map(async (url) => {
             if (assets.segmentBackgrounds.has(url)) return;
             try {
-                const img = new Image();
-                if (!url.startsWith('data:') && !url.startsWith('blob:')) {
-                    img.crossOrigin = "anonymous";
+                if (isVideoAssetUrl(url)) {
+                    const video = document.createElement('video');
+                    if (!url.startsWith('data:') && !url.startsWith('blob:')) {
+                        video.crossOrigin = "anonymous";
+                    }
+                    video.muted = true;
+                    video.playsInline = true;
+                    video.preload = 'auto';
+                    video.src = url;
+                    await new Promise((resolve, reject) => {
+                        video.onloadedmetadata = resolve;
+                        video.onerror = reject;
+                    });
+                    assets.segmentBackgrounds.set(url, video);
+                } else {
+                    const img = new Image();
+                    if (!url.startsWith('data:') && !url.startsWith('blob:')) {
+                        img.crossOrigin = "anonymous";
+                    }
+                    img.src = url;
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                    });
+                    assets.segmentBackgrounds.set(url, img);
                 }
-                img.src = url;
-                await new Promise((resolve, reject) => {
-                    img.onload = resolve;
-                    img.onerror = reject;
-                });
-                assets.segmentBackgrounds.set(url, img);
             } catch (e) {
                 console.warn("Failed to load bg", url);
             }
@@ -3322,12 +3393,20 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         await Promise.all(bgPromises);
 
         // Preload speaker backgrounds (including Narrator default/custom background)
+        // — images need `complete`, videos need metadata (duration/videoWidth)
+        // before they can be seeked frame-by-frame during export.
         if (assets.speakerBackgrounds) {
-            for (const [, img] of assets.speakerBackgrounds) {
-                if (img && img instanceof HTMLImageElement && !img.complete) {
+            for (const [, media] of assets.speakerBackgrounds) {
+                if (media instanceof HTMLImageElement && !media.complete) {
                     await new Promise(r => {
-                        img.onload = r;
-                        img.onerror = r;
+                        media.onload = r;
+                        media.onerror = r;
+                    });
+                } else if (media instanceof HTMLVideoElement && media.readyState < 1) {
+                    await new Promise<void>(resolve => {
+                        const done = () => { media.removeEventListener('loadedmetadata', done); resolve(); };
+                        media.addEventListener('loadedmetadata', done);
+                        setTimeout(done, 3000);
                     });
                 }
             }
@@ -3422,7 +3501,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             width: exportResolution === '1080p' ? 1920 : 1280,
             height: exportResolution === '1080p' ? 1080 : 720,
             backgroundVideoUrl: backgroundVideoUrl || undefined,
-            renderCallback: (time, audioLevel, offlineVideoElement, offCtx) => {
+            renderCallback: async (time, audioLevel, offlineVideoElement, offCtx) => {
                 // Draw onto the dedicated OffscreenCanvas (completely isolated
                 // from the visible preview canvas — no flicker, no rAF interference)
                 if (!offCtx) return;
@@ -3454,6 +3533,21 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                     backgroundVideo: offlineVideoElement || null
                 };
 
+                // A per-segment or per-speaker background can itself be a video
+                // (not just the single global background video, which is already
+                // seeked above by renderVideoOffline). Resolve exactly which
+                // segment/asset this frame will actually draw and, if it's a
+                // video, seek it to this export frame's own time first —
+                // otherwise it would just show whatever it happened to be
+                // playing in real time, out of sync with the render clock.
+                const effectiveSegment = resolveEffectiveSegment(script, segmentOffsets, index, time, currentAssets);
+                if (effectiveSegment) {
+                    const { video: activeBgVideo } = resolveBackgroundAsset(currentAssets, effectiveSegment);
+                    if (activeBgVideo && activeBgVideo !== offlineVideoElement) {
+                        await seekVideoTo(activeBgVideo, time);
+                    }
+                }
+
                 drawDebateFrame(
                     offCtx,
                     time,
@@ -3471,9 +3565,17 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                 setExportProgress(p * 100);
                 setStatusMessage(`Rendering: ${Math.round(p * 100)}%`);
             }
-        });
+        }, fileStream ?? undefined);
 
-        // 4. Attach Channel Intro and Download
+        // 4a. Streamed straight to disk — file is already fully written, nothing to download
+        if (fileStream) {
+            await fileStream.close();
+            setStatusMessage("Complete! Video disk pe save ho gaya.");
+            toast.success("Video disk pe seedha save ho gaya!");
+            setStatusSafe("", 6000);
+        }
+
+        // 4b. Attach Channel Intro and Download (in-memory path)
         if (videoBlob) {
             setRenderedBlob(videoBlob as Blob);
             
@@ -3533,6 +3635,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         
 
       } catch (err: any) {
+          if (fileStream) { try { await fileStream.close(); } catch {} }
           console.error("Export error:", err);
           setStatusMessage(`Error: ${err.message}`);
           toast.error(`Export failed: ${err.message}`);
@@ -4995,7 +5098,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                       <div className="flex items-center gap-2">
                         <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 text-xs text-purple-400 bg-[#111] px-3 py-2.5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all">
                           <Upload size={13} />
-                          {currentSegment.visualConfig?.backgroundUrl ? 'Change Image' : 'Upload Image'}
+                          {currentSegment.visualConfig?.backgroundUrl ? 'Change Image/Video' : 'Upload Image/Video'}
                           <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => {
                             if (e.target.files?.[0]) {
                               const reader = new FileReader();

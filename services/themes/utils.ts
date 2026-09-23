@@ -99,31 +99,54 @@ export const renderCoverImageWithMotion = (
   }
 };
 
-export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, assets: any, currentSegment: any, width: number, height: number, dimLevel: number = 0) => {
-  const isQuizSeg = currentSegment?.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment?.learnEnglish?.quiz);
-  if (isQuizSeg) {
-    ctx.fillStyle = '#ffffff'; // Pure white background for quiz
-    ctx.fillRect(0, 0, width, height);
-    return;
-  }
+/** True for anything that behaves like an HTMLVideoElement — including the
+ *  offline-export video elements built off-document, which still satisfy
+ *  `instanceof HTMLVideoElement` but are checked defensively via tagName too. */
+export const isVideoMediaElement = (v: any): v is HTMLVideoElement =>
+  Boolean(v) && (v instanceof HTMLVideoElement || v?.tagName === 'VIDEO');
 
-  const segmentBgUrl = currentSegment.visualConfig?.backgroundUrl;
-  const segmentBgColor = currentSegment.visualConfig?.backgroundColor;
-  
-  let bgToDraw = assets.background;
-  let videoToDraw = assets.backgroundVideo;
-  let colorToDraw = assets.backgroundColor;
+export interface ResolvedBackground {
+  video: HTMLVideoElement | null;
+  image: HTMLImageElement | null;
+  color: string | null;
+}
 
-  const isNarrator = currentSegment?.learnEnglish?.segmentType === 'intro' || 
-                     currentSegment?.learnEnglish?.segmentType === 'narrator' || 
-                     currentSegment?.speaker?.toLowerCase() === 'narrator' || 
+/**
+ * Figures out which background asset (video, image, or solid color) applies
+ * to `currentSegment`, following the same precedence used when actually
+ * drawing: an explicit per-segment backgroundUrl override, then a per-segment
+ * solid color, then that speaker's own full-frame background, then the
+ * Narrator/Intro default, then the global background/color.
+ *
+ * Pulled out of drawBackground so the offline export pipeline can ask the
+ * exact same question — to know which video (if any) needs to be seeked to
+ * the current export frame time before the frame is actually drawn — without
+ * re-implementing this resolution order a second time.
+ */
+export const resolveBackgroundAsset = (assets: any, currentSegment: any): ResolvedBackground => {
+  const segmentBgUrl = currentSegment?.visualConfig?.backgroundUrl;
+  const segmentBgColor = currentSegment?.visualConfig?.backgroundColor;
+
+  let bgToDraw: HTMLImageElement | null = assets.background;
+  let videoToDraw: HTMLVideoElement | null = assets.backgroundVideo;
+  let colorToDraw: string | null = assets.backgroundColor ?? null;
+
+  const isNarrator = currentSegment?.learnEnglish?.segmentType === 'intro' ||
+                     currentSegment?.learnEnglish?.segmentType === 'narrator' ||
+                     currentSegment?.speaker?.toLowerCase() === 'narrator' ||
                      currentSegment?.speaker?.toLowerCase() === 'intro' ||
                      currentSegment?.speaker?.toLowerCase() === 'i';
 
   // Segment overrides
   if (segmentBgUrl && assets.segmentBackgrounds.has(segmentBgUrl)) {
-      bgToDraw = assets.segmentBackgrounds.get(segmentBgUrl) || null;
-      videoToDraw = null;
+      const segAsset = assets.segmentBackgrounds.get(segmentBgUrl) || null;
+      if (isVideoMediaElement(segAsset)) {
+          videoToDraw = segAsset;
+          bgToDraw = null;
+      } else {
+          bgToDraw = segAsset;
+          videoToDraw = null;
+      }
       colorToDraw = null;
   } else if (segmentBgColor) {
       bgToDraw = null;
@@ -132,14 +155,13 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
   } else if (assets.speakerBackgrounds?.has(currentSegment.speaker)) {
       // No per-segment override set — fall back to that speaker's own background.
       const bgItem = assets.speakerBackgrounds.get(currentSegment.speaker);
-       if (bgItem instanceof HTMLVideoElement || (bgItem as any)?.tagName === "VIDEO") {
-           videoToDraw = bgItem as HTMLVideoElement;
-           bgToDraw = null;
-       } else {
-           bgToDraw = bgItem || null;
-           videoToDraw = null;
-       }
-      videoToDraw = null;
+      if (isVideoMediaElement(bgItem)) {
+          videoToDraw = bgItem;
+          bgToDraw = null;
+      } else {
+          bgToDraw = bgItem || null;
+          videoToDraw = null;
+      }
       colorToDraw = null;
   } else if (isNarrator) {
       // Narrator segment: use Narrator's background from speakerBackgrounds (defaults to Narrator.png)
@@ -147,17 +169,29 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
                      assets.speakerBackgrounds?.get('narrator') ||
                      assets.speakerBackgrounds?.get('Intro');
       if (narrBg) {
-          if (narrBg instanceof HTMLVideoElement || (narrBg as any)?.tagName === "VIDEO") {
-           videoToDraw = narrBg as HTMLVideoElement;
-           bgToDraw = null;
-       } else {
-           bgToDraw = narrBg;
-           videoToDraw = null;
-       }
-          videoToDraw = null;
+          if (isVideoMediaElement(narrBg)) {
+              videoToDraw = narrBg;
+              bgToDraw = null;
+          } else {
+              bgToDraw = narrBg;
+              videoToDraw = null;
+          }
           colorToDraw = null;
       }
   }
+
+  return { video: videoToDraw, image: bgToDraw, color: colorToDraw };
+};
+
+export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, assets: any, currentSegment: any, width: number, height: number, dimLevel: number = 0) => {
+  const isQuizSeg = currentSegment?.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment?.learnEnglish?.quiz);
+  if (isQuizSeg) {
+    ctx.fillStyle = '#ffffff'; // Pure white background for quiz
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
+
+  const { video: videoToDraw, image: bgToDraw, color: colorToDraw } = resolveBackgroundAsset(assets, currentSegment);
 
   if (videoToDraw) {
     // Check if video is ready to play

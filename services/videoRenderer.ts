@@ -1,5 +1,35 @@
 import { Muxer, ArrayBufferTarget, FileSystemWritableFileStreamTarget } from 'mp4-muxer';
 
+/**
+ * Seeks a video element to `time` (wrapped to the video's own duration so
+ * shorter background loops repeat) and waits for the frame to actually be
+ * ready, with a hard timeout so a slow/stalled seek never stalls the whole
+ * export. Shared by the main background-video seek below and by callers that
+ * need to seek per-segment/per-speaker background videos to the same offline
+ * render clock before a frame is drawn.
+ */
+export const seekVideoTo = async (video: HTMLVideoElement, time: number): Promise<void> => {
+  if (!video || !isFinite(video.duration) || video.duration <= 0) return;
+  const vidTime = time % video.duration;
+  const alreadyThere =
+    Math.abs(video.currentTime - vidTime) < 0.08 &&
+    video.readyState >= 2;
+  if (alreadyThere) return;
+
+  video.currentTime = vidTime;
+  await new Promise<void>(resolve => {
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    const cleanup = () => {
+      video.removeEventListener('seeked', onSeeked);
+      if (timerId !== null) { clearTimeout(timerId); timerId = null; }
+    };
+    const onSeeked = () => { cleanup(); resolve(); };
+    video.addEventListener('seeked', onSeeked);
+    // Hard timeout so a slow seek never stalls the export
+    timerId = setTimeout(() => { cleanup(); resolve(); }, 120);
+  });
+};
+
 export interface RenderVideoOptions {
   canvas: HTMLCanvasElement;
   audioChannels: Float32Array[];
@@ -254,26 +284,8 @@ export const renderVideoOffline = async (
     const time = i * frameDuration;
 
     // ── Background video seek ────────────────────────────────────────────
-    if (backgroundVideo && isFinite(backgroundVideo.duration) && backgroundVideo.duration > 0) {
-      const vidTime = time % backgroundVideo.duration;
-      const alreadyThere =
-        Math.abs(backgroundVideo.currentTime - vidTime) < 0.08 &&
-        backgroundVideo.readyState >= 2;
-
-      if (!alreadyThere) {
-        backgroundVideo.currentTime = vidTime;
-        await new Promise<void>(resolve => {
-          let timerId: ReturnType<typeof setTimeout> | null = null;
-          const cleanup = () => {
-            backgroundVideo!.removeEventListener('seeked', onSeeked);
-            if (timerId !== null) { clearTimeout(timerId); timerId = null; }
-          };
-          const onSeeked = () => { cleanup(); resolve(); };
-          backgroundVideo!.addEventListener('seeked', onSeeked);
-          // Hard timeout so a slow seek never stalls the export
-          timerId = setTimeout(() => { cleanup(); resolve(); }, 120);
-        });
-      }
+    if (backgroundVideo) {
+      await seekVideoTo(backgroundVideo, time);
     }
 
     // ── Audio level (all channels averaged) ──────────────────────────────
