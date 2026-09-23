@@ -3937,102 +3937,39 @@ Speaker B (Curious): choose a different name — asks what the audience is think
         } else if (style === 'first_person_dilemma') {
           prompt = `
             ═══════════════════════════════════════
-            STYLE: FIRST-PERSON DILEMMA (1ST PERSON POV + 2 ADVISORS GUIDANCE & DEBATE)
-            🔴 CRITICAL: The Narrator is NOT a third-person observer telling someone else's story. THE NARRATOR IS THE PROTAGONIST THEMSELVES!
-            🔴 DYNAMIC TOPIC ADAPTATION: The user's input can be ANY real-life dilemma (Personal Finance & Debt trap, Rent vs Buy a home, Marriage & Intimacy issues, Career crossroads, Savings & Investments, Family conflict, etc.).
-               YOU MUST BASE THE ENTIRE SCRIPT DYNAMICALLY ON THE USER'S EXACT TOPIC/SCENARIO! Never overwrite or divert from what they requested.
+            STYLE: FIRST-PERSON DILEMMA (protagonist + 2 advisors)
+            🔴 The Narrator IS the protagonist, speaking in first person — never a third-person voice describing someone else's story ("Meet Alex" is forbidden).
+            🔴 Build the whole script around the user's own topic/scenario exactly as given (finance, relationship, career, family, or anything else) — don't swap it for a different dilemma.
 
-            🇺🇸 USA / WESTERN CONTEXT & HIGH-CPM ALGORITHM TARGETING:
-            - Ground the scenario in a USA / Western foreign context by default (unless user explicitly requests another country).
-            - Financials: US Dollars ($), realistic figures ($70k-$120k salary, $40k-$80k debt/savings, 6.8% mortgage rate).
-            - US Keywords & Lifestyle: Mention US cities (e.g., Austin, TX; Seattle, WA; Denver, CO; Charlotte, NC; Chicago, IL), 401(k), High-Yield Savings Accounts (HYSA), FICO Credit Score, student loans, mortgage interest rates, HOA fees, US healthcare/therapy norms.
-            - This ensures natural high-intent SEO keywords that trigger high-CPM USA and global YouTube algorithm distribution!
-
-            ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Context: ${specificDetails}` : ''}
             ${durLineEn}
             Language: ${language}.
-            Tone: High emotional and intellectual stakes, authentic first-person vulnerability, sharp tactical debate with constructive actionable guidance.
+            Tone: honest, personal, emotionally real — like someone genuinely torn talking to two people they trust. The advisors should push back on each other, not just take turns lecturing.
+
+            Ground the details (money, places, people) in whatever fits the actual topic — default to a realistic Western/US setting with plausible numbers if the topic doesn't specify one, but don't force finance jargon or US city names onto a dilemma that isn't about US finances.
 
             Speakers — exactly 4 speaker tags (fixed):
-            - Intro: ONLY the very first turn (Turn 1) — THE PROTAGONIST INTRODUCING THEMSELVES IN STRICT 1ST PERSON ("I", "My", "Me"). Tag MUST be "Intro".
-            - Narrator: All subsequent turns of the protagonist — asking sub-questions, intervening with fears/obstacles mid-debate, and wrapping up.
-            - 2 Hosts / Advisors:
-            ${speakers.length >= 2
+            - Intro: ONLY the very first turn — the protagonist introducing themselves and the situation, first person ("I", "my"). Tag MUST be "Intro".
+            - Narrator: every later turn from the protagonist — asking the advisors questions, raising doubts or fears, wrapping things up. Tag MUST be "Narrator".
+            - 2 Hosts / Advisors: ${speakers.length >= 2
               ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
-              : `Choose two distinct advisor names with opposing mindsets (e.g. Conservative/Risk-Averse Strategist vs Aggressive/Growth/Modern Mentor).`
+              : `Pick two advisor names who'd genuinely take different, opposing views on this specific dilemma.`
             }
 
-            ══════════════════════════════════════════
-            【 TURN 1 (SPEAKER TAG "Intro") — EXTREME VIRAL HOOK & FIRST-PERSON SITUATION 】
-            ══════════════════════════════════════════
-            🔴 Turn 1 speaker tag MUST be exactly "Intro" — NOT "Narrator".
-            🔴 OPENING LINE MUST BE AN EXPLOSIVE SCROLL-STOPPING HOOK: Grab the viewer in the first 3 seconds with high tension, urgent confession, or alarming vulnerability.
-               - E.g. Finance/Debt: "I make $85,000 a year living in Dallas, but I'm secretly suffocating under $58,000 of high-interest debt and I don't know how to stop the bleeding..."
-               - E.g. Rent vs Buy: "I finally saved $95,000 in cash after 6 years of grinding in Seattle, but with 7% mortgage interest rates, buying a home feels like financial suicide..."
-               - E.g. Marriage/Intimacy: "I love my wife with everything I have, but our intimacy has completely vanished over the last two years and it's tearing our marriage apart..."
-            🔴 STRICT FIRST-PERSON POV: The protagonist speaks directly: "My name is [Name], I'm [age] years old, working as a [profession] in [US City]...".
-               NEVER tell a story about someone else ("Meet Alex" or "Imagine a 30-year-old" is STRICTLY FORBIDDEN).
-            Must be 4-6 COMPLETE lines covering:
-            1. HOOK + IDENTITY: Explosive opening hook, name, age, profession, and US location.
-            2. HARD REALITY & NUMBERS: Concrete numbers (income, savings, debt, interest rates, monthly bills, emotional costs).
-            3. HIGH STAKES OF BOTH CHOICES: Why Option A is tempting yet risky; why Option B feels safe yet terrifying.
-            4. THE DILEMMA QUESTION: "So tell me: should I take [Option A] or choose [Option B]? I honestly don't know what to do! [Option A vs Option B]"
-            🔴 CRITICAL: Must end with a short silent bracketed roadmap tag: [Option A vs Option B] (under 8 words, English).
+            Loose flow (adapt naturally to the topic rather than forcing an exact template):
+            1. Intro turn — a hook that pulls the viewer in, then enough real, concrete detail (who they are, the situation, what's really at stake on each side) to make the dilemma land, ending with a direct question to the advisors and audience. Close with a short bracketed tag summarizing the choice, e.g. [Option A vs Option B].
+            2. Narrator turn — the protagonist puts their first concrete question to the advisors, closing with a short bracketed tag.
+            3. Both advisors respond with real, contrasting, actionable guidance, addressing the protagonist by name — they can challenge each other's reasoning, not just alternate monologues.
+            4. Narrator turn — the protagonist raises a genuine complication, fear, or follow-up sparked by what was just said, closing with a short bracketed tag. The advisors dig into it.
+            5. Repeat steps 3-4 as many rounds as the dilemma genuinely needs to feel fully explored — usually a handful, but let the content decide, not a fixed count.
+            6. Conclusion — the protagonist reflects that the decision is still hard but clearer now; each advisor gives one closing take; the protagonist ends by turning the question to the viewers ("what would you do?").
 
-            ══════════════════════════════════════════
-            【 TURN 2 (SPEAKER TAG "Narrator") — FIRST SUB-QUESTION 】
-            ══════════════════════════════════════════
-            Immediately after Turn 1, in a NEW turn with speaker tag "Narrator", the protagonist asks their first pointed question to their advisors:
-            e.g.: "You two are my closest mentors. Let's start with the immediate hurdle: should I first [Specific Sub-Dilemma]? [Sub-Question Tag]"
-            Ending with a bracketed roadmap tag (under 8 words).
-
-            ══════════════════════════════════════════
-            【 ADVISORS — DIRECTLY ADDRESS PROTAGONIST BY NAME & PROVIDE ACTIONABLE SOLUTIONS 】
-            ══════════════════════════════════════════
-            Both advisors address the protagonist directly by name and give concrete, contrasting roadmaps:
-            - Advisor 1: "[Name], you need to see this clearly. In your position..." (lays out a concrete strategy with numbers, psychological safety, or strict debt-snowball/foundational discipline).
-            - Advisor 2: "[Name], don't follow that advice! That sounds nice on paper, but in reality..." (points out hidden pitfalls, argues for growth, leverage, modern relationship communication, or alternative paths).
-            - SUBSTANTIAL PARAGRAPHS: 3 to 6 complete sentences per speaker turn. Short 1-liners are strictly banned.
-            - They debate each other's blind spots while building realistic, empowering solutions for the protagonist.
-
-            ══════════════════════════════════════════
-            【 PROTAGONIST INTERVENES MID-DEBATE (REAL FEAR / CONSTRAINT / PROBLEM) 】
-            ══════════════════════════════════════════
-            After the advisors debate, the protagonist (Narrator) JUMPS IN:
-            - Shares a raw, personal complication or anxiety:
-              e.g.: "Wait, [Advisor 1], the huge issue with that is... [real-world hurdle like credit score drops, spouse feels rejected, emergency fund gets drained]. If this goes wrong, I risk losing everything. Should I still do that? [Specific Hurdle Tag]"
-            - Or advances the decision to the next phase:
-              e.g.: "That makes sense, but what about [Next Sub-Dilemma]? Should I [Option C] right now or wait? [Next Tag]"
-            - Ends with a silent bracketed tag [Short Tag].
-            - Both advisors immediately debate that specific complication and offer refined, practical solutions!
-            - Continue this interactive cadence for 3 to 5 sub-dilemmas/hurdles!
-
-            ══════════════════════════════════════════
-            【 CONCLUSION — FINAL VERDICTS & AUDIENCE VOTE 】
-            ══════════════════════════════════════════
-            1. Narrator (Protagonist) Turn: "Listening to both of you has completely shifted how I see this. The decision is still terrifying, but the trade-offs are now crystal clear."
-            2. Advisor 1 Closing Turn: One full paragraph offering a definitive closing principle / verdict directly to the protagonist.
-            3. Advisor 2 Closing Turn: One full paragraph offering a contrasting closing principle / verdict directly to the protagonist.
-            4. Narrator Closing Turn: The protagonist turns directly to the VIEWERS:
-               "Now the choice is in your hands — if you were standing in my shoes right now, what would you choose? Option A or Option B? Tell me in the comments down below!"
-
-            ══════════════════════════════════════════
-            NON-NEGOTIABLE HARD RULES:
-            ══════════════════════════════════════════
-            ✓ STRICT FIRST PERSON POV: Narrator IS THE PROTAGONIST ("I", "My name is [Name]"). Third-person framing is STRICTLY FORBIDDEN!
-            ✓ Turn 1 MUST open with an explosive scroll-stopping hook and have speaker tag "Intro".
-            ✓ US/Western context by default ($ figures, US cities, US financial/relationship keywords).
-            ✓ Subsequent protagonist turns MUST be speaker tag "Narrator".
-            ✓ Both advisors address the protagonist by name ("[Name], listen...", "[Name], don't do that...").
-            ✓ Host turns must be SUBSTANTIAL PARAGRAPHS (3-6 sentences), providing actionable advice & contrasting solutions.
-            ✓ Protagonist intervenes mid-debate with real hurdles/fears ("Wait, but the problem is... should I still do this?").
-            ✓ Every bracketed heading is SHORT (under 8 words) and in English.
-            ✓ Only Turn 1 and Narrator question/intervention turns have [bracketed] tags — host turns and conclusion lines NEVER have brackets.
-            ✓ Banned cliché phrases: "In conclusion", "At the end of the day", "It's important to remember", "Let's dive into".
-            ✓ No obvious easy winner — viewers must feel the genuine agony of the choice.
-            ══════════════════════════════════════════
+            Rules:
+            ✓ Strict first person for the protagonist throughout — never narrated in third person.
+            ✓ Bracketed tags are short (under 8 words, English) and only appear at the end of Intro/Narrator turns — never on advisor lines or the closing verdicts.
+            ✓ Avoid stock phrases like "In conclusion", "At the end of the day", "It's important to remember".
+            ✓ No easy, obvious answer — the audience should genuinely feel torn between both choices.
             ${durFillEn}
           `;
         } else if (style === 'docu_debate') {
