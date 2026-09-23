@@ -1329,7 +1329,7 @@ const PodcastAnalysisFlow: React.FC<PodcastFlowProps> = ({ sel, variant, onChang
     if (!podcastUrl.trim()) { toast.error('Podcast URL paste karo pehle'); return; }
     setFetching(true);
     try {
-      const r = await fetch('/api/youtube/transcript', {
+      const r = await fetch('https://autovid-flask.onrender.com/api/youtube/transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: podcastUrl.trim(), language: 'auto' }),
@@ -3801,7 +3801,7 @@ Return JSON only:
       // ── YouTube mode: fetch transcript → summarize with Gemini ─────────────
       if (genYtMode && genYtUrl.trim()) {
         toast.info('YouTube transcript fetch ho raha hai…');
-        const ytRes = await fetch('/api/youtube/transcript', {
+        const ytRes = await fetch('https://autovid-flask.onrender.com/api/youtube/transcript', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: genYtUrl.trim(), language: 'auto' }),

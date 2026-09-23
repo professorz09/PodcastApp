@@ -1649,7 +1649,7 @@ const Shorts: React.FC<ShortsProps> = ({ script, youtubeData, shortsContext, onC
     try {
       const imageLayersToSend = subtitleLayers.filter(l => l.imageDataUrl);
       setVideoProgress({ pct: 20, msg: `Video download + trim ho raha hai (${fmtSec(trimEnd - trimStart)} clip)…` });
-      const res = await fetch('/api/shorts/render', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/shorts/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

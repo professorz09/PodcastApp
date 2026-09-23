@@ -39,7 +39,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   const [model, setModel] = useState<'gemini-3.8-flash' | 'gemini-3.1-pro-preview'>('gemini-3.8-flash');
   const [language, setLanguage] = useState('English');
   // Auto Joe Rogan Style when context file is attached from YoutubeImporter
-  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'case_debate' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
+  const [style, setStyle] = useState<'debate' | 'debate2' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_panel' | 'podcast_breakdown' | 'context_bridge' | 'situational' | 'case_debate' | 'first_person_dilemma' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov'>(
     initialContextContent ? 'podcast_panel' : 'situational'
   );
   const [joeRoganGuest, setJoeRoganGuest] = useState<string>('Elon Musk');
@@ -75,7 +75,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   // ── Learn English state — kept fully separate from the other tabs' state ────
   const [leTopic, setLeTopic] = useState('');
   const [leSituations, setLeSituations] = useState<{topic: string, duration: number}[]>([{topic: '', duration: 3}]);
-  const [leStyle, setLeStyle] = useState<'situational' | 'roleplay' | 'interview' | 'casual' | 'debate' | 'podcast' | 'multi_situation'>('podcast');
+  const [leStyle, setLeStyle] = useState<'case_debate' | 'first_person_dilemma' | 'situational' | 'roleplay' | 'interview' | 'casual' | 'debate' | 'podcast' | 'multi_situation'>('podcast');
   const [leDuration, setLeDuration] = useState<number>(12);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
   const [leIntro, setLeIntro] = useState(false); // podcast defaults to false
@@ -136,7 +136,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
     setPhoneSegments([]);
     setPhoneSelectedSegs(new Set());
     try {
-      const res = await fetch('/api/youtube/transcript', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/youtube/transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: phoneYtUrl.trim(), lang: '' }),
@@ -187,6 +187,36 @@ const DebateInput: React.FC<DebateInputProps> = ({
           toast.warning('Topic/situation daalo pehle');
           return;
         }
+      }
+
+      if (leStyle === 'first_person_dilemma') {
+        onGenerate({
+          topic: finalTopic,
+          specificDetails: `FIRST_PERSON_DILEMMA:true\nLEARN_ENGLISH_LANGUAGE:english`,
+          duration: finalDuration,
+          includeNarrator: true,
+          model,
+          language: 'English',
+          style: 'first_person_dilemma',
+          speakerCount: 2,
+          useGrounding,
+        });
+        return;
+      }
+
+      if (leStyle === 'case_debate') {
+        onGenerate({
+          topic: finalTopic,
+          specificDetails: `DILEMMA_DEBATE:true\nLEARN_ENGLISH_LANGUAGE:english`,
+          duration: finalDuration,
+          includeNarrator: true,
+          model,
+          language: 'English',
+          style: 'case_debate',
+          speakerCount: 2,
+          useGrounding,
+        });
+        return;
       }
 
       onGenerate({
@@ -266,6 +296,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
     }
 
     const isJoeRogan = style === 'joe_rogan';
+    const isDilemmaStyle = style === 'case_debate' || style === 'first_person_dilemma';
     const finalSpeakerNames = isJoeRogan
       ? ['Joe Rogan', joeRoganGuest]
       : (activeNames.length > 0 ? activeNames : undefined);
@@ -277,7 +308,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
       topic: finalTopic || (customScript ? "Custom Script" : ""),
       specificDetails,
       duration: duration,
-      includeNarrator: isJoeRogan ? false : includeNarrator,
+      includeNarrator: isDilemmaStyle ? true : (isJoeRogan ? false : includeNarrator),
       customScript: customScript.trim() ? customScript : undefined,
       contextFileContent: finalContext,
       commentsFileContent: initialCommentsContent,
@@ -443,6 +474,39 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   rows={3}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 resize-none"
                 />
+
+                {(leStyle === 'case_debate' || leStyle === 'first_person_dilemma') && (
+                  <div className="mt-2.5 space-y-1.5">
+                    <span className="text-[11px] text-gray-500 block font-medium">
+                      💡 {leStyle === 'first_person_dilemma' ? 'First-Person Dilemmas ("Main Khud Hu"):' : 'Quick Dilemma Topics:'}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(leStyle === 'first_person_dilemma' ? [
+                        "I took a $60,000 loan for my lifestyle & business. Earning $75k in Dallas and drowning in interest — what should I do?",
+                        "I saved $90,000 cash. Mortgage rates are 6.8% — should I buy my first home in Austin or keep renting and invest?",
+                        "I love my wife deeply, but our intimacy has completely faded over the last 2 years. How do we fix this?",
+                        "I'm 29, earn $85k with $50k saved. Layoffs are coming — invest in index funds or hold cash in high-yield savings?",
+                        "I found out my partner is secretly $50,000 in debt before our wedding. Postpone or marry and help pay?"
+                      ] : [
+                        "A 30-Year-Old Man Doesn't Enjoy Sex Anymore, But His Wife Does — What Should He Do?",
+                        "A Woman Discovers Her Husband Is Hiding $50,000 in Debt — What Should She Do?",
+                        "AI Can Save 1,000 Jobs but Destroy 10,000 — Should the Company Deploy It?",
+                        "Investing vs Saving: He Has $50,000 — What Should He Do?",
+                        "The Trolley Problem: Divert the Train or Do Nothing?"
+                      ]).map((preset, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => setLeTopic(preset)}
+                          className="text-[11px] bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white px-2.5 py-1 rounded-lg border border-white/5 hover:border-cyan-500/30 transition-all text-left truncate max-w-full"
+                          title={preset}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -510,10 +574,16 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       setLeGenerateQuestions(false);
                     } else if (val === 'situational') {
                       setLeIntro(true);
+                    } else if (val === 'case_debate' || val === 'first_person_dilemma') {
+                      setLeIntro(true);
+                      setLeNarrator(true);
+                      setLeSpeakerCount(2);
                     }
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
                 >
+                  <option value="first_person_dilemma">🙋‍♂️ First-Person Dilemma (Narrator = Protagonist + 2 Advisors)</option>
+                  <option value="case_debate">⚖️ Dilemma Debate (Character Situation + Questions Board + Deep Arguments)</option>
                   <option value="multi_situation">Multi-Situation (Story/Scenes)</option>
                   <option value="podcast">Podcast Style (Boy & Girl Hosts)</option>
                   <option value="situational">Situational</option>
@@ -661,7 +731,9 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   placeholder={
-                    style === 'book_summary'
+                    style === 'first_person_dilemma'
+                      ? "Meri situation: 'I'm 28, earn $65k with $30k savings. Layoffs coming — switch job or launch startup?'"
+                      : style === 'book_summary'
                       ? "Book ka naam likhо (e.g. '48 Laws of Power') ya chapter (e.g. 'Atomic Habits - Chapter 1')"
                       : style === 'questioning'
                       ? "Enter any topic or situation (e.g. 'Is money the key to happiness?' or 'Which AI is actually the smartest?')"
@@ -671,6 +743,36 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   }
                   className="w-full bg-transparent text-white px-5 py-4 text-base md:text-lg placeholder:text-gray-600 focus:outline-none font-medium"
                 />
+                {style === 'first_person_dilemma' && (
+                  <div className="px-5 space-y-2">
+                    <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg px-3.5 py-2.5 text-xs text-amber-200/90 leading-relaxed">
+                      🙋‍♂️ <strong>First-Person Protagonist Mode:</strong> Narrator koi teesra insaan nahi hai — <strong>NARRATOR KHUD WO PERSON HAI!</strong><br/>
+                      1️⃣ <strong>Self-Intro & Situation:</strong> Pehle khud ka naam, job aur exact high-stakes situation batayega.<br/>
+                      2️⃣ <strong>Core Dilemma:</strong> &quot;Ab aap hi batayein, kya main Option A karun ya Option B?&quot;<br/>
+                      3️⃣ <strong>Advisors Debate:</strong> Dono debaters person ko sidha naam se address karenge aur solutions denge.<br/>
+                      4️⃣ <strong>Beech me bolna:</strong> Narrator khud beech me aakar naye doubts/samasya puchega (&quot;Lekin isme samasya yeh hai... kya main yeh karun?&quot;).
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {[
+                        "I took a $60,000 loan for my business & lifestyle. Salary is $75k in Dallas and I can't pay back. What should I do?",
+                        "I saved $90,000 cash. Mortgage rates are 6.8%. Should I buy my first home in Austin or keep renting and invest?",
+                        "I love my wife deeply, but our intimacy has completely faded over the last 2 years. How do we fix this?",
+                        "I'm 29, earn $85k with $50k saved. Layoffs are coming — invest in stocks or hold cash in high-yield savings?",
+                        "Partner is secretly $50,000 in debt before our wedding. Postpone wedding or marry and help pay?"
+                      ].map((preset, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => setTopic(preset)}
+                          className="text-[11px] bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white px-2.5 py-1 rounded-lg border border-white/5 hover:border-amber-500/30 transition-all text-left truncate max-w-full"
+                          title={preset}
+                        >
+                          💡 {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {style === 'book_summary' && (
                   <div className="px-5">
                     <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-300/80">
@@ -1174,12 +1276,13 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       setStyle(newStyle);
                       if (newStyle === 'podcast_panel' || newStyle === 'situational') { setSpeakerCount(3); }
                       else if (newStyle === 'questioning') { setSpeakerCount(4); setIncludeNarrator(true); }
-                      else if (newStyle === 'debate2' || newStyle === 'case_debate') { setSpeakerCount(2); setIncludeNarrator(true); }
+                      else if (newStyle === 'debate2' || newStyle === 'case_debate' || newStyle === 'first_person_dilemma') { setSpeakerCount(2); setIncludeNarrator(true); }
                       else if (['narration', 'monkey_explain', 'viral_recap', 'image', 'professor_jiang', 'transcript_review', 'summarizer_pov', 'context_bridge', 'explained_solo'].includes(newStyle)) { setSpeakerCount(1); setIncludeNarrator(false); }
                       else { setSpeakerCount(2); }
                     }}
                     className="w-full bg-[#111111] border border-white/5 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-pink-500/50 outline-none appearance-none cursor-pointer capitalize"
                   >
+                    <option value="first_person_dilemma">🙋‍♂️ First-Person Dilemma (Main Khud Hu + 2 Advisors)</option>
                     <option value="podcast">🎙️ Podcast Style (Boy & Girl Hosts)</option>
                     <option value="situational">🌍 Situational</option>
                     <option value="case_debate">🧩 Case Debate (Life Dilemma)</option>
@@ -1315,8 +1418,8 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
                 )}
 
-                {/* Narrator — hidden for Joe Rogan, Docu-Debate & Case Debate styles (handled automatically) */}
-                {(style !== 'joe_rogan' && style !== 'docu_debate' && style !== 'case_debate') && (
+                {/* Narrator — hidden for Joe Rogan, Docu-Debate, Case Debate & First-Person Dilemma styles (handled automatically) */}
+                {(style !== 'joe_rogan' && style !== 'docu_debate' && style !== 'case_debate' && style !== 'first_person_dilemma') && (
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5 text-gray-300">
                     <Mic size={12} className="text-blue-400" />

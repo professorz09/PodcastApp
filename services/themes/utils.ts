@@ -1,5 +1,104 @@
 import { DrawContext } from './types';
 
+export const renderCoverImageWithMotion = (
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  img: HTMLImageElement,
+  width: number,
+  height: number,
+  dimLevel: number = 0,
+  introMotion?: { active: boolean; progress: number; sceneIndex: number; localTime: number }
+) => {
+  const isIntroMotion = Boolean(introMotion?.active);
+  if (isIntroMotion) {
+    const rawProg = Math.max(0, Math.min(1, introMotion!.progress ?? 0));
+    // Smooth sinusoidal ease-in-out for a silky camera glide
+    const smoothProg = 0.5 - 0.5 * Math.cos(rawProg * Math.PI);
+    const sceneIndex = introMotion!.sceneIndex ?? 0;
+    const localTime = introMotion!.localTime ?? 0;
+
+    // Micro ambient breathing and cinematic drift so the picture stays alive and organic
+    const microBreath = Math.sin(localTime * 1.5) * 0.006;
+    const microDriftX = Math.cos(localTime * 1.1) * (width * 0.004);
+    const microDriftY = Math.sin(localTime * 0.9) * (height * 0.004);
+
+    // Ken Burns Cinematic Choreography (noticeable, rich zoom and smooth camera glides)
+    let zoomFactor = 1.06;
+    let panX = 0;
+    let panY = 0;
+
+    const pattern = Math.abs(sceneIndex) % 4;
+    if (pattern === 0) {
+      // Pattern 0: Cinematic dynamic Push-In (1.06 -> 1.20) + upward drift
+      zoomFactor = 1.06 + 0.14 * smoothProg + microBreath;
+      panY = -0.025 * smoothProg * height;
+      panX = (smoothProg - 0.5) * 0.018 * width;
+    } else if (pattern === 1) {
+      // Pattern 1: Cinematic dynamic Pull-Out (1.20 -> 1.06) + gentle horizontal pan
+      zoomFactor = 1.20 - 0.14 * smoothProg + microBreath;
+      panX = (smoothProg - 0.5) * 0.03 * width;
+      panY = (smoothProg - 0.5) * 0.015 * height;
+    } else if (pattern === 2) {
+      // Pattern 2: Diagonal Push-In (1.08 -> 1.22) + left/upward camera drift
+      zoomFactor = 1.08 + 0.14 * smoothProg + microBreath;
+      panX = -0.028 * smoothProg * width;
+      panY = -0.020 * smoothProg * height;
+    } else {
+      // Pattern 3: Dynamic slow Pull-Out (1.18 -> 1.06) + downward pan
+      zoomFactor = 1.18 - 0.12 * smoothProg + microBreath;
+      panY = 0.025 * smoothProg * height;
+      panX = (smoothProg - 0.5) * 0.022 * width;
+    }
+
+    const baseScale = Math.max(width / img.width, height / img.height);
+    const finalScale = baseScale * Math.max(1.02, zoomFactor);
+    const drawW = img.width * finalScale;
+    const drawH = img.height * finalScale;
+
+    // Centered with camera pan offsets
+    let drawX = (width / 2) - (drawW / 2) + panX + microDriftX;
+    let drawY = (height / 2) - (drawH / 2) + panY + microDriftY;
+
+    // Clamp so the frame is completely filled with no empty border gaps
+    if (drawX > 0) drawX = 0;
+    if (drawX + drawW < width) drawX = width - drawW;
+    if (drawY > 0) drawY = 0;
+    if (drawY + drawH < height) drawY = height - drawH;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    ctx.clip();
+
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+    // Subtle high-end cinematic vignette on intro images
+    const vignette = ctx.createRadialGradient(
+      width / 2, height / 2, Math.min(width, height) * 0.45,
+      width / 2, height / 2, Math.max(width, height) * 0.82
+    );
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.28)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+
+    if (dimLevel > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${dimLevel})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    ctx.restore();
+  } else {
+    const scale = Math.max(width / img.width, height / img.height);
+    const x = (width / 2) - (img.width / 2) * scale;
+    const y = (height / 2) - (img.height / 2) * scale;
+    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+    if (dimLevel > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${dimLevel})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+  }
+};
+
 export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, assets: any, currentSegment: any, width: number, height: number, dimLevel: number = 0) => {
   const isQuizSeg = currentSegment?.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment?.learnEnglish?.quiz);
   if (isQuizSeg) {
@@ -32,7 +131,14 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
       colorToDraw = segmentBgColor;
   } else if (assets.speakerBackgrounds?.has(currentSegment.speaker)) {
       // No per-segment override set — fall back to that speaker's own background.
-      bgToDraw = assets.speakerBackgrounds.get(currentSegment.speaker) || null;
+      const bgItem = assets.speakerBackgrounds.get(currentSegment.speaker);
+       if (bgItem instanceof HTMLVideoElement || (bgItem as any)?.tagName === "VIDEO") {
+           videoToDraw = bgItem as HTMLVideoElement;
+           bgToDraw = null;
+       } else {
+           bgToDraw = bgItem || null;
+           videoToDraw = null;
+       }
       videoToDraw = null;
       colorToDraw = null;
   } else if (isNarrator) {
@@ -41,7 +147,13 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
                      assets.speakerBackgrounds?.get('narrator') ||
                      assets.speakerBackgrounds?.get('Intro');
       if (narrBg) {
-          bgToDraw = narrBg;
+          if (narrBg instanceof HTMLVideoElement || (narrBg as any)?.tagName === "VIDEO") {
+           videoToDraw = narrBg as HTMLVideoElement;
+           bgToDraw = null;
+       } else {
+           bgToDraw = narrBg;
+           videoToDraw = null;
+       }
           videoToDraw = null;
           colorToDraw = null;
       }
@@ -63,14 +175,7 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
     } else {
         // Fallback to speaker background, color, or gradient if video not ready (never draw solid black)
         if (bgToDraw) {
-            const scale = Math.max(width / bgToDraw.width, height / bgToDraw.height);
-            const x = (width / 2) - (bgToDraw.width / 2) * scale;
-            const y = (height / 2) - (bgToDraw.height / 2) * scale;
-            ctx.drawImage(bgToDraw, x, y, bgToDraw.width * scale, bgToDraw.height * scale);
-            if (dimLevel > 0) {
-                ctx.fillStyle = `rgba(0,0,0,${dimLevel})`;
-                ctx.fillRect(0, 0, width, height);
-            }
+            renderCoverImageWithMotion(ctx, bgToDraw, width, height, dimLevel, currentSegment?.introMotion);
         } else if (colorToDraw) {
             ctx.fillStyle = colorToDraw;
             ctx.fillRect(0, 0, width, height);
@@ -87,16 +192,7 @@ export const drawBackground = (ctx: CanvasRenderingContext2D | OffscreenCanvasRe
         }
     }
   } else if (bgToDraw) {
-    const scale = Math.max(width / bgToDraw.width, height / bgToDraw.height);
-    const x = (width / 2) - (bgToDraw.width / 2) * scale;
-    const y = (height / 2) - (bgToDraw.height / 2) * scale;
-    ctx.drawImage(bgToDraw, x, y, bgToDraw.width * scale, bgToDraw.height * scale);
-    
-    // Apply Dimming
-    if (dimLevel > 0) {
-        ctx.fillStyle = `rgba(0,0,0,${dimLevel})`;
-        ctx.fillRect(0, 0, width, height);
-    }
+    renderCoverImageWithMotion(ctx, bgToDraw, width, height, dimLevel, currentSegment?.introMotion);
   } else if (colorToDraw) {
     ctx.fillStyle = colorToDraw;
     ctx.fillRect(0, 0, width, height);

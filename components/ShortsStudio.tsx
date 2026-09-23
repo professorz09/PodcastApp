@@ -369,7 +369,7 @@ const ShortsStudio: React.FC<ShortsStudioProps> = ({ onBack }) => {
     } else if (inputMode === 'youtube' && ytUrl.trim()) {
       try {
         setStatus('YouTube transcript fetch ho raha hai…');
-        const res = await fetch('/api/youtube/transcript', {
+        const res = await fetch('https://autovid-flask.onrender.com/api/youtube/transcript', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: ytUrl.trim(), language: 'auto' }),

@@ -1,6 +1,7 @@
 import { DebateSegment } from '../types';
 import { getTheme, getDefaultThemeConfig } from './themes';
 import { drawLearnEnglishOverlay } from './learnEnglishOverlay';
+import { drawWhiteboardRoadmap, WhiteboardBoardConfig, drawWhiteboardSubtitles, drawSummaryCard } from './whiteboardRenderer';
 
 export interface VisualConfig {
   theme: string;
@@ -31,6 +32,8 @@ export interface VisualConfig {
   nameBadgeColorB?: string;
   nameBadgeColorC?: string;
   introSubtitleColor?: string;
+  narratorBoard?: WhiteboardBoardConfig | null;
+  roadmapSpeakerName?: string;
 }
 
 export interface RenderAssets {
@@ -43,7 +46,7 @@ export interface RenderAssets {
   narratorImage?: HTMLImageElement | null;
   /** Per-speaker full-frame background, keyed by exact speaker name — used
    *  when a segment has no explicit backgroundUrl override of its own. */
-  speakerBackgrounds?: Map<string, HTMLImageElement>;
+  speakerBackgrounds?: Map<string, HTMLImageElement | HTMLVideoElement>;
 }
 
 export const drawDebateFrame = (
@@ -67,14 +70,51 @@ export const drawDebateFrame = (
   // segment and use ITS image for this frame, via the same
   // visualConfig.backgroundUrl mechanism every theme already reads.
   let currentSegment = rawSegment;
+  const segStart = segmentOffsets[currentSegmentIndex] ?? 0;
+  const segNext = segmentOffsets[currentSegmentIndex + 1] ?? (segStart + (rawSegment.duration || 4));
+  const segDuration = Math.max(0.1, segNext - segStart);
+  const localTime = Math.max(0, time - segStart);
+
+  const isIntro = rawSegment.speaker === 'Intro' ||
+                  rawSegment.speaker?.toLowerCase() === 'intro' ||
+                  rawSegment.learnEnglish?.segmentType === 'intro' ||
+                  (currentSegmentIndex === 0 && (rawSegment.speaker === 'Narrator' || rawSegment.speaker?.toLowerCase() === 'narrator')) ||
+                  Boolean(rawSegment.learnEnglish?.introScenes?.length);
+
+  let introMotion: {
+    active: boolean;
+    progress: number;
+    sceneIndex: number;
+    localTime: number;
+  } | undefined = undefined;
+
   const introScenes = rawSegment.learnEnglish?.introScenes;
   if (introScenes?.length) {
-      const segStart = segmentOffsets[currentSegmentIndex] ?? 0;
-      const localTime = time - segStart;
-      const scene = introScenes.find(s => localTime >= s.startOffset && localTime < s.endOffset) || introScenes[introScenes.length - 1];
+      const activeIdx = introScenes.findIndex(s => localTime >= s.startOffset && localTime < s.endOffset);
+      const sceneIndex = activeIdx >= 0 ? activeIdx : introScenes.length - 1;
+      const scene = introScenes[sceneIndex];
       if (scene?.imageUrl && assets.segmentBackgrounds.has(scene.imageUrl)) {
           currentSegment = { ...rawSegment, visualConfig: { ...rawSegment.visualConfig, backgroundUrl: scene.imageUrl } };
       }
+      const sStart = scene?.startOffset ?? 0;
+      const sEnd = scene?.endOffset ?? segDuration;
+      const sDur = Math.max(0.1, sEnd - sStart);
+      const sceneLocalTime = Math.max(0, localTime - sStart);
+      const sProg = Math.min(1, Math.max(0, sceneLocalTime / sDur));
+      introMotion = {
+        active: true,
+        progress: sProg,
+        sceneIndex,
+        localTime: sceneLocalTime,
+      };
+  } else if (isIntro) {
+      const sProg = Math.min(1, Math.max(0, localTime / segDuration));
+      introMotion = {
+        active: true,
+        progress: sProg,
+        sceneIndex: 0,
+        localTime,
+      };
   } else if (!currentSegment.visualConfig?.backgroundUrl) {
       // If the current segment has no background, look backwards for the most recent intro scene's background.
       // This ensures different situations in a multi-situation script persist their respective backgrounds across dialogue.
@@ -93,6 +133,10 @@ export const drawDebateFrame = (
               break;
           }
       }
+  }
+
+  if (introMotion) {
+      currentSegment = { ...currentSegment, introMotion };
   }
 
   // Determine Theme
@@ -118,6 +162,37 @@ export const drawDebateFrame = (
 
   const isQuizSeg = currentSegment.learnEnglish?.segmentType === 'quiz' || currentSegment.speaker === 'Question' || Boolean(currentSegment.learnEnglish?.quiz);
   if (isQuizSeg && currentSegment.learnEnglish?.quiz?.hideSubtitles !== false) {
+      mergedConfig.showSubtitles = false;
+  }
+
+  // Whiteboard question sheet (Phone Studio 2 style): ONLY active if explicitly configured & enabled!
+  // If disabled (or narratorBoard is null/undefined), NEVER show whiteboard;
+  // it cleanly falls back to standard narrator/speaker background and normal subtitles.
+  const board = mergedConfig.narratorBoard;
+  const isWhiteboardEnabled = Boolean(
+    board &&
+    board.enabled !== false &&
+    board.questions &&
+    board.questions.length > 0
+  );
+
+  const configuredSpeaker = (board?.speakerName || mergedConfig.roadmapSpeakerName || 'Narrator').trim().toLowerCase();
+  const curSpeaker = (currentSegment.speaker || '').trim().toLowerCase();
+
+  const isSpeakerMatch =
+    configuredSpeaker === 'all' ||
+    configuredSpeaker === 'any' ||
+    curSpeaker === configuredSpeaker ||
+    (configuredSpeaker === 'narrator' && (curSpeaker === 'narrator' || currentSegment.learnEnglish?.segmentType === 'narrator'));
+
+  const isRoadmapSegment = isWhiteboardEnabled && (
+    isSpeakerMatch ||
+    (Boolean(currentSegment.boardPoint) && (configuredSpeaker === 'all' || configuredSpeaker === 'any' || isSpeakerMatch))
+  );
+
+  const hasBoardOverlay = Boolean(isWhiteboardEnabled && isRoadmapSegment);
+
+  if (hasBoardOverlay) {
       mergedConfig.showSubtitles = false;
   }
 
@@ -151,15 +226,154 @@ export const drawDebateFrame = (
       themeConfig
   });
 
+  // Whiteboard Question Sheet Roadmap (Phone Studio 2 style) for debate dilemmas
+  if (hasBoardOverlay && board) {
+    // Solid black background behind the whiteboard card as requested
+    ctx.save();
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.restore();
+
+    let doneCount = 0;
+    let activeIndex = -1;
+
+    const currentPoint = currentSegment.boardPoint?.trim().toLowerCase();
+    let matchIdx = -1;
+    if (currentPoint) {
+      matchIdx = board.questions.findIndex(q => 
+        q.toLowerCase() === currentPoint ||
+        q.toLowerCase().includes(currentPoint) ||
+        currentPoint.includes(q.toLowerCase())
+      );
+    }
+
+    if (matchIdx !== -1) {
+      doneCount = matchIdx;
+      activeIndex = matchIdx;
+    } else {
+      let nIdx = 0;
+      for (let i = 0; i < effectiveScript.length; i++) {
+        const s = effectiveScript[i];
+        const sSpeaker = (s.speaker || '').trim().toLowerCase();
+        const sMatch =
+          configuredSpeaker === 'all' ||
+          configuredSpeaker === 'any' ||
+          sSpeaker === configuredSpeaker ||
+          (configuredSpeaker === 'narrator' && (sSpeaker === 'narrator' || s.learnEnglish?.segmentType === 'narrator'));
+        const isN = sMatch || (Boolean(s.boardPoint) && (configuredSpeaker === 'all' || configuredSpeaker === 'any' || sMatch));
+        if (isN) {
+          if (i === currentSegmentIndex) {
+            matchIdx = nIdx;
+          }
+          nIdx++;
+        }
+      }
+      if (matchIdx >= 0 && matchIdx < board.questions.length) {
+        doneCount = matchIdx;
+        activeIndex = matchIdx;
+      } else {
+        // Closing turn — all questions covered
+        doneCount = board.questions.length;
+        activeIndex = -1;
+      }
+    }
+
+    const segStart = segmentOffsets[currentSegmentIndex] ?? 0;
+    const segNext = segmentOffsets[currentSegmentIndex + 1] ?? (segStart + (currentSegment.duration || 4));
+    const segDur = Math.max(0.1, segNext - segStart);
+    const progress = Math.min(1, Math.max(0, (time - segStart) / segDur));
+
+    // Determine if this is the closing/summary card turn (at the end of debate)
+    const isEndClosingTurn = activeIndex === -1 && doneCount >= board.questions.length;
+    const segTypeStr = String(currentSegment.learnEnglish?.segmentType || '');
+    const isSummarySegment = isEndClosingTurn || 
+      segTypeStr === 'summary' ||
+      segTypeStr === 'conclusion' ||
+      currentSegment.speaker?.toLowerCase() === 'summary' ||
+      currentSegment.speaker?.toLowerCase() === 'conclusion' ||
+      /summary|conclusion|takeaway|in conclusion|to sum up|final thoughts/i.test(currentSegment.text || '');
+
+    if (isSummarySegment) {
+      // End Summary Card: reveals points sequentially as spoken!
+      const totalPoints = board.questions.length;
+      let revealCount = 1;
+      let activeRevealIdx = 0;
+
+      const relTime = Math.max(0, time - segStart);
+      const ptDuration = segDur / Math.max(1, totalPoints);
+      const computedStep = Math.min(totalPoints, Math.floor(relTime / ptDuration) + 1);
+
+      revealCount = Math.max(1, computedStep);
+      activeRevealIdx = Math.min(totalPoints - 1, revealCount - 1);
+
+      drawSummaryCard(
+        ctx,
+        ctx.canvas.width,
+        ctx.canvas.height,
+        progress,
+        board,
+        revealCount,
+        activeRevealIdx
+      );
+    } else {
+      drawWhiteboardRoadmap(
+        ctx,
+        ctx.canvas.width,
+        ctx.canvas.height,
+        currentSegment.text,
+        progress,
+        board,
+        doneCount,
+        activeIndex,
+        { showSpokenSubtitle: false }
+      );
+    }
+
+    // Draw white subtitles at the bottom
+    if (config.showSubtitles !== false && currentSegment.text) {
+      const relTime = Math.max(0, time - segStart);
+      const whiteColor = '#ffffff';
+      drawWhiteboardSubtitles(
+        ctx,
+        ctx.canvas.width,
+        ctx.canvas.height,
+        currentSegment,
+        relTime,
+        whiteColor
+      );
+    }
+  }
+
   // Additive Learn English overlay (narrator teaching card / quiz panel) — no-ops
   // for scripts without learnEnglish tags, so this never affects other renders.
   const isQuizOverlay = currentSegment.learnEnglish?.segmentType === 'quiz' || Boolean(currentSegment.learnEnglish?.quiz);
-  drawLearnEnglishOverlay(
-    ctx, 
-    effectiveScript, 
-    segmentOffsets, 
-    currentSegmentIndex, 
-    time, 
-    isQuizOverlay ? null : (assets.narratorImage ?? null)
-  );
+  if (!hasBoardOverlay) {
+    drawLearnEnglishOverlay(
+      ctx, 
+      effectiveScript, 
+      segmentOffsets, 
+      currentSegmentIndex, 
+      time, 
+      isQuizOverlay ? null : (assets.narratorImage ?? null)
+    );
+  }
 };
+
+// Helper: Auto-derive whiteboard question sheet from script if not explicitly provided
+function deriveNarratorBoard(script: DebateSegment[]): WhiteboardBoardConfig | null {
+  const introSeg = script.find(s => (s.speaker === 'Intro' || s.speaker?.toLowerCase() === 'intro' || s.learnEnglish?.segmentType === 'intro') && s.boardPoint);
+  const title = introSeg?.boardPoint?.trim() || 'DEBATE ROADMAP';
+
+  const questions: string[] = [];
+  script.forEach(s => {
+    const isNarrator = s.speaker === 'Narrator' || s.speaker?.toLowerCase() === 'narrator' || s.learnEnglish?.segmentType === 'narrator';
+    if (isNarrator && s.boardPoint && s.boardPoint.trim()) {
+      questions.push(s.boardPoint.trim());
+    }
+  });
+
+  if (questions.length > 0) {
+    return { title, questions };
+  }
+  return null;
+}

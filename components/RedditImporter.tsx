@@ -120,7 +120,7 @@ const RedditImporter: React.FC<Props> = ({ onAttachContext, onAttachPost, onSkip
     if (!url.trim()) return;
     setInfoLoading(true); setInfoError(''); setPostInfo(null); setPostAttached(false);
     try {
-      const res = await fetch('/api/reddit/info', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/reddit/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -139,7 +139,7 @@ const RedditImporter: React.FC<Props> = ({ onAttachContext, onAttachPost, onSkip
     if (!url.trim()) return;
     setCommentsLoading(true); setCommentsError(''); setComments(null); setCommentsAttached(false);
     try {
-      const res = await fetch('/api/reddit/comments', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/reddit/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, max_comments: maxComments, include_replies: includeReplies, sort }),

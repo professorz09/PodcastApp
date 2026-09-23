@@ -173,7 +173,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
   // Check cookies on mount
   const checkCookies = async () => {
     try {
-      const r = await fetch('/api/health');
+      const r = await fetch('https://autovid-flask.onrender.com/api/health');
       const d = await r.json();
       setHasCookies(!!d.cookies);
     } catch { setHasCookies(false); }
@@ -188,7 +188,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
     setInfoErrorCode('');
     setPostInfo(null);
     try {
-      const res = await fetch('/api/instagram/info', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/instagram/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -221,7 +221,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
 
     try {
       // Start background job — returns immediately with job_id
-      const res = await fetch('/api/instagram/comments', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/instagram/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, max_comments: maxComments }),
@@ -247,7 +247,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
       // Poll for status every 1.5 s
       commentsPollRef.current = setInterval(async () => {
         try {
-          const sr = await fetch(`/api/instagram/comments/status/${jobId}`);
+          const sr = await fetch('https://autovid-flask.onrender.com/api/instagram/comments/status/${jobId}');
           const sd = await safeJson(sr);
 
           if (sd.status === 'scraping') {
@@ -286,7 +286,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`/api/instagram/download/status/${jobId}`);
+        const res = await fetch('https://autovid-flask.onrender.com/api/instagram/download/status/${jobId}');
         const data = await safeJson(res);
         if (data.status === 'downloading') {
           if (typeof data.progress === 'number') setDownloadProgress(data.progress);
@@ -320,7 +320,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
     setDownloadSpeed('');
     setDownloadEta('');
     try {
-      const res = await fetch('/api/instagram/download', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/instagram/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -346,7 +346,7 @@ const InstagramImporter: React.FC<Props> = ({ onAttachContext, onSkip }) => {
     setCookiesUploading(true);
     try {
       const content = await file.text();
-      const r = await fetch('/api/cookies/upload', {
+      const r = await fetch('https://autovid-flask.onrender.com/api/cookies/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),

@@ -35,7 +35,7 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
     setTranscriptLanguage(isHindiScript ? 'hi-IN' : 'en-US');
   }, [isHindiScript]);
 
-  const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'नारेटर', 'Narator', 'narrator', 'NARRATOR', 'Voiceover', 'voiceover', 'VOICEOVER'];
+  const NARRATOR_KEYS = ['Narrator', 'नैरेटर', 'नारेटर', 'Narator', 'narrator', 'NARRATOR', 'Voiceover', 'voiceover', 'VOICEOVER', 'Intro', 'intro', 'INTRO'];
   const isNarrator = (s: string) => NARRATOR_KEYS.some(k => s.trim() === k || s.trim().toLowerCase() === k.toLowerCase());
 
   const uniqueSpeakers = React.useMemo(() => {
@@ -71,8 +71,9 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
 
       uniqueSpeakers.forEach((speaker) => {
         if (!newVoices[speaker]) {
-          if (isNarrator(speaker)) newVoices[speaker] = 'Puck';
-          else {
+          if (isNarrator(speaker)) {
+            newVoices[speaker] = newVoices['Narrator'] || newVoices['Intro'] || 'Puck';
+          } else {
             const gender = speakerGenders[speaker];
             if (gender === 'male') {
               newVoices[speaker] = maleDefaults[maleIdx % maleDefaults.length];
@@ -87,6 +88,14 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
           }
         }
       });
+
+      // Synchronize Intro and Narrator voice so the protagonist sounds identical
+      if (newVoices['Narrator'] && uniqueSpeakers.includes('Intro')) {
+        newVoices['Intro'] = newVoices['Narrator'];
+      } else if (newVoices['Intro'] && uniqueSpeakers.includes('Narrator')) {
+        newVoices['Narrator'] = newVoices['Intro'];
+      }
+
       return newVoices;
     });
   }, [uniqueSpeakers, speakerGenders]);
@@ -1104,7 +1113,15 @@ const AudioGenerator: React.FC<AudioGeneratorProps> = ({ script, onUpdateScript,
                   <div className="relative">
                     <select
                       value={voices[role] || ''}
-                      onChange={(e) => setVoices({ ...voices, [role]: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setVoices(prev => {
+                          const next = { ...prev, [role]: val };
+                          if (role === 'Narrator' && 'Intro' in prev) next['Intro'] = val;
+                          if (role === 'Intro' && 'Narrator' in prev) next['Narrator'] = val;
+                          return next;
+                        });
+                      }}
                       className="w-full bg-black/30 border border-white/5 text-white text-xs rounded-xl px-3 py-2.5 appearance-none focus:outline-none focus:ring-1 focus:ring-purple-500/50 cursor-pointer hover:border-white/10 transition-colors"
                       disabled={loadingVoices}
                     >

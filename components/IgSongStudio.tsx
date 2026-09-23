@@ -142,7 +142,7 @@ const IgSongStudio: React.FC = () => {
     isInitialized.current = true;
 
     // Check cookies (used by /api/instagram/*)
-    fetch('/api/health').then(r => r.json()).then(d => setHasCookies(!!d.cookies)).catch(() => setHasCookies(false));
+    fetch('https://autovid-flask.onrender.com/api/health').then(r => r.json()).then(d => setHasCookies(!!d.cookies)).catch(() => setHasCookies(false));
   }, []);
 
   // Persist key state
@@ -180,7 +180,7 @@ const IgSongStudio: React.FC = () => {
     }
     setInfoLoading(true); setInfoError(''); setPostInfo(null);
     try {
-      const res = await fetch('/api/instagram/info', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/instagram/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim() }),
@@ -204,7 +204,7 @@ const IgSongStudio: React.FC = () => {
     if (scrapePollRef.current) clearInterval(scrapePollRef.current);
     setScrapeLoading(true); setScrapeError(''); setScrapeStatus('Starting…'); setComments(null);
     try {
-      const res = await fetch('/api/instagram/comments', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/instagram/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim(), max_comments: maxFetch }),
@@ -223,7 +223,7 @@ const IgSongStudio: React.FC = () => {
       const jobId = d.job_id;
       scrapePollRef.current = setInterval(async () => {
         try {
-          const sr = await fetch(`/api/instagram/comments/status/${jobId}`);
+          const sr = await fetch('https://autovid-flask.onrender.com/api/instagram/comments/status/${jobId}');
           const sd = await safeJson(sr);
           if (sd.status === 'scraping') {
             setScrapeStatus(sd.message || 'Scraping…');
@@ -312,7 +312,7 @@ const IgSongStudio: React.FC = () => {
     if (dlPollRef.current) clearInterval(dlPollRef.current);
     setDlLoading(true); setDlError(''); setDlProgress(0); setDlSpeed(''); setDlEta(''); setDlFilename('');
     try {
-      const res = await fetch('/api/instagram/download', {
+      const res = await fetch('https://autovid-flask.onrender.com/api/instagram/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim() }),
@@ -328,7 +328,7 @@ const IgSongStudio: React.FC = () => {
       const jobId = d.job_id;
       dlPollRef.current = setInterval(async () => {
         try {
-          const sr = await fetch(`/api/instagram/download/status/${jobId}`);
+          const sr = await fetch('https://autovid-flask.onrender.com/api/instagram/download/status/${jobId}');
           const sd = await safeJson(sr);
           if (sd.status === 'downloading') {
             if (typeof sd.progress === 'number') setDlProgress(sd.progress);

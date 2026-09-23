@@ -135,6 +135,11 @@ export const generateTitleTextPair = async (scriptText: string, scriptStyle?: st
     keywords = 'true crime debate, docu-debate, legal case study, documentary debate';
     channelType = 'true crime and legal debate channels';
     exampleTitle = '"The Lindsay Clancy Case: Justice or Punishment? | Docu-Debate"';
+  } else if (scriptStyle === 'first_person_dilemma' || scriptStyle === 'case_debate') {
+    prefix = 'The personal high-stakes dilemma followed by " | What Should I Do? | Real Life Dilemma Debate"';
+    keywords = 'life advice, dilemma debate, real life dilemma, what should I do, relationship dilemma, financial advice debate, English speaking practice';
+    channelType = 'dilemma and advice debate channels';
+    exampleTitle = '"I Discovered $50,000 Hidden Debt — What Should I Do? | Real Life Dilemma Debate"';
   } else if (scriptStyle) {
     // If a different style is provided that we don't have a specific rule for
     prefix = 'A compelling, highly clickable, and searchable title relevant to the topic (No strict prefix required, but make it catchy)';
@@ -149,7 +154,7 @@ DESCRIPTION RULES — a comprehensive, highly optimized YouTube video descriptio
 - Keep it 3-4 professional, SEO-packed paragraphs.
 `;
 
-  const englishLearningStyles = ['podcast', 'debate', 'interview', 'roleplay', 'situational', 'casual'];
+  const englishLearningStyles = ['podcast', 'debate', 'interview', 'roleplay', 'situational', 'casual', 'case_debate', 'first_person_dilemma'];
   if (englishLearningStyles.includes(scriptStyle || '')) {
     descriptionRules = `
 DESCRIPTION RULES — MUST FOLLOW THIS EXACT TEMPLATE STRUCTURE:
@@ -388,7 +393,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.5-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'first_person_dilemma' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -1640,12 +1645,19 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
         } else if (style === 'case_debate') {
           prompt = `
               ═══════════════════════════════════════
-              STYLE: CASE DEBATE — एक इंसान की असली दुविधा, सवालों में तोड़ी हुई
-              Narrator एक specific इंसान का real, relatable dilemma introduce करता है
-              (relationship, money, family, moral, या AI-era decision)। फिर उस dilemma को
-              4-7 concrete sub-questions में तोड़ा जाता है, और दो hosts — जिनकी सोच genuinely
-              अलग है — हर sub-question पर बारी-बारी debate करते हैं। generic "for vs against"
-              नहीं — हमेशा इसी एक इंसान की specific situation पर grounded।
+              STYLE: CASE DEBATE / DILEMMA DEBATE — एक इंसान की असली दुविधा, सवालों में तोड़ी हुई ROADMAP
+              Narrator एक specific इंसान का real, high-stakes dilemma introduce करता है
+              (relationship, money, family, moral, ethical, या AI-era decision)। फिर उस dilemma को
+              3-6 concrete sub-questions में तोड़ा जाता है, और दो hosts — जिनकी सोच genuinely
+              अलग है — हर sub-question पर बड़े-बड़े, ठोस paragraphs में बारी-बारी debate करते हैं।
+              Generic "for vs against" नहीं — हमेशा इसी एक इंसान की specific situation, numbers, psychology और consequences पर grounded।
+
+              Top dilemma topics to draw inspiration from:
+              - The Trolley Problem: Train divert karke 1 ko maro ya kuch na karke 5 ko marne do?
+              - A 30-Year-Old Man Doesn't Enjoy Sex Anymore, But His Wife Does — What Should He Do?
+              - A Woman Discovers Her Husband Is Hiding $50,000 in Debt — What Should She Do?
+              - AI Can Save 1,000 Jobs but Destroy 10,000 — Should the Company Deploy It?
+              - Investing vs Saving: He Has $50,000 — Should He Invest for Growth or Keep it Safe?
 
               🚨 Output array ka BILKUL PEHLA element hamesha ek turn hona chahiye jiska speaker tag
               EXACTLY "Intro" ho (NAHI "Narrator") jisme poori 3-5 line ki opening situation ho (neeche
@@ -1656,7 +1668,7 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               विषय: "${topic}"
               ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
               ${durLineHi}
-              भाषा: हिंदी + Hinglish (natural, emotionally grounded — जैसे दो smart दोस्त genuinely असहमत हों, formal debate नहीं)।
+              भाषा: हिंदी + Hinglish (natural, emotionally grounded, deep philosophical friction — जैसे दो intellectual दोस्त genuinely असहमत हों, formal debate नहीं)।
 
               पात्र — ठीक 4 speaker tags (fixed):
               - Intro: SIRF sabse pehla turn (opening situation, Turn 1 neeche) — speaker tag exactly
@@ -1669,87 +1681,165 @@ Speaker B (Curious): अलग नाम choose करो — audience जो �
               }
 
               ══════════════════════════════════════════
-              【 TURN 1 (SPEAKER TAG "Intro") — SITUATION — MANDATORY, chhota mat karo ya skip mat karo 】
+              【 TURN 1 (SPEAKER TAG "Intro") — CHARACTER & SITUATION SETUP — MANDATORY 】
               ══════════════════════════════════════════
               🔴 Is turn ka speaker tag EXACTLY "Intro" hona chahiye — "Narrator" NAHI. Ye apna poora, alag
-              turn hai aur poori video mein SABSE PEHLE bola jaata hai — audience ko abhi tak kuch pata
-              nahi hai, isliye sirf isi turn ko poori situation samjhani hai, sirf bare facts nahi. Ye 3-5
-              COMPLETE lines ka hona chahiye aur in sabko cover karna hai, order mein:
+              turn hai aur poori video mein SABSE PEHLE bola jaata hai. Audience ko story mehsoos honi chahiye:
+              Ek specific character ke saath shuru karo: "Imagine a 30-year-old man named Alex... / Dekho ek 34-year-old architect Sarah..."
+              Ye 3-5 COMPLETE lines ka hona chahiye aur in sabko cover karna hai, order mein:
               1. KAUN — ek specific इंसान naam ke saath, concrete believable details ke saath (age, job/context).
-              2. KYA — exactly kya ho raha hai / kaunsa decision abhi lena hai, aur ABHI hi kyu (koi trigger
-                 event) — koi vague situation nahi jo hamesha se aise hi hai.
-              3. DONO SIDES KE STAKES — har option mein kya milega ya kya risk hai, briefly par specifically
-                 (real numbers/consequences, "achha ya bura ho sakta hai" jaisa vague nahi) — yahi cheez ise
-                 genuinely hard decision banati hai, obvious nahi — aur yahi cheez audience ko hosts ke
-                 arguments shuru hone se PEHLE hi torn feel karwati hai.
-              KAUN se seedha question par mat kudo — viewer ko samajhna chahiye ki ye HARD KYU hai, sirf
-              KYA choice hai wo nahi.
-              जैसे: "जेम्स 30 साल का है। उसकी stable ₹70K/month job है, कोई debt नहीं, और ₹5 लाख savings में पड़े हैं।
-              Company ने abhi layoffs ka announce kiya hai, isliye job security ab guaranteed nahi rahi — lekin
-              ₹5 लाख invest karne se 10 saal mein significantly grow ho sakte hain, jabki cash mein rakhne se
-              growth miss hoti hai par job jaane par full safety net milta hai। Invest करे long-term growth के लिए,
-              ya safe रखे?"
-              Turn 1 ko ek clear, direct MAIN QUESTION par khatam karo jiske ird-gird poora episode ghoomega.
+              2. KYA — exactly kya crisis ya fork-in-the-road abhi trigger hua hai.
+              3. DONO SIDES KE STAKES — har option mein kya milega ya kya risk hai, concrete numbers ya psychological consequences ke saath.
+              Jaise: "James is 30 years old, earns $70,000 a year, has zero debt, and has $50,000 in savings. His company just signaled that massive layoffs are coming next quarter. Agar wo cash safe rakhta hai toh full safety net hai par 10 saal ki compound growth miss hogi; agar market mein invest karta hai toh job jaane par forced loss mein bechna padega. What should he do? [Invest or play it safe?]"
+              Turn 1 ko ek clear, direct MAIN QUESTION par khatam karo.
               🔴 CRITICAL — is turn ke text ke bilkul aakhir mein main question ka ek chhota bracketed heading
-              jodo, जैसे: ...invest kare ya safe rakhe? [Invest kare ya safe rakhe?]
-              Bracket sirf on-screen display ke liye silent tag hai — kabhi bola nahi jaata, isliye bracket se
-              pehle wala sentence khud mein complete aur natural rehna chahiye.
+              jodo, jaise: ...What should he do? [Invest or play it safe?]
+              Bracket screen roadmap ke liye silent tag hai — kabhi bola nahi jaata.
 
               ══════════════════════════════════════════
-              【 TURN 2 (SPEAKER TAG "Narrator") — PEHLE SUB-QUESTION MEIN — Turn 1 se ALAG turn 】
+              【 TURN 2 (SPEAKER TAG "Narrator") — PEHLE SUB-QUESTION MEIN TRANSITION 】
               ══════════════════════════════════════════
-              Turn 1 ke turant baad, ek NAYE alag turn mein jiska speaker tag "Narrator" ho (NAHI "Intro" —
-              "Intro" sirf Turn 1 ke liye hai), pehla sub-question introduce karo
-              (neeche Hosts section dekho ki sub-question transition kaisi dikhti hai). Narrator se sare
-              sub-questions pehle ek saath mat bulwao — audience screen par poori question sheet already
-              dekh raha hoga, toh sab pehle bata dena sirf repeat lagega.
+              Turn 1 ke turant baad, ek NAYE alag turn mein jiska speaker tag "Narrator" ho, pehla sub-question introduce karo.
+              🔴 CRITICAL — is line ke bilkul aakhir mein chhota bracketed heading (under 8 words) jodo,
+              jaise: "Let's break this dilemma down. First: how much emergency fund does he need before investing a dime? [Emergency fund first?]"
+              Sare future questions pehle ek saath bolne ki zaroorat nahi hai, whiteboard screen par dikhayega.
 
               ══════════════════════════════════════════
-              【 HOSTS — एक-एक SUB-QUESTION पर DEBATE 】
+              【 HOSTS — BADE BADE PARAGRAPHS MEIN DEBATE 】
               ══════════════════════════════════════════
-              Dilemma ko 4-7 concrete sub-questions mein todo. Har ek ke liye, order mein (pehla wala Turn 2
-              hai; baad wale bhi isi tarah apna-apna alag Narrator turn honge):
-              - Narrator us specific sub-question ko ek natural line mein introduce kare (form item ki tarah
-                nahi) — yahi ek jagah hai jahan wo sub-question bola jaata hai.
-                🔴 CRITICAL — is line ke bilkul aakhir mein sirf usi sub-question ka chhota bracketed version
-                jodo, jaise: To — emergency fund pehle kitna chahiye? [Emergency fund pehle?]
-                Wahi rule — bracket silent/on-screen-only hai, kabhi bola nahi jaata.
-              - दोनों hosts उसी sub-question पर अपनी OWN real position दें — सिर्फ एक-दूसरे को react नहीं
-                करते, हर एक genuinely कुछ मानता है और उसके लिए argue करता है।
-              - Arguments Turn 1 mein establish hui SPECIFIC stakes/details mein grounded ho — actual
-                numbers, actual trigger event, actual इंसान ki situation — generic advice nahi jo kisi
-                pe bhi apply ho jaaye. Host aise sound kare jaise specifically James ke ₹5 लाख aur James
-                ke layoff risk ki baat kar raha hai, kabhi general financial gyaan recite karte hue nahi।
-              - Real back-and-forth: हर sub-question पर 3-8 turns, alternating, genuine reactions के साथ
-                ("रुक, लेकिन—", "ठीक है पर फिर—")।
-              - हर turn 1-2 पूरे sentences का हो और किसी concrete चीज़ का reference हो — number, नाम,
-                real consequence — सिर्फ vibe या abstract principle नहीं।
-              - कोई technical/financial/legal term आए तो उसे तुरंत एक concrete example या comparison से simple करो —
-                jargon dump कभी नहीं।
-              - अगले sub-question पर तभी बढ़ो जब इस पर genuine tension या disagreement आ चुका हो।
+              Dilemma ko 3-6 concrete sub-questions mein todo. Har ek ke liye:
+              - Narrator us specific sub-question ko ek natural line mein introduce kare with bracket:
+                e.g.: "Moving to the second dilemma: does waiting for market clarity ever work? [Timing vs market risk]"
+              - DONO hosts us question par BADE-BADE PARAGRAPHS (3 se 6 complete, articulate sentences per turn) mein debate karein!
+                1-2 line ke chhote dialogues STRICTLY BANNED hain.
+                Har host apna poora argument build kare:
+                * Psychology, morality, financial calculations, aur real life trade-offs samjhaye.
+                * Character ko naam se address kare aur Turn 1 ke exact numbers/stakes ko refer kare.
+                * Dusre host ke blind spots ko directly challenge kare.
+              - Real back-and-forth: 2-4 substantial turns per host for each sub-question.
 
               ══════════════════════════════════════════
-              【 CLOSING — आप क्या करते? 】
+              【 CONCLUSION — FINAL VERDICTS & AUDIENCE TAKEAWAY 】
               ══════════════════════════════════════════
-              आखिरी sub-question के बाद, Narrator सीधे audience से पूछे: "तो — अगर आप [नाम] की जगह होते तो क्या करते?"
-              Is line mein koi bracket mat jodo — ye recap moment hai, koi naya point nahi।
-              फिर दोनों hosts अपनी एक final, honest, personal position दें — दोनों का agree करना ज़रूरी नहीं,
-              और किसी को "सही" घोषित नहीं किया जाता।
-              Narrator एक sharp, thought-provoking final line से खत्म करे। कोई moralizing नहीं, कोई neat bow नहीं।
+              Sare sub-questions debate hone ke baad, conclusion section:
+              1. Narrator Turn: "So after weighing all the consequences, where do we stand? What is the final verdict for [Character's Name]?"
+                 (Isme bracket mat lagao).
+              2. Host 1 Concluding Turn: Ek poora, substantial paragraph apna definitive verdict aur philosophy dete hue.
+              3. Host 2 Concluding Turn: Ek poora, substantial paragraph apna opposing verdict aur philosophy dete hue.
+              4. Narrator Closing Turn: "Now the choice is in your hands — if you were in [Character's Name]'s shoes, what would YOU do?"
 
               ══════════════════════════════════════════
-              HARD RULES:
+              NON-NEGOTIABLE HARD RULES:
               ══════════════════════════════════════════
+              ✓ Turn 1 speaker tag MUST be exactly "Intro"
+              ✓ Host turns must be SUBSTANTIAL PARAGRAPHS (3-6 sentences), never short 1-liners
               ✓ दोनों hosts की एक REAL, specific position हो — सिर्फ दूसरे को react नहीं करते
               ✓ हर sub-question पर genuine disagreement हो, politely agree करना नहीं
               ✓ पूरे script में concrete details — real number, real नाम, real consequence
-              ✓ Har bracketed heading SHORT ho (8 words se kam) aur English mein ho — ye ek screen label hai,
-                sentence nahi
+              ✓ Har bracketed heading SHORT ho (8 words se kam) aur English mein ho — ye ek screen label hai, sentence nahi
+              ✓ Only Turn 1 and Narrator question turns have [bracketed] tags
+              ✗ Bracket sirf Narrator ki opening line aur har Narrator sub-question transition line ke bilkul aakhir mein hi aaye — hosts ki lines aur closing mein KABHI nahi
               ✗ सीधे "balanced" answer पर मत कूदो — tension ही video है
-              ✗ Banned: "ध्यान देने योग्य है", "निष्कर्ष में", "आइए जानते हैं", "अंत में"
-              ✗ कोई obvious winner नहीं — audience genuinely torn महसूस करे
-              ✗ Bracket sirf Narrator ki opening line aur har Narrator sub-question transition line ke bilkul
-                aakhir mein hi aaye — hosts ki lines aur closing mein KABHI nahi
+              ✗ Banned: "In conclusion", "At the end of the day", "It's important to remember", "ध्यान देने योग्य है", "निष्कर्ष में", "आइए जानते हैं", "अंत में"
+              ✗ No obvious winner — audience genuinely torn feel kare
+               ══════════════════════════════════════════
+              ${durFillHi}
+          `;
+        } else if (style === 'first_person_dilemma') {
+          prompt = `
+              ═══════════════════════════════════════
+              STYLE: FIRST-PERSON DILEMMA (1ST PERSON POV + 2 ADVISORS GUIDANCE & DEBATE) — "मैं खुद हूँ"
+              🔴 CRITICAL: यहाँ Narrator किसी तीसरे इंसान (Alex/Rahul) की कहानी नहीं सुनाता — NARRATOR KHUD WO PERSON HAI!
+              🔴 DYNAMIC TOPIC ADAPTATION: User ka topic jo bhi ho (Finance, Debt Trap, Rent vs Buy Home, Marriage/Sex-life Dilemma, Career/Startup, Savings) — SCRIPT USI EXACT SCENARIO PAR HI BANEGI! Topic ko change mat karna.
+
+              🇺🇸 USA / WESTERN CONTEXT & HIGH-CPM ALGORITHM TARGETING:
+              - Setting ko USA / Western foreign context par anchor karo (unless user explicitly India kahe).
+              - Financials: US Dollars ($), realistic US figures ($70k-$120k salary, $40k-$80k debt/savings, 6.8% mortgage rate).
+              - US Keywords & Lifestyle: Mention US cities (e.g., Austin, TX; Seattle, WA; Denver, CO; Chicago, IL), 401(k), High-Yield Savings Account (HYSA), FICO Credit Score, student loans, mortgage interest, HOA fees, US healthcare/therapy norms.
+              - Isse script me organic high-value SEO keywords aayenge jo USA & global YouTube algorithm ko target karenge!
+
+              ═══════════════════════════════════════
+              विषय/Topic: "${topic}"
+              ${specificDetails ? `परिस्थिति का विवरण: ${specificDetails}` : ''}
+              ${durLineHi}
+              भाषा: हिंदी + Hinglish (deep emotional stakes, natural first-person storytelling, sharp intellectual debate)।
+
+              पात्र — ठीक 4 speaker tags (fixed):
+              - Intro: SIRF sabse pehla turn (Turn 1) — NARRATOR KHUD WO PERSON HAI jo first person ("Main", "Mera", "Mujhe") me apna introduction aur situation bata raha hai. Speaker tag EXACTLY "Intro" hona chahiye.
+              - Narrator: uske baad ke saare person ke turns — har sub-question puchna, beech me aakar samasya/darr batana, aur closing verdict lena.
+              - 2 Hosts / Advisors:
+              ${speakers.length >= 2
+                ? `इन नामों का उपयोग करें: ${speakers[0]} और ${speakers[1]}.`
+                : `Topic के हिसाब से 2 distinct advisor names चुनो — ek conservative/risk-averse strategist aur dusra aggressive/growth-oriented mentor.`
+              }
+
+              ══════════════════════════════════════════
+              【 TURN 1 (SPEAKER TAG "Intro") — EXTREME VIRAL HOOK & FIRST-PERSON SITUATION 】
+              ══════════════════════════════════════════
+              🔴 Is turn ka speaker tag EXACTLY "Intro" hona chahiye — "Narrator" NAHI.
+              🔴 OPENING LINE MUST BE A POWERFUL VIRAL HOOK: Pehle 3 seconds me audience ko shock ya high tension feel hona chahiye.
+                 - E.g. Finance/Debt: "Meri salary $85,000 hai, lekin main pichle 2 saal se $50,000 ke credit card debt ke neeche dab chuka hoon aur mujhe rone ka mann karta hai..."
+                 - E.g. Rent vs Buy: "Maine pichle 5 saal mein $90,000 cash save kiya hai, lekin 7% mortgage interest rate ne meri neend uda di hai..."
+                 - E.g. Marriage/Intimacy: "Main apni wife se beinteha pyar karta hoon, lekin pichle ek saal se hamari intimacy zero ho chuki hai aur main andar se toot raha hoon..."
+              🔴 STRICT FIRST PERSON POV: Person KHUD bol raha hai — "Mera naam [Name] hai, main [age] saal ka hoon, [US City] me rehta hoon...".
+                 KISI TEESRE INSAAN KI STORY NAHI HAI ("Meet Rahul" ya "Imagine Alex" STRICTLY BANNED HAI).
+              Ye 4-6 COMPLETE lines ka hona chahiye aur in sabko cover kare:
+              1. HOOK + IDENTITY: Gripping confession, naam, age, profession, aur US city.
+              2. HARD REALITY & NUMBERS: Concrete details (salary, savings, interest rates, debt, monthly EMI/bills, family expectations).
+              3. HIGH STAKES OF BOTH CHOICES: Option A chunne par kya fayda/khatra hai; Option B chunne par kya fayda/khatra hai.
+              4. DIRECT QUESTION TO ADVISORS & AUDIENCE: "Ab aap hi dono aur audience batayein: kya mujhe [Option A] karna chahiye ya [Option B]? [Option A vs Option B]"
+              🔴 CRITICAL: Is turn ke aakhir me ek chhota silent bracketed tag jodo: [Option A vs Option B] (under 8 words, English).
+
+              ══════════════════════════════════════════
+              【 TURN 2 (SPEAKER TAG "Narrator") — FIRST SUB-QUESTION 】
+              ══════════════════════════════════════════
+              Turn 1 ke turant baad, ek NAYE turn me jiska speaker tag "Narrator" ho, wo person apne advisors se pehla concrete sub-question puchega:
+              e.g.: "Aap dono mere sabse trusted mentors ho. Pehla sabse bada sawaal jo mujhe pareshan kar raha hai: kya mujhe pehle [Specific Dilemma]? [Sub-Question Tag]"
+              Ending me bracketed heading jodo (under 8 words).
+
+              ══════════════════════════════════════════
+              【 ADVISORS — PERSON KO DIRECT ADDRESS KARKE DETAILED SOLUTIONS & DEBATE 】
+              ══════════════════════════════════════════
+              Dono hosts person ko NAAM se address karte hain aur real actionable guidance dete hain:
+              - Advisor 1: "[Name], meri advice dhyan se suno. Tumhari situation me..." (lays out a concrete roadmap with numbers, psychological safety, or Dave Ramsey-style discipline).
+              - Advisor 2: "[Name], Advisor 1 ki baat bilkul mat sunna! Yeh paper par accha lagta hai lekin real life me..." (challenges with counter-risks, wealth leverage, or modern lifestyle solutions).
+              - BADE-BADE PARAGRAPHS (3 se 6 complete sentences per speaker turn). Chhote 1-liners BANNED hain.
+              - Dono ek-doosre ke blind spots ko ujaagar karte hain aur person ke liye better actionable solutions nikalte hain.
+
+              ══════════════════════════════════════════
+              【 NARRATOR BEECH ME BOLEGA (REAL HURDLE / FEAR / SAMASYA) 】
+              ══════════════════════════════════════════
+              Advisors ki debate ke baad, Narrator (person khud) BEECH ME AAYEGA:
+              - Apni sachhi samasya ya darr samne rakhega:
+                e.g.: "Lekin [Advisor 1], isme ek sabse badi samasya yeh hai ki... [give real-world obstacle like credit score drops, spouse feels hurt, emergency fund runs out]. Kya tab bhi mujhe yeh karna chahiye? [Specific Obstacle Tag]"
+              - Ya agla sub-question puchega:
+                e.g.: "Aap dono ki baat sunkar yeh toh samajh aaya, lekin ab mera doosra sawaal yeh hai... [Next Question Tag]"
+              - Ending me silent bracketed tag [Short Tag].
+              - Dono advisors turant us nayi samasya par debate karte hain aur concrete solutions dete hain!
+              - Ye interactive flow 3 se 5 questions / hurdles tak chalta rahega!
+
+              ══════════════════════════════════════════
+              【 CONCLUSION — FINAL VERDICTS & AUDIENCE VOTE 】
+              ══════════════════════════════════════════
+              1. Narrator (Person) Turn: "Aap dono ke arguments sunne ke baad meri aankhein khul gayi hain. Decision abhi bhi aasan nahi hai, lekin reality saaf dikh rahi hai."
+              2. Advisor 1 Closing Turn: Ek poora paragraph definitive closing rule / verdict person ko dete hue.
+              3. Advisor 2 Closing Turn: Ek poora paragraph opposing closing rule / verdict person ko dete hue.
+              4. Narrator Closing Turn: Person sidha AUDIENCE se sawaal puchega:
+                 "Ab faisla aapke haath me hai — agar aap meri jagah hote, toh aap kya chun-te? Option A ya Option B? Mujhe comments me zaroor batayein!"
+
+              ══════════════════════════════════════════
+              NON-NEGOTIABLE HARD RULES:
+              ══════════════════════════════════════════
+              ✓ STRICT FIRST PERSON POV: Narrator KHUD WO PERSON HAI ("Main", "Mera naam [Name] hai"). 3rd person narration ("Meet Alex") STRICTLY FORBIDDEN!
+              ✓ Turn 1 MUST open with a powerful scroll-stopping hook and have speaker tag "Intro".
+              ✓ US/Western context by default ($ figures, US cities, US financial/relationship keywords).
+              ✓ Subsequent person turns MUST be speaker tag "Narrator".
+              ✓ Dono advisors person ko NAAM se address karein ("Rahul, dekho...", "[Name], meri baat suno...").
+              ✓ Advisors turns must be SUBSTANTIAL PARAGRAPHS (3-6 sentences), providing actionable advice & contrasting solutions.
+              ✓ Person beech me aakar genuine samasya/darr bataye ("Lekin isme samasya yeh hai... kya main yeh karun?").
+              ✓ Only Turn 1 and Narrator question/intervention turns have [bracketed] tags (under 8 words, English).
+              ✓ Banned: "In conclusion", "At the end of the day", "ध्यान देने योग्य है", "निष्कर्ष में".
+              ✓ No obvious easy winner — choices feel genuinely agonizing.
               ══════════════════════════════════════════
               ${durFillHi}
           `;
@@ -3743,118 +3833,205 @@ Speaker B (Curious): choose a different name — asks what the audience is think
         } else if (style === 'case_debate') {
           prompt = `
             ═══════════════════════════════════════
-            STYLE: CASE DEBATE — ONE CHARACTER'S REAL DILEMMA, BROKEN INTO QUESTIONS
-            A Narrator introduces ONE specific person facing a real, relatable life dilemma
-            (relationship, money, family, moral, or AI-era decision). The dilemma is then
-            broken into 4-7 concrete sub-questions, and two hosts with genuinely different
-            worldviews debate EACH sub-question in turn — never generic "for vs against"
-            rambling, always grounded in this one character's specific situation.
+            STYLE: CASE DEBATE / DILEMMA DEBATE — ONE CHARACTER'S REAL DILEMMA, BROKEN INTO QUESTIONS ROADMAP
+            A gripping, character-driven dilemma debate. The video begins with a rich, cinematic situation setup
+            introducing ONE specific person facing a high-stakes, relatable dilemma (relationship, financial,
+            ethical, corporate, or AI-era decision). The dilemma is then mapped into 3-6 concrete sub-questions
+            displayed on a visual roadmap. Two debate hosts with passionately opposing philosophies debate EACH
+            sub-question in deep, substantial paragraphs — articulating real arguments, psychology, numbers, and consequences.
+
+            Examples of the calibre of dilemmas to model:
+            - The Trolley Problem: Divert the train to kill one person, or do nothing and allow five to die?
+            - A 30-Year-Old Man Doesn't Enjoy Sex Anymore, But His Wife Does — What Should He Do?
+            - A Woman Discovers Her Husband Is Hiding $50,000 in Debt — What Should She Do?
+            - AI Can Save 1,000 Jobs but Destroy 10,000 — Should the Company Deploy It?
+            - Investing vs Saving: He Has $50,000 — Should He Invest for Growth or Keep it Safe?
 
             🚨 THE VERY FIRST ELEMENT OF THE OUTPUT ARRAY MUST BE A TURN WITH SPEAKER TAG EXACTLY
             "Intro" (NOT "Narrator") CONTAINING THE FULL 3-5 SENTENCE OPENING SITUATION (see TURN 1
             below) — this is not optional and is never skipped, shortened to one line, or merged with
-            anything else. A viewer who has seen nothing yet MUST understand who this is about and what
-            the dilemma is before any debate starts.
+            anything else. A viewer who has seen nothing yet MUST understand who this character is, what
+            their situation is, and why the stakes are genuinely agonizing before any debate starts.
             ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Additional context: ${specificDetails}` : ''}
             ${durLineEn}
-            Language: ${language}. Tone: natural, conversational, emotionally grounded — two smart friends who genuinely disagree, not a formal debate.
+            Language: ${language}. Tone: natural, conversational, deeply engaging, intellectually rigorous — two passionate, articulate thinkers who genuinely disagree, not a surface-level talk show.
 
             Characters — exactly 4 speaker tags (fixed):
             - Intro: ONLY the very first turn (the opening situation, Turn 1 below) — speaker tag must be
               exactly "Intro", never "Narrator"
-            - Narrator: everything after that — transitions into each sub-question, and the closing
-            - 2 Hosts:
+            - Narrator: everything after that — transitions into each sub-question, and the concluding wrap-up
+            - 2 Debate Hosts:
             ${speakers.length >= 2
               ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
-              : `Choose two fresh, topic-appropriate names for the hosts — people who would naturally take genuinely different sides on THIS specific dilemma.`
+              : `Choose two fresh, topic-appropriate names for the hosts — thinkers who naturally take genuinely opposing, uncompromising sides on THIS specific dilemma.`
             }
 
             ══════════════════════════════════════════
-            【 TURN 1 (SPEAKER TAG "Intro") — THE SITUATION — MANDATORY, DO NOT SHORTEN OR SKIP 】
+            【 TURN 1 (SPEAKER TAG "Intro") — CHARACTER & SITUATION SETUP — MANDATORY 】
             ══════════════════════════════════════════
             🔴 Speaker tag for this turn MUST BE EXACTLY "Intro" — NOT "Narrator". This is its own full
-            turn and the FIRST thing spoken in the whole video — the audience has no idea what's going on
-            yet, so this turn alone has to make them understand the full scenario, not just the bare facts.
-            It must be 3-5 COMPLETE sentences and cover ALL of these, in order:
-            1. WHO — one specific person by name, with concrete believable details (age, job/context).
-            2. WHAT — exactly what's happening / what decision they're now facing, and what triggered it
-               right now (not a vague situation that's been true forever).
-            3. THE STAKES ON BOTH SIDES — what they gain or risk with EACH option, briefly but specifically
-               (real numbers/consequences, not "it could go well or badly") — this is what makes it a genuinely
-               hard decision instead of an obvious one, and it's what the audience needs to actually feel torn
-               before the hosts even start arguing.
-            Do not skip straight from WHO to the question — a viewer must understand WHY this is hard, not
-            just WHAT the choice is.
-            e.g. "James is 30. He's got a stable $70K job, no debt, and $50,000 sitting in savings. His
-            company just announced layoffs are coming, so that job security isn't guaranteed anymore — but
-            investing the $50K could grow it significantly over 10 years, while keeping it in cash means
-            missing that growth but having a full safety net if he's let go. Should he invest it for
-            long-term growth, or keep it safe in case something goes wrong?"
+            turn and the FIRST thing spoken in the whole video. The audience needs to see and feel the story:
+            Build the situation around a clear character: "Imagine a 30-year-old man named Alex... / Meet Sarah, a 34-year-old architect... / Consider Marcus..."
+            It must be 3-5 COMPLETE, vivid sentences covering:
+            1. WHO — one specific person with believable details (name, age, profession/life context).
+            2. WHAT — exactly what crisis, discovery, or fork-in-the-road has occurred right now.
+            3. THE STAKES ON BOTH SIDES — what they stand to gain or lose with each choice, with concrete numbers,
+               emotional risks, or irreversible consequences. This is what makes it a genuine moral or strategic
+               paradox where reasonable people tear each other apart.
+            e.g.: "James is 30 years old, earns $70,000 a year, has zero debt, and has scraped together exactly $50,000 in savings. His company just signaled that massive layoffs are imminent next quarter, completely shaking his sense of stability. If he leaves the $50,000 in cash, he has a bulletproof safety net, but he forfeits a decade of critical compound growth in an inflationary economy. If he invests it all into the market today, he could secure his long-term freedom, but if he loses his job tomorrow, he risks being forced to sell at a loss just to pay rent. What should he do? [Invest or play it safe?]"
             End Turn 1 with ONE clear, direct MAIN QUESTION the whole episode revolves around.
             🔴 CRITICAL — append this turn's text with a short bracketed heading version of that main
-            question, e.g.: ...should he invest it, or keep it safe? [Invest or play it safe?]
-            The bracket is a SILENT tag for on-screen display only — it is never spoken, so keep the
-            spoken sentence before it complete and natural on its own.
+            question, e.g.: ...What should he do? [Invest or play it safe?]
+            The bracket is a SILENT tag for the on-screen roadmap title — it is never spoken aloud.
 
             ══════════════════════════════════════════
-            【 TURN 2 (SPEAKER TAG "Narrator") — INTO THE FIRST SUB-QUESTION — A SEPARATE TURN FROM TURN 1 】
+            【 TURN 2 (SPEAKER TAG "Narrator") — FIRST SUB-QUESTION TRANSITION 】
             ══════════════════════════════════════════
-            Immediately after Turn 1, in a NEW separate turn with speaker tag "Narrator" (not "Intro" —
-            "Intro" is used ONLY for Turn 1), introduce the first sub-question
-            (see the Hosts section below for what a sub-question transition looks like). Do NOT have the
-            Narrator separately list out all the sub-questions before this — the audience sees the full
-            question sheet on screen as it comes up, so reading the whole list out loud first would just
-            repeat what they're already reading.
+            Immediately after Turn 1, in a NEW separate turn with speaker tag "Narrator" (not "Intro"),
+            introduce the first concrete sub-question.
+            🔴 CRITICAL — append this line with a short bracketed heading (under 8 words), e.g.:
+            "Let's break this dilemma down. First: how much of an emergency fund does he actually need before touching a single dollar? [Emergency fund first?]"
+            Do NOT list all future questions out loud at once — the visual whiteboard on screen displays the roadmap.
 
             ══════════════════════════════════════════
-            【 HOSTS — DEBATE, ONE SUB-QUESTION AT A TIME 】
+            【 HOSTS — DEBATE IN SUBSTANTIAL PARAGRAPHS ("bade bade paragraphs") 】
             ══════════════════════════════════════════
-            Break the dilemma into 4-7 concrete sub-questions. For EACH one, in order (the first one is
-            Turn 2 above; later ones are their own Narrator turn the same way):
-            - The Narrator introduces THAT specific sub-question in one natural line (not read like a
-              form item) — this is the ONLY place that sub-question gets stated out loud.
-              🔴 CRITICAL — append this line with a short bracketed version of just that sub-question,
-              e.g.: So — how much of an emergency fund does he actually need first? [Emergency fund first?]
-              Same rule as above: the bracket is silent/on-screen-only, never spoken.
-            - Both hosts give their OWN real position on THAT sub-question — not just reacting to each
-              other, each one actually believes something and argues for it.
-            - Ground arguments in the SPECIFIC stakes/details established in Turn 1 — the actual numbers,
-              the actual trigger event, the actual person's situation — not generic advice that could apply
-              to anyone. A host should sound like they're talking about James's $50K and James's layoff risk
-              specifically, never like they're reciting general financial wisdom.
-            - Real back-and-forth: 3-8 turns per sub-question, alternating, with genuine reactions
-              ("Wait, but—", "Okay sure, but what about—").
-            - Every turn is 1-2 full sentences and references something concrete — a number, a name,
-              a real consequence — never just vibes or abstract principle.
-            - If a technical/financial/legal term comes up, simplify it immediately with one concrete
-              example or comparison — never a jargon dump.
-            - Move to the next sub-question only once this one has a real moment of tension or disagreement.
+            Break the dilemma into 3-6 concrete sub-questions. For EACH one:
+            - The Narrator introduces THAT specific sub-question in one natural line ending with a bracketed tag:
+              e.g.: "Moving to the second dilemma: does waiting for market clarity ever actually work? [Timing vs market risk]"
+            - BOTH hosts debate that question in SUBSTANTIAL, WELL-DEVELOPED PARAGRAPHS (3 to 6 rich, thoughtful sentences per speaker turn).
+              DO NOT write short 1-line or 2-line quips! Each host must build a thorough argument:
+              * Unpack the psychology, ethics, financial math, or human cost of their stance.
+              * Address the character by name and ground points in the specific numbers or stakes established in Turn 1.
+              * Provide counter-analogies, challenge the other host's blind spots, and defend their core principle.
+              * Maintain intense, respectful, intellectual friction. Neither host yields easily.
+            - Real back-and-forth: 2-4 substantial turns per host for each sub-question before moving to the next.
 
             ══════════════════════════════════════════
-            【 CLOSING — WHAT WOULD YOU DO? 】
+            【 CONCLUSION — FINAL VERDICTS & AUDIENCE TAKEAWAY 】
             ══════════════════════════════════════════
-            After the last sub-question, the Narrator turns to the audience directly: "So — what would
-            YOU do in [name]'s position?" (or equivalent, in ${language}). Do NOT add a bracket to this
-            line — this is the recap moment, not a new point.
-            Then each host gives ONE final, honest, personal position — they do NOT have to agree, and
-            neither is declared "right".
-            Narrator closes with ONE sharp, thought-provoking final line. No moralizing, no neat bow.
+            After the final sub-question debate has completed, transition into a dedicated conclusion:
+            1. Narrator Turn: "So after weighing all the consequences, where do we stand? What is the final verdict for [Character's Name]?"
+               (No bracket on this line).
+            2. Host 1 Concluding Turn: A full, comprehensive paragraph delivering their definitive advice, closing rationale, and philosophical principle.
+            3. Host 2 Concluding Turn: A full, comprehensive paragraph delivering their opposing verdict, closing rationale, and philosophical principle.
+            4. Narrator Closing Turn: A sharp, thought-provoking concluding line addressing the audience directly:
+               "Now the choice is in your hands — if you were in [Character's Name]'s shoes, what would YOU do?"
 
             ══════════════════════════════════════════
             NON-NEGOTIABLE RULES:
             ══════════════════════════════════════════
-            ✓ Both hosts hold a REAL, specific position — not just reacting to the other person
-            ✓ Every sub-question gets genuine disagreement, not two people politely agreeing
-            ✓ Concrete details throughout — a real number, a real name, a real consequence
-            ✓ Every bracketed heading is SHORT (under 8 words) and in ${language === 'Hindi' ? 'English' : language} — a
-              screen label, not a sentence
-            ✗ NEVER skip straight to a "balanced" answer — the tension IS the video
-            ✗ Banned: "It's important to note", "In conclusion", "Let's delve into", "At the end of the day"
-            ✗ No obvious winner — the audience should genuinely be torn
-            ✗ NEVER put a bracket anywhere except at the very end of the Narrator's opening line and each
-              Narrator sub-question transition line — hosts' lines and the closing NEVER get one
+            ✓ Turn 1 speaker tag MUST be exactly "Intro"
+            ✓ Every host turn MUST be a substantial, deep paragraph (3-6 complete sentences), NEVER short 1-liners
+            ✓ Genuine disagreement and contrasting philosophies throughout
+            ✓ Concrete details — real numbers, real character name, real trade-offs
+            ✓ Every bracketed heading is SHORT (under 8 words) and in ${language === 'Hindi' ? 'English' : language} — screen roadmap label
+            ✓ Only Turn 1 and Narrator question-intro turns have [bracketed] tags — host turns and conclusion lines NEVER have brackets
+            ✗ Banned cliché phrases: "It's important to remember", "In conclusion", "At the end of the day", "Let's dive into"
+            ✗ No obvious winner — viewers should feel the genuine agony of the choice
+            ══════════════════════════════════════════
+            ${durFillEn}
+          `;
+        } else if (style === 'first_person_dilemma') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: FIRST-PERSON DILEMMA (1ST PERSON POV + 2 ADVISORS GUIDANCE & DEBATE)
+            🔴 CRITICAL: The Narrator is NOT a third-person observer telling someone else's story. THE NARRATOR IS THE PROTAGONIST THEMSELVES!
+            🔴 DYNAMIC TOPIC ADAPTATION: The user's input can be ANY real-life dilemma (Personal Finance & Debt trap, Rent vs Buy a home, Marriage & Intimacy issues, Career crossroads, Savings & Investments, Family conflict, etc.).
+               YOU MUST BASE THE ENTIRE SCRIPT DYNAMICALLY ON THE USER'S EXACT TOPIC/SCENARIO! Never overwrite or divert from what they requested.
+
+            🇺🇸 USA / WESTERN CONTEXT & HIGH-CPM ALGORITHM TARGETING:
+            - Ground the scenario in a USA / Western foreign context by default (unless user explicitly requests another country).
+            - Financials: US Dollars ($), realistic figures ($70k-$120k salary, $40k-$80k debt/savings, 6.8% mortgage rate).
+            - US Keywords & Lifestyle: Mention US cities (e.g., Austin, TX; Seattle, WA; Denver, CO; Charlotte, NC; Chicago, IL), 401(k), High-Yield Savings Accounts (HYSA), FICO Credit Score, student loans, mortgage interest rates, HOA fees, US healthcare/therapy norms.
+            - This ensures natural high-intent SEO keywords that trigger high-CPM USA and global YouTube algorithm distribution!
+
+            ═══════════════════════════════════════
+            Topic: "${topic}"
+            ${specificDetails ? `Context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}.
+            Tone: High emotional and intellectual stakes, authentic first-person vulnerability, sharp tactical debate with constructive actionable guidance.
+
+            Speakers — exactly 4 speaker tags (fixed):
+            - Intro: ONLY the very first turn (Turn 1) — THE PROTAGONIST INTRODUCING THEMSELVES IN STRICT 1ST PERSON ("I", "My", "Me"). Tag MUST be "Intro".
+            - Narrator: All subsequent turns of the protagonist — asking sub-questions, intervening with fears/obstacles mid-debate, and wrapping up.
+            - 2 Hosts / Advisors:
+            ${speakers.length >= 2
+              ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
+              : `Choose two distinct advisor names with opposing mindsets (e.g. Conservative/Risk-Averse Strategist vs Aggressive/Growth/Modern Mentor).`
+            }
+
+            ══════════════════════════════════════════
+            【 TURN 1 (SPEAKER TAG "Intro") — EXTREME VIRAL HOOK & FIRST-PERSON SITUATION 】
+            ══════════════════════════════════════════
+            🔴 Turn 1 speaker tag MUST be exactly "Intro" — NOT "Narrator".
+            🔴 OPENING LINE MUST BE AN EXPLOSIVE SCROLL-STOPPING HOOK: Grab the viewer in the first 3 seconds with high tension, urgent confession, or alarming vulnerability.
+               - E.g. Finance/Debt: "I make $85,000 a year living in Dallas, but I'm secretly suffocating under $58,000 of high-interest debt and I don't know how to stop the bleeding..."
+               - E.g. Rent vs Buy: "I finally saved $95,000 in cash after 6 years of grinding in Seattle, but with 7% mortgage interest rates, buying a home feels like financial suicide..."
+               - E.g. Marriage/Intimacy: "I love my wife with everything I have, but our intimacy has completely vanished over the last two years and it's tearing our marriage apart..."
+            🔴 STRICT FIRST-PERSON POV: The protagonist speaks directly: "My name is [Name], I'm [age] years old, working as a [profession] in [US City]...".
+               NEVER tell a story about someone else ("Meet Alex" or "Imagine a 30-year-old" is STRICTLY FORBIDDEN).
+            Must be 4-6 COMPLETE lines covering:
+            1. HOOK + IDENTITY: Explosive opening hook, name, age, profession, and US location.
+            2. HARD REALITY & NUMBERS: Concrete numbers (income, savings, debt, interest rates, monthly bills, emotional costs).
+            3. HIGH STAKES OF BOTH CHOICES: Why Option A is tempting yet risky; why Option B feels safe yet terrifying.
+            4. THE DILEMMA QUESTION: "So tell me: should I take [Option A] or choose [Option B]? I honestly don't know what to do! [Option A vs Option B]"
+            🔴 CRITICAL: Must end with a short silent bracketed roadmap tag: [Option A vs Option B] (under 8 words, English).
+
+            ══════════════════════════════════════════
+            【 TURN 2 (SPEAKER TAG "Narrator") — FIRST SUB-QUESTION 】
+            ══════════════════════════════════════════
+            Immediately after Turn 1, in a NEW turn with speaker tag "Narrator", the protagonist asks their first pointed question to their advisors:
+            e.g.: "You two are my closest mentors. Let's start with the immediate hurdle: should I first [Specific Sub-Dilemma]? [Sub-Question Tag]"
+            Ending with a bracketed roadmap tag (under 8 words).
+
+            ══════════════════════════════════════════
+            【 ADVISORS — DIRECTLY ADDRESS PROTAGONIST BY NAME & PROVIDE ACTIONABLE SOLUTIONS 】
+            ══════════════════════════════════════════
+            Both advisors address the protagonist directly by name and give concrete, contrasting roadmaps:
+            - Advisor 1: "[Name], you need to see this clearly. In your position..." (lays out a concrete strategy with numbers, psychological safety, or strict debt-snowball/foundational discipline).
+            - Advisor 2: "[Name], don't follow that advice! That sounds nice on paper, but in reality..." (points out hidden pitfalls, argues for growth, leverage, modern relationship communication, or alternative paths).
+            - SUBSTANTIAL PARAGRAPHS: 3 to 6 complete sentences per speaker turn. Short 1-liners are strictly banned.
+            - They debate each other's blind spots while building realistic, empowering solutions for the protagonist.
+
+            ══════════════════════════════════════════
+            【 PROTAGONIST INTERVENES MID-DEBATE (REAL FEAR / CONSTRAINT / PROBLEM) 】
+            ══════════════════════════════════════════
+            After the advisors debate, the protagonist (Narrator) JUMPS IN:
+            - Shares a raw, personal complication or anxiety:
+              e.g.: "Wait, [Advisor 1], the huge issue with that is... [real-world hurdle like credit score drops, spouse feels rejected, emergency fund gets drained]. If this goes wrong, I risk losing everything. Should I still do that? [Specific Hurdle Tag]"
+            - Or advances the decision to the next phase:
+              e.g.: "That makes sense, but what about [Next Sub-Dilemma]? Should I [Option C] right now or wait? [Next Tag]"
+            - Ends with a silent bracketed tag [Short Tag].
+            - Both advisors immediately debate that specific complication and offer refined, practical solutions!
+            - Continue this interactive cadence for 3 to 5 sub-dilemmas/hurdles!
+
+            ══════════════════════════════════════════
+            【 CONCLUSION — FINAL VERDICTS & AUDIENCE VOTE 】
+            ══════════════════════════════════════════
+            1. Narrator (Protagonist) Turn: "Listening to both of you has completely shifted how I see this. The decision is still terrifying, but the trade-offs are now crystal clear."
+            2. Advisor 1 Closing Turn: One full paragraph offering a definitive closing principle / verdict directly to the protagonist.
+            3. Advisor 2 Closing Turn: One full paragraph offering a contrasting closing principle / verdict directly to the protagonist.
+            4. Narrator Closing Turn: The protagonist turns directly to the VIEWERS:
+               "Now the choice is in your hands — if you were standing in my shoes right now, what would you choose? Option A or Option B? Tell me in the comments down below!"
+
+            ══════════════════════════════════════════
+            NON-NEGOTIABLE HARD RULES:
+            ══════════════════════════════════════════
+            ✓ STRICT FIRST PERSON POV: Narrator IS THE PROTAGONIST ("I", "My name is [Name]"). Third-person framing is STRICTLY FORBIDDEN!
+            ✓ Turn 1 MUST open with an explosive scroll-stopping hook and have speaker tag "Intro".
+            ✓ US/Western context by default ($ figures, US cities, US financial/relationship keywords).
+            ✓ Subsequent protagonist turns MUST be speaker tag "Narrator".
+            ✓ Both advisors address the protagonist by name ("[Name], listen...", "[Name], don't do that...").
+            ✓ Host turns must be SUBSTANTIAL PARAGRAPHS (3-6 sentences), providing actionable advice & contrasting solutions.
+            ✓ Protagonist intervenes mid-debate with real hurdles/fears ("Wait, but the problem is... should I still do this?").
+            ✓ Every bracketed heading is SHORT (under 8 words) and in English.
+            ✓ Only Turn 1 and Narrator question/intervention turns have [bracketed] tags — host turns and conclusion lines NEVER have brackets.
+            ✓ Banned cliché phrases: "In conclusion", "At the end of the day", "It's important to remember", "Let's dive into".
+            ✓ No obvious easy winner — viewers must feel the genuine agony of the choice.
             ══════════════════════════════════════════
             ${durFillEn}
           `;
@@ -4029,8 +4206,7 @@ Speaker B (Curious): choose a different name — asks what the audience is think
             CHARACTERS — exactly 3:
             ${speakers.length >= 3
               ? `- Normal Person: ${speakers[0]} | Expert 1: ${speakers[1]} | Expert 2: ${speakers[2]}`
-              : `- Speaker 1: a regular American dealing with this exact financial topic — pick a realistic age, job, city, and family situation that fits
-            - Speaker 2 and 3: the two most relevant finance experts for this topic — fresh realistic names, different every time`
+              : `- Speaker 1: a regular American dealing with this exact financial topic — pick a realistic age, job, city, and family situation that fits\n            - Speaker 2 and 3: the two most relevant finance experts for this topic — fresh realistic names, different every time`
             }
 
             ══════════════════════════════════════════

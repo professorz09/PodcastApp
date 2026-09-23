@@ -127,7 +127,7 @@ const VideoClipImporter: React.FC<Props> = ({ onUseTranscript, onSendToShorts })
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const res  = await fetch(`/api/youtube/download/status/${jobId}`);
+        const res  = await fetch('https://autovid-flask.onrender.com/api/youtube/download/status/${jobId}');
         const data = await safeJson(res);
         if (data.status === 'downloading') {
           const parts: string[] = [];
@@ -160,7 +160,7 @@ const VideoClipImporter: React.FC<Props> = ({ onUseTranscript, onSendToShorts })
     let transcript: TranscriptSegment[] = [];
     let fullText = '', videoId = '', videoTitle = '', videoDescription = '';
     try {
-      const res  = await fetch('/api/youtube/transcript', {
+      const res  = await fetch('https://autovid-flask.onrender.com/api/youtube/transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim() }),
@@ -206,7 +206,7 @@ const VideoClipImporter: React.FC<Props> = ({ onUseTranscript, onSendToShorts })
     // Step 3 ── Download (non-fatal)
     setStep('downloading');
     try {
-      const res  = await fetch('/api/youtube/download', {
+      const res  = await fetch('https://autovid-flask.onrender.com/api/youtube/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim(), quality: '720p' }),

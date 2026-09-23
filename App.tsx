@@ -565,7 +565,13 @@ Return JSON only (no markdown):
       )}
 
       {appState === AppState.PHONE_STUDIO_2 && (
-        <PhoneConvoStudio2 mainScript={script} sourceClips={phoneSourceClips} videoFile={phoneVideoFile} />
+        <PhoneConvoStudio2
+          mainScript={script}
+          onUpdateScript={setScript}
+          onBack={() => setAppState(AppState.AUDIO)}
+          sourceClips={phoneSourceClips}
+          videoFile={phoneVideoFile}
+        />
       )}
 
       {appState === AppState.IG_SONG_STUDIO && (

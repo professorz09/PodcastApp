@@ -169,7 +169,7 @@ export const clearShortsScenes = async (): Promise<void> => {
 
 export interface EnglishVideoVisualsData {
   speakerImages: (HTMLImageElement | null)[];
-  speakerBackgroundImages: (HTMLImageElement | null)[];
+  speakerBackgroundImages: (HTMLImageElement | HTMLVideoElement | null)[];
   narratorImage: HTMLImageElement | null;
   background: HTMLImageElement | null;
   backgroundColor?: string;
@@ -228,20 +228,60 @@ export const urlToBlob = async (url: string | null | undefined): Promise<Blob | 
   }
 };
 
-const imageToBlob = async (img: HTMLImageElement | null): Promise<Blob | null> => {
-  if (!img?.src) return null;
-  return urlToBlob(img.src);
+const imageToBlob = async (media: HTMLImageElement | HTMLVideoElement | null): Promise<Blob | null> => {
+  if (!media?.src) return null;
+  return urlToBlob(media.src);
 };
 
-const blobToImage = (blob: Blob | null, blobUrls: string[]): Promise<HTMLImageElement | null> => {
+
+
+const blobToMedia = (blob: Blob | null, blobUrls: string[]): Promise<HTMLImageElement | HTMLVideoElement | null> => {
   if (!blob) return Promise.resolve(null);
   return new Promise((resolve) => {
     const url = URL.createObjectURL(blob);
     blobUrls.push(url);
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = url;
+    if (blob.type && blob.type.startsWith("video/")) {
+      const video = document.createElement("video");
+      video.src = url;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.crossOrigin = "anonymous";
+      video.load();
+      video.play().catch(() => {});
+      resolve(video);
+    } else {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    }
+  });
+};
+
+const blobToImage = (blob: Blob | null, blobUrls: string[]): Promise<HTMLImageElement | HTMLVideoElement | null> => {
+  if (!blob) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    blobUrls.push(url);
+    if (blob.type && blob.type.startsWith("video/")) {
+      const video = document.createElement("video");
+      video.src = url;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.crossOrigin = "anonymous";
+      video.load();
+      video.play().catch(() => {});
+      resolve(video);
+    } else {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    }
   });
 };
 
@@ -276,13 +316,13 @@ export const loadEnglishVideoVisuals = async (script: DebateSegment[]): Promise<
     _englishVideoVisualsBlobUrls = [];
 
     const [speakerImages, speakerBackgroundImages, narratorImage, background] = await Promise.all([
-      Promise.all(stored.speakerImageBlobs.map(b => blobToImage(b, _englishVideoVisualsBlobUrls))),
-      Promise.all(stored.speakerBackgroundBlobs.map(b => blobToImage(b, _englishVideoVisualsBlobUrls))),
-      blobToImage(stored.narratorImageBlob, _englishVideoVisualsBlobUrls),
-      blobToImage(stored.backgroundBlob, _englishVideoVisualsBlobUrls),
+      Promise.all(stored.speakerImageBlobs.map(async b => (await blobToMedia(b, _englishVideoVisualsBlobUrls)) as HTMLImageElement)),
+      Promise.all(stored.speakerBackgroundBlobs.map(b => blobToMedia(b, _englishVideoVisualsBlobUrls))),
+      blobToMedia(stored.narratorImageBlob, _englishVideoVisualsBlobUrls),
+      blobToMedia(stored.backgroundBlob, _englishVideoVisualsBlobUrls),
     ]);
 
-    return { speakerImages, speakerBackgroundImages, narratorImage, background, backgroundColor: stored.backgroundColor };
+    return { speakerImages, speakerBackgroundImages: speakerBackgroundImages as (HTMLImageElement | HTMLVideoElement | null)[], narratorImage: narratorImage as HTMLImageElement | null, background: background as HTMLImageElement | null, backgroundColor: stored.backgroundColor };
   } catch (e) {
     console.error('Failed to load English Video visuals', e);
     return null;

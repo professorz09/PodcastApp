@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DebateSegment, YoutubeImportData } from '../types';
 import { toast } from './Toast';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check, Sparkles, CheckCircle2, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Upload, Video, Settings, Type, Layout, Activity, Palette, Loader2, Layers, X, Wand2, Merge, Download, Eye, EyeOff, RefreshCw, BookOpen, ImagePlus, HelpCircle, Plus, Trash2, Check, Sparkles, CheckCircle2, Copy, Grid } from 'lucide-react';
 import { mergeAudioUrls } from '../services/audioUtils';
 import { renderVideoOffline } from '../services/videoRenderer';
 import { drawDebateFrame, VisualConfig, RenderAssets } from '../services/canvasRenderer';
@@ -77,10 +77,10 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
   const uniqueSpeakers = useMemo(() => {
     let speakers = Array.from(new Set<string>(script.map(s => s.speaker)));
-    // Filter out question/quiz speakers so they don't appear in backgrounds/avatars
+    // Filter out question/quiz/intro speakers so they don't appear in backgrounds/avatars
     speakers = speakers.filter(s => {
       const lower = s?.toLowerCase() || '';
-      return lower !== 'question' && lower !== 'quiz';
+      return lower !== 'question' && lower !== 'quiz' && lower !== 'intro';
     });
 
     if (speakers.includes('Narrator')) {
@@ -92,7 +92,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const activeSpeakers = useMemo(() => {
     return uniqueSpeakers.filter(s => {
       const lower = s.toLowerCase();
-      return lower !== 'narrator' && lower !== 'question' && lower !== 'quiz';
+      return lower !== 'narrator' && lower !== 'question' && lower !== 'quiz' && lower !== 'intro';
     });
   }, [uniqueSpeakers]);
 
@@ -186,6 +186,84 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   const narratorBlobUrlRef = React.useRef<string | null>(null);
   const hasNarrator = uniqueSpeakers.includes('Narrator');
 
+  // ── Whiteboard Question Roadmap State (Phone Studio 2 style) ─────────────
+  const [showWhiteboard, setShowWhiteboard] = useState(true);
+  const [roadmapSpeakerName, setRoadmapSpeakerName] = useState('Narrator');
+  const [narratorBoardTitle, setNarratorBoardTitle] = useState('');
+  const [narratorQuestionsText, setNarratorQuestionsText] = useState('');
+  const [showWhiteboardSection, setShowWhiteboardSection] = useState(false);
+  const narratorBoardSeededRef = useRef(false);
+
+  // Seed whiteboard questions from script whenever a dilemma debate script is loaded
+  useEffect(() => {
+    if (!narratorBoardSeededRef.current && script && script.length > 0) {
+      const introSeg = script.find(seg =>
+        (seg.speaker === 'Intro' || seg.speaker?.toLowerCase() === 'intro' || seg.learnEnglish?.segmentType === 'intro') && seg.boardPoint
+      );
+      const title = introSeg?.boardPoint?.trim() || '';
+
+      const segWithPoint = script.find(seg => seg.boardPoint && seg.speaker !== 'Intro');
+      if (segWithPoint?.speaker) {
+        setRoadmapSpeakerName(segWithPoint.speaker);
+      }
+
+      const nPoints = script
+        .filter(seg => (
+          seg.speaker === 'Narrator' ||
+          seg.speaker?.toLowerCase() === 'narrator' ||
+          (segWithPoint && seg.speaker === segWithPoint.speaker)
+        ) && seg.boardPoint)
+        .map(seg => seg.boardPoint!.trim());
+
+      if (title || nPoints.length > 0) {
+        if (title) setNarratorBoardTitle(title);
+        if (nPoints.length > 0) {
+          const uniquePoints = Array.from(new Set(nPoints));
+          setNarratorQuestionsText(uniquePoints.join('\n'));
+        }
+        narratorBoardSeededRef.current = true;
+      }
+    }
+  }, [script]);
+
+  const narratorQuestions = useMemo(() => {
+    return narratorQuestionsText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+  }, [narratorQuestionsText]);
+
+  const handleSyncWhiteboardFromScript = useCallback(() => {
+    const introSeg = script.find(seg =>
+      (seg.speaker === 'Intro' || seg.speaker?.toLowerCase() === 'intro' || seg.learnEnglish?.segmentType === 'intro') && seg.boardPoint
+    );
+    const title = introSeg?.boardPoint?.trim() || narratorBoardTitle || '';
+
+    const segWithPoint = script.find(seg => seg.boardPoint && seg.speaker !== 'Intro');
+    const speakerToSync = segWithPoint?.speaker || roadmapSpeakerName || 'Narrator';
+    if (segWithPoint?.speaker) {
+      setRoadmapSpeakerName(segWithPoint.speaker);
+    }
+
+    const nPoints = script
+      .filter(seg => (
+        seg.speaker === 'Narrator' ||
+        seg.speaker?.toLowerCase() === 'narrator' ||
+        seg.speaker === speakerToSync ||
+        seg.speaker?.toLowerCase() === speakerToSync.toLowerCase() ||
+        Boolean(seg.boardPoint)
+      ) && seg.boardPoint)
+      .map(seg => seg.boardPoint!.trim());
+
+    const uniquePoints = Array.from(new Set(nPoints));
+
+    setNarratorBoardTitle(title);
+    if (uniquePoints.length > 0) {
+      setNarratorQuestionsText(uniquePoints.join('\n'));
+    }
+    toast.success(`Synced roadmap (${uniquePoints.length} questions found in script)`);
+  }, [script, narratorBoardTitle, roadmapSpeakerName]);
+
   // Helper to load fresh Narrator default background (/Narrator.png)
   const createDefaultNarratorBg = useCallback(() => {
     const img = new Image();
@@ -198,7 +276,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // uniqueSpeakers (Narrator included), so when a given speaker talks, their
   // background fills the whole frame instead of a floating avatar box.
   // By default, Narrator's background is /Narrator.png (can be replaced anytime).
-  const [speakerBackgroundImages, setSpeakerBackgroundImages] = useState<(HTMLImageElement | null)[]>([]);
+  const [speakerBackgroundImages, setSpeakerBackgroundImages] = useState<(HTMLImageElement | HTMLVideoElement | null)[]>([]);
   const [speakerBackgroundLoading, setSpeakerBackgroundLoading] = useState<boolean[]>([]);
   const speakerBgBlobUrls = React.useRef<(string | null)[]>([]);
 
@@ -218,8 +296,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   }, [uniqueSpeakers, createDefaultNarratorBg]);
 
   const speakerBackgroundsMap = useMemo(() => {
-      const map = new Map<string, HTMLImageElement>();
-      let customNarratorBg: HTMLImageElement | null = null;
+      const map = new Map<string, HTMLImageElement | HTMLVideoElement>();
+      let customNarratorBg: HTMLImageElement | HTMLVideoElement | null = null;
       uniqueSpeakers.forEach((name, idx) => {
           const img = speakerBackgroundImages[idx];
           if (img) {
@@ -255,7 +333,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
           const existingImageIdx = speakerBackgroundImages.findIndex((img, i) => i !== idx && img !== null);
           if (existingImageIdx !== -1 && speakerBackgroundImages[existingImageIdx]) {
               try {
-                  const imgEl = speakerBackgroundImages[existingImageIdx]!;
+                  const imgEl = speakerBackgroundImages[existingImageIdx]! as HTMLImageElement;
                   const canvas = document.createElement('canvas');
                   canvas.width = imgEl.naturalWidth || 1280;
                   canvas.height = imgEl.naturalHeight || 720;
@@ -284,12 +362,26 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
 
   const handleSpeakerBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
       if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
           if (speakerBgBlobUrls.current[idx]) URL.revokeObjectURL(speakerBgBlobUrls.current[idx]!);
-          const objectUrl = URL.createObjectURL(e.target.files[0]);
+          const objectUrl = URL.createObjectURL(file);
           speakerBgBlobUrls.current[idx] = objectUrl;
-          const img = new Image();
-          img.src = objectUrl;
-          img.onload = () => setSpeakerBackgroundImages(prev => { const a = [...prev]; a[idx] = img; return a; });
+          if (file.type && file.type.startsWith("video/")) {
+              const video = document.createElement("video");
+              video.src = objectUrl;
+              video.muted = true;
+              video.loop = true;
+              video.playsInline = true;
+              video.crossOrigin = "anonymous";
+              video.load();
+              video.play().catch(() => {});
+              setSpeakerBackgroundImages(prev => { const a = [...prev]; a[idx] = video as any; return a; });
+          } else {
+              const img = new Image();
+              img.crossOrigin = "anonymous";
+              img.src = objectUrl;
+              img.onload = () => setSpeakerBackgroundImages(prev => { const a = [...prev]; a[idx] = img; return a; });
+          }
       }
   };
 
@@ -493,7 +585,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
   // Intro settings live in their own standalone section now (not one of
   // these tabs) — see the "Intro Settings" card rendered right after the
   // Timeline Strip, kept fully separate from Speakers/Background/etc.
-  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'|'intro'>('background');
+  const [settingsTab, setSettingsTab] = useState<'speakers'|'background'|'subtitle'|'options'|'intro'|'roadmap'>('background');
   const [statusMessage, setStatusMessage] = useState("");
   // Rendered video blob kept in memory for merge
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
@@ -1007,7 +1099,17 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               backgroundVideo.pause();
           }
       }
-  }, [isPlaying, backgroundVideo]);
+      speakerBackgroundsMap.forEach((bg) => {
+          if (bg instanceof HTMLVideoElement || (bg as any)?.tagName === "VIDEO") {
+              const vid = bg as unknown as HTMLVideoElement;
+              if (isPlaying) {
+                  vid.play().catch(() => {});
+              } else {
+                  vid.pause();
+              }
+          }
+      });
+  }, [isPlaying, backgroundVideo, speakerBackgroundsMap]);
 
   const handleGenerateSpeakerImage = async (index: number) => {
     setSpeakerImageLoading(prev => { const a = [...prev]; a[index] = true; return a; });
@@ -1406,7 +1508,14 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         nameBadgeColorA,
         nameBadgeColorB,
         nameBadgeColorC,
-        introSubtitleColor
+        introSubtitleColor,
+        narratorBoard: showWhiteboard && (narratorQuestions.length > 0 || Boolean(narratorBoardTitle)) ? {
+          enabled: true,
+          title: narratorBoardTitle || 'DEBATE ROADMAP',
+          questions: narratorQuestions,
+          speakerName: roadmapSpeakerName || 'Narrator',
+        } : null,
+        roadmapSpeakerName: roadmapSpeakerName || 'Narrator',
     };
 
     const assets: RenderAssets = {
@@ -3215,7 +3324,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
         // Preload speaker backgrounds (including Narrator default/custom background)
         if (assets.speakerBackgrounds) {
             for (const [, img] of assets.speakerBackgrounds) {
-                if (img && !img.complete) {
+                if (img && img instanceof HTMLImageElement && !img.complete) {
                     await new Promise(r => {
                         img.onload = r;
                         img.onerror = r;
@@ -3293,6 +3402,14 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             nameBadgeColorA,
             nameBadgeColorB,
             nameBadgeColorC,
+            introSubtitleColor,
+            narratorBoard: showWhiteboard && (narratorQuestions.length > 0 || Boolean(narratorBoardTitle)) ? {
+              enabled: true,
+              title: narratorBoardTitle || 'DEBATE ROADMAP',
+              questions: narratorQuestions,
+              speakerName: roadmapSpeakerName || 'Narrator',
+            } : null,
+            roadmapSpeakerName: roadmapSpeakerName || 'Narrator',
         };
 
         const videoBlob = await renderVideoOffline({
@@ -3371,7 +3488,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         formData.append('custom_intro', customIntroFile);
                     }
 
-                    const mergeRes = await fetch('/api/video/merge-intro', {
+                    const mergeRes = await fetch('https://autovid-flask.onrender.com/api/video/merge-intro', {
                         method: 'POST',
                         body: formData,
                     });
@@ -3446,7 +3563,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
               formData.append('custom_intro', customIntroFile);
           }
 
-          const res = await fetch('/api/video/merge-intro', {
+          const res = await fetch('https://autovid-flask.onrender.com/api/video/merge-intro', {
               method: 'POST',
               body: formData,
           });
@@ -3523,9 +3640,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
       }
   };
 
-  const introSegments = script.filter(s => s.learnEnglish?.segmentType === 'intro');
+  const introSegments = script.filter(s => s.learnEnglish?.segmentType === 'intro' || s.speaker === 'Intro' || s.speaker?.toLowerCase() === 'intro');
   const isCurrentSegmentIntro = Boolean(
     currentSegment?.learnEnglish?.segmentType === 'intro' ||
+    currentSegment?.speaker === 'Intro' ||
+    currentSegment?.speaker?.toLowerCase() === 'intro' ||
     (introSegments.length > 0 && introSegments.some(s => s.id === currentSegment?.id))
   );
 
@@ -3627,7 +3746,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
     });
   };
 
-  const TABS = ['Background', 'Subtitle', 'Options', 'Speakers'] as const;
+  const TABS = ['Background', 'Roadmap', 'Subtitle', 'Options', 'Speakers'] as const;
 
   return (
     <div className="w-full h-full bg-black text-white flex flex-col overflow-hidden">
@@ -3857,7 +3976,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                   <div className="flex items-center gap-2.5">
                                     <div className="flex flex-col gap-1.5 shrink-0">
                                       <div className="relative w-20 h-12 rounded-lg overflow-hidden bg-[#111] border border-white/10 group cursor-pointer hover:border-cyan-500/50 transition-colors">
-                                        <input type="file" accept="image/*" onChange={(e) => handleIntroSceneUpload(e, seg.id, sceneIdx)} className="absolute inset-0 opacity-0 cursor-pointer z-10" title="Upload custom image" />
+                                        <input type="file" accept="image/*,video/*" onChange={(e) => handleIntroSceneUpload(e, seg.id, sceneIdx)} className="absolute inset-0 opacity-0 cursor-pointer z-10" title="Upload custom image" />
                                         {introImageLoading[sceneKey] ? (
                                           <div className="absolute inset-0 flex items-center justify-center bg-black/60"><Loader2 size={13} className="text-cyan-400 animate-spin" /></div>
                                         ) : scene.imageUrl ? (
@@ -4380,7 +4499,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                           <Upload size={13} />
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,video/*"
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
@@ -4399,9 +4518,8 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
             </div>
           )}
 
-          {/* ── Visual Settings Panel (inline, collapsible) — only visible when NOT on intro or question segments ── */}
-          {!isCurrentSegmentIntro && !isCurrentSegmentQuiz && (
-            <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
+          {/* ── Visual Settings Panel (inline, collapsible) ── */}
+          <div className="bg-[#0d0d0d] border border-white/5 rounded-2xl overflow-hidden">
             {/* Collapsible header */}
             <button
               onClick={() => setShowSettings(!showSettings)}
@@ -4486,7 +4604,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                               <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer gap-2 hover:bg-white/5 transition-colors">
                                 <Upload size={22} className="text-gray-500" />
                                 <span className="text-xs text-gray-500">{speakerLabels[idx] || speakerName}</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerImageUpload(e, idx)} />
+                                <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleSpeakerImageUpload(e, idx)} />
                               </label>
                             )}
                             <button
@@ -4520,7 +4638,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             </button>
                             <label className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
                               <Upload size={9} /> Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerImageUpload(e, idx)} />
+                              <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleSpeakerImageUpload(e, idx)} />
                             </label>
                           </div>
 
@@ -4559,7 +4677,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             ) : (
                               <label className="absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-white/5 transition-colors">
                                 <Upload size={16} className="text-gray-500" />
-                                <input type="file" accept="image/*" className="hidden" onChange={handleNarratorImageUpload} />
+                                <input type="file" accept="image/*,video/*" className="hidden" onChange={handleNarratorImageUpload} />
                               </label>
                             )}
                           </div>
@@ -4574,7 +4692,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             </button>
                             <label className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-500 hover:text-gray-300 cursor-pointer transition-all">
                               <Upload size={9} /> Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={handleNarratorImageUpload} />
+                              <input type="file" accept="image/*,video/*" className="hidden" onChange={handleNarratorImageUpload} />
                             </label>
                           </div>
                         </div>
@@ -4664,7 +4782,11 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                   </div>
                                 ) : speakerBackgroundImages[idx] ? (
                                   <>
-                                    <img src={speakerBackgroundImages[idx]!.src} alt={speakerName} className="w-full h-full object-cover" />
+                                    {speakerBackgroundImages[idx] instanceof HTMLVideoElement || (speakerBackgroundImages[idx] as any)?.tagName === "VIDEO" ? (
+                                    <video src={(speakerBackgroundImages[idx] as unknown as HTMLVideoElement).src} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                                  ) : (
+                                    <img src={(speakerBackgroundImages[idx] as HTMLImageElement)!.src} alt={speakerName} className="w-full h-full object-cover" />
+                                  )}
                                     <button
                                       onClick={() => setSpeakerBackgroundImages(prev => { const n = [...prev]; n[idx] = null; return n; })}
                                       className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-black/90 transition-colors"
@@ -4684,7 +4806,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                       <Upload size={16} className="text-gray-500" />
                                       <span className="text-[10px] text-gray-400 font-medium">{speakerName} Background</span>
                                       <span className="text-[9px] text-gray-600">Click to upload</span>
-                                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
+                                      <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
                                     </label>
                                     {speakerName.toLowerCase() === 'narrator' && (
                                       <button
@@ -4714,7 +4836,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                                 </button>
                                 <label className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-white/3 hover:bg-white/8 border border-white/5 text-gray-400 hover:text-gray-200 cursor-pointer transition-all">
                                   <Upload size={9} /> Replace
-                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
+                                  <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleSpeakerBackgroundUpload(e, idx)} />
                                 </label>
                               </div>
                             </div>
@@ -4874,7 +4996,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                         <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 text-xs text-purple-400 bg-[#111] px-3 py-2.5 rounded-xl border border-white/5 hover:border-purple-500/30 transition-all">
                           <Upload size={13} />
                           {currentSegment.visualConfig?.backgroundUrl ? 'Change Image' : 'Upload Image'}
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                          <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => {
                             if (e.target.files?.[0]) {
                               const reader = new FileReader();
                               reader.onload = (ev) => {
@@ -4890,6 +5012,119 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                             className="text-xs text-red-400 px-2 py-2.5 font-bold uppercase">Clear</button>
                         )}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── ROADMAP (WHITEBOARD) TAB ── */}
+                {settingsTab === 'roadmap' && (
+                  <div className="space-y-4">
+                    {/* Master Toggle Card */}
+                    <div className="bg-[#111] border border-white/5 rounded-xl p-3.5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${showWhiteboard ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-gray-500'}`}>
+                            <Grid size={16} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-xs block">Whiteboard Question Roadmap</span>
+                              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                                showWhiteboard
+                                  ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                                  : 'bg-white/5 text-gray-400 border-white/10'
+                              }`}>
+                                {showWhiteboard ? `${narratorQuestions.length} Questions` : 'Off'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-400">Phone Studio 2 white-grid question sheet with live strike-throughs</p>
+                          </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={showWhiteboard}
+                            onChange={e => setShowWhiteboard(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+
+                      <div className={`p-2.5 rounded-lg text-xs leading-relaxed ${showWhiteboard ? 'bg-blue-950/25 border border-blue-500/20 text-blue-200/90' : 'bg-white/[0.02] border border-white/5 text-gray-400'}`}>
+                        {showWhiteboard ? (
+                          <>💡 <strong>Active:</strong> Jab configured speaker ya roadmap tag aayega, tab Phone Studio 2-style whiteboard sheet slide in hogi. Active question blue highlight hogi aur covered questions red marker se strike-through honge.</>
+                        ) : (
+                          <>⚪ <strong>Disabled (Fallback to Normal Background):</strong> Whiteboard completely disabled hai. Speaker/Narrator ke normal background aur regular subtitles jaise phle the simple waise hi show honge.</>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Speaker Trigger / Naming */}
+                    <div className="bg-[#111] border border-white/5 rounded-xl p-3.5 space-y-2.5">
+                      <label className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block">
+                        Trigger on Speaker / Name
+                      </label>
+                      <p className="text-[11px] text-gray-500 leading-normal">
+                        Whiteboard kis speaker ya tag par display ho (Default: Narrator, ya debate host/judge ka custom name):
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <select
+                          value={roadmapSpeakerName}
+                          onChange={e => setRoadmapSpeakerName(e.target.value)}
+                          className="bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                        >
+                          <option value="Narrator">Narrator (Default)</option>
+                          <option value="all">Any speaker with roadmap [bracket] tag</option>
+                          {uniqueSpeakers.filter(s => s.toLowerCase() !== 'narrator').map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={roadmapSpeakerName}
+                          onChange={e => setRoadmapSpeakerName(e.target.value)}
+                          placeholder="Custom speaker name (e.g. Host)..."
+                          className="bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Roadmap Title */}
+                    <div className="bg-[#111] border border-white/5 rounded-xl p-3.5 space-y-2">
+                      <label className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block">
+                        Roadmap Title (Crimson Header Banner)
+                      </label>
+                      <input
+                        type="text"
+                        value={narratorBoardTitle}
+                        onChange={e => setNarratorBoardTitle(e.target.value)}
+                        placeholder="e.g. INVESTING VS SAVING ($50,000)"
+                        className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-600 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {/* Questions List */}
+                    <div className="bg-[#111] border border-white/5 rounded-xl p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">
+                          Questions List ({narratorQuestions.length})
+                        </label>
+                        <button
+                          onClick={handleSyncWhiteboardFromScript}
+                          className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <RefreshCw size={11} /> Sync from Script
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-500">Ek line mein ek question likhein:</p>
+                      <textarea
+                        rows={5}
+                        value={narratorQuestionsText}
+                        onChange={e => setNarratorQuestionsText(e.target.value)}
+                        placeholder={"Emergency fund first?\nTiming vs market risk\nLump sum vs DCA\nPsychological security vs growth"}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-mono text-white placeholder-gray-600 outline-none focus:border-blue-500"
+                      />
                     </div>
                   </div>
                 )}
@@ -5490,8 +5725,7 @@ const EnglishVideoMaker: React.FC<EnglishVideoMakerProps> = ({ script: initialSc
                 </div>{/* end tab content */}
               </>
             )}
-          </div>
-          )}{/* end Visual Settings panel */}
+          </div>{/* end Visual Settings panel */}
 
         </div>{/* end max-w-2xl inner col */}
       </div>{/* end scrollable content */}

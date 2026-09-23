@@ -1,4 +1,4 @@
-export const fetchWithRetry = async (url: string, options: RequestInit, retries: number = 3, delayMs: number = 1000): Promise<Response> => {
+export const fetchWithRetry = async (url: string, options: RequestInit = {}, retries: number = 3, delayMs: number = 1000): Promise<Response> => {
   let attempt = 0;
   while (attempt < retries) {
     try {

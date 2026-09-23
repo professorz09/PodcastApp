@@ -73,9 +73,17 @@ export interface StudioState {
     enabled: boolean;
     size: number;
     background: 'dark' | 'light' | 'none';
+    backgroundColor?: string;
     textColor?: string;
     narratorColor?: string;
     boxBorder?: number;
+    borderRadius?: number;
+    borderColor?: string;
+    borderWidth?: number;
+    x?: number;
+    y?: number;
+    showBox?: boolean;
+    showSpeakerBadge?: boolean;
   };
   // Voice-driven "z-axis" scale pulse on the active phone. Default ON for
   // single-speaker scripts, OFF for 2+ speakers (set by the consumer).
@@ -97,6 +105,10 @@ export interface StudioState {
     enabled: boolean;
     size: number;
     textColor?: string;
+    x?: number;
+    y?: number;
+    backgroundColor?: string;
+    borderRadius?: number;
   };
   /** Top + bottom black letterbox bars on storyboard frames; subtitles sit in the bottom bar. */
   storyboardLetterbox?: boolean;
@@ -461,10 +473,16 @@ export class CanvasRenderer {
     const { ctx } = this;
     const letterbox = this.state.storyboardLetterbox ?? false;
     const barH = letterbox ? regionH * 0.12 : regionH * 0.08;
-    const subY = regionY + regionH - barH;
+    const subY = subCfg.y !== undefined 
+      ? Math.max(0, Math.min(regionH - barH, (subCfg.y / 720) * regionH))
+      : (regionY + regionH - barH);
 
     if (!letterbox) {
-      ctx.fillStyle = '#000';
+      if (subCfg.backgroundColor) {
+        ctx.fillStyle = subCfg.backgroundColor;
+      } else {
+        ctx.fillStyle = '#000000cc';
+      }
       ctx.fillRect(0, subY, w, barH);
     }
 
@@ -565,16 +583,20 @@ export class CanvasRenderer {
   private drawSyncedSubtitles(
     bx: number, by: number, bw: number, bh: number,
     text: string, turnProgress: number, activeTurn: ScriptTurn | null,
-    subCfg: { enabled: boolean; size: number; background?: 'dark' | 'light' | 'none'; textColor?: string },
+    subCfg: NonNullable<StudioState['subtitleConfig']>,
     verticalAnchor = 0.68,
   ) {
     const { ctx } = this;
     if (!subCfg.enabled || !text) return;
 
-    const cx = bx + bw / 2;
+    const cx = subCfg.x !== undefined
+      ? (bx + (subCfg.x / 1280) * bw)
+      : (bx + bw / 2);
 
     const bgType = subCfg.background ?? 'dark';
-    if (bgType !== 'none') {
+    if (subCfg.backgroundColor) {
+      // Custom solid/rgba background box handled around the text group below
+    } else if (bgType !== 'none') {
       const tg = ctx.createLinearGradient(0, by + bh * 0.2, 0, by + bh);
       tg.addColorStop(0, 'transparent');
       if (bgType === 'light') {
@@ -647,7 +669,39 @@ export class CanvasRenderer {
     const activeGroup = phraseGroups[activeGroupIdx] || [];
     const lh = fontSize * 1.4;
     const groupH = activeGroup.length * lh;
-    const ty = by + bh * verticalAnchor - groupH / 2;
+    const ty = subCfg.y !== undefined
+      ? (by + (subCfg.y / 720) * bh - groupH / 2)
+      : (by + bh * verticalAnchor - groupH / 2);
+
+    if (subCfg.showBox !== false && subCfg.backgroundColor) {
+      ctx.save();
+      ctx.fillStyle = subCfg.backgroundColor;
+      const padX = bw * 0.04;
+      const padY = 6;
+      let maxLineW = 0;
+      activeGroup.forEach(l => {
+        const lw = ctx.measureText(l.text).width;
+        if (lw > maxLineW) maxLineW = lw;
+      });
+      const boxW = Math.min(bw * 0.94, maxLineW + padX * 2);
+      const boxH = groupH + padY * 2;
+      const boxX = cx - boxW / 2;
+      const boxY = ty - padY;
+      const r = subCfg.borderRadius ?? 10;
+      ctx.beginPath();
+      if ((ctx as any).roundRect) {
+        (ctx as any).roundRect(boxX, boxY, boxW, boxH, r);
+      } else {
+        ctx.rect(boxX, boxY, boxW, boxH);
+      }
+      ctx.fill();
+      if (subCfg.borderWidth && subCfg.borderColor) {
+        ctx.lineWidth = subCfg.borderWidth;
+        ctx.strokeStyle = subCfg.borderColor;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     const col = subCfg.textColor ?? '#ffffff';
     const rr = parseInt(col.slice(1, 3), 16) || 255;

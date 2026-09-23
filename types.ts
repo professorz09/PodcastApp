@@ -115,6 +115,12 @@ export interface DebateSegment {
      *  intro line, auto-broken into beats instead of one static image. */
     introScenes?: { prompt: string; startOffset: number; endOffset: number; imageUrl?: string }[];
   };
+  introMotion?: {
+    active: boolean;
+    progress: number;
+    sceneIndex: number;
+    localTime: number;
+  };
   visualConfig?: {
     backgroundUrl?: string;
     backgroundColor?: string;
@@ -205,7 +211,7 @@ export interface DebateConfig {
   commentsFileContent?: string;
   model: 'gemini-3.8-flash' | 'gemini-3.1-pro-preview';
   language: string;
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'learn_english';
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'first_person_dilemma' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'learn_english';
   speakerCount: number;
   speakerNames?: string[]; // Optional, if user provides them. Otherwise auto-detected.
   specificDetails?: string;
