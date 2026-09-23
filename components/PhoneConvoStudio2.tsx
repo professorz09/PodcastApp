@@ -5278,23 +5278,6 @@ Return ONLY a valid JSON array. No markdown. No explanation. Just the array:
         {tab === 'visual' && (
           <div style={{ padding: 12, paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* Script info banner */}
-            <div style={{
-              padding: '10px 12px', borderRadius: 12,
-              background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>
-                  Main App Script Connected
-                </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-                  {script.length} turns · {phones.length} speakers · {script.filter(t => t.audioUrl).length}/{script.length} audio ready
-                </div>
-              </div>
-            </div>
-
             {activeSettingsSection === 'discussion' && (
             <>
             {/* Sub-tabs */}
