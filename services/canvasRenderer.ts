@@ -41,7 +41,7 @@ export interface RenderAssets {
   backgroundVideo: HTMLVideoElement | null;
   backgroundColor?: string;
   speakerImages: (HTMLImageElement | null)[];
-  segmentBackgrounds: Map<string, HTMLImageElement>;
+  segmentBackgrounds: Map<string, HTMLImageElement | HTMLVideoElement>;
   /** Learn English only — Narrator's own avatar, shown in the teaching card. */
   narratorImage?: HTMLImageElement | null;
   /** Per-speaker full-frame background, keyed by exact speaker name — used
@@ -49,20 +49,24 @@ export interface RenderAssets {
   speakerBackgrounds?: Map<string, HTMLImageElement | HTMLVideoElement>;
 }
 
-export const drawDebateFrame = (
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  time: number,
-  audioLevel: number,
+/**
+ * Resolves which segment (and, for "Generate Scenes" intros, which motion
+ * state) should actually be drawn for a given playback moment — including
+ * carrying forward a prior segment's/scene's backgroundUrl override when the
+ * current one has none of its own. Extracted out of drawDebateFrame so the
+ * offline export pipeline can ask the exact same question (to know which
+ * background asset needs seeking to `time` before the frame is drawn),
+ * without re-implementing this resolution twice.
+ */
+export const resolveEffectiveSegment = (
   script: DebateSegment[],
   segmentOffsets: number[],
   currentSegmentIndex: number,
-  totalDuration: number,
-  scores: { scoreA: string; scoreB: string }, // This might need to be an array too
-  config: VisualConfig,
+  time: number,
   assets: RenderAssets
-) => {
+): DebateSegment | null => {
   const rawSegment = script[currentSegmentIndex];
-  if (!rawSegment) return;
+  if (!rawSegment) return null;
 
   // Learn English "Generate Scenes" — a segment (usually the intro) can carry
   // multiple cinematic scene-beats across its own duration instead of one
@@ -139,6 +143,24 @@ export const drawDebateFrame = (
       currentSegment = { ...currentSegment, introMotion };
   }
 
+  return currentSegment;
+};
+
+export const drawDebateFrame = (
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  time: number,
+  audioLevel: number,
+  script: DebateSegment[],
+  segmentOffsets: number[],
+  currentSegmentIndex: number,
+  totalDuration: number,
+  scores: { scoreA: string; scoreB: string }, // This might need to be an array too
+  config: VisualConfig,
+  assets: RenderAssets
+) => {
+  const currentSegment = resolveEffectiveSegment(script, segmentOffsets, currentSegmentIndex, time, assets);
+  if (!currentSegment) return;
+
   // Determine Theme
   const themeId = currentSegment.visualConfig?.themeId || config.theme;
   const theme = getTheme(themeId);
@@ -207,7 +229,7 @@ export const drawDebateFrame = (
   // Themes independently re-read script[currentSegmentIndex] internally, so
   // swap the resolved (possibly scene-overridden) segment into the array at
   // that index rather than passing currentSegment separately.
-  const effectiveScript = currentSegment === rawSegment
+  const effectiveScript = currentSegment === script[currentSegmentIndex]
       ? script
       : script.map((s, i) => (i === currentSegmentIndex ? currentSegment : s));
 

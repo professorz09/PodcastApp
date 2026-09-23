@@ -75,7 +75,7 @@ const DebateInput: React.FC<DebateInputProps> = ({
   // ── Learn English state — kept fully separate from the other tabs' state ────
   const [leTopic, setLeTopic] = useState('');
   const [leSituations, setLeSituations] = useState<{topic: string, duration: number}[]>([{topic: '', duration: 3}]);
-  const [leStyle, setLeStyle] = useState<'case_debate' | 'first_person_dilemma' | 'situational' | 'roleplay' | 'interview' | 'casual' | 'debate' | 'podcast' | 'multi_situation'>('podcast');
+  const [leStyle, setLeStyle] = useState<'case_debate' | 'first_person_dilemma' | 'real_case_debate' | 'situational' | 'roleplay' | 'interview' | 'casual' | 'debate' | 'podcast' | 'multi_situation'>('podcast');
   const [leDuration, setLeDuration] = useState<number>(12);
   const [leSpeakerCount, setLeSpeakerCount] = useState<number>(2);
   const [leIntro, setLeIntro] = useState(false); // podcast defaults to false
@@ -213,6 +213,21 @@ const DebateInput: React.FC<DebateInputProps> = ({
           model,
           language: 'English',
           style: 'case_debate',
+          speakerCount: 2,
+          useGrounding,
+        });
+        return;
+      }
+
+      if (leStyle === 'real_case_debate') {
+        onGenerate({
+          topic: finalTopic,
+          specificDetails: `REAL_CASE_DEBATE:true\nLEARN_ENGLISH_LANGUAGE:english`,
+          duration: finalDuration,
+          includeNarrator: true,
+          model,
+          language: 'English',
+          style: 'real_case_debate',
           speakerCount: 2,
           useGrounding,
         });
@@ -475,10 +490,10 @@ const DebateInput: React.FC<DebateInputProps> = ({
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 resize-none"
                 />
 
-                {(leStyle === 'case_debate' || leStyle === 'first_person_dilemma') && (
+                {(leStyle === 'case_debate' || leStyle === 'first_person_dilemma' || leStyle === 'real_case_debate') && (
                   <div className="mt-2.5 space-y-1.5">
                     <span className="text-[11px] text-gray-500 block font-medium">
-                      💡 {leStyle === 'first_person_dilemma' ? 'First-Person Dilemmas ("Main Khud Hu"):' : 'Quick Dilemma Topics:'}
+                      💡 {leStyle === 'first_person_dilemma' ? 'First-Person Dilemmas ("Main Khud Hu"):' : leStyle === 'real_case_debate' ? 'Famous / Recent Real Cases:' : 'Quick Dilemma Topics:'}
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {(leStyle === 'first_person_dilemma' ? [
@@ -487,6 +502,12 @@ const DebateInput: React.FC<DebateInputProps> = ({
                         "I love my wife deeply, but our intimacy has completely faded over the last 2 years. How do we fix this?",
                         "I'm 29, earn $85k with $50k saved. Layoffs are coming — invest in index funds or hold cash in high-yield savings?",
                         "I found out my partner is secretly $50,000 in debt before our wedding. Postpone or marry and help pay?"
+                      ] : leStyle === 'real_case_debate' ? [
+                        "The Lindsay Clancy case — a mother with severe postpartum depression who killed her three children. Was justice served?",
+                        "The Casey Anthony trial — acquitted of killing her daughter. Guilty or not guilty?",
+                        "A recent AI deepfake scam case — should the platform be held responsible?",
+                        "A famous whistleblower case — hero or traitor?",
+                        "Any well-known court case or news story in the headlines right now"
                       ] : [
                         "A 30-Year-Old Man Doesn't Enjoy Sex Anymore, But His Wife Does — What Should He Do?",
                         "A Woman Discovers Her Husband Is Hiding $50,000 in Debt — What Should She Do?",
@@ -578,12 +599,18 @@ const DebateInput: React.FC<DebateInputProps> = ({
                       setLeIntro(true);
                       setLeNarrator(true);
                       setLeSpeakerCount(2);
+                    } else if (val === 'real_case_debate') {
+                      setLeIntro(true);
+                      setLeNarrator(true);
+                      setLeSpeakerCount(2);
+                      setUseGrounding(true);
                     }
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50"
                 >
                   <option value="first_person_dilemma">🙋‍♂️ First-Person Dilemma (Narrator = Protagonist + 2 Advisors)</option>
                   <option value="case_debate">⚖️ Dilemma Debate (Character Situation + Questions Board + Deep Arguments)</option>
+                  <option value="real_case_debate">📰 Real Case Debate (Real/Famous Case + Google Search)</option>
                   <option value="multi_situation">Multi-Situation (Story/Scenes)</option>
                   <option value="podcast">Podcast Style (Boy & Girl Hosts)</option>
                   <option value="situational">Situational</option>
@@ -685,6 +712,40 @@ const DebateInput: React.FC<DebateInputProps> = ({
                 </div>
               </div>
             </div>
+
+            {leStyle === 'real_case_debate' && (
+              <div className="bg-[#0a0a0a] p-4 rounded-[16px] border border-white/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-gray-200">
+                    <div className="p-1.5 bg-green-500/10 rounded-lg">
+                      <Globe size={14} className="text-green-400" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-sm block">Google Search Grounding</span>
+                      <span className="text-[10px] text-gray-500">Real case ke real facts research karne ke liye — is style ke liye recommended On rakho.</span>
+                    </div>
+                  </div>
+                  <div className="flex bg-[#111111] p-0.5 rounded-lg border border-white/5 shrink-0">
+                    <button
+                      onClick={() => setUseGrounding(true)}
+                      className={`px-4 py-1 rounded-md text-[10px] font-bold transition-all ${
+                        useGrounding ? 'bg-white/10 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      On
+                    </button>
+                    <button
+                      onClick={() => setUseGrounding(false)}
+                      className={`px-4 py-1 rounded-md text-[10px] font-bold transition-all ${
+                        !useGrounding ? 'bg-white/10 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      Off
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Model</label>

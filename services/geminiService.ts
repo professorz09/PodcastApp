@@ -130,9 +130,9 @@ export const generateTitleTextPair = async (scriptText: string, scriptStyle?: st
     keywords = 'casual English conversation, informal English, natural English speaking, learn English with friends';
     channelType = 'informal and conversational English learning channels';
     exampleTitle = '"Talking About Weekend Plans with Friends | Casual English Chat"';
-  } else if (scriptStyle === 'docu_debate') {
+  } else if (scriptStyle === 'docu_debate' || scriptStyle === 'real_case_debate') {
     prefix = 'The case name or core mystery followed by " | Docu-Debate" or " | Case Study"';
-    keywords = 'true crime debate, docu-debate, legal case study, documentary debate';
+    keywords = 'true crime debate, docu-debate, legal case study, documentary debate, English speaking practice';
     channelType = 'true crime and legal debate channels';
     exampleTitle = '"The Lindsay Clancy Case: Justice or Punishment? | Docu-Debate"';
   } else if (scriptStyle === 'first_person_dilemma' || scriptStyle === 'case_debate') {
@@ -154,7 +154,7 @@ DESCRIPTION RULES — a comprehensive, highly optimized YouTube video descriptio
 - Keep it 3-4 professional, SEO-packed paragraphs.
 `;
 
-  const englishLearningStyles = ['podcast', 'debate', 'interview', 'roleplay', 'situational', 'casual', 'case_debate', 'first_person_dilemma'];
+  const englishLearningStyles = ['podcast', 'debate', 'interview', 'roleplay', 'situational', 'casual', 'case_debate', 'first_person_dilemma', 'real_case_debate'];
   if (englishLearningStyles.includes(scriptStyle || '')) {
     descriptionRules = `
 DESCRIPTION RULES — MUST FOLLOW THIS EXACT TEMPLATE STRUCTURE:
@@ -393,7 +393,7 @@ export const generateDebateScript = async (
   contextFileContent?: string,
   model: string = 'gemini-3.5-flash',
   language: string = 'English',
-  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'first_person_dilemma' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
+  style: 'debate' | 'debate2' | 'conversational' | 'formal debate' | 'explained' | 'explained_solo' | 'narration' | 'monkey_explain' | 'crime_documentary' | 'viral_recap' | 'deep_explainer' | 'image' | 'podcast_breakdown' | 'podcast_panel' | 'context_bridge' | 'situational' | 'case_debate' | 'first_person_dilemma' | 'real_case_debate' | 'documentary' | 'docu_debate' | 'joe_rogan' | 'finance_deep_dive' | 'professor_jiang' | 'book_summary' | 'questioning' | 'transcript_review' | 'summarizer_pov' | 'phone_studio' | 'podcast' | 'roleplay' | 'formal_interview' | 'casual_chat' | 'learn_english' = 'debate',
   speakerCount: number = 2,
   providedSpeakerNames?: string[],
   specificDetails?: string,
@@ -3937,102 +3937,70 @@ Speaker B (Curious): choose a different name — asks what the audience is think
         } else if (style === 'first_person_dilemma') {
           prompt = `
             ═══════════════════════════════════════
-            STYLE: FIRST-PERSON DILEMMA (1ST PERSON POV + 2 ADVISORS GUIDANCE & DEBATE)
-            🔴 CRITICAL: The Narrator is NOT a third-person observer telling someone else's story. THE NARRATOR IS THE PROTAGONIST THEMSELVES!
-            🔴 DYNAMIC TOPIC ADAPTATION: The user's input can be ANY real-life dilemma (Personal Finance & Debt trap, Rent vs Buy a home, Marriage & Intimacy issues, Career crossroads, Savings & Investments, Family conflict, etc.).
-               YOU MUST BASE THE ENTIRE SCRIPT DYNAMICALLY ON THE USER'S EXACT TOPIC/SCENARIO! Never overwrite or divert from what they requested.
+            STYLE: FIRST-PERSON DILEMMA (protagonist + 2 advisors)
+            🔴 The Narrator IS the protagonist, speaking in first person — never a third-person voice describing someone else's story ("Meet Alex" is forbidden).
+            🔴 Build the whole script around the user's own topic/scenario exactly as given — don't swap it for a different dilemma, and don't slot it into any fixed category. Let the topic itself decide what kind of dilemma this is; it could be about money, a relationship, family, career, ethics, or anything else — figure that out from what's actually written, don't assume one going in.
 
-            🇺🇸 USA / WESTERN CONTEXT & HIGH-CPM ALGORITHM TARGETING:
-            - Ground the scenario in a USA / Western foreign context by default (unless user explicitly requests another country).
-            - Financials: US Dollars ($), realistic figures ($70k-$120k salary, $40k-$80k debt/savings, 6.8% mortgage rate).
-            - US Keywords & Lifestyle: Mention US cities (e.g., Austin, TX; Seattle, WA; Denver, CO; Charlotte, NC; Chicago, IL), 401(k), High-Yield Savings Accounts (HYSA), FICO Credit Score, student loans, mortgage interest rates, HOA fees, US healthcare/therapy norms.
-            - This ensures natural high-intent SEO keywords that trigger high-CPM USA and global YouTube algorithm distribution!
-
-            ═══════════════════════════════════════
             Topic: "${topic}"
             ${specificDetails ? `Context: ${specificDetails}` : ''}
             ${durLineEn}
             Language: ${language}.
-            Tone: High emotional and intellectual stakes, authentic first-person vulnerability, sharp tactical debate with constructive actionable guidance.
+            Tone: honest, personal, emotionally real — like someone genuinely torn talking to two people they trust. The advisors should push back on each other, not just take turns lecturing.
+
+            Ground every detail — money, places, people, stakes — entirely in whatever the actual topic calls for. Don't default to any fixed country, city, currency, or setting; only use specifics (like US cities or dollar figures) if the topic itself points that way.
 
             Speakers — exactly 4 speaker tags (fixed):
-            - Intro: ONLY the very first turn (Turn 1) — THE PROTAGONIST INTRODUCING THEMSELVES IN STRICT 1ST PERSON ("I", "My", "Me"). Tag MUST be "Intro".
-            - Narrator: All subsequent turns of the protagonist — asking sub-questions, intervening with fears/obstacles mid-debate, and wrapping up.
-            - 2 Hosts / Advisors:
-            ${speakers.length >= 2
+            - Intro: ONLY the very first turn — the protagonist introducing themselves and the situation, first person ("I", "my"). Tag MUST be "Intro".
+            - Narrator: every later turn from the protagonist — asking the advisors questions, raising doubts or fears, wrapping things up. Tag MUST be "Narrator".
+            - 2 Hosts / Advisors: ${speakers.length >= 2
               ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
-              : `Choose two distinct advisor names with opposing mindsets (e.g. Conservative/Risk-Averse Strategist vs Aggressive/Growth/Modern Mentor).`
+              : `Pick two advisor names who'd genuinely take different, opposing views on this specific dilemma.`
             }
 
-            ══════════════════════════════════════════
-            【 TURN 1 (SPEAKER TAG "Intro") — EXTREME VIRAL HOOK & FIRST-PERSON SITUATION 】
-            ══════════════════════════════════════════
-            🔴 Turn 1 speaker tag MUST be exactly "Intro" — NOT "Narrator".
-            🔴 OPENING LINE MUST BE AN EXPLOSIVE SCROLL-STOPPING HOOK: Grab the viewer in the first 3 seconds with high tension, urgent confession, or alarming vulnerability.
-               - E.g. Finance/Debt: "I make $85,000 a year living in Dallas, but I'm secretly suffocating under $58,000 of high-interest debt and I don't know how to stop the bleeding..."
-               - E.g. Rent vs Buy: "I finally saved $95,000 in cash after 6 years of grinding in Seattle, but with 7% mortgage interest rates, buying a home feels like financial suicide..."
-               - E.g. Marriage/Intimacy: "I love my wife with everything I have, but our intimacy has completely vanished over the last two years and it's tearing our marriage apart..."
-            🔴 STRICT FIRST-PERSON POV: The protagonist speaks directly: "My name is [Name], I'm [age] years old, working as a [profession] in [US City]...".
-               NEVER tell a story about someone else ("Meet Alex" or "Imagine a 30-year-old" is STRICTLY FORBIDDEN).
-            Must be 4-6 COMPLETE lines covering:
-            1. HOOK + IDENTITY: Explosive opening hook, name, age, profession, and US location.
-            2. HARD REALITY & NUMBERS: Concrete numbers (income, savings, debt, interest rates, monthly bills, emotional costs).
-            3. HIGH STAKES OF BOTH CHOICES: Why Option A is tempting yet risky; why Option B feels safe yet terrifying.
-            4. THE DILEMMA QUESTION: "So tell me: should I take [Option A] or choose [Option B]? I honestly don't know what to do! [Option A vs Option B]"
-            🔴 CRITICAL: Must end with a short silent bracketed roadmap tag: [Option A vs Option B] (under 8 words, English).
+            Loose flow (adapt naturally to the topic rather than forcing an exact template):
+            1. Intro turn — a hook that pulls the viewer in, then enough real, concrete detail (who they are, the situation, what's really at stake on each side) to make the dilemma land, ending with a direct question to the advisors and audience. Close with a short bracketed tag summarizing the choice, e.g. [Option A vs Option B].
+            2. Narrator turn — the protagonist puts their first concrete question to the advisors, closing with a short bracketed tag.
+            3. Both advisors respond with real, contrasting, actionable guidance, addressing the protagonist by name — they can challenge each other's reasoning, not just alternate monologues.
+            4. Narrator turn — the protagonist raises a genuine complication, fear, or follow-up sparked by what was just said, closing with a short bracketed tag. The advisors dig into it.
+            5. Repeat steps 3-4 as many rounds as the dilemma genuinely needs to feel fully explored — usually a handful, but let the content decide, not a fixed count.
+            6. Conclusion — the protagonist reflects that the decision is still hard but clearer now; each advisor gives one closing take; the protagonist ends by turning the question to the viewers ("what would you do?").
 
-            ══════════════════════════════════════════
-            【 TURN 2 (SPEAKER TAG "Narrator") — FIRST SUB-QUESTION 】
-            ══════════════════════════════════════════
-            Immediately after Turn 1, in a NEW turn with speaker tag "Narrator", the protagonist asks their first pointed question to their advisors:
-            e.g.: "You two are my closest mentors. Let's start with the immediate hurdle: should I first [Specific Sub-Dilemma]? [Sub-Question Tag]"
-            Ending with a bracketed roadmap tag (under 8 words).
+            Rules:
+            ✓ Strict first person for the protagonist throughout — never narrated in third person.
+            ✓ Bracketed tags are short (under 8 words, English) and only appear at the end of Intro/Narrator turns — never on advisor lines or the closing verdicts.
+            ✓ Avoid stock phrases like "In conclusion", "At the end of the day", "It's important to remember".
+            ✓ No easy, obvious answer — the audience should genuinely feel torn between both choices.
+            ${durFillEn}
+          `;
+        } else if (style === 'real_case_debate') {
+          prompt = `
+            ═══════════════════════════════════════
+            STYLE: REAL CASE DEBATE (a real, famous, or recent real-world case — cinematic true-story hook, then open debate)
+            🔴 This is about a REAL case, not a fictional one. Use Google Search to find what actually happened — real names (where public), real dates, the real outcome or verdict — and build the script on those verified facts.
+            🔴 If the exact case can't be verified, stick as closely as possible to real, well-documented cases of this kind rather than inventing specifics from nothing.
 
-            ══════════════════════════════════════════
-            【 ADVISORS — DIRECTLY ADDRESS PROTAGONIST BY NAME & PROVIDE ACTIONABLE SOLUTIONS 】
-            ══════════════════════════════════════════
-            Both advisors address the protagonist directly by name and give concrete, contrasting roadmaps:
-            - Advisor 1: "[Name], you need to see this clearly. In your position..." (lays out a concrete strategy with numbers, psychological safety, or strict debt-snowball/foundational discipline).
-            - Advisor 2: "[Name], don't follow that advice! That sounds nice on paper, but in reality..." (points out hidden pitfalls, argues for growth, leverage, modern relationship communication, or alternative paths).
-            - SUBSTANTIAL PARAGRAPHS: 3 to 6 complete sentences per speaker turn. Short 1-liners are strictly banned.
-            - They debate each other's blind spots while building realistic, empowering solutions for the protagonist.
+            Topic/Case: "${topic}"
+            ${specificDetails ? `Context: ${specificDetails}` : ''}
+            ${durLineEn}
+            Language: ${language}. Keep the English simple, clear, and natural to follow — this is for English learners, so explain any legal or technical terms naturally in the dialogue instead of assuming the viewer already knows them.
 
-            ══════════════════════════════════════════
-            【 PROTAGONIST INTERVENES MID-DEBATE (REAL FEAR / CONSTRAINT / PROBLEM) 】
-            ══════════════════════════════════════════
-            After the advisors debate, the protagonist (Narrator) JUMPS IN:
-            - Shares a raw, personal complication or anxiety:
-              e.g.: "Wait, [Advisor 1], the huge issue with that is... [real-world hurdle like credit score drops, spouse feels rejected, emergency fund gets drained]. If this goes wrong, I risk losing everything. Should I still do that? [Specific Hurdle Tag]"
-            - Or advances the decision to the next phase:
-              e.g.: "That makes sense, but what about [Next Sub-Dilemma]? Should I [Option C] right now or wait? [Next Tag]"
-            - Ends with a silent bracketed tag [Short Tag].
-            - Both advisors immediately debate that specific complication and offer refined, practical solutions!
-            - Continue this interactive cadence for 3 to 5 sub-dilemmas/hurdles!
+            Speakers:
+            - Intro: ONLY the first turn — a cinematic, documentary-style narrator voice that introduces the real person and case by name, e.g. "This is [Name]. [He/She/They] ..." — specific, vivid, pulls the viewer in immediately. Tag MUST be "Intro".
+            - 2 Hosts: ${speakers.length >= 2
+              ? `Use these names: ${speakers[0]} and ${speakers[1]}.`
+              : `Pick two host names who would naturally take genuinely different views on this case.`
+            }
 
-            ══════════════════════════════════════════
-            【 CONCLUSION — FINAL VERDICTS & AUDIENCE VOTE 】
-            ══════════════════════════════════════════
-            1. Narrator (Protagonist) Turn: "Listening to both of you has completely shifted how I see this. The decision is still terrifying, but the trade-offs are now crystal clear."
-            2. Advisor 1 Closing Turn: One full paragraph offering a definitive closing principle / verdict directly to the protagonist.
-            3. Advisor 2 Closing Turn: One full paragraph offering a contrasting closing principle / verdict directly to the protagonist.
-            4. Narrator Closing Turn: The protagonist turns directly to the VIEWERS:
-               "Now the choice is in your hands — if you were standing in my shoes right now, what would you choose? Option A or Option B? Tell me in the comments down below!"
+            Loose flow (let the real case shape this, don't force a rigid template):
+            1. Intro turn — tell the real story: who's involved, what happened, why it became notable or controversial, ending on the central open question the case raises (right or wrong? guilty or not? justice done or not?).
+            2. The two hosts then have a genuine, free-flowing debate about the case — not fixed rounds, just a real conversation that naturally moves across whatever angles actually matter here (the facts, the law, the ethics, the human side, what could have been done differently). They can agree, disagree, or partly agree with each other — whatever's honest to the case, not a scripted 50/50 split.
+            3. Close with each host giving their honest take, and a final line that leaves the audience with the case's real, unresolved question.
 
-            ══════════════════════════════════════════
-            NON-NEGOTIABLE HARD RULES:
-            ══════════════════════════════════════════
-            ✓ STRICT FIRST PERSON POV: Narrator IS THE PROTAGONIST ("I", "My name is [Name]"). Third-person framing is STRICTLY FORBIDDEN!
-            ✓ Turn 1 MUST open with an explosive scroll-stopping hook and have speaker tag "Intro".
-            ✓ US/Western context by default ($ figures, US cities, US financial/relationship keywords).
-            ✓ Subsequent protagonist turns MUST be speaker tag "Narrator".
-            ✓ Both advisors address the protagonist by name ("[Name], listen...", "[Name], don't do that...").
-            ✓ Host turns must be SUBSTANTIAL PARAGRAPHS (3-6 sentences), providing actionable advice & contrasting solutions.
-            ✓ Protagonist intervenes mid-debate with real hurdles/fears ("Wait, but the problem is... should I still do this?").
-            ✓ Every bracketed heading is SHORT (under 8 words) and in English.
-            ✓ Only Turn 1 and Narrator question/intervention turns have [bracketed] tags — host turns and conclusion lines NEVER have brackets.
-            ✓ Banned cliché phrases: "In conclusion", "At the end of the day", "It's important to remember", "Let's dive into".
-            ✓ No obvious easy winner — viewers must feel the genuine agony of the choice.
-            ══════════════════════════════════════════
+            Rules:
+            ✓ Stay grounded in the real case throughout — don't invent facts beyond what's verifiable.
+            ✓ Simple, clear, natural spoken English (B1-B2 friendly) — no unexplained jargon.
+            ✓ A genuine, engaging debate — both hosts feel real and neither side is handed an obvious win.
+            ✓ Avoid stock phrases like "In conclusion", "At the end of the day", "It's important to remember".
             ${durFillEn}
           `;
         } else if (style === 'docu_debate') {
